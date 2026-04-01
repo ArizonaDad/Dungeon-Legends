@@ -37,4 +37,66 @@ namespace message_types
 	// AI bot management.
 	const string add_bot = "add_bot";                           // Host requests to add an AI player to the room.
 	const string remove_bot = "remove_bot";                     // Host requests to remove an AI player.
+
+	// === COMBAT SYSTEM ===
+	// Game state
+	const string game_state = "game_state";                   // Server sends full game state snapshot.
+	const string game_start_battle = "game_start_battle";     // Server signals battle has begun.
+	const string game_end_battle = "game_end_battle";         // Server signals battle is over.
+
+	// Turn system
+	const string turn_start = "turn_start";                   // Server tells a player their turn started.
+	const string turn_end = "turn_end";                       // Client signals they end their turn.
+	const string initiative_order = "initiative_order";       // Server sends initiative order to all.
+	const string roll_request = "roll_request";               // Server asks client to press Roll.
+	const string roll_result = "roll_result";                 // Client pressed Roll, server sends result.
+
+	// Actions
+	const string action_move = "action_move";                 // Client moves their character.
+	const string action_attack = "action_attack";             // Client attacks a target.
+	const string action_cast = "action_cast";                 // Client casts a spell.
+	const string action_dodge = "action_dodge";               // Client takes Dodge action.
+	const string action_dash = "action_dash";                 // Client takes Dash action.
+	const string action_disengage = "action_disengage";       // Client takes Disengage action.
+	const string action_help = "action_help";                 // Client takes Help action.
+	const string action_hide = "action_hide";                 // Client takes Hide action.
+	const string action_ready = "action_ready";               // Client readies an action.
+	const string action_use_item = "action_use_item";         // Client uses an item.
+	const string action_shove = "action_shove";               // Client shoves a target.
+	const string action_grapple = "action_grapple";           // Client grapples a target.
+	const string bonus_action = "bonus_action";               // Client uses bonus action.
+	const string reaction_opportunity = "reaction_opp";       // Server triggers opportunity attack.
+	const string reaction_spell = "reaction_spell";           // Client uses a reaction spell.
+	const string reaction_ready_trigger = "reaction_ready";   // Server triggers readied action.
+
+	// Combat feedback
+	const string damage_dealt = "damage_dealt";               // Server announces damage to all.
+	const string healing_done = "healing_done";               // Server announces healing.
+	const string condition_applied = "condition_applied";     // Server announces condition change.
+	const string condition_removed = "condition_removed";     // Server announces condition removed.
+	const string death_save = "death_save";                   // Server/client death saving throw.
+	const string creature_died = "creature_died";             // Server announces a creature died.
+	const string creature_stabilized = "creature_stabilized"; // Server announces stabilization.
+	const string spell_effect = "spell_effect";               // Server announces spell effect.
+	const string concentration_check = "concentration_check"; // Server requests concentration save.
+
+	// Scanning / targeting
+	const string scan_direction = "scan_direction";           // Client scans IJKL direction.
+	const string scan_result = "scan_result";                 // Server sends scan results.
+	const string set_target = "set_target";                   // Client locks onto a target.
+	const string target_info = "target_info";                 // Server sends target details.
+
+	// Character data
+	const string character_data = "character_data";           // Server sends character sheet.
+	const string character_create = "character_create";       // Client creates/imports a character.
+	const string level_up = "level_up";                       // Client levels up.
+	const string spell_list = "spell_list";                   // Server sends available spells.
+	const string inventory_update = "inventory_update";       // Server sends inventory changes.
+
+	// Monster/wave system
+	const string wave_start = "wave_start";                   // Server announces new wave.
+	const string wave_complete = "wave_complete";             // Server announces wave cleared.
+	const string monster_spawn = "monster_spawn";             // Server spawns monster.
+	const string monster_action = "monster_action";           // Server announces monster action.
+	const string monster_update = "monster_update";           // Server sends monster state update.
 }

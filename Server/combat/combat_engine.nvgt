@@ -1,0 +1,466 @@
+// D&D 5e Combat Engine - Server Side
+// Manages initiative, turns, actions, attacks, damage, conditions, death saves.
+
+#include "../../common/combat_constants.nvgt"
+
+// A single combatant in battle (player or monster)
+class combatant {
+	uint id;
+	string name;
+	bool is_player;          // true = player, false = monster/NPC
+	string player_username;  // if is_player, the user's username
+
+	// Position on grid
+	int x;
+	int y;
+	int size = SIZE_MEDIUM;  // creature size
+
+	// Core stats
+	int max_hp;
+	int current_hp;
+	int temp_hp = 0;
+	int armor_class;
+	int speed;               // in feet
+	int initiative_bonus;    // dex mod + any bonuses
+
+	// Ability scores
+	int[] ability_scores = {10, 10, 10, 10, 10, 10}; // STR DEX CON INT WIS CHA
+	int[] save_proficiencies = {0, 0, 0, 0, 0, 0};   // 1 = proficient
+	int level = 1;
+	int proficiency = 2;
+
+	// Turn state
+	int initiative_roll = 0;
+	bool has_action = true;
+	bool has_bonus_action = true;
+	bool has_reaction = true;
+	int movement_remaining = 0;     // feet remaining this turn
+	bool has_moved = false;
+	bool used_action = false;
+	bool used_bonus_action = false;
+
+	// Conditions (array of active condition IDs)
+	int[] conditions;
+	int exhaustion_level = 0;
+
+	// Death saves
+	int death_save_successes = 0;
+	int death_save_failures = 0;
+	bool is_dead = false;
+	bool is_stable = false;
+
+	// Combat tracking
+	bool is_concentrating = false;
+	string concentration_spell = "";
+	bool is_dodging = false;
+	bool is_hidden = false;
+	bool took_disengage = false;
+	int readied_action = -1;       // -1 = none
+	string readied_trigger = "";
+
+	// Spell slots (index 0 = cantrip, 1-9 = spell levels)
+	int[] spell_slots_max = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+	int[] spell_slots_current = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+	// Equipment
+	string main_hand = "";
+	string off_hand = "";
+	int main_hand_damage_dice = 6;     // d6
+	int main_hand_damage_count = 1;    // 1d6
+	int main_hand_damage_type = DMG_SLASHING;
+	int main_hand_range = 5;           // melee = 5, ranged = varies
+	bool main_hand_finesse = false;
+	int extra_attacks = 0;             // Extra Attack feature
+
+	// Helpers
+	int get_ability_mod(int ability_id) {
+		return ability_modifier(ability_scores[ability_id]);
+	}
+
+	int get_save_bonus(int ability_id) {
+		int mod = get_ability_mod(ability_id);
+		if (save_proficiencies[ability_id] == 1) mod += proficiency;
+		// 2024 exhaustion: subtract 2 * level from d20 rolls
+		mod -= exhaustion_level * 2;
+		return mod;
+	}
+
+	bool has_condition(int cond_id) {
+		for (uint i = 0; i < conditions.length(); i++) {
+			if (conditions[i] == cond_id) return true;
+		}
+		return false;
+	}
+
+	void add_condition(int cond_id) {
+		if (!has_condition(cond_id)) conditions.insert_last(cond_id);
+	}
+
+	void remove_condition(int cond_id) {
+		for (int i = int(conditions.length()) - 1; i >= 0; i--) {
+			if (conditions[i] == cond_id) { conditions.remove_at(i); break; }
+		}
+	}
+
+	bool is_alive() {
+		return current_hp > 0 and !is_dead;
+	}
+
+	bool is_conscious() {
+		return is_alive() and !has_condition(COND_UNCONSCIOUS);
+	}
+
+	bool is_incapacitated_check() {
+		return has_condition(COND_INCAPACITATED) or has_condition(COND_PARALYZED) or has_condition(COND_PETRIFIED) or has_condition(COND_STUNNED) or has_condition(COND_UNCONSCIOUS);
+	}
+}
+
+// The battle instance managing one combat encounter
+class battle {
+	uint id;
+	combatant@[] combatants;
+	int[] initiative_order;        // indices into combatants, sorted by initiative
+	int current_turn_index = -1;   // index into initiative_order
+	int round_number = 0;
+	bool battle_active = false;
+	string mode = "pvp";           // "pvp", "wave", "boss"
+	int wave_number = 0;
+
+	// Pending roll state
+	bool waiting_for_roll = false;
+	uint roll_target_id = 0;       // who we're waiting for
+	int roll_type = -1;
+	int roll_dice_type = 20;       // d20 by default
+	int roll_modifier = 0;
+	string roll_reason = "";
+
+	// Map
+	int map_width = DEFAULT_MAP_WIDTH;
+	int map_height = DEFAULT_MAP_HEIGHT;
+
+	// Get combatant by ID
+	combatant@ get_combatant(uint cid) {
+		for (uint i = 0; i < combatants.length(); i++) {
+			if (combatants[i].id == cid) return combatants[i];
+		}
+		return null;
+	}
+
+	// Get current turn combatant
+	combatant@ current_combatant() {
+		if (current_turn_index < 0 or current_turn_index >= int(initiative_order.length())) return null;
+		int idx = initiative_order[current_turn_index];
+		if (idx < 0 or idx >= int(combatants.length())) return null;
+		return combatants[idx];
+	}
+
+	// Add a combatant to the battle
+	uint add_combatant(combatant@ c) {
+		c.id = combatants.length();
+		combatants.insert_last(c);
+		return c.id;
+	}
+
+	// Roll a d20 (server-side, but result sent after player presses Roll)
+	int roll_d20() {
+		return random(1, 20);
+	}
+
+	// Roll any dice: count d sides
+	int roll_dice_pool(int count, int sides) {
+		int total = 0;
+		for (int i = 0; i < count; i++) {
+			total += random(1, sides);
+		}
+		return total;
+	}
+
+	// Start initiative phase - roll for all combatants
+	void start_initiative() {
+		battle_active = true;
+		round_number = 0;
+		// For each combatant, roll initiative
+		// Players get a "Press Roll" prompt, monsters auto-roll
+		initiative_order.resize(0);
+		for (uint i = 0; i < combatants.length(); i++) {
+			if (!combatants[i].is_alive()) continue;
+			int roll = roll_d20();
+			int bonus = combatants[i].get_ability_mod(ABILITY_DEX);
+			combatants[i].initiative_roll = roll + bonus;
+		}
+		// Collect alive combatant indices
+		for (uint i = 0; i < combatants.length(); i++) {
+			if (!combatants[i].is_alive()) continue;
+			initiative_order.insert_last(int(i));
+		}
+		// Bubble sort by initiative roll descending
+		for (uint i = 0; i < initiative_order.length(); i++) {
+			for (uint j = i + 1; j < initiative_order.length(); j++) {
+				if (combatants[initiative_order[j]].initiative_roll > combatants[initiative_order[i]].initiative_roll) {
+					int temp = initiative_order[i];
+					initiative_order[i] = initiative_order[j];
+					initiative_order[j] = temp;
+				}
+			}
+		}
+	}
+
+	// Start the next turn
+	void advance_turn() {
+		current_turn_index++;
+		if (current_turn_index >= int(initiative_order.length())) {
+			current_turn_index = 0;
+			round_number++;
+		}
+		// Skip dead combatants (unconscious ones still need death saves)
+		combatant@ c = current_combatant();
+		if (@c == null) return;
+
+		// Reset turn resources
+		c.has_action = true;
+		c.has_bonus_action = true;
+		c.movement_remaining = c.speed;
+		c.has_moved = false;
+		c.used_action = false;
+		c.used_bonus_action = false;
+		c.is_dodging = false;
+		c.took_disengage = false;
+
+		// Reaction resets at start of YOUR turn
+		c.has_reaction = true;
+
+		// 2024 Exhaustion: reduce speed by 5 per level
+		c.movement_remaining -= c.exhaustion_level * 5;
+		if (c.movement_remaining < 0) c.movement_remaining = 0;
+
+		// If at 0 HP and not dead/stable, death save is needed
+		// (handled externally via roll_request)
+	}
+
+	// Apply damage to a combatant
+	void apply_damage(combatant@ target, int amount, int damage_type, combatant@ source = null) {
+		if (@target == null or target.is_dead) return;
+		if (amount <= 0) return;
+
+		// TODO: implement resistance/vulnerability per creature
+
+		// Temp HP absorbs first
+		if (target.temp_hp > 0) {
+			if (amount <= target.temp_hp) {
+				target.temp_hp -= amount;
+				return;
+			}
+			amount -= target.temp_hp;
+			target.temp_hp = 0;
+		}
+
+		target.current_hp -= amount;
+
+		// Concentration check
+		if (target.is_concentrating and target.current_hp > 0) {
+			int dc = amount / 2;
+			if (dc < 10) dc = 10;
+			// Need to request a Constitution save from the player
+		}
+
+		// Check for dropping to 0
+		if (target.current_hp <= 0) {
+			// Instant death check: remaining damage >= max HP
+			int overflow = -target.current_hp;
+			if (overflow >= target.max_hp) {
+				target.is_dead = true;
+				target.current_hp = 0;
+				target.add_condition(COND_UNCONSCIOUS);
+				return;
+			}
+			target.current_hp = 0;
+			if (target.is_player) {
+				// Player falls unconscious, start death saves
+				target.add_condition(COND_UNCONSCIOUS);
+				target.death_save_successes = 0;
+				target.death_save_failures = 0;
+			} else {
+				// Monster dies instantly (standard D&D rule)
+				target.is_dead = true;
+			}
+			return;
+		}
+
+		// Damage while at 0 HP = auto death save failure
+		if (target.current_hp == 0 and !target.is_dead and target.has_condition(COND_UNCONSCIOUS)) {
+			target.death_save_failures++;
+			// Crit = 2 failures (handled in attack resolution)
+			if (target.death_save_failures >= DEATH_SAVE_FAILURES_NEEDED) {
+				target.is_dead = true;
+			}
+		}
+	}
+
+	// Apply healing
+	void apply_healing(combatant@ target, int amount) {
+		if (@target == null or target.is_dead) return;
+		if (amount <= 0) return;
+
+		bool was_unconscious = target.current_hp == 0;
+		target.current_hp += amount;
+		if (target.current_hp > target.max_hp) target.current_hp = target.max_hp;
+
+		// Regaining HP from 0 removes unconscious
+		if (was_unconscious and target.current_hp > 0) {
+			target.remove_condition(COND_UNCONSCIOUS);
+			target.death_save_successes = 0;
+			target.death_save_failures = 0;
+			target.is_stable = false;
+		}
+	}
+
+	// Process a death saving throw result
+	void process_death_save(combatant@ c, int roll) {
+		if (@c == null or c.is_dead or c.current_hp > 0) return;
+
+		if (roll == 1) {
+			// Natural 1 = 2 failures
+			c.death_save_failures += 2;
+		} else if (roll == 20) {
+			// Natural 20 = regain 1 HP
+			c.current_hp = 1;
+			c.remove_condition(COND_UNCONSCIOUS);
+			c.death_save_successes = 0;
+			c.death_save_failures = 0;
+		} else if (roll >= DEATH_SAVE_DC) {
+			c.death_save_successes++;
+		} else {
+			c.death_save_failures++;
+		}
+
+		if (c.death_save_failures >= DEATH_SAVE_FAILURES_NEEDED) {
+			c.is_dead = true;
+		}
+		if (c.death_save_successes >= DEATH_SAVE_SUCCESSES_NEEDED) {
+			c.is_stable = true;
+		}
+	}
+
+	// Resolve an attack roll
+	// Returns: {hit (0/1), natural_roll, total, is_crit (0/1)}
+	int[] resolve_attack(combatant@ attacker, combatant@ target, int attack_bonus, bool has_advantage, bool has_disadvantage) {
+		int[] result = {0, 0, 0, 0};
+		if (@attacker == null or @target == null) return result;
+
+		int roll1 = roll_d20();
+		int roll2 = roll_d20();
+		int natural_roll = roll1;
+
+		if (has_advantage and !has_disadvantage) {
+			natural_roll = roll1 > roll2 ? roll1 : roll2;
+		} else if (has_disadvantage and !has_advantage) {
+			natural_roll = roll1 < roll2 ? roll1 : roll2;
+		}
+
+		// 2024 Exhaustion penalty
+		int exhaustion_penalty = attacker.exhaustion_level * 2;
+
+		int total = natural_roll + attack_bonus - exhaustion_penalty;
+		bool is_crit = natural_roll == 20;
+		bool is_miss = natural_roll == 1;
+
+		bool hit = false;
+		if (is_crit) hit = true;
+		else if (is_miss) hit = false;
+		else hit = total >= target.armor_class;
+
+		result[0] = hit ? 1 : 0;
+		result[1] = natural_roll;
+		result[2] = total;
+		result[3] = is_crit ? 1 : 0;
+		return result;
+	}
+
+	// Roll damage
+	int resolve_damage(int dice_count, int dice_sides, int modifier, bool is_crit) {
+		int total = 0;
+		int rolls = is_crit ? dice_count * 2 : dice_count;
+		for (int i = 0; i < rolls; i++) {
+			total += random(1, dice_sides);
+		}
+		total += modifier;
+		if (total < 1) total = 1;
+		return total;
+	}
+
+	// Check if a combatant can see another (basic - not hidden, not invisible)
+	bool can_see(combatant@ viewer, combatant@ target) {
+		if (@viewer == null or @target == null) return false;
+		if (viewer.has_condition(COND_BLINDED)) return false;
+		if (target.has_condition(COND_INVISIBLE) and !target.is_hidden) return false;
+		return true;
+	}
+
+	// Check if battle is over (all of one side dead)
+	bool check_battle_over() {
+		bool any_player_alive = false;
+		bool any_monster_alive = false;
+		for (uint i = 0; i < combatants.length(); i++) {
+			if (combatants[i].is_alive()) {
+				if (combatants[i].is_player) any_player_alive = true;
+				else any_monster_alive = true;
+			}
+		}
+		if (mode == "pvp") {
+			// PvP: check if only 1 player alive
+			int alive_count = 0;
+			for (uint i = 0; i < combatants.length(); i++) {
+				if (combatants[i].is_alive() and combatants[i].is_player) alive_count++;
+			}
+			return alive_count <= 1;
+		}
+		// PvE: all players dead or all monsters dead
+		return !any_player_alive or !any_monster_alive;
+	}
+
+	// Get battle state as JSON for sending to clients
+	json_object@ build_state_json() {
+		json_object@ state = json_object();
+		state["type"] = message_types::game_state;
+		state["round"] = round_number;
+		state["turn_index"] = current_turn_index;
+		state["battle_active"] = battle_active;
+		state["mode"] = mode;
+		state["wave"] = wave_number;
+
+		json_array combatant_arr;
+		for (uint i = 0; i < combatants.length(); i++) {
+			combatant@ c = combatants[i];
+			json_object cobj;
+			cobj["id"] = c.id;
+			cobj["name"] = c.name;
+			cobj["is_player"] = c.is_player;
+			cobj["x"] = c.x;
+			cobj["y"] = c.y;
+			cobj["hp"] = c.current_hp;
+			cobj["max_hp"] = c.max_hp;
+			cobj["ac"] = c.armor_class;
+			cobj["level"] = c.level;
+			cobj["is_dead"] = c.is_dead;
+			cobj["is_stable"] = c.is_stable;
+			cobj["initiative"] = c.initiative_roll;
+			// Conditions
+			json_array cond_arr;
+			for (uint j = 0; j < c.conditions.length(); j++) {
+				cond_arr.add(c.conditions[j]);
+			}
+			cobj["conditions"] = cond_arr;
+			combatant_arr.add(cobj);
+		}
+		state["combatants"] = combatant_arr;
+
+		// Initiative order
+		json_array init_arr;
+		for (uint i = 0; i < initiative_order.length(); i++) {
+			init_arr.add(initiative_order[i]);
+		}
+		state["initiative_order"] = init_arr;
+
+		return state;
+	}
+}

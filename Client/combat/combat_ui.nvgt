@@ -1,0 +1,674 @@
+// D&D 5e Combat UI - Client Side
+// Handles turn display, Roll button prompts, action menus, targeting, TTS feedback.
+
+#include "../../common/combat_constants.nvgt"
+
+// Client-side view of a combatant
+class combat_entity {
+	uint id;
+	string name;
+	bool is_player;
+	int x;
+	int y;
+	int hp;
+	int max_hp;
+	int ac;
+	int level;
+	bool is_dead;
+	bool is_stable;
+	int initiative;
+	int[] conditions;
+
+	combat_entity() {
+		id = 0;
+		is_player = false;
+		x = 0;
+		y = 0;
+		hp = 0;
+		max_hp = 0;
+		ac = 0;
+		level = 1;
+		is_dead = false;
+		is_stable = false;
+		initiative = 0;
+	}
+
+	string health_status() {
+		if (is_dead) return "dead";
+		if (hp <= 0) return "unconscious";
+		int pct = (hp * 100) / max_hp;
+		if (pct >= 90) return "full health";
+		if (pct >= 60) return "healthy";
+		if (pct >= 40) return "wounded";
+		if (pct >= 20) return "badly wounded";
+		return "critical";
+	}
+
+	bool has_condition(int cond_id) {
+		for (uint i = 0; i < conditions.length(); i++) {
+			if (conditions[i] == cond_id) return true;
+		}
+		return false;
+	}
+}
+
+// Combat UI state
+combat_entity[] combat_entities;
+int[] initiative_order;
+int current_turn_index = -1;
+int current_round = 0;
+bool battle_active = false;
+bool is_my_turn = false;
+uint my_combatant_id = 0;
+string battle_mode = "pvp";
+int wave_number = 0;
+
+// Roll state
+bool waiting_for_roll = false;
+int roll_type = -1;
+string roll_reason = "";
+int roll_dice_sides = 20;
+int roll_modifier = 0;
+
+// Targeting
+uint current_target_id = 0;
+string current_target_name = "";
+int scan_cursor = 0;
+combat_entity[] scan_results;
+string last_scan_dir = "";
+
+// ============================================================
+// ROLL BUTTON - The core interaction for blind D&D
+// ============================================================
+
+void prompt_roll(string reason, int dice, int modifier) {
+	waiting_for_roll = true;
+	roll_reason = reason;
+	roll_dice_sides = dice;
+	roll_modifier = modifier;
+
+	string mod_text = "";
+	if (modifier > 0) mod_text = " plus " + modifier;
+	else if (modifier < 0) mod_text = " minus " + (-modifier);
+
+	speak(reason + ". Press R to roll a d " + dice + mod_text + ".", true);
+}
+
+bool check_roll_input() {
+	if (!waiting_for_roll) return false;
+	if (key_pressed(KEY_R) or key_pressed(KEY_RETURN)) {
+		waiting_for_roll = false;
+		send({{"type", message_types::roll_result}, {"rolled", true}});
+		speak("Rolling.", true);
+		return true;
+	}
+	return false;
+}
+
+void show_roll_result(int natural_roll, int total, string outcome) {
+	string text = "Rolled " + natural_roll;
+	if (natural_roll == 20) text = "Natural 20!";
+	else if (natural_roll == 1) text = "Natural 1!";
+	if (total != natural_roll) text += ", total " + total;
+	text += ". " + outcome;
+	speak(text, true);
+}
+
+// ============================================================
+// TURN ACTIONS MENU
+// ============================================================
+
+void show_action_menu() {
+	if (!is_my_turn) {
+		speak("It's not your turn.", true);
+		return;
+	}
+
+	menu@ m = setup_sub_menu("Your turn. Choose an action.");
+	int attack_opt = m.add_item("Attack. Strike a target with your weapon.");
+	int cast_opt = m.add_item("Cast a spell.");
+	int dodge_opt = m.add_item("Dodge. Attacks against you have disadvantage.");
+	int dash_opt = m.add_item("Dash. Double your movement this turn.");
+	int disengage_opt = m.add_item("Disengage. Move without provoking opportunity attacks.");
+	int help_opt = m.add_item("Help. Give an ally advantage on their next roll.");
+	int hide_opt = m.add_item("Hide. Make a stealth check.");
+	int ready_opt = m.add_item("Ready. Prepare an action for a trigger.");
+	int shove_opt = m.add_item("Shove. Push or knock prone a creature.");
+	int grapple_opt = m.add_item("Grapple. Grab and restrain a creature.");
+	int end_opt = m.add_item("End turn.");
+	int status_opt = m.add_item("Check status. Hear your current stats.");
+
+	int res = m.run();
+
+	if (res == attack_opt) {
+		if (current_target_id == 0) {
+			speak("No target selected. Scan with I J K L and press Enter to lock a target.", true);
+			return;
+		}
+		send({{"type", message_types::action_attack}, {"target", current_target_id}});
+	} else if (res == cast_opt) {
+		show_spell_menu();
+	} else if (res == dodge_opt) {
+		send({{"type", message_types::action_dodge}});
+		speak("You take the Dodge action. Attacks against you have disadvantage until your next turn.", true);
+	} else if (res == dash_opt) {
+		send({{"type", message_types::action_dash}});
+		speak("You take the Dash action. Your movement is doubled.", true);
+	} else if (res == disengage_opt) {
+		send({{"type", message_types::action_disengage}});
+		speak("You take the Disengage action. You can move without provoking opportunity attacks.", true);
+	} else if (res == help_opt) {
+		if (current_target_id == 0) {
+			speak("No target selected. Scan with I J K L and press Enter to lock a target.", true);
+			return;
+		}
+		send({{"type", message_types::action_help}, {"target", current_target_id}});
+		speak("You help your ally. They have advantage on their next roll.", true);
+	} else if (res == hide_opt) {
+		send({{"type", message_types::action_hide}});
+	} else if (res == ready_opt) {
+		speak("Readying action. What trigger do you want?", true);
+		send({{"type", message_types::action_ready}});
+	} else if (res == shove_opt) {
+		if (current_target_id == 0) {
+			speak("No target selected. Scan with I J K L and press Enter to lock a target.", true);
+			return;
+		}
+		send({{"type", message_types::action_shove}, {"target", current_target_id}});
+	} else if (res == grapple_opt) {
+		if (current_target_id == 0) {
+			speak("No target selected. Scan with I J K L and press Enter to lock a target.", true);
+			return;
+		}
+		send({{"type", message_types::action_grapple}, {"target", current_target_id}});
+	} else if (res == end_opt) {
+		send({{"type", message_types::turn_end}});
+		speak("Turn ended.", true);
+		is_my_turn = false;
+	} else if (res == status_opt) {
+		speak_my_status();
+	}
+}
+
+void show_spell_menu() {
+	speak("Spell casting not yet implemented. Choose another action.", true);
+	// TODO: Build spell selection menu from character's known spells.
+}
+
+// ============================================================
+// STATUS READOUTS
+// ============================================================
+
+void speak_my_status() {
+	combat_entity@ me = get_entity(my_combatant_id);
+	if (@me == null) {
+		speak("No character data.", true);
+		return;
+	}
+
+	string text = me.name + ". Level " + me.level + ". ";
+	text += me.hp + " of " + me.max_hp + " hit points. ";
+	text += "Armor class " + me.ac + ". ";
+
+	// Conditions
+	for (uint i = 0; i < me.conditions.length(); i++) {
+		int cond = me.conditions[i];
+		if (cond > 0 and cond < int(CONDITION_NAMES.length())) {
+			text += CONDITION_NAMES[cond] + ". ";
+		}
+	}
+
+	// Position
+	text += "Position " + me.x + ", " + me.y + ". ";
+
+	// Current target
+	if (current_target_id > 0) {
+		text += "Targeting " + current_target_name + ". ";
+	}
+
+	speak(text, true);
+}
+
+void speak_initiative_order() {
+	if (initiative_order.length() == 0) {
+		speak("No initiative order yet.", true);
+		return;
+	}
+	string text = "Initiative order, round " + current_round + ". ";
+	for (uint i = 0; i < initiative_order.length(); i++) {
+		int idx = initiative_order[i];
+		combat_entity@ e = get_entity_by_index(idx);
+		if (@e != null) {
+			if (int(i) == current_turn_index) text += "Current: ";
+			text += (i + 1) + ": " + e.name;
+			if (e.is_dead) text += ", dead";
+			else if (e.hp <= 0) text += ", unconscious";
+			text += ". ";
+		}
+	}
+	speak(text, true);
+}
+
+void speak_turn_start(string name, bool is_me) {
+	if (is_me) {
+		speak("Your turn! Round " + current_round + ". Press F for actions, W A S D to move, I J K L to scan.", true);
+	} else {
+		speak(name + "'s turn.", false);
+	}
+}
+
+// ============================================================
+// TARGETING / SCANNING (IJKL)
+// ============================================================
+
+void scan_direction(string dir) {
+	send({{"type", message_types::scan_direction}, {"dir", dir}});
+	last_scan_dir = dir;
+	scan_cursor = 0;
+}
+
+void receive_scan_results(json_array@ results) {
+	scan_results.resize(0);
+	if (@results == null or results.length() == 0) {
+		speak("Nothing in that direction.", true);
+		return;
+	}
+
+	for (uint i = 0; i < results.length(); i++) {
+		json_object@ r = results[i];
+		combat_entity@ e = get_entity(uint(int(r["id"])));
+		if (@e != null) {
+			scan_results.insert_last(e);
+		}
+	}
+
+	if (scan_results.length() > 0) {
+		announce_scan_target(0);
+	} else {
+		speak("Nothing in that direction.", true);
+	}
+}
+
+void cycle_scan(int direction) {
+	if (scan_results.length() == 0) {
+		speak("No scan results. Press I J K L to scan a direction first.", true);
+		return;
+	}
+	scan_cursor += direction;
+	if (scan_cursor < 0) scan_cursor = int(scan_results.length()) - 1;
+	if (scan_cursor >= int(scan_results.length())) scan_cursor = 0;
+	announce_scan_target(scan_cursor);
+}
+
+void announce_scan_target(int index) {
+	if (index < 0 or index >= int(scan_results.length())) return;
+	combat_entity@ e = @scan_results[index];
+	combat_entity@ me = get_entity(my_combatant_id);
+	int dist = 0;
+	if (@me != null) dist = feet_distance(me.x, me.y, e.x, e.y);
+
+	string text = "";
+	if (e.is_player) text = "Ally: ";
+	text += e.name + ", " + dist + " feet, " + e.health_status();
+	// Show conditions
+	for (uint c = 0; c < e.conditions.length(); c++) {
+		int cond = e.conditions[c];
+		if (cond > 0 and cond < int(CONDITION_NAMES.length())) {
+			text += ", " + CONDITION_NAMES[cond];
+		}
+	}
+	text += ". " + (index + 1) + " of " + scan_results.length() + ". Press Tab for next, Enter to target.";
+	speak(text, true);
+}
+
+void lock_target() {
+	if (scan_results.length() == 0 or scan_cursor < 0 or scan_cursor >= int(scan_results.length())) {
+		speak("No target to lock.", true);
+		return;
+	}
+	combat_entity@ e = @scan_results[scan_cursor];
+	current_target_id = e.id;
+	current_target_name = e.name;
+	send({{"type", message_types::set_target}, {"target", current_target_id}});
+	speak("Targeting " + e.name + ".", true);
+}
+
+// ============================================================
+// COMBAT FEEDBACK (from server messages)
+// ============================================================
+
+void on_damage_dealt(string attacker, string target, int amount, string damage_type, bool is_crit) {
+	string text = attacker + " hits " + target + " for " + amount + " " + damage_type + " damage";
+	if (is_crit) text += "! Critical hit!";
+	else text += ".";
+	speak(text, true);
+}
+
+void on_healing_done(string source, string target, int amount) {
+	speak(source + " heals " + target + " for " + amount + " hit points.", true);
+}
+
+void on_condition_applied(string target, string condition) {
+	speak(target + " is now " + condition + ".", false);
+}
+
+void on_condition_removed(string target, string condition) {
+	speak(target + " is no longer " + condition + ".", false);
+}
+
+void on_creature_died(string name, bool is_player) {
+	if (is_player) speak(name + " has fallen!", true);
+	else speak(name + " is defeated!", true);
+}
+
+void on_death_save_result(string name, int roll, string outcome) {
+	speak(name + " death saving throw. " + outcome, true);
+}
+
+void on_miss(string attacker, string target) {
+	speak(attacker + " misses " + target + ".", true);
+}
+
+void on_battle_start(string mode_text) {
+	speak("Battle begins! " + mode_text, true);
+}
+
+void on_battle_end(string result) {
+	speak("Battle over! " + result, true);
+	battle_active = false;
+}
+
+void on_wave_start(int wave_num) {
+	wave_number = wave_num;
+	speak("Wave " + wave_num + "!", true);
+}
+
+// ============================================================
+// MESSAGE HANDLER - Process combat messages from server
+// ============================================================
+
+void handle_combat_message(json_object@ msg) {
+	if (@msg == null or !msg.exists("type")) return;
+	string msg_type = msg["type"];
+
+	if (msg_type == message_types::game_state) {
+		parse_game_state(msg);
+	}
+	else if (msg_type == message_types::game_start_battle) {
+		battle_active = true;
+		string mode_text = msg.exists("mode_text") ? string(msg["mode_text"]) : "";
+		if (msg.exists("combatant_id")) my_combatant_id = uint(int(msg["combatant_id"]));
+		on_battle_start(mode_text);
+	}
+	else if (msg_type == message_types::game_end_battle) {
+		string result = msg.exists("result") ? string(msg["result"]) : "Unknown result.";
+		on_battle_end(result);
+	}
+	else if (msg_type == message_types::turn_start) {
+		uint turn_id = msg.exists("combatant_id") ? uint(int(msg["combatant_id"])) : 0;
+		string turn_name = msg.exists("name") ? string(msg["name"]) : "Unknown";
+		current_round = msg.exists("round") ? int(msg["round"]) : current_round;
+		current_turn_index = msg.exists("turn_index") ? int(msg["turn_index"]) : current_turn_index;
+		is_my_turn = (turn_id == my_combatant_id);
+		speak_turn_start(turn_name, is_my_turn);
+	}
+	else if (msg_type == message_types::initiative_order) {
+		if (msg.exists("order")) {
+			json_array@ iarr = msg["order"];
+			initiative_order.resize(0);
+			for (uint i = 0; i < iarr.length(); i++) {
+				initiative_order.insert_last(int(iarr[i]));
+			}
+		}
+		speak_initiative_order();
+	}
+	else if (msg_type == message_types::roll_request) {
+		string reason = msg.exists("reason") ? string(msg["reason"]) : "Roll";
+		int dice = msg.exists("dice") ? int(msg["dice"]) : 20;
+		int modifier = msg.exists("modifier") ? int(msg["modifier"]) : 0;
+		roll_type = msg.exists("roll_type") ? int(msg["roll_type"]) : -1;
+		prompt_roll(reason, dice, modifier);
+	}
+	else if (msg_type == message_types::roll_result) {
+		int natural_roll = msg.exists("natural") ? int(msg["natural"]) : 0;
+		int total = msg.exists("total") ? int(msg["total"]) : natural_roll;
+		string outcome = msg.exists("outcome") ? string(msg["outcome"]) : "";
+		show_roll_result(natural_roll, total, outcome);
+	}
+	else if (msg_type == message_types::scan_result) {
+		if (msg.exists("entities")) {
+			json_array@ results = msg["entities"];
+			receive_scan_results(results);
+		}
+	}
+	else if (msg_type == message_types::damage_dealt) {
+		string attacker = msg.exists("attacker") ? string(msg["attacker"]) : "Someone";
+		string target = msg.exists("target") ? string(msg["target"]) : "something";
+		int amount = msg.exists("amount") ? int(msg["amount"]) : 0;
+		string dmg_type = msg.exists("damage_type") ? string(msg["damage_type"]) : "unknown";
+		bool is_crit = msg.exists("critical") ? bool(msg["critical"]) : false;
+		on_damage_dealt(attacker, target, amount, dmg_type, is_crit);
+	}
+	else if (msg_type == message_types::healing_done) {
+		string source = msg.exists("source") ? string(msg["source"]) : "Someone";
+		string target = msg.exists("target") ? string(msg["target"]) : "someone";
+		int amount = msg.exists("amount") ? int(msg["amount"]) : 0;
+		on_healing_done(source, target, amount);
+	}
+	else if (msg_type == message_types::condition_applied) {
+		string target = msg.exists("target") ? string(msg["target"]) : "someone";
+		string condition = msg.exists("condition") ? string(msg["condition"]) : "unknown";
+		on_condition_applied(target, condition);
+	}
+	else if (msg_type == message_types::condition_removed) {
+		string target = msg.exists("target") ? string(msg["target"]) : "someone";
+		string condition = msg.exists("condition") ? string(msg["condition"]) : "unknown";
+		on_condition_removed(target, condition);
+	}
+	else if (msg_type == message_types::creature_died) {
+		string name = msg.exists("name") ? string(msg["name"]) : "Unknown";
+		bool is_player_death = msg.exists("is_player") ? bool(msg["is_player"]) : false;
+		on_creature_died(name, is_player_death);
+	}
+	else if (msg_type == message_types::death_save) {
+		string name = msg.exists("name") ? string(msg["name"]) : "Unknown";
+		int roll = msg.exists("roll") ? int(msg["roll"]) : 0;
+		string outcome = msg.exists("outcome") ? string(msg["outcome"]) : "";
+		on_death_save_result(name, roll, outcome);
+	}
+	else if (msg_type == message_types::spell_effect) {
+		string text = msg.exists("text") ? string(msg["text"]) : "A spell takes effect.";
+		speak(text, false);
+	}
+	else if (msg_type == message_types::wave_start) {
+		int wave_num = msg.exists("wave") ? int(msg["wave"]) : 0;
+		on_wave_start(wave_num);
+	}
+	else if (msg_type == message_types::monster_action) {
+		string text = msg.exists("text") ? string(msg["text"]) : "";
+		if (!text.empty()) speak(text, false);
+	}
+	else if (msg_type == message_types::reaction_opportunity) {
+		string text = msg.exists("text") ? string(msg["text"]) : "Opportunity attack!";
+		speak(text, true);
+		// Server will follow up with a roll_request if the player can react.
+	}
+	else if (msg_type == message_types::concentration_check) {
+		string text = msg.exists("text") ? string(msg["text"]) : "Concentration check!";
+		speak(text, true);
+		// Server will follow up with a roll_request.
+	}
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+
+combat_entity@ get_entity(uint eid) {
+	for (uint i = 0; i < combat_entities.length(); i++) {
+		if (combat_entities[i].id == eid) return combat_entities[i];
+	}
+	return null;
+}
+
+combat_entity@ get_entity_by_index(int idx) {
+	if (idx >= 0 and idx < int(combat_entities.length())) return combat_entities[idx];
+	return null;
+}
+
+void parse_game_state(json_object@ msg) {
+	if (@msg == null) return;
+	if (msg.exists("round")) current_round = int(msg["round"]);
+	if (msg.exists("turn_index")) current_turn_index = int(msg["turn_index"]);
+	if (msg.exists("battle_active")) battle_active = bool(msg["battle_active"]);
+	if (msg.exists("mode")) battle_mode = string(msg["mode"]);
+	if (msg.exists("wave")) wave_number = int(msg["wave"]);
+
+	// Parse combatants
+	if (msg.exists("combatants")) {
+		json_array@ arr = msg["combatants"];
+		combat_entities.resize(0);
+		for (uint i = 0; i < arr.length(); i++) {
+			json_object@ cobj = arr[i];
+			combat_entity e;
+			e.id = uint(int(cobj["id"]));
+			e.name = string(cobj["name"]);
+			e.is_player = bool(cobj["is_player"]);
+			e.x = int(cobj["x"]);
+			e.y = int(cobj["y"]);
+			e.hp = int(cobj["hp"]);
+			e.max_hp = int(cobj["max_hp"]);
+			e.ac = int(cobj["ac"]);
+			e.level = cobj.exists("level") ? int(cobj["level"]) : 1;
+			e.is_dead = bool(cobj["is_dead"]);
+			e.is_stable = cobj.exists("is_stable") ? bool(cobj["is_stable"]) : false;
+			e.initiative = cobj.exists("initiative") ? int(cobj["initiative"]) : 0;
+			if (cobj.exists("conditions")) {
+				json_array@ conds = cobj["conditions"];
+				for (uint j = 0; j < conds.length(); j++) {
+					e.conditions.insert_last(int(conds[j]));
+				}
+			}
+			combat_entities.insert_last(e);
+		}
+	}
+
+	// Parse initiative order
+	if (msg.exists("initiative_order")) {
+		json_array@ iarr = msg["initiative_order"];
+		initiative_order.resize(0);
+		for (uint i = 0; i < iarr.length(); i++) {
+			initiative_order.insert_last(int(iarr[i]));
+		}
+	}
+}
+
+void reset_combat_state() {
+	combat_entities.resize(0);
+	initiative_order.resize(0);
+	scan_results.resize(0);
+	current_turn_index = -1;
+	current_round = 0;
+	battle_active = false;
+	is_my_turn = false;
+	my_combatant_id = 0;
+	waiting_for_roll = false;
+	roll_type = -1;
+	current_target_id = 0;
+	current_target_name = "";
+	scan_cursor = 0;
+	last_scan_dir = "";
+	wave_number = 0;
+}
+
+// ============================================================
+// MAIN COMBAT GAME LOOP
+// ============================================================
+
+void combat_game_loop() {
+	speak("Entering combat. I J K L to scan for creatures. F for actions on your turn. H for status. O for initiative order.", true);
+
+	while (battle_active) {
+		wait(10);
+		network_loop();
+
+		// Roll button check - blocks other input while waiting for a roll
+		if (waiting_for_roll) {
+			check_roll_input();
+			continue;
+		}
+
+		// IJKL scanning
+		if (key_pressed(KEY_I)) scan_direction("north");
+		else if (key_pressed(KEY_K)) scan_direction("south");
+		else if (key_pressed(KEY_J)) scan_direction("west");
+		else if (key_pressed(KEY_L)) scan_direction("east");
+
+		// Target cycling and locking
+		else if (key_pressed(KEY_TAB)) {
+			if (keyboard_modifiers & KEYMOD_SHIFT != 0) cycle_scan(-1);
+			else cycle_scan(1);
+		}
+		else if (key_pressed(KEY_RETURN) and scan_results.length() > 0) lock_target();
+
+		// Movement (WASD) - only on your turn
+		else if (is_my_turn) {
+			if (key_pressed(KEY_W)) {
+				send({{"type", message_types::action_move}, {"dx", 0}, {"dy", 1}});
+			}
+			else if (key_pressed(KEY_S)) {
+				send({{"type", message_types::action_move}, {"dx", 0}, {"dy", -1}});
+			}
+			else if (key_pressed(KEY_A)) {
+				send({{"type", message_types::action_move}, {"dx", -1}, {"dy", 0}});
+			}
+			else if (key_pressed(KEY_D)) {
+				send({{"type", message_types::action_move}, {"dx", 1}, {"dy", 0}});
+			}
+
+			// Action menu
+			else if (key_pressed(KEY_F)) show_action_menu();
+		}
+
+		// Info keys (available any time during combat)
+		if (key_pressed(KEY_H)) speak_my_status();
+		else if (key_pressed(KEY_O)) speak_initiative_order();
+		else if (key_pressed(KEY_T) and current_target_id > 0) {
+			// Re-announce current target info
+			combat_entity@ t = get_entity(current_target_id);
+			combat_entity@ me = get_entity(my_combatant_id);
+			if (@t != null) {
+				string text = "Target: " + t.name + ", " + t.health_status();
+				if (@me != null) text += ", " + feet_distance(me.x, me.y, t.x, t.y) + " feet";
+				text += ".";
+				speak(text, true);
+			}
+		}
+		else if (key_pressed(KEY_ESCAPE)) {
+			speak("Press escape again to forfeit, or any other key to continue.", true);
+			bool confirmed = false;
+			timer esc_timer;
+			while (esc_timer.elapsed < 3000) {
+				wait(10);
+				if (key_pressed(KEY_ESCAPE)) {
+					confirmed = true;
+					break;
+				}
+				// Any other key cancels
+				if (key_pressed(KEY_RETURN) or key_pressed(KEY_SPACE) or key_pressed(KEY_A) or key_pressed(KEY_W) or key_pressed(KEY_S) or key_pressed(KEY_D)) {
+					break;
+				}
+			}
+			if (confirmed) {
+				send({{"type", message_types::leave_game}});
+				speak("Forfeiting battle.", true);
+				battle_active = false;
+			} else {
+				speak("Continuing.", false);
+			}
+		}
+	}
+
+	speak("Combat ended.", true);
+	reset_combat_state();
+}

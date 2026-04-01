@@ -1,0 +1,131 @@
+// D&D 5e Combat Constants
+
+// Grid settings (5 feet per tile)
+const int FEET_PER_TILE = 5;
+const int DEFAULT_MAP_WIDTH = 20;  // 100 feet wide
+const int DEFAULT_MAP_HEIGHT = 20; // 100 feet tall
+
+// Default speeds (in feet)
+const int DEFAULT_SPEED = 30;
+const int DASH_MULTIPLIER = 2;
+
+// Death saving throws
+const int DEATH_SAVE_DC = 10;
+const int DEATH_SAVE_SUCCESSES_NEEDED = 3;
+const int DEATH_SAVE_FAILURES_NEEDED = 3;
+
+// Cover bonuses
+const int HALF_COVER_AC_BONUS = 2;
+const int THREE_QUARTER_COVER_AC_BONUS = 5;
+
+// Difficulty classes
+const int EASY_DC = 10;
+const int MEDIUM_DC = 15;
+const int HARD_DC = 20;
+
+// Condition IDs
+const int COND_NONE = 0;
+const int COND_BLINDED = 1;
+const int COND_CHARMED = 2;
+const int COND_DEAFENED = 3;
+const int COND_FRIGHTENED = 4;
+const int COND_GRAPPLED = 5;
+const int COND_INCAPACITATED = 6;
+const int COND_INVISIBLE = 7;
+const int COND_PARALYZED = 8;
+const int COND_PETRIFIED = 9;
+const int COND_POISONED = 10;
+const int COND_PRONE = 11;
+const int COND_RESTRAINED = 12;
+const int COND_STUNNED = 13;
+const int COND_UNCONSCIOUS = 14;
+const int COND_EXHAUSTION = 15;
+const int COND_CONCENTRATING = 16;
+const int COND_DODGING = 17;
+const int COND_HIDDEN = 18;
+
+// Damage type IDs
+const int DMG_ACID = 0;
+const int DMG_BLUDGEONING = 1;
+const int DMG_COLD = 2;
+const int DMG_FIRE = 3;
+const int DMG_FORCE = 4;
+const int DMG_LIGHTNING = 5;
+const int DMG_NECROTIC = 6;
+const int DMG_PIERCING = 7;
+const int DMG_POISON = 8;
+const int DMG_PSYCHIC = 9;
+const int DMG_RADIANT = 10;
+const int DMG_SLASHING = 11;
+const int DMG_THUNDER = 12;
+
+// Ability score IDs
+const int ABILITY_STR = 0;
+const int ABILITY_DEX = 1;
+const int ABILITY_CON = 2;
+const int ABILITY_INT = 3;
+const int ABILITY_WIS = 4;
+const int ABILITY_CHA = 5;
+
+// Weapon mastery IDs (2024 rules)
+const int MASTERY_NONE = 0;
+const int MASTERY_CLEAVE = 1;
+const int MASTERY_GRAZE = 2;
+const int MASTERY_NICK = 3;
+const int MASTERY_TOPPLE = 4;
+const int MASTERY_PUSH = 5;
+const int MASTERY_SAP = 6;
+const int MASTERY_SLOW = 7;
+const int MASTERY_VEX = 8;
+
+// Creature size
+const int SIZE_TINY = 0;
+const int SIZE_SMALL = 1;
+const int SIZE_MEDIUM = 2;
+const int SIZE_LARGE = 3;
+const int SIZE_HUGE = 4;
+const int SIZE_GARGANTUAN = 5;
+
+// Roll types (for roll_request message)
+const int ROLL_INITIATIVE = 0;
+const int ROLL_ATTACK = 1;
+const int ROLL_DAMAGE = 2;
+const int ROLL_SAVING_THROW = 3;
+const int ROLL_ABILITY_CHECK = 4;
+const int ROLL_DEATH_SAVE = 5;
+const int ROLL_CONCENTRATION = 6;
+const int ROLL_HIT_DICE = 7;
+
+string[] ABILITY_NAMES = {"Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"};
+string[] ABILITY_SHORT = {"STR", "DEX", "CON", "INT", "WIS", "CHA"};
+string[] DAMAGE_TYPE_NAMES = {"Acid", "Bludgeoning", "Cold", "Fire", "Force", "Lightning", "Necrotic", "Piercing", "Poison", "Psychic", "Radiant", "Slashing", "Thunder"};
+string[] CONDITION_NAMES = {"None", "Blinded", "Charmed", "Deafened", "Frightened", "Grappled", "Incapacitated", "Invisible", "Paralyzed", "Petrified", "Poisoned", "Prone", "Restrained", "Stunned", "Unconscious", "Exhaustion", "Concentrating", "Dodging", "Hidden"};
+string[] SIZE_NAMES = {"Tiny", "Small", "Medium", "Large", "Huge", "Gargantuan"};
+
+// Helper: ability modifier from score
+int ability_modifier(int score) {
+	return (score - 10) / 2;
+}
+
+// Helper: proficiency bonus from level
+int proficiency_bonus(int level) {
+	if (level <= 4) return 2;
+	if (level <= 8) return 3;
+	if (level <= 12) return 4;
+	if (level <= 16) return 5;
+	return 6;
+}
+
+// Helper: manhattan distance in tiles
+int tile_distance(int x1, int y1, int x2, int y2) {
+	int dx = x1 - x2;
+	if (dx < 0) dx = -dx;
+	int dy = y1 - y2;
+	if (dy < 0) dy = -dy;
+	return dx + dy;
+}
+
+// Helper: distance in feet
+int feet_distance(int x1, int y1, int x2, int y2) {
+	return tile_distance(x1, y1, x2, y2) * FEET_PER_TILE;
+}
