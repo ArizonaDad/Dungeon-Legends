@@ -1,0 +1,185 @@
+#pragma plugin nvgt_sqlite
+#include "rooms_Dom.nvgt"
+#include "users _dom.nvgt";
+#include "speech.nvgt"
+#include "account.nvgt"
+#include "../common/message_types.nvgt"
+#include "../common/utils.nvgt"
+network net;           // Low-level network object.
+server svr;            // Our server wrapper.
+room_manager rooms;    // Manages all open rooms.
+
+// Bot name generation (moved from game-specific code).
+string generate_bot_name() {
+	string[] prefixes = {"Sir", "Captain", "Lord", "Dr.", "Professor", "King", "Prince", "Baron", "Agent", "General"};
+	string[] firsts = {"Wobble", "Noodle", "Bumble", "Pickle", "Waffle", "Turnip", "Biscuit", "Pudding", "Muffin", "Nugget"};
+	string[] lasts = {"knees", "pants", "face", "brain", "toes", "beard", "bottom", "fingers", "stein", "worth"};
+	return prefixes[random(0, prefixes.length() - 1)] + " " + firsts[random(0, firsts.length() - 1)] + lasts[random(0, lasts.length() - 1)];
+}
+
+user@ create_bot_user(string bot_name) {
+	user@ bot = user(null);
+	bot.username = bot_name;
+	bot.is_bot = true;
+	bot.peer_id = 0;
+	bot.status = "in_game";
+	return bot;
+}
+user_manager users;    // Manages all connected users.
+void main()
+{
+	chdir(spec::path(SCRIPT_CURRENT_FILE).make_parent());
+	if (!svr.create()) {
+		println("[SERVER] FATAL: Failed to start server.");
+		return;
+	}
+	println("[SERVER] Server started successfully. Listening on port 10500.");
+	svr.run();
+}
+// server class  Manages the network listener and main event loop.
+class server
+{
+	// Initialize the server: load accounts and bind the network port.
+	bool create()
+	{
+		if (!load_accounts()) {
+			println("[SERVER] ERROR: Failed to load accounts from database.");
+			return false;
+		}
+		println("[SERVER] Accounts loaded. Binding to port 10500...");
+		return net.setup_local_server(10500, 255, 4095);
+	}
+	// Main event loop  runs until Escape is pressed.
+	void run()
+	{
+		show_window("server");
+		while (!key_pressed(KEY_ESCAPE)) {
+			wait(5);
+			const network_event@ event = net.request();
+			int events_this_tick = 0;
+			while (event.type != event_none and events_this_tick < 200) {
+				try {
+					dispatch_event(event);
+				} catch {
+					println("[SERVER] EXCEPTION in event dispatch (peer=" + event.peer_id + ")");
+				}
+				events_this_tick++;
+				@event = net.request();
+			}
+		}
+		println("[SERVER] Shutting down  saving accounts...");
+		save_accounts();
+		println("[SERVER] Goodbye.");
+	}
+	// Route a single network event to the appropriate handler.
+	void dispatch_event(const network_event@ event)
+	{
+		if (event.type == event_connect) {
+			println("[NET] Peer " + event.peer_id + " connected.");
+		}
+		else if (event.type == event_receive) {
+			// Parse the incoming JSON message.
+			json_object@ msg = null;
+			try { @msg = parse_json(event.message); }
+			catch {
+				println("[NET] Bad JSON from peer " + event.peer_id + "  ignoring.");
+				return;
+			}
+			if (@msg == null or !msg.exists("type")) return;
+			// Check if this peer belongs to a logged-in user.
+			user@ u = users.get_user_by_peer(event.peer_id);
+				if (@u != null) {
+					// Authenticated user  route to user handlers.
+					try { handle_user_message(u, msg); } catch { println("[SERVER] Exception in handle_user_message for " + u.username); }
+				} else {
+				// Unauthenticated  only login/signup allowed.
+				handle_message(msg, event.peer_id);
+			}
+		}
+		else if (event.type == event_disconnect) {
+			println("[NET] Peer " + event.peer_id + " disconnected.");
+			user@ u = users.get_user_by_peer(event.peer_id);
+			if (@u != null) {
+				println("[NET] Cleaning up user: " + u.username);
+				try { users.remove_user(u); } catch { println("[NET] Exception during user cleanup."); }
+			}
+		}
+	}
+	// Handle messages from unauthenticated peers (login, signup).
+	void handle_message(json_object@ msg, uint peer_id)
+	{
+		if (@msg == null or !msg.exists("type")) return;
+		string msg_type = msg["type"];
+		if (msg_type == message_types::login and msg.exists("username") and msg.exists("password")) {
+			// Check if this user is disconnected and trying to reconnect.
+			user@ existing = users.get_user_by_name(msg["username"]);
+			if (@existing != null and existing.disconnected) {
+				// Verify password before allowing reconnect.
+				string errmsg;
+				account@ acc = verify_login(msg["username"], msg["password"], errmsg);
+				if (@acc == null) {
+					send(peer_id, {{"type", message_types::error}, {"text", !errmsg.empty() ? errmsg : "Invalid password."}});
+					return;
+				}
+				// Reconnect: update peer and re-register in dictionary.
+				println("[AUTH] " + existing.username + " reconnecting (new peer=" + peer_id + ")");
+				existing.peer_id = peer_id;
+				existing.disconnected = false;
+				existing.is_bot = false;
+				users.user_dictionary.set("p/" + peer_id, @existing);
+				existing.send({{"type", message_types::login}, {"id", existing.id}});
+				return;
+			}
+			// Prevent duplicate logins (not disconnected).
+			if (@existing != null) {
+				send(peer_id, {{"type", message_types::error}, {"text", "This user is already logged in."}});
+				return;
+			}
+			string errmsg;
+			user@ u = login(msg["username"], msg["password"], peer_id, errmsg);
+			if (@u == null) {
+				send(peer_id, {{"type", message_types::error}, {"text", !errmsg.empty() ? errmsg : "Unknown login failure, please try again."}});
+			} else {
+				println("[AUTH] " + u.username + " logged in (peer=" + peer_id + ")");
+				u.send({{"type", message_types::login}, {"id", u.id}});
+				u.on_login();
+			}
+		}
+		else if (msg_type == message_types::signup and msg.exists("username") and msg.exists("password")) {
+			string errmsg = create_account(msg["username"], msg["password"]);
+			if (!errmsg.empty()) {
+				send(peer_id, {{"type", message_types::error}, {"text", errmsg}});
+			} else {
+				println("[AUTH] New account created: " + string(msg["username"]));
+				send(peer_id, {{"type", message_types::signup}});
+			}
+		}
+	}
+	// Low-level send to a specific peer.
+	bool send(uint peer_id, json_object@ message, int channel = 0)
+	{
+		if (@message == null) return false;
+		return net.send(peer_id, message.stringify(), 0);
+	}
+	// Convenience helpers for common message patterns.
+	bool send_speech(uint peer_id, string text_to_speak, bool interrupt_previous_speech = true)
+	{
+		return send(peer_id, {{"type", message_types::announce}, {"text", text_to_speak}, {"interrupt", interrupt_previous_speech}});
+	}
+	bool send_text_popout(uint peer_id, string text, uint timeout = 0)
+	{
+		return send(peer_id, {{"type", message_types::pop_text}, {"text", text}, {"timeout", timeout}});
+	}
+}
+// process_network  Called during blocking game loops (priority windows etc.)
+// to keep the server responsive while waiting inside game logic.
+void process_network()
+{
+	const network_event@ event = net.request();
+	while (event.type != event_none) {
+		try { svr.dispatch_event(event); } catch {
+			println("[NET] Exception in process_network for peer " + event.peer_id);
+		}
+		@event = net.request();
+	}
+}

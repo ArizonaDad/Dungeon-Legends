@@ -1,0 +1,138 @@
+#include "form.nvgt"
+bool pop_text(const string&in message, int timeout = 0) {
+	speak(message);
+	uint64 t = ticks();
+	while (true) {
+		wait(5);
+		if (timeout > 0 and ticks() - t > timeout) return true;
+		network_loop();
+		if (key_pressed(KEY_LEFT) or key_pressed(KEY_RIGHT) or key_pressed(KEY_UP) or key_pressed(KEY_DOWN))
+			speak(message);
+		if (key_pressed(KEY_RETURN)) return true;
+		else if (key_pressed(KEY_ESCAPE) or key_pressed(KEY_AC_BACK)) break;
+	}
+	return false;
+}
+string input_box_form(string title, string prompt, string default_value = "", bool&out canceled = void) {
+	audio_form f;
+	f.create_window(title, false, true);
+	int text = f.create_input_box(prompt, default_value);
+	int ok = f.create_button("ok", primary = true);
+	int cancel = f.create_button("cancel", cancel = true);
+	f.focus(text);
+	while (true) {
+		wait(5);
+		network_loop();
+		f.monitor();
+		if (f.is_pressed(cancel)) {
+			canceled = true;
+			break;
+		}
+		else if (f.is_pressed(ok)) return f.get_text(text);
+	}
+	return "";
+}
+void info_box_form(string title, string prompt, string text, bool multiline = true) {
+	audio_form f;
+	f.create_window(title, false, true);
+	f.focus(f.create_input_box(prompt, text, multiline = multiline, read_only = true));
+	int close = f.create_button("close", primary = true, cancel = true);
+	while (true) {
+		wait(5);
+		network_loop();
+		f.monitor();
+		if (f.is_pressed(close)) return;
+	}
+}
+
+enum connection_form_state { CONNECT_SUCCESS, CONNECT_RETRY, CONNECT_ABORT }
+connection_form_state login_form(string& username, string&out password) {
+	audio_form f;
+	f.create_window("login", false, true);
+	int f_username = f.create_input_box("enter username", username);
+	int f_password = f.create_input_box("enter password", config.read_string("password"), "*");
+	int f_remember = f.create_checkbox("&Remember me", config.read_bool("remember_login", false));
+	int f_signup = f.create_button("create new account...");
+	int ok = f.create_button("login", primary = true);
+	int cancel = f.create_button("cancel", cancel = true);
+	f.focus(f_username);
+	while (true) {
+		wait(5);
+		network_loop();
+		f.monitor();
+		if (f.is_pressed(cancel)) return CONNECT_ABORT;
+		else if (f.is_pressed(f_signup)) {
+			connection_form_state signup_state = CONNECT_RETRY;
+			while (signup_state == CONNECT_RETRY) {
+				signup_state = signup_form(username, password);
+				if (signup_state != CONNECT_RETRY) return signup_state;
+			}
+		}
+		else if (f.is_pressed(ok)) break;
+	}
+	username = f.get_text(f_username);
+	password = f.get_text(f_password);
+	config.write_bool("remember_login", f.is_checked(f_remember));
+	if (!f.is_checked(f_remember)) {
+		config.remove_value("username");
+		config.remove_value("password");
+	}
+	return CONNECT_SUCCESS;
+}
+connection_form_state signup_form(string& username, string&out password) {
+	audio_form f;
+	f.create_window("signup", false, true);
+	int f_username = f.create_input_box("enter username", username);
+	int f_password = f.create_input_box("enter password", "", "*");
+	int f_remember = f.create_checkbox("Remember me if account is created successfully", config.read_bool("remember_login"));
+	int f_accept = f.create_checkbox("all information is correct / agree to terms of service.", false);
+	int ok = f.create_button("signup", primary = true);
+	int cancel = f.create_button("cancel", cancel = true);
+	f.focus(f_username);
+	while (true) {
+		wait(5);
+		network_loop();
+		f.monitor();
+		if (f.is_pressed(cancel)) return CONNECT_ABORT;
+		else if (f.is_pressed(ok)) {
+			if (!f.is_checked(f_accept)) f.focus(f_accept);
+			else break;
+		}
+	}
+	username = f.get_text(f_username);
+	password = f.get_text(f_password);
+	config.write_bool("remember_login", f.is_checked(f_remember));
+	if (!f.is_checked(f_remember)) {
+		config.remove_value("username");
+		config.remove_value("password");
+	}
+	json_object@ msg = send_blocking({{"type", message_types::signup}, {"username", username}, {"password", password}});
+	if (@msg == null) return CONNECT_RETRY;
+	pop_text("Account created! Press enter to log in.");
+	return CONNECT_SUCCESS;
+}
+bool create_room_form(string&out name, string&out password) {
+	audio_form f;
+	f.create_window("create a room", false, true);
+	int f_name = f.create_input_box("enter a &name for this room", "", maximum_length = 40);
+	int f_password = f.create_input_box("enter a &password to prevent unknown players from joining (leave blank to allow everyone to join)", "", "*", maximum_length = 100);
+	int ok = f.create_button("ok", primary = true);
+	int cancel = f.create_button("cancel", cancel = true);
+	f.focus(f_name);
+	while (true) {
+		wait(5);
+		network_loop();
+		f.monitor();
+		if (f.is_pressed(cancel)) break;
+		else if (f.is_pressed(ok)) {
+			name = f.get_text(f_name);
+			if (name.empty()) {
+				speak("You must provide a name.");
+				continue;
+			}
+			password = f.get_text(f_password);
+			return true;
+		}
+	}
+	return false;
+}

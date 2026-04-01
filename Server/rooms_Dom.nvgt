@@ -1,0 +1,92 @@
+#include "server.nvgt"
+#include "speech.nvgt"
+class room_manager
+{
+	int total = 0;              // Lifetime count of rooms created.
+	int current_room_id = 0;    // Auto-incrementing room id.
+	string[] games;             // Reserved for future game-type filtering.
+	room@[] rooms;              // All currently open rooms.
+	// Create a new room and immediately add the creator as the first player.
+	room@ create_room(user@ player, string name, string password, string game_type = "")
+	{
+		if (@player == null) {
+			println("[ROOMS] ERROR: create_room called with null player.");
+			return null;
+		}
+		room new_room;
+		new_room.name = name;
+		new_room.id = current_room_id;
+		new_room.password = password;
+		new_room.game_type = game_type;
+		this.rooms.insert_last(new_room);
+		this.current_room_id++;
+		this.total++;
+		player.join_room(new_room);
+		println("[ROOMS] Room '" + name + "' created by " + player.username + " (id=" + new_room.id + ", total rooms=" + this.rooms.length() + ")");
+		return new_room;
+	}
+	// Convert all rooms to a JSON array for the room listing UI.
+	// All rooms are shown; locked ones are marked as such.
+	json_array@ jsonify()
+	{
+		json_array output;
+		for (uint i = 0; i < rooms.length(); i++) {
+			json_array usernames;
+			for (uint p = 0; p < rooms[i].players.length(); p++) usernames.add(rooms[i].players[p].username);
+			json_object room_info;
+			room_info["name"] = rooms[i].name;
+			room_info["private"] = rooms[i].is_private;
+			room_info["started"] = rooms[i].started;
+			room_info["players"] = usernames;
+			room_info["locked"] = rooms[i].is_private;
+			room_info["game_type"] = rooms[i].game_type;
+			output.add(room_info);
+		}
+		return output;
+	}
+	var@ opImplConv() { return jsonify(); }
+}
+class room
+{
+	string name;                 // Display name set by the creator.
+	uint id;                     // Unique room id.
+	string password;             // Empty = public, non-empty = private.
+	string game_type = "";
+	bool get_is_private() const property { return !password.empty(); }
+	user@[] players;             // Players currently in the room.
+	bool started = false;        // True once a game has been started.
+	// Close this room and remove it from the global rooms list.
+	void close_room()
+	{
+		int list_index = rooms.rooms.find_by_ref(this);
+		if (list_index >= 0) {
+			rooms.rooms.remove_at(list_index);
+			println("[ROOMS] Room '" + this.name + "' closed. (remaining rooms=" + rooms.rooms.length() + ")");
+		} else {
+			println("[ROOMS] WARNING: close_room  room not found in global list.");
+		}
+	}
+	void on_player_join(user@ u)
+	{
+		// Reserved for future hooks (e.g. sound effects, logging).
+	}
+	void on_player_leave(user@ u)
+	{
+		// Reserved for future hooks.
+	}
+	// Speak to all players in the room.
+	void speak(string text, bool interrupt = true)
+	{
+		for (uint i = 0; i < players.length(); i++) {
+			try { players[i].speak(text); }
+			catch { println("[ROOM] Exception speaking to player " + i); }
+		}
+	}
+	string get_game_name() const property { return game_type; }
+	var@ opImplConv()
+	{
+		json_array usernames;
+		for (uint i = 0; i < players.length(); i++) usernames.add(players[i].username);
+		return json_object({{"name", name}, {"private", is_private}, {"started", started}, {"players", usernames}, {"game_type", game_type}});
+	}
+}

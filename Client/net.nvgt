@@ -1,0 +1,260 @@
+#include "../common/message_types.nvgt"
+network net;
+uint client_peer_id;
+uint player_id; // Assigned by the server after successful login.
+
+// Stats/progression data cached from server responses.
+json_object@ cached_stats = null;         // Personal stats blob.
+int cached_level = 1;                     // Player level.
+int cached_xp = 0;                        // Current XP.
+int cached_xp_needed = 100;              // XP needed for next level.
+bool has_pending_invite = false;          // True when a game invite is waiting.
+string pending_invite_from = "";
+string pending_invite_room_name = "";
+uint pending_invite_room_id = 0;
+// connect  Initiate a connection to the server.
+// If blocking=true, wait until confirmed or timeout expires.
+bool connect(bool blocking = true, int timeout = 3000)
+{
+	net.setup_client(10, 900);
+	uint client_id = net.connect("localhost", 10500);
+	if (client_id == 0) {
+		net.destroy();
+		return false;
+	}
+	client_peer_id = client_id;
+	if (!blocking) return true;
+	timer timeout_check;
+	while (timeout_check.elapsed < timeout) {
+		wait(5);
+		const network_event@ e = net.request();
+		if (e.type != event_connect) continue;
+		return true; // Connected.
+	}
+	// Timeout.
+	net.destroy();
+	client_id = player_id = 0;
+	return false;
+}
+// send_blocking  Send a message and wait for a response (pre-auth only).
+// Returns the server's reply as a json_object, or null on error/timeout.
+json_object@ send_blocking(json_object@ message, uint timeout = 3000, bool handle_generic_error = true)
+{
+	if (@message == null) return null;
+	send(message);
+	timer timeout_check;
+	while (timeout_check.elapsed < timeout) {
+		wait(5);
+		const network_event@ e = net.request();
+		if (e.type == event_disconnect) {
+			pop_text("The server disconnected you. Please try again.");
+			return null;
+		}
+		if (e.type != event_receive) continue;
+		try {
+			json_object@ msg = parse_json(e.message);
+			if (@msg == null or !msg.exists("type")) continue;
+			if (handle_generic_error and msg["type"] == message_types::error) {
+				if (msg.exists("text")) pop_text(msg["text"]);
+				return null;
+			}
+			return msg;
+		} catch {}
+	}
+	pop_text("Network timeout, please try again.");
+	return null;
+}
+// login  Collect credentials and authenticate with the server.
+bool login(uint timeout = 3000)
+{
+	if (client_peer_id == 0) return false;
+	string username_val = config.read_string("username"), password;
+	connection_form_state login_state = CONNECT_RETRY;
+	while (login_state == CONNECT_RETRY) {
+		login_state = login_form(username_val, password);
+		if (login_state == CONNECT_ABORT) return false;
+		else if (login_state == CONNECT_RETRY) continue;
+		json_object@ msg = send_blocking({{"type", message_types::login}, {"username", username_val}, {"password", password}}, timeout);
+		if (@msg == null) {
+			login_state = CONNECT_RETRY;
+			continue;
+		}
+		if (msg["type"] == message_types::login and msg.exists("id")) {
+			player_id = uint(msg["id"]);
+			username = username_val; // Store our username globally.
+			if (config.read_bool("remember_login")) {
+				config["username"] = username_val;
+				config["password"] = password;
+			}
+			return true;
+		}
+	}
+	return false;
+}
+// network_loop  Poll for incoming messages and dispatch them.
+// Call this frequently in every menu/game loop.
+void network_loop()
+{
+	if (player_id < 1) {
+		net.request(); // Keep the connection alive even pre-auth.
+		return;
+	}
+	const network_event@ e = net.request();
+	while (e.type != event_none) {
+		if (e.type == event_receive) {
+			json_object@ msg = null;
+			try { @msg = parse_json(e.message); } catch {}
+			if (@msg != null and msg.exists("type")) {
+				try { handle_message(msg); }
+				catch { /* Silently absorb bad messages. */ }
+			}
+		}
+		else if (e.type == event_disconnect) {
+			speak("Disconnected from server. Attempting to reconnect...", false);
+			client_disconnected = true;
+			// Attempt automatic reconnection.
+			net.destroy();
+			wait(1000);
+			if (connect(true, 5000)) {
+				// Re-authenticate with stored credentials.
+				string stored_user = config.read_string("username");
+				string stored_pass = config.read_string("password");
+				if (!stored_user.empty() and !stored_pass.empty()) {
+					json_object@ reply = send_blocking({{"type", message_types::login}, {"username", stored_user}, {"password", stored_pass}}, 5000);
+					if (@reply != null and reply.exists("type") and string(reply["type"]) == message_types::login) {
+						player_id = uint(reply["id"]);
+						client_disconnected = false;
+						speak("Reconnected to server!", false);
+					} else {
+						speak("Reconnect failed. Please restart the game.", false);
+					}
+				} else {
+					speak("Cannot reconnect automatically. Please restart the game.", false);
+				}
+			} else {
+				speak("Could not reach server. Please restart the game.", false);
+			}
+		}
+		@e = net.request();
+	}
+}
+
+// handle_message  Central message dispatcher for all server messages.
+void handle_message(json_object@ msg)
+{
+	if (@msg == null or !msg.exists("type")) return;
+	string msg_type = msg["type"];
+	if (msg_type == message_types::announce and msg.exists("text") and msg.exists("interrupt")) {
+		speak(string(msg["text"]), bool(msg["interrupt"]));
+	}
+	else if (msg_type == message_types::pop_text and msg.exists("text") and msg.exists("timeout")) {
+		pop_text(string(msg["text"]), uint(msg["timeout"]));
+	}
+	else if (msg_type == message_types::chat_message and msg.exists("message") and msg.exists("username")) {
+		on_incoming_chat(string(msg["username"]), string(msg["message"]));
+	}
+	else if (msg_type == message_types::private_message) {
+		string from = msg.exists("from") ? string(msg["from"]) : "Unknown";
+		string pm_text = msg.exists("message") ? string(msg["message"]) : "";
+		string display;
+		if (msg.exists("to")) {
+			// This is our confirmation (we sent it).
+			display = "PM to " + string(msg["to"]) + ": " + pm_text;
+		} else {
+			// Someone sent us a PM.
+			display = "PM from " + from + ": " + pm_text;
+		}
+		speak(display, false);
+		if (@main_screen != null) {
+			main_screen.form.add_list_item(f_main_history, display + "  ( " + calendar().format(DATE_TIME_FORMAT_RFC822) + ")", pm_text);
+		}
+	}
+	else if (msg_type == message_types::report_confirm and msg.exists("target")) {
+		speak("Your report against " + string(msg["target"]) + " has been recorded.", false);
+	}
+	else if (msg_type == message_types::friend_request_received and msg.exists("from")) {
+		has_pending_notification = true;
+		speak(string(msg["from"]) + " sent you a friend request!", false);
+	}
+	else if (msg_type == message_types::friend_list and msg.exists("friends")) {
+		@cached_friends = msg["friends"];
+	}
+	else if (msg_type == message_types::pending_requests and msg.exists("requests")) {
+		@cached_pending = msg["requests"];
+	}
+	else if (msg_type == message_types::room_players and msg.exists("players")) {
+		@room_player_names = msg["players"];
+		if (msg.exists("host")) room_host_name = msg["host"];
+		if (msg.exists("game_type")) current_room_game_type = string(msg["game_type"]);
+		if (msg.exists("bots")) @room_player_bots = msg["bots"];
+		else { room_player_bots = json_array(); for (uint rpi = 0; rpi < room_player_names.length(); rpi++) room_player_bots.add(false); }
+	}
+	else if (msg_type == message_types::start_game) {
+		pending_view = "";
+		start_game_pending = true;
+	}
+	else if (msg_type == message_types::leave_room) {
+		if (msg.exists("close")) {
+			game = false;
+			json_array empty_players;
+			@room_player_names = empty_players;
+			room_host_name = "";
+			current_room_game_type = "default";
+			room_closed_flag = true;
+			speak("You have been removed from the room.", false);
+		}
+	}
+	else if (msg_type == message_types::list_rooms and msg.exists("rooms")) {
+		on_list_rooms(msg["rooms"]);
+	}
+	else if (msg_type == message_types::check_online) {
+		json_array@ online_players = msg["users"];
+		if (@online_players != null) {
+			speak(online_players.size() + (online_players.size() == 1 ? " player online." : " players online."));
+		}
+	}
+	else if (msg_type == message_types::join_room and msg.exists("player")) {
+		if (msg.exists("game_type")) current_room_game_type = string(msg["game_type"]);
+		wait_menu();
+	}
+	else if (msg_type == message_types::join_room and msg.exists("host")) {
+		if (msg.exists("game_type")) current_room_game_type = string(msg["game_type"]);
+	}
+	// Server notifies that the room was closed.
+	else if (msg_type == message_types::room_closed) {
+		room_closed_flag = true;
+		game = false;
+		json_array empty_players;
+		@room_player_names = empty_players;
+		room_host_name = "";
+		speak("The room has been closed.", false);
+	}
+	// Fix 11: Server requests password for a locked room.
+	else if (msg_type == message_types::password_required) {
+		int room_idx = msg.exists("room") ? int(msg["room"]) : -1;
+		bool canceled = false;
+		string pw = input_box_form("Room Password", "This room requires a password:", "", canceled);
+		if (!canceled and !pw.empty() and room_idx >= 0) {
+			send({{"type", message_types::password_submit}, {"room", room_idx}, {"password", pw}});
+		} else {
+			speak("Canceled.", false);
+		}
+	}
+	else if (msg_type == message_types::game_invite_received) {
+		string from = msg.exists("from") ? string(msg["from"]) : "Unknown";
+		string room_name = msg.exists("room_name") ? string(msg["room_name"]) : "Unknown";
+		uint room_id = msg.exists("room_id") ? uint(msg["room_id"]) : 0;
+		pending_invite_from = from;
+		pending_invite_room_name = room_name;
+		pending_invite_room_id = room_id;
+		has_pending_invite = true;
+		speak(from + " has invited you to join their game: " + room_name + ". Press F3 to accept or decline.", false);
+	}
+	// Unknown messages are silently ignored.
+}
+// send  Send a JSON message to the server.
+bool send(json_object@ message, int channel = 0)
+{
+	if (@message == null) return false;
+	return net.send(client_peer_id, message.stringify(), 0);
+}

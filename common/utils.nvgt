@@ -1,0 +1,22 @@
+string pretty_print(json_array@ list, bool include_and = true, string empty_text = "", string query = "") {
+	string output;
+	for (uint i = 0; i < list.length(); i++) {
+		if (list.is_object(i) and query != "") {
+			json_object@ o = list[i];
+			output += o(query);
+		} else output += list[i];
+		if (i < list.length() -1) output += ", ";
+		if (i == list.length() -2 and include_and) output += "and ";
+	}
+	if (output.empty()) output = empty_text;
+	return output;
+}
+bool letters_repeat(const string& in text) {
+	int count = 0;
+	for (uint i = 0; i < text.length(); i++) {
+		if (i > 0 and text[i -1] == text[i]) count++;
+		else count = 0;
+		if (count > 1) return true;
+	}
+	return false;
+}

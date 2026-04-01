@@ -1,0 +1,180 @@
+#include "db_props.nvgt"
+#include "sqlite3constants.nvgt"
+
+sqlite3 user_db("data/user.db");
+account@[] accounts;
+dictionary accounts_dict;
+
+class account : database_object {
+	database_int id("id", "auto");
+	database_string username("username");
+	database_string password_hash("password_hash");
+	private database_string _data_storage("data");
+	json_object@ _data;
+	json_object@ get_data() property {
+		if (@_data != null) return _data;
+		else if (_data_storage != "") @_data = parse_json(_data_storage);
+		else @_data = json_object();
+		return _data;
+	}
+	bool public = false;
+	// constructor which creates a new account, called exclusively by the string create_account() global function below after it verifies user input.
+	account(const string&in username, const string&in password) {
+		super(user_db, "accounts", "id");
+		postconstruct();
+		this.username = username;
+		this.password_hash.blob = true;
+		set_password(password);
+		commit();
+		publisize();
+	}
+	// constructor which loads an existing account
+	account(sqlite3statement@ s) {
+		super(user_db, "accounts", "id");
+		this.password_hash.blob = true;
+		postconstruct(s);
+		publisize();
+	}
+	void publisize() {
+		if (public) return;
+		accounts.insert_last(this);
+		accounts_dict.set("i/" + this.id, @this);
+		accounts_dict.set("u/" + this.username, @this);
+		public = true;
+	}
+	void unpublisize() {
+		if (!public) return;
+		int idx = accounts.find_by_ref(this);
+		if (idx > -1) accounts.remove_at(idx);
+		accounts_dict.delete("i/" + this.id);
+		accounts_dict.delete("u/" + this.username);
+		public = false;
+	}
+	bool set_password(const string&in password) {
+		if (password.empty()) return false;
+		this.password_hash = string_hash_sha512(password, true);
+		return true;
+	}
+	bool is_valid_password(const string&in password) {
+		return !password.empty() and this.password_hash == string_hash_sha512(password, true);
+	}
+	bool commit() {
+		if (@_data != null) _data_storage = _data.stringify();
+		return database_object::commit();
+	}
+}
+account@ get_account(const string&in username) {
+	if (!accounts_dict.exists("u/" + username)) return null;
+	return cast<account@>(accounts_dict["u/" + username]);
+}
+account@ get_account_by_id(uint id) {
+	if (!accounts_dict.exists("i/" + id)) return null;
+	return cast<account@>(accounts_dict["i/" + id]);
+}
+void clear_accounts() {
+	accounts_dict.delete_all();
+	accounts.resize(0);
+}
+bool create_account_database_tables() {
+	return user_db.execute("CREATE TABLE IF NOT EXISTS 'accounts' (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, password_hash BLOB, data BLOB);") == SQLITE_OK;
+}
+bool load_accounts() {
+	if (!create_account_database_tables()) return false;
+	clear_accounts();
+	sqlite3statement@ s = user_db.prepare("SELECT * FROM 'accounts';");
+	if (@s == null) return false;
+	while (s.step() == SQLITE_ROW) account(s);
+	return true;
+}
+void save_accounts() {
+	user_db.execute("BEGIN TRANSACTION;");
+	for (uint i = 0; i < accounts.length(); i++) accounts[i].commit();
+	user_db.execute("COMMIT;");
+}
+// usernames must be at least 3 characters long and less than 128, must not have more than 2 repeating characters (aaa), and can only contain characters shown in the whitelist array below.
+bool is_valid_username(const string& in user) {
+	if (user.length()<3 or user.length()>128) return false;
+	if (letters_repeat(user)) return false;
+	if (user.is_alphabetic()) return true;
+	string whitelist = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-.";
+	for (uint i = 0; i < user.length(); i++) {
+		if (whitelist.find(user[i]) < 0) return false;
+	}
+	return true;
+}
+bool is_valid_password(const string& in password, dictionary@ usernames = null, string&out error = void) {
+	if (password.length() < 8) {
+		error = "password must be at least 8 characters";
+		return false;
+	}
+	if (password.find(" ") > -1) {
+		error = "password cannot contain spaces";
+		return false;
+	}
+	if (password.find_first_of("0123456789") < 0) {
+		error = "password must contain at least 1 number";
+		return false;
+	}
+	if (password.find_first_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ") < 0) {
+		error = "password must contain at least one uppercase or lowercase letter";
+		return false;
+	}
+	bool punc = false;
+	for (uint i = 0; i < password.length(); i++) {
+		if (!password[i].is_punctuation()) continue;
+		punc = true;
+		break;
+	}
+	if (!punc) {
+		error = "Password must contain at least one punctuation character";
+		return false;
+	}
+	if (@usernames != null) {
+		string[]@ users = usernames.get_keys();
+		for (uint i = 0; i < users.length(); i++) {
+			string username = string(usernames[users[i]]);
+			if (string_distance(password, username)<4 or password.lower().find(username.lower())> -1 and password.length() - username.length() < 4) {
+				error = "password is too similar to " + users[i];
+				return false;
+			}
+		}
+	}
+	return true;
+}
+// Returns empty string on success, else an error message.
+string create_account(const string&in username, const string&in password) {
+	if (!is_valid_username(username))
+		return "This username is invalid. It must not start with a number, and must only contain uppercase and lowercase letters, numbers, and the characters dash, underscore, and period. Please make sure your username does not contain any illegal characters and try again.";
+	for (uint i = 0; i < accounts.length(); i++) {
+		if (username.lower() == accounts[i].username.lower()) return "This username has already been taken!";
+	}
+	string errormsg = "";
+	if (!is_valid_password(password, {{"username", string(username)}}, errormsg))
+	return errormsg;
+	account(username, password);
+	return "";
+}
+// Verify credentials without creating a user (for reconnect).
+account@ verify_login(const string&in username, const string&in password, string&out error = void) {
+	account@ a = get_account(username);
+	if (@a == null) { error = "invalid username provided"; return null; }
+	if (!a.is_valid_password(password)) { error = "invalid password"; return null; }
+	return a;
+}
+
+user@ login(const string&in username, const string&in password, uint peer_id, string&out error = void) {
+	account@ a = get_account(username);
+	if (@a == null) {
+		error = "invalid username provided";
+		return null;
+	}
+	if (!a.is_valid_password(password)) {
+		error = "invalid password";
+		return null;
+	}
+	if (@users.get_user_by_name(username) != null) {
+		error = "already logged in on another device or instance";
+		return null;
+	}
+	return users.create_user(a, peer_id);
+}

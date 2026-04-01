@@ -1,0 +1,681 @@
+#pragma asset "sounds"
+#include "menu.nvgt"
+#include "instance.nvgt"
+#include "forms.nvgt"
+#include "net.nvgt"
+#include "settings.nvgt"
+#include "../common/utils.nvgt"
+bool game = false;
+bool start_game_pending = false;
+string pending_view = "";
+tts_voice v;
+settings config;
+string username;
+menu@ main_screen = null;
+int f_main_history, f_main_chat, f_main_chat_send, f_main_cancel, f_main_keyboard_area;
+string current_room_game_type = "default"; // Tracks the game type of the current room.
+json_array@ room_player_names = json_array();  // Usernames of players in the current room.
+json_array@ room_player_bots = json_array();   // Parallel array: true if player is a bot.
+string room_host_name;          // Username of the room host.
+json_array@ cached_friends = json_array();     // Most recent friends list from server.
+json_array@ cached_pending = json_array();     // Most recent pending friend requests.
+bool has_pending_notification = false; // True when we got a friend request notification.
+// Check if a player name corresponds to a bot in the current room.
+bool is_room_bot(string name) {
+	for (uint i = 0; i < room_player_names.length(); i++) {
+		if (string(room_player_names[i]) == name and i < room_player_bots.length()) return bool(room_player_bots[i]);
+	}
+	return false;
+}
+instance single_game("TabletopTavern");
+void main()
+{
+	chdir(spec::path(SCRIPT_CURRENT_FILE).make_parent());
+	if (SCRIPT_COMPILED and single_game.is_already_running) {
+		alert("Tabletop Tavern is already running", "Sorry, only one instance of the game can be run at a time.");
+		exit();
+	}
+	show_window("TableTop Tavern.");
+	install_keyhook();
+	config.set_encryption("Libertos918!!!");
+	config.setup("Libertos Gaming", "Master Dungeon", false);
+	if (!connect()) {
+		pop_text("Unable to connect to server.");
+		return;
+	}
+	if (!login()) return;
+	wait(100);
+	network_loop();
+	main_menu();
+	config.close();
+}
+// Placeholder: called when the server signals a game start.
+bool launch_pending_game_if_needed()
+{
+	if (!start_game_pending) return false;
+	start_game_pending = false;
+	speak("Game started.", false);
+	return true;
+}
+string current_screen_name = "main_menu"; // Tracks current screen for F1 help.
+void main_menu()
+{
+	while (true) {
+		menu@ m = setup_menu("");
+		@m = main_screen;
+		int total = 6;
+		int create_room = m.add_item("Create a lobby! 1 of " + total);
+		int join = m.add_item("Join a game! 2 of " + total);
+		int social = m.add_item("Friends. 3 of " + total);
+		int CHECK_ONLINE = m.add_item("Check who is online. 4 of " + total);
+		int About = m.add_item("About us. 5 of " + total);
+		int quit = m.add_item("Quit. 6 of " + total);
+		int res = m.run();
+		if (res == create_room) {
+			string name, password;
+			if (create_room_form(name, password)) {
+				send({{"type", message_types::new_room}, {"name", name}, {"password", password}, {"game_type", "default"}});
+				host_menu();
+				m.play(m.select_sound);
+			}
+		}
+		else if (res == join) {
+			send({{"type", message_types::list_rooms}});
+			m.play(m.select_sound);
+		}
+		else if (res == social) {
+			social_panel();
+		}
+		else if (res == CHECK_ONLINE) {
+			send({{"type", message_types::check_online}});
+			m.play(m.select_sound);
+		}
+		else if (res == About) {
+			m.play(m.select_sound);
+			info_box_form("About", "Information",
+				"Multiplayer Game Framework.\r\nBuilt with NVGT.\r\n"
+			);
+		}
+		else {
+			m.play("sounds/exit.wav");
+			v.speak_wait("Thanks for playing.");
+			return;
+		}
+	}
+}
+bool main_screen_loop()
+{
+	int focus = main_screen.form.get_current_focus();
+	int default_ok = focus == 0 ? 1 : -1;
+	int default_cancel = focus != 0 ? f_main_cancel : 2;
+	if (focus != f_main_keyboard_area)
+		main_screen.form.set_default_controls(focus == f_main_chat ? f_main_chat_send : default_ok, default_cancel);
+	else
+		main_screen.form.set_default_controls(-1, -1);
+	if (main_screen.form.is_pressed(f_main_chat_send)) send_chat_message();
+	if (main_screen.form.is_pressed(f_main_cancel)) main_screen.form.focus(0);
+	if (focus == f_main_history) {
+		int pos = main_screen.form.get_list_position(f_main_history);
+		// Ctrl+C: copy focused message.
+		if (keyboard_modifiers & KEYMOD_CTRL != 0 and key_pressed(KEY_C)) {
+			if (pos < 0) speak("No focused item to copy.", false);
+			else {
+				clipboard_set_text(main_screen.form.get_list_item_id(f_main_history, pos));
+				speak("Copied.", false);
+			}
+		}
+		if (key_pressed(KEY_RETURN) and pos >= 0) {
+			string full_msg = main_screen.form.get_list_item(f_main_history, pos);
+			// Extract username from "username says: ..." or "PM from username: ..." format.
+			string msg_user = extract_username_from_chat(full_msg);
+			if (!msg_user.empty() and msg_user != username and msg_user != "You") {
+				wait(50);
+				show_player_context_menu(msg_user, false);
+			}
+		}
+	}
+	if (key_pressed(KEY_F4)) {
+		social_panel();
+	}
+	return focus == f_main_keyboard_area;
+}
+void send_chat_message()
+{
+	string msg = main_screen.form.get_text(f_main_chat).trim_whitespace();
+	if (msg.empty()) {
+		speak("No message entered.", false);
+		return;
+	}
+	// If not in a room, server will echo back as a local message.
+	send({{"type", message_types::chat_message}, {"message", msg}});
+	main_screen.form.set_text(f_main_chat, "");
+}
+string extract_username_from_chat(string full_msg)
+{
+	// Check "PM from username: ..." format first.
+	if (full_msg.find("PM from ") == 0) {
+		string rest = full_msg.substr(8); // After "PM from "
+		int colon_pos = rest.find(": ");
+		if (colon_pos > 0) return rest.substr(0, colon_pos);
+	}
+	// Check "username says: ..." format.
+	int says_pos = full_msg.find(" says: ");
+	if (says_pos > 0) return full_msg.substr(0, says_pos);
+	return "";
+}
+void handle_game_invite() {
+	if (!has_pending_invite) return;
+	has_pending_invite = false;
+	if (yes_no(pending_invite_from + " invited you to join their game: " + pending_invite_room_name + ". Accept?", setup_sub_menu())) {
+		send({{"type", message_types::game_invite_response}, {"accepted", true}, {"room_id", pending_invite_room_id}, {"from", pending_invite_from}});
+		speak("Joining " + pending_invite_from + "'s game...", false);
+	} else {
+		send({{"type", message_types::game_invite_response}, {"accepted", false}, {"room_id", pending_invite_room_id}, {"from", pending_invite_from}});
+		speak("Invite declined.", false);
+	}
+}
+
+void menu_callback(menu@ m, string user = "")
+{
+	network_loop();
+	main_screen_loop();
+	if (key_pressed(KEY_F3) and has_pending_invite) { handle_game_invite(); }
+}
+void sub_menu_callback(menu@ m, string user = "")
+{
+	network_loop();
+	if (key_pressed(KEY_BACK)) { simulate_key_down(KEY_ESCAPE); }
+	if (key_pressed(KEY_F3) and has_pending_invite) { handle_game_invite(); }
+}
+menu@ setup_menu(string intro, bool use_main_screen = true)
+{
+	menu@ m = null;
+	if (use_main_screen) {
+		if (@main_screen != null) main_screen.delete_all_items();
+		else {
+			@main_screen = menu();
+			f_main_history = main_screen.form.create_list("&History");
+			f_main_chat = main_screen.form.create_input_box("Chat &message");
+			f_main_chat_send = main_screen.form.create_button("Send message");
+			f_main_cancel = main_screen.form.create_button("cancel");
+			f_main_keyboard_area = main_screen.form.create_keyboard_area("");
+			main_screen.form.set_state(f_main_keyboard_area, true, false);
+			main_screen.form.set_state(f_main_chat_send, true, false);
+			main_screen.form.set_state(f_main_cancel, true, false);
+		}
+		@m = main_screen;
+	} else {
+		@m = menu();
+	}
+	@m.background_callback = use_main_screen ? menu_callback : sub_menu_callback;
+	m.click_sound = "sounds/Menu_Click.wav";
+	m.select_sound = "sounds/menu_select.ogg";
+	m.wrap = false;
+	m.wrap_sound = "sounds/wrap sound.wav";
+	m.focus_first_item = true;
+	m.automatic_intro = true;
+	m.intro_text = intro;
+	return m;
+}
+menu@ setup_sub_menu(string intro = "") { return setup_menu(intro, false); }
+bool room_closed_flag = false; // Fix 17: Flag set when room is closed by host.
+bool client_disconnected = false; // True when connection to server is lost.
+bool rejoin_game_pending = false; // True when server sends rejoin_game after reconnect.
+void on_list_rooms(json_array@ rooms_list)
+{
+	if (@rooms_list == null or rooms_list.empty) {
+		pop_text("No games available.");
+		return;
+	}
+	// Fix 16: Use sub_menu to avoid overwriting main_screen and causing freeze.
+	menu@ rm = setup_sub_menu("Rooms. Viewing " + rooms_list.length() + " games. Press escape to return to the main menu.");
+	for (uint i = 0; i < rooms_list.length(); i++) {
+		json_object@ room_obj = rooms_list[i];
+		// Fix 11: Show locked status for password-protected rooms.
+		string lock_label = "";
+		if (room_obj.exists("locked") and bool(room_obj["locked"])) lock_label = " (Locked)";
+		string game_label = room_obj.exists("game_type") ? " [" + string(room_obj["game_type"]) + "]" : "";
+		rm.add_item(room_obj["name"] + game_label + lock_label + " with " + pretty_print(room_obj["players"], empty_text = "0 players") + " " + (i + 1) + " of " + rooms_list.length());
+	}
+	int res = rm.run();
+	if (res < 0) {
+		speak("Canceled.");
+		return;
+	}
+	if (res >= 0 and res < rooms_list.length()) {
+		json_object@ room_obj = rooms_list[res];
+		// Fix 11/18: If room is locked, ask for password.
+		if (room_obj.exists("locked") and bool(room_obj["locked"])) {
+			bool canceled = false;
+			string pw = input_box_form("Room Password", "Enter the password for this room:", "", canceled);
+			if (canceled or pw.empty()) {
+				speak("Canceled.", false);
+				return;
+			}
+			send({{"type", message_types::join_room}, {"room", res}, {"password", pw}});
+		} else {
+			send({{"type", message_types::join_room}, {"room", res}});
+		}
+	}
+}
+void on_incoming_chat(string sender_name, string message)
+{
+	string msg = sender_name.empty() ? message : ("%0 says: %1".format(sender_name, message));
+	speak(msg, false);
+	if (@main_screen == null) return;
+	main_screen.form.add_list_item(f_main_history, msg + "  ( " + calendar().format(DATE_TIME_FORMAT_RFC822) + ")", message);
+}
+void host_menu()
+{
+	current_screen_name = "host_menu";
+	bool do_intro = true;
+	send({{"type", message_types::room_players}});
+	wait(100);
+	network_loop();
+	while (true) {
+		send({{"type", message_types::room_players}});
+		wait(50);
+		network_loop();
+		if (launch_pending_game_if_needed()) {
+			do_intro = false;
+			continue;
+		}
+		if (room_closed_flag) {
+			room_closed_flag = false;
+			return;
+		}
+		menu@ m = setup_menu("You created a lobby. Select an option when you are ready.");
+		m.intro_interrupt = false;
+		m.automatic_intro = do_intro;
+		int total_items = 3 + room_player_names.length();
+		int start = m.add_item("Start game 1 of " + total_items);
+		int add_bot = m.add_item("Add AI player 2 of " + total_items);
+		int close_room = m.add_item("Close room and return to Main Menu 3 of " + total_items);
+		int[] player_items;
+		for (uint i = 0; i < room_player_names.length(); i++) {
+			string pname = room_player_names[i];
+			string label = pname;
+			if (pname == room_host_name) label += " (Host)";
+			if (is_room_bot(pname)) label += " (AI)";
+			label += " " + (i + 4) + " of " + total_items;
+			player_items.insert_last(m.add_item("Player: " + label));
+		}
+		int res = m.run();
+		if (room_closed_flag) {
+			room_closed_flag = false;
+			return;
+		}
+		if (res < 0) {
+			speak("You have left the room.", false);
+			send({{"type", message_types::leave_room}});
+			return;
+		}
+		if (res == close_room) {
+			speak("You have closed the room.");
+			send({{"type", message_types::leave_room}});
+			return;
+		}
+		else if (res == add_bot and add_bot >= 0) {
+			send({{"type", message_types::add_bot}});
+			speak("Adding AI player...", false);
+			wait(200);
+			network_loop();
+			do_intro = false;
+		}
+		else if (res == start) {
+			send({{"type", message_types::start_game}});
+			do_intro = false;
+		}
+		else {
+			for (uint pi = 0; pi < player_items.length(); pi++) {
+				if (res == player_items[pi] and pi < room_player_names.length()) {
+					string selected_player = string(room_player_names[pi]);
+					bool is_host = (username == room_host_name);
+					wait(50);
+					show_player_context_menu(selected_player, is_host);
+					break;
+				}
+			}
+			do_intro = false;
+		}
+	}
+}
+void wait_menu()
+{
+	current_screen_name = "wait_menu";
+	room_closed_flag = false;
+	send({{"type", message_types::room_players}});
+	wait(100);
+	network_loop();
+	while (true) {
+		if (room_closed_flag) {
+			room_closed_flag = false;
+			return;
+		}
+		send({{"type", message_types::room_players}});
+		wait(50);
+		network_loop();
+		if (launch_pending_game_if_needed()) continue;
+		if (room_closed_flag) {
+			room_closed_flag = false;
+			return;
+		}
+		menu@ m = setup_menu("You joined the room. Waiting for the host to start the game...");
+		int total_items = 1 + room_player_names.length();
+		int leave = m.add_item("Leave room 1 of " + total_items);
+		int[] player_items;
+		for (uint i = 0; i < room_player_names.length(); i++) {
+			string pname = room_player_names[i];
+			string label = pname;
+			if (pname == room_host_name) label += " (Host)";
+			if (is_room_bot(pname)) label += " (AI)";
+			label += " " + (i + 2) + " of " + total_items;
+			player_items.insert_last(m.add_item("Player: " + label));
+		}
+		int res = m.run();
+		if (room_closed_flag) {
+			room_closed_flag = false;
+			return;
+		}
+		if (res < 0 or res == leave) {
+			speak("You have left the room.", false);
+			send({{"type", message_types::leave_room}, {"leave", ""}});
+			return;
+		}
+		else {
+			for (uint pi = 0; pi < player_items.length(); pi++) {
+				if (res == player_items[pi] and pi < room_player_names.length()) {
+					string selected_player = string(room_player_names[pi]);
+					wait(50);
+					show_player_context_menu(selected_player, false);
+					break;
+				}
+			}
+		}
+	}
+}
+void show_player_context_menu(string target_name, bool show_kick)
+{
+	if (target_name == username) {
+		speak("That's you!", false);
+		// Fix 15: Return immediately so caller can refocus the menu.
+		return;
+	}
+
+	// If this player is a bot, show a simplified bot-specific menu.
+	if (is_room_bot(target_name)) {
+		bool is_host = (username == room_host_name);
+		if (!is_host) {
+			speak(target_name + " is an AI player.", false);
+			return;
+		}
+		menu@ bm = setup_sub_menu(target_name + " (AI Player)");
+		int remove_opt = bm.add_item("Remove " + target_name + " 1 of 1");
+		int res = bm.run();
+		if (res == remove_opt) {
+			if (yes_no("Remove AI player " + target_name + "?", setup_sub_menu())) {
+				send({{"type", message_types::remove_bot}, {"bot_name", target_name}});
+				speak(target_name + " removed.", false);
+				wait(200);
+				network_loop();
+			} else {
+				speak("Canceled.", false);
+			}
+		}
+		return;
+	}
+
+	int total = show_kick ? 4 : 3;
+	int item_num = 1;
+	menu@ pm = setup_sub_menu("Options for " + target_name);
+	int kick_opt = -1;
+	if (show_kick) { kick_opt = pm.add_item("Kick " + target_name + " " + item_num + " of " + total); item_num++; }
+	int msg_opt = pm.add_item("Send private message to " + target_name + " " + item_num + " of " + total); item_num++;
+	int friend_opt = pm.add_item("Add " + target_name + " as friend " + item_num + " of " + total); item_num++;
+	int report_opt = pm.add_item("Report " + target_name + " " + item_num + " of " + total);
+	wait(50);
+	int res = pm.run();
+	if (res < 0) {
+		speak("Canceled.", false);
+		return;
+	}
+	if (res == kick_opt and show_kick) {
+		if (!yes_no("Are you sure you want to kick " + target_name + "?", setup_sub_menu())) {
+			speak("Canceled.", false);
+		} else {
+			send({{"type", message_types::kick_player}, {"target", target_name}});
+		}
+	}
+	else if (res == msg_opt) {
+		send_private_message_form(target_name);
+	}
+	else if (res == friend_opt) {
+		send({{"type", message_types::friend_request}, {"target", target_name}});
+	}
+	else if (res == report_opt) {
+		send_report_form(target_name);
+	}
+}
+void send_private_message_form(string target_name)
+{
+	wait(50);
+	bool canceled = false;
+	string msg = input_box_form("Private Message", "Enter message for " + target_name + ":", "", canceled);
+	if (canceled or msg.empty()) {
+		speak("Canceled.", false);
+		return;
+	}
+	send({{"type", message_types::private_message}, {"target", target_name}, {"message", msg}});
+	speak("Message sent to " + target_name + ".", false);
+}
+void send_report_form(string target_name)
+{
+	wait(50);
+	bool canceled = false;
+	string reason = input_box_form("Report " + target_name, "Enter your report reason:", "", canceled);
+	if (canceled or reason.empty()) {
+		speak("Report canceled.", false);
+		return;
+	}
+	send({{"type", message_types::report_player}, {"target", target_name}, {"reason", reason}});
+	speak("Report submitted for " + target_name + ".", false);
+}
+void social_panel()
+{
+	while (true) {
+		// Re-fetch data from server each time the menu rebuilds.
+		send({{"type", message_types::friend_list}});
+		send({{"type", message_types::pending_requests}});
+		wait(200);
+		network_loop();
+		int online_count = 0;
+		for (uint i = 0; i < cached_friends.length(); i++) {
+			json_object@ f = cached_friends[i];
+			if (bool(f["online"])) online_count++;
+		}
+		menu@ sm = setup_sub_menu("Social Panel. Press escape to close.");
+		int total_social_items = (cached_pending.length() > 0) ? 3 : 2;
+		int item_num = 1;
+		string friends_label = "Friends";
+		if (online_count > 0) friends_label += " " + online_count + " online";
+		int friends_btn = sm.add_item(friends_label + " " + item_num + " of " + total_social_items);
+		item_num++;
+		int pending_btn = -1;
+		if (cached_pending.length() > 0) {
+			pending_btn = sm.add_item("Friend Requests (" + cached_pending.length() + ") " + item_num + " of " + total_social_items);
+			item_num++;
+		}
+		int add_btn = sm.add_item("Add friend " + item_num + " of " + total_social_items);
+		int res = sm.run();
+		if (res < 0) {
+			speak("Social panel closed.", false);
+			if (@main_screen != null) main_screen.form.focus(f_main_keyboard_area);
+			return;
+		}
+		if (res == friends_btn) {
+			friends_list_menu();
+		}
+		else if (pending_btn >= 0 and res == pending_btn) {
+			pending_requests_menu();
+		}
+		else if (res == add_btn) {
+			bool canceled = false;
+			string target = input_box_form("Add Friend", "Enter username to send a friend request to:", "", canceled);
+			if (!canceled and !target.empty()) {
+				send({{"type", message_types::friend_request}, {"target", target}});
+			} else {
+				speak("Canceled.", false);
+			}
+		}
+	}
+}
+void friends_list_menu()
+{
+	// Refresh data.
+	send({{"type", message_types::friend_list}});
+	wait(200);
+	network_loop();
+	if (cached_friends.length() == 0) {
+		pop_text("You have no friends yet. Use 'Add Friend' to send requests!");
+		return;
+	}
+	int focus_index = 0;
+	string focus_field = "status"; // "status" or "name"
+	// Speak the first friend.
+	speak(describe_friend(focus_index), false);
+	while (true) {
+		wait(5);
+		network_loop();
+		// keyboard-driven menu that handles its own input. Calling the form monitor
+		// from within a room context causes the menu to stop functioning.
+		if (key_pressed(KEY_ESCAPE) or key_pressed(KEY_BACK)) {
+			speak("Back to social panel.", false);
+			return;
+		}
+		// Left/Right to navigate between friends.
+		if (key_pressed(KEY_RIGHT)) {
+			if (focus_index < int(cached_friends.length()) - 1) focus_index++;
+			focus_field = "status";
+			speak(describe_friend(focus_index), false);
+		}
+		if (key_pressed(KEY_LEFT)) {
+			if (focus_index > 0) focus_index--;
+			focus_field = "status";
+			speak(describe_friend(focus_index), false);
+		}
+		if (key_pressed(KEY_HOME)) {
+			focus_index = 0;
+			focus_field = "status";
+			speak(describe_friend(focus_index), false);
+		}
+		if (key_pressed(KEY_END) and cached_friends.length() > 0) {
+			focus_index = int(cached_friends.length()) - 1;
+			focus_field = "status";
+			speak(describe_friend(focus_index), false);
+		}
+		// Up/Down for detail fields.
+		if (key_pressed(KEY_DOWN)) {
+			if (focus_field == "status") {
+				focus_field = "name";
+				json_object@ f = cached_friends[focus_index];
+				speak(string(f["username"]) + ", " + (focus_index + 1) + " of " + cached_friends.length(), false);
+			}
+		}
+		if (key_pressed(KEY_UP)) {
+			if (focus_field == "name") {
+				focus_field = "status";
+				speak(describe_friend(focus_index), false);
+			}
+		}
+		// Enter: options for this friend.
+		if (key_pressed(KEY_RETURN)) {
+			wait(50);
+			json_object@ f = cached_friends[focus_index];
+			string fname = f["username"];
+			show_friend_context_menu(fname);
+		}
+	}
+}
+string describe_friend(int index)
+{
+	if (index < 0 or index >= cached_friends.length()) return "No friend at this position.";
+	json_object@ f = cached_friends[index];
+	string fname = f["username"];
+	string result = fname;
+	if (bool(f["online"])) {
+		result += " online " + string(f["status"]);
+	} else {
+		string last = f.exists("last_seen") ? string(f["last_seen"]) : "unknown";
+		result += " last online " + last;
+	}
+	result += ", " + (index + 1) + " of " + cached_friends.length();
+	return result;
+}
+void show_friend_context_menu(string fname)
+{
+	menu@ fm = setup_sub_menu("Options for " + fname);
+	int msg_opt = fm.add_item("Send private message 1 of 4");
+	int invite_opt = fm.add_item("Invite to game 2 of 4");
+	int remove_opt = fm.add_item("Remove friend 3 of 4");
+	int report_opt = fm.add_item("Report " + fname + " 4 of 4");
+	wait(50);
+	int res = fm.run();
+	if (res < 0) { speak("Canceled.", false); return; }
+	if (res == msg_opt) {
+		send_private_message_form(fname);
+	}
+	else if (res == invite_opt) {
+		send({{"type", message_types::game_invite}, {"target", fname}});
+		speak("Sending game invite to " + fname + "...", false);
+		wait(200);
+		network_loop();
+	}
+	else if (res == remove_opt) {
+		if (yes_no("Remove " + fname + " from your friends list?", setup_sub_menu())) {
+			send({{"type", message_types::friend_remove}, {"target", fname}});
+			send({{"type", message_types::friend_list}});
+			wait(200);
+			network_loop();
+		} else {
+			speak("Canceled.", false);
+		}
+	}
+	else if (res == report_opt) {
+		send_report_form(fname);
+	}
+}
+void pending_requests_menu()
+{
+	// Refresh.
+	send({{"type", message_types::pending_requests}});
+	wait(200);
+	network_loop();
+	if (cached_pending.length() == 0) {
+		pop_text("No pending friend requests.");
+		return;
+	}
+	menu@ pm = setup_sub_menu("Pending friend requests. Select to accept or decline.");
+	for (uint i = 0; i < cached_pending.length(); i++) {
+		pm.add_item("Request from " + string(cached_pending[i]) + ", " + (i + 1) + " of " + cached_pending.length());
+	}
+	int res = pm.run();
+	if (res < 0) { speak("Back to social panel.", false); return; }
+	if (res >= 0 and res < cached_pending.length()) {
+		string requester = cached_pending[res];
+		menu@ action_menu = setup_sub_menu("Friend request from " + requester);
+		int accept = action_menu.add_item("Accept");
+		int decline = action_menu.add_item("Decline");
+		int action = action_menu.run();
+		if (action == accept) {
+			send({{"type", message_types::friend_accept}, {"target", requester}});
+			speak("Friend request accepted!", false);
+		}
+		else if (action == decline) {
+			send({{"type", message_types::friend_decline}, {"target", requester}});
+			speak("Friend request declined.", false);
+		}
+		else {
+			speak("Canceled.", false);
+		}
+	}
+}

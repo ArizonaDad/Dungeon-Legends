@@ -1,0 +1,808 @@
+//          private messaging, friend system, reporting, kick.
+
+// Helper: Remove the first occurrence of a string value from a json_array.
+// Returns a new json_array with the element removed.
+json_array@ json_array_remove_string(json_array@ arr, string value)
+{
+	json_array result;
+	if (@arr == null) return result;
+	bool removed = false;
+	for (uint i = 0; i < arr.length(); i++) {
+		if (!removed and string(arr[i]) == value) {
+			removed = true;
+			continue; // Skip this one.
+		}
+		result.add(arr[i]);
+	}
+	return result;
+}
+
+class user_manager
+{
+	user@[] user_list;       // Every connected user.
+	dictionary user_dictionary; // Fast lookup by id / name / peer.
+	int id = 0;              // Auto-incrementing user id for this session.
+
+	// Create a new in-memory user tied to a persistent account.
+	user@ create_user(account@ a, uint peer_id)
+	{
+		user new_user(a);
+		this.id++;
+		new_user.id = this.id;
+		new_user.username = a.username;
+		new_user.peer_id = peer_id;
+		this.user_list.insert_last(new_user);
+		// Dictionary allows O(1) lookup by id, name, or peer_id.
+		this.user_dictionary.set("i/" + this.id, @new_user);
+		this.user_dictionary.set("n/" + a.username, @new_user);
+		this.user_dictionary.set("p/" + peer_id, @new_user);
+		println("[USERS] User created: " + a.username + " (id=" + this.id + ", peer=" + peer_id + ")");
+		return new_user;
+	}
+
+	// Fully remove a user  cleans up room and dictionary entries.
+	bool remove_user(user@ u)
+	{
+		if (@u == null) {
+			println("[USERS] WARNING: remove_user called with null user.");
+			return false;
+		}
+		println("[USERS] Removing user: " + u.username + " (peer=" + u.peer_id + ")");
+
+		// Record last-seen timestamp on their account for friends.
+		if (@u.account != null) {
+			u.account.data["last_seen"] = calendar().format(DATE_TIME_FORMAT_RFC822);
+			u.account.data["last_seen_timestamp"] = ticks();
+		}
+
+		// Clean up room membership.
+		if (@u.room != null) {
+			try { u.leave_room(u.room); } catch { println("[USERS] Exception removing player from room."); }
+		}
+
+		int list_index = user_list.find_by_ref(u);
+		if (list_index > -1) user_list.remove_at(list_index);
+		user_dictionary.delete("i/" + u.id);
+		user_dictionary.delete("n/" + u.username);
+		user_dictionary.delete("p/" + u.peer_id);
+		return true;
+	}
+
+	user@ get_user_by_name(string username)
+	{
+		if (!user_dictionary.exists("n/" + username)) return null;
+		return cast<user@>(user_dictionary["n/" + username]);
+	}
+
+	user@ get_user_by_peer(uint peer_id)
+	{
+		if (!user_dictionary.exists("p/" + peer_id)) return null;
+		return cast<user@>(user_dictionary["p/" + peer_id]);
+	}
+
+	bool send(json_object@ message, uint channel = 0)
+	{
+		if (@message == null) return false;
+		return net.send(0, message.stringify(), 0);
+	}
+
+	var@ opImplConv()
+	{
+		json_array output;
+		for (uint i = 0; i < user_list.length(); i++) output.add(user_list[i]);
+		return output;
+	}
+
+	uint get_total_users() const property { return user_list.length(); }
+}
+
+class user
+{
+	bool disconnected = false;         // True if player disconnected (awaiting reconnect).
+	bool is_bot = false;               // True if this is an AI-controlled player.
+	string[] saved_messages;
+
+	int id;
+	string status = "online";   // "online", "in_room", "in_game"
+	string username;
+	uint peer_id;
+
+	private weakref<room> _room;
+	private weakref<account> _account;
+
+	room@ get_room() property { return @_room; }
+	void set_room(room@ r) property { @_room = r; }
+	account@ get_account() property { return @_account; }
+
+	user(account@ a)
+	{
+		@_account = a;
+	}
+
+	room@ new_room(string name, string password, string game_type = "")
+	{
+		if (@room != null) {
+			this.pop_text("You are already in a room!");
+			return null;
+		}
+		room@ r = rooms.create_room(this, name, password, game_type);
+		if (@r == null) this.pop_text("Failed to create room.");
+		return r;
+	}
+	void send_to_room(json_object@ message, uint channel = 0)
+	{
+		if (@room == null or @message == null) return;
+		for (uint i = 0; i < this.room.players.length(); i++) {
+			try { this.room.players[i].send(message, channel); }
+			catch { println("[USER] Exception sending to room member " + i); }
+		}
+	}
+	bool join_room(room@ r)
+	{
+		if (@r == null) {
+			this.pop_text("That room does not exist.");
+			return false;
+		}
+		if (@room != null) {
+			this.pop_text("You are already in a room!");
+			return false;
+		}
+		if (rooms.rooms.find_by_ref(@r) == -1) {
+			this.speak("This room has been closed.");
+			return false;
+		}
+
+		r.players.insert_last(this);
+		@room = r;
+		this.status = "in_room";
+		println("[ROOM] " + this.username + " joined room '" + r.name + "' (players=" + r.players.length() + ")");
+
+		// Tell everyone in the room.
+		this.send_to_room({{
+			"type", message_types::chat_message},
+			{"username", ""},
+			{"message", this.username + " has joined the room!"},
+			{"join", "join"}
+		});
+
+		// Tell the joining client whether they are the host or a guest.
+		if (this.room.players.size() > 1)
+			this.send({{"type", message_types::join_room}, {"username", this.username}, {"player", "player"}, {"game_type", this.room.game_type}});
+		else
+			this.send({{"type", message_types::join_room}, {"username", this.username}, {"host", "host"}, {"game_type", this.room.game_type}});
+
+		// Send updated player list to everyone in the room.
+		send_room_player_list();
+		return true;
+	}
+
+	bool leave_room(room@ r)
+	{
+		if (@r == null or @room == null) return false;
+
+		int list_index = r.players.find_by_ref(this);
+		if (list_index < 0) {
+			@room = null;
+			return false;
+		}
+
+		println("[ROOM] " + this.username + " leaving room '" + r.name + "' (was index " + list_index + ")");
+
+		if (r.players.size() == 1 or list_index == 0) {
+			// Last player or host leaving - close the room for everyone.
+			// Send close to all players so their menus exit.
+			for (uint ci = 0; ci < r.players.length(); ci++) {
+				try {
+					r.players[ci].send({{"type", message_types::leave_room}, {"close", "close"}});
+					r.players[ci].send({{"type", message_types::room_closed}, {"reason", this.username + " closed the room."}});
+					if (int(ci) != list_index) {
+						r.players[ci].status = "online";
+						@r.players[ci].room = null;
+					}
+				} catch {}
+			}
+			r.players.resize(0);
+			r.close_room();
+		} else {
+			// Non-host leaving  notify and remove.
+			this.send_to_room({{"type", message_types::chat_message}, {"username", ""}, {"message", this.username + " has left the room."}});
+			r.players.remove_at(list_index);
+			// Send updated player list to remaining players.
+			if (r.players.length() > 0) {
+				try { r.players[0].send_room_player_list(); } catch {}
+			}
+		}
+
+		r.on_player_leave(this);
+		this.status = "online";
+		@room = null;
+		return true;
+	}
+
+	// Broadcasts the current list of usernames in the room to all room members.
+	void send_room_player_list()
+	{
+		if (@room == null) return;
+		json_array names;
+		json_array bot_flags;
+		for (uint i = 0; i < this.room.players.length(); i++) {
+			names.add(this.room.players[i].username);
+			bot_flags.add(this.room.players[i].is_bot);
+		}
+		// The first player in the list is always the host.
+		string host_name = (this.room.players.length() > 0) ? this.room.players[0].username : "";
+		json_object@ msg = {{"type", message_types::room_players}, {"players", names}, {"host", host_name}, {"bots", bot_flags}, {"game_type", this.room.game_type}};
+		for (uint i = 0; i < this.room.players.length(); i++) {
+			try { this.room.players[i].send(msg); }
+			catch { println("[ROOM] Exception sending player list to " + i); }
+		}
+	}
+
+	void on_login()
+	{
+		this.speak("Main menu, Welcome. Use page up and page down to adjust the volume.  Select an option.");
+
+		// Deliver any pending friend requests that arrived while offline.
+		if (@this.account != null) {
+			json_object@ data = this.account.data;
+			if (data.exists("pending_friend_requests")) {
+				json_array@ pending = data["pending_friend_requests"];
+				if (pending.length() > 0) {
+					this.send({{"type", message_types::announce}, {"text", "You have " + pending.length() + " pending friend request" + (pending.length() == 1 ? "" : "s") + "!"}, {"interrupt", false}});
+				}
+			}
+		}
+	}
+
+	var@ opImplConv()
+	{
+		return json_object({{"username", this.username}});
+	}
+	bool send(json_object@ message, int channel = 0)
+	{
+		if (@message == null or disconnected) return false;
+		if (is_bot) return true; // Bots don't have network peers; silently succeed.
+		return svr.send(peer_id, message, channel);
+	}
+
+	void speak(string text)
+	{
+		json_object@ message = {{"type", message_types::chat_message}, {"username", ""}, {"message", text}};
+		this.send(message);
+	}
+
+	void speak_else(string text)
+	{
+		if (@room == null) return;
+		json_object@ message = {{"type", message_types::chat_message}, {"username", ""}, {"message", text}};
+		int list_index = this.room.players.find_by_ref(this);
+		for (int i = 0; i < this.room.players.length(); i++) {
+			if (i != list_index) {
+				try { this.room.players[i].send(message); } catch {}
+			}
+		}
+	}
+
+	void speak_all(string msg)
+	{
+		this.send_to_room({{"type", message_types::chat_message}, {"username", ""}, {"message", msg}});
+	}
+
+	void send_else(json_object@ message)
+	{
+		if (@room == null or @message == null) return;
+		int list_index = this.room.players.find_by_ref(this);
+		for (int i = 0; i < this.room.players.length(); i++) {
+			if (i != list_index) {
+				try { this.room.players[i].send(message); } catch {}
+			}
+		}
+	}
+
+	bool pop_text(string text, uint timeout = 0)
+	{
+		if (is_bot) return true;
+		return svr.send_text_popout(peer_id, text, timeout);
+	}
+}
+
+// handle_user_message  Dispatches authenticated user messages.
+// This is the main router for all non-game-specific messages.
+
+void handle_user_message(user@ u, json_object@ msg)
+{
+	// Safety: null checks.
+	if (@u == null or @msg == null or !msg.exists("type")) return;
+
+	string msg_type = msg["type"];
+
+	if (msg_type == message_types::check_online) {
+		u.send({{"type", message_types::check_online}, {"users", users}});
+	}
+
+	else if (msg_type == message_types::new_room and msg.exists("name") and msg.exists("password")) {
+		string game_type = msg.exists("game_type") ? string(msg["game_type"]) : "";
+		u.new_room(msg["name"], msg["password"], game_type);
+	}
+
+	else if (msg_type == message_types::list_rooms) {
+		u.send({{"type", message_types::list_rooms}, {"rooms", rooms}});
+	}
+
+	else if (msg_type == message_types::chat_message and msg.exists("message")) {
+		if (@u.room != null) {
+			// In a room: broadcast to room.
+			u.send_to_room({{"type", message_types::chat_message}, {"username", u.username}, {"message", msg["message"]}});
+		} else {
+			// Not in a room: broadcast to all players in the main menu (not in any room).
+			json_object@ chat_msg = {{"type", message_types::chat_message}, {"username", u.username}, {"message", msg["message"]}};
+			for (uint mm = 0; mm < users.user_list.length(); mm++) {
+				try {
+					if (@users.user_list[mm].room == null) {
+						users.user_list[mm].send(chat_msg);
+					}
+				} catch {}
+			}
+		}
+	}
+
+	else if (msg_type == message_types::join_room and msg.exists("room")) {
+		int room_index = int(msg["room"]);
+		if (room_index < 0 or room_index >= rooms.rooms.length()) {
+			u.speak("That room no longer exists.");
+		} else {
+			room@ target_room = rooms.rooms[room_index];
+			// If the room is password-locked, require password.
+			if (target_room.is_private) {
+				if (msg.exists("password") and string(msg["password"]) == target_room.password) {
+					u.join_room(target_room);
+				} else {
+					// Tell client a password is required.
+					u.send({{"type", message_types::password_required}, {"room", room_index}});
+				}
+			} else {
+				u.join_room(target_room);
+			}
+		}
+	}
+
+	else if (msg_type == message_types::password_submit and msg.exists("room") and msg.exists("password")) {
+		int room_index = int(msg["room"]);
+		if (room_index < 0 or room_index >= rooms.rooms.length()) {
+			u.speak("That room no longer exists.");
+		} else {
+			room@ target_room = rooms.rooms[room_index];
+			if (string(msg["password"]) == target_room.password) {
+				u.join_room(target_room);
+			} else {
+				u.speak("Incorrect password.");
+			}
+		}
+	}
+
+	else if (msg_type == message_types::leave_room) {
+		room@ temp_room = u.get_room();
+		if (@temp_room != null) {
+			if (msg.exists("leave")) {
+				u.send_to_room({{"type", message_types::chat_message}, {"username", ""}, {"message", u.username + " has left the room."}});
+			}
+			u.leave_room(temp_room);
+		}
+	}
+
+	else if (msg_type == message_types::leave_game) {
+		// Placeholder for game-specific leave logic.
+	}
+
+	else if (msg_type == message_types::kick_player and msg.exists("target")) {
+		string target_name = msg["target"];
+		if (@u.room == null) {
+			u.speak("You are not in a room.");
+			return;
+		}
+		// Only the host (first player) can kick.
+		if (u.room.players.length() == 0 or u.room.players[0].username != u.username) {
+			u.speak("Only the host can kick players.");
+			return;
+		}
+		// Find the target in the room.
+		user@ target = null;
+		for (uint i = 0; i < u.room.players.length(); i++) {
+			if (u.room.players[i].username == target_name) {
+				@target = u.room.players[i];
+				break;
+			}
+		}
+		if (@target == null) {
+			u.speak(target_name + " is not in this room.");
+			return;
+		}
+		if (target.username == u.username) {
+			u.speak("You cannot kick yourself.");
+			return;
+		}
+		println("[ROOM] Host " + u.username + " kicked " + target_name + " from room '" + u.room.name + "'");
+		// Notify the kicked player.
+		target.send({{"type", message_types::announce}, {"text", "You have been kicked from the room by the host."}, {"interrupt", true}});
+		target.send({{"type", message_types::leave_room}, {"close", "close"}});
+		// Remove from room.
+		room@ r = u.room;
+		int idx = r.players.find_by_ref(target);
+		if (idx >= 0) {
+			r.players.remove_at(idx);
+			@target.room = null;
+			target.status = "online";
+		}
+		// Notify remaining players.
+		u.send_to_room({{"type", message_types::chat_message}, {"username", ""}, {"message", target_name + " has been kicked from the room."}});
+		u.send_room_player_list();
+	}
+
+	else if (msg_type == message_types::private_message and msg.exists("target") and msg.exists("message")) {
+		string target_name = msg["target"];
+		string pm_text = msg["message"];
+		user@ target = users.get_user_by_name(target_name);
+		if (@target == null) {
+			u.speak(target_name + " is not online.");
+			return;
+		}
+		println("[PM] " + u.username + " -> " + target_name + ": " + pm_text);
+		string time_str = calendar().format(DATE_TIME_FORMAT_RFC822);
+		u.saved_messages.insert_last("[" + time_str + "] To " + target_name + ": " + pm_text);
+		target.saved_messages.insert_last("[" + time_str + "] From " + u.username + ": " + pm_text);
+		// Deliver to target.
+		target.send({{"type", message_types::private_message}, {"from", u.username}, {"message", pm_text}});
+		// Confirm to sender.
+		u.send({{"type", message_types::private_message}, {"from", "You"}, {"to", target_name}, {"message", pm_text}});
+	}
+
+	else if (msg_type == message_types::report_player and msg.exists("target") and msg.exists("reason")) {
+		string target_name = msg["target"];
+		string reason = msg["reason"];
+		println("[REPORT] " + u.username + " reported " + target_name + ": " + reason);
+
+		// Save report to the TARGET's account data (persists across sessions).
+		account@ target_acct = get_account(target_name);
+		if (@target_acct != null) {
+			json_object@ data = target_acct.data;
+			// Ensure reported_messages array exists.
+			json_array@ reports;
+			if (data.exists("reported_messages")) {
+				@reports = data["reported_messages"];
+			} else {
+				json_array new_reports;
+				data.set("reported_messages", new_reports);
+				@reports = data["reported_messages"];
+			}
+			// Build the report entry.
+			string entry = "Reported by " + u.username + " on " + calendar().format(DATE_TIME_FORMAT_RFC822) + ": " + reason;
+			reports.add(entry);
+			target_acct.commit();
+			println("[REPORT] Saved report to " + target_name + "'s account. Total reports: " + reports.length());
+		}
+		u.send({{"type", message_types::report_confirm}, {"target", target_name}});
+	}
+
+	else if (msg_type == message_types::friend_request and msg.exists("target")) {
+		string target_name = msg["target"];
+
+		if (target_name == u.username) {
+			u.speak("You cannot add yourself as a friend.");
+			return;
+		}
+
+		// Get both accounts.
+		account@ my_acct = u.account;
+		account@ target_acct = get_account(target_name);
+		if (@target_acct == null) {
+			u.speak("No account found for " + target_name + ".");
+			return;
+		}
+
+		// Check if already friends.
+		json_object@ my_data = my_acct.data;
+		if (!my_data.exists("friends")) my_data.set("friends", json_array());
+		json_array@ my_friends = my_data["friends"];
+		for (uint i = 0; i < my_friends.length(); i++) {
+			if (string(my_friends[i]) == target_name) {
+				u.speak(target_name + " is already your friend.");
+				return;
+			}
+		}
+
+		// Add to target's pending requests.
+		json_object@ target_data = target_acct.data;
+		if (!target_data.exists("pending_friend_requests")) target_data.set("pending_friend_requests", json_array());
+		json_array@ pending = target_data["pending_friend_requests"];
+
+		// Check for duplicates.
+		for (uint i = 0; i < pending.length(); i++) {
+			if (string(pending[i]) == u.username) {
+				u.speak("You have already sent a friend request to " + target_name + ".");
+				return;
+			}
+		}
+
+		pending.add(u.username);
+		target_acct.commit();
+		println("[FRIENDS] " + u.username + " sent friend request to " + target_name);
+
+		u.speak("Friend request sent to " + target_name + "!");
+
+		// If target is online, notify them.
+		user@ target_user = users.get_user_by_name(target_name);
+		if (@target_user != null) {
+			target_user.send({{"type", message_types::friend_request_received}, {"from", u.username}});
+		}
+	}
+
+	else if (msg_type == message_types::friend_accept and msg.exists("target")) {
+		string requester_name = msg["target"];
+		account@ my_acct = u.account;
+		account@ requester_acct = get_account(requester_name);
+
+		if (@my_acct == null or @requester_acct == null) {
+			u.speak("Could not find that account.");
+			return;
+		}
+
+		// Remove from pending.
+		json_object@ my_data = my_acct.data;
+		if (my_data.exists("pending_friend_requests")) {
+			json_array@ pending = my_data["pending_friend_requests"];
+			my_data.set("pending_friend_requests", json_array_remove_string(pending, requester_name));
+		}
+
+		// Add each other to friends lists.
+		if (!my_data.exists("friends")) my_data.set("friends", json_array());
+		json_array@ my_friends = my_data["friends"];
+		my_friends.add(requester_name);
+
+		json_object@ req_data = requester_acct.data;
+		if (!req_data.exists("friends")) req_data.set("friends", json_array());
+		json_array@ req_friends = req_data["friends"];
+		req_friends.add(u.username);
+
+		my_acct.commit();
+		requester_acct.commit();
+		println("[FRIENDS] " + u.username + " accepted friend request from " + requester_name);
+
+		u.speak("You and " + requester_name + " are now friends!");
+
+		// Notify the requester if online.
+		user@ requester_user = users.get_user_by_name(requester_name);
+		if (@requester_user != null) {
+			requester_user.send({{"type", message_types::announce}, {"text", u.username + " accepted your friend request!"}, {"interrupt", false}});
+		}
+	}
+
+	else if (msg_type == message_types::friend_decline and msg.exists("target")) {
+		string requester_name = msg["target"];
+		account@ my_acct = u.account;
+		if (@my_acct == null) return;
+
+		json_object@ my_data = my_acct.data;
+		if (my_data.exists("pending_friend_requests")) {
+			json_array@ pending = my_data["pending_friend_requests"];
+			my_data.set("pending_friend_requests", json_array_remove_string(pending, requester_name));
+		}
+		my_acct.commit();
+		u.speak("Friend request from " + requester_name + " declined.");
+		println("[FRIENDS] " + u.username + " declined friend request from " + requester_name);
+	}
+
+	else if (msg_type == message_types::friend_remove and msg.exists("target")) {
+		string friend_name = msg["target"];
+		account@ my_acct = u.account;
+		account@ friend_acct = get_account(friend_name);
+
+		if (@my_acct != null) {
+			json_object@ my_data = my_acct.data;
+			if (my_data.exists("friends")) {
+				json_array@ my_friends = my_data["friends"];
+				my_data.set("friends", json_array_remove_string(my_friends, friend_name));
+			}
+			my_acct.commit();
+		}
+
+		if (@friend_acct != null) {
+			json_object@ fdata = friend_acct.data;
+			if (fdata.exists("friends")) {
+				json_array@ f_friends = fdata["friends"];
+				fdata.set("friends", json_array_remove_string(f_friends, u.username));
+			}
+			friend_acct.commit();
+		}
+
+		u.speak(friend_name + " has been removed from your friends list.");
+		println("[FRIENDS] " + u.username + " removed friend " + friend_name);
+	}
+
+	else if (msg_type == message_types::friend_list) {
+		account@ my_acct = u.account;
+		if (@my_acct == null) return;
+
+		json_object@ my_data = my_acct.data;
+		if (!my_data.exists("friends")) my_data.set("friends", json_array());
+		json_array@ my_friends = my_data["friends"];
+
+		// Build a detailed list with online status.
+		json_array friend_details;
+		for (uint i = 0; i < my_friends.length(); i++) {
+			string fname = my_friends[i];
+			user@ online_friend = users.get_user_by_name(fname);
+			json_object entry;
+			entry["username"] = fname;
+
+			if (@online_friend != null) {
+				entry["online"] = true;
+				if (@online_friend.room != null) {
+					entry["status"] = "in a room";
+				} else {
+					entry["status"] = "in main menu";
+				}
+			} else {
+				entry["online"] = false;
+				// Get last seen from their account.
+				account@ facct = get_account(fname);
+				if (@facct != null and facct.data.exists("last_seen_timestamp")) {
+					uint64 last_ts = uint64(facct.data["last_seen_timestamp"]);
+					uint64 now_ts = ticks();
+					uint64 diff_ms = (now_ts > last_ts) ? (now_ts - last_ts) : 0;
+					int diff_min = int(diff_ms / 60000);
+					int diff_hr = diff_min / 60;
+					int diff_day = diff_hr / 24;
+
+					if (diff_day > 0) entry["last_seen"] = "" + diff_day + " day" + (diff_day == 1 ? "" : "s") + " ago";
+					else if (diff_hr > 0) entry["last_seen"] = "" + diff_hr + " hour" + (diff_hr == 1 ? "" : "s") + " ago";
+					else if (diff_min > 0) entry["last_seen"] = "" + diff_min + " minute" + (diff_min == 1 ? "" : "s") + " ago";
+					else entry["last_seen"] = "just now";
+				} else {
+					entry["last_seen"] = "unknown";
+				}
+			}
+			friend_details.add(entry);
+		}
+		u.send({{"type", message_types::friend_list}, {"friends", friend_details}});
+	}
+
+	else if (msg_type == message_types::pending_requests) {
+		account@ my_acct = u.account;
+		if (@my_acct == null) return;
+
+		json_object@ my_data = my_acct.data;
+		if (!my_data.exists("pending_friend_requests")) my_data.set("pending_friend_requests", json_array());
+		json_array@ pending = my_data["pending_friend_requests"];
+		u.send({{"type", message_types::pending_requests}, {"requests", pending}});
+	}
+
+	else if (msg_type == message_types::room_players) {
+		u.send_room_player_list();
+	}
+
+	// --- AI Bot Management ---
+
+	else if (msg_type == message_types::add_bot) {
+		if (@u.room == null) {
+			u.send({{"type", message_types::chat_message}, {"username", ""}, {"message", "You must be in a room to add an AI player."}});
+			return;
+		}
+		// Only the host (first player) can add bots.
+		if (u.room.players.length() == 0 or @u.room.players[0] != @u) {
+			u.send({{"type", message_types::chat_message}, {"username", ""}, {"message", "Only the host can add AI players."}});
+			return;
+		}
+		if (u.room.started) {
+			u.send({{"type", message_types::chat_message}, {"username", ""}, {"message", "Cannot add bots after the game has started."}});
+			return;
+		}
+		// Limit to reasonable number of total players.
+		if (u.room.players.length() >= 4) {
+			u.send({{"type", message_types::chat_message}, {"username", ""}, {"message", "Room is full. Maximum 4 players."}});
+			return;
+		}
+		// Generate unique silly bot name.
+		string bot_name = generate_bot_name();
+		// Ensure no duplicate names in the room.
+		bool dupe = true;
+		while (dupe) {
+			dupe = false;
+			for (uint bi = 0; bi < u.room.players.length(); bi++) {
+				if (u.room.players[bi].username == bot_name) { dupe = true; bot_name = generate_bot_name(); break; }
+			}
+		}
+		user@ bot = create_bot_user(bot_name);
+		@bot.room = u.room;
+		u.room.players.insert_last(bot);
+		// Notify room.
+		u.send_to_room({{"type", message_types::chat_message}, {"username", ""}, {"message", bot_name + " (AI) has joined the room!"}});
+		u.send_room_player_list();
+	}
+
+	else if (msg_type == message_types::remove_bot and msg.exists("bot_name")) {
+		if (@u.room == null) return;
+		if (u.room.players.length() == 0 or @u.room.players[0] != @u) {
+			u.send({{"type", message_types::chat_message}, {"username", ""}, {"message", "Only the host can remove AI players."}});
+			return;
+		}
+		string bot_name = string(msg["bot_name"]);
+		for (uint bi = 0; bi < u.room.players.length(); bi++) {
+			if (u.room.players[bi].is_bot and u.room.players[bi].username == bot_name) {
+				u.room.players.remove_at(bi);
+				u.send_to_room({{"type", message_types::chat_message}, {"username", ""}, {"message", bot_name + " (AI) has been removed from the room."}});
+				u.send_room_player_list();
+				break;
+			}
+		}
+	}
+
+	// --- Game Invites ---
+
+	else if (msg_type == message_types::game_invite and msg.exists("target")) {
+		string target_name = string(msg["target"]);
+		// Must be in a room to invite.
+		if (@u.room == null) {
+			u.send({{"type", message_types::chat_message}, {"username", ""}, {"message", "You must be in a room to invite players."}});
+			return;
+		}
+		// Must be a friend.
+		if (@u.account == null) return;
+		json_object@ my_data = u.account.data;
+		if (!my_data.exists("friends")) {
+			u.send({{"type", message_types::chat_message}, {"username", ""}, {"message", target_name + " is not on your friends list."}});
+			return;
+		}
+		json_array@ my_friends = my_data["friends"];
+		bool is_friend = false;
+		for (uint fi = 0; fi < my_friends.length(); fi++) {
+			if (string(my_friends[fi]) == target_name) { is_friend = true; break; }
+		}
+		if (!is_friend) {
+			u.send({{"type", message_types::chat_message}, {"username", ""}, {"message", target_name + " is not on your friends list."}});
+			return;
+		}
+		// Target must be online.
+		user@ target = users.get_user_by_name(target_name);
+		if (@target == null) {
+			u.send({{"type", message_types::chat_message}, {"username", ""}, {"message", target_name + " is not online."}});
+			return;
+		}
+		// Send invite to target.
+		target.send({{"type", message_types::game_invite_received}, {"from", u.username}, {"room_name", u.room.name}, {"room_id", u.room.id}});
+		u.send({{"type", message_types::chat_message}, {"username", ""}, {"message", "Game invite sent to " + target_name + "!"}});
+	}
+
+	else if (msg_type == message_types::game_invite_response and msg.exists("accepted") and msg.exists("room_id")) {
+		bool accepted = bool(msg["accepted"]);
+		uint room_id = uint(msg["room_id"]);
+		string from_name = msg.exists("from") ? string(msg["from"]) : "";
+		if (!accepted) {
+			// Notify the inviter.
+			if (from_name != "") {
+				user@ inviter = users.get_user_by_name(from_name);
+				if (@inviter != null) {
+					inviter.send({{"type", message_types::chat_message}, {"username", ""}, {"message", u.username + " declined your game invite."}});
+				}
+			}
+			return;
+		}
+		// Find the room by ID.
+		room@ target_room = null;
+		for (uint ri = 0; ri < rooms.rooms.length(); ri++) {
+			if (rooms.rooms[ri].id == room_id) {
+				@target_room = rooms.rooms[ri];
+				break;
+			}
+		}
+		if (@target_room == null) {
+			u.send({{"type", message_types::chat_message}, {"username", ""}, {"message", "That room no longer exists."}});
+			return;
+		}
+		if (target_room.started) {
+			u.send({{"type", message_types::chat_message}, {"username", ""}, {"message", "That game has already started."}});
+			return;
+		}
+		// Join the room (bypasses password).
+		u.join_room(target_room);
+	}
+}

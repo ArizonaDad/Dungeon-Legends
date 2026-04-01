@@ -1,0 +1,40 @@
+namespace message_types
+{
+	const string login = "login";
+	const string signup = "signup";
+	const string error = "error";
+	const string announce = "announce";
+	const string pop_text = "pop_text";
+	const string chat_message = "chat_message";
+	const string tell = "tell";
+	const string new_room = "new_room";
+	const string list_rooms = "list_rooms";
+	const string check_online = "check_online";
+	const string join_room = "join_room";
+	const string leave_room = "leave_room";
+	const string leave_game = "leave_game";
+	const string room_players = "room_players";       // Server sends list of players in the room.
+	const string kick_player = "kick_player";         // Host kicks a player from the room.
+	const string start_game = "start_game";
+	const string close_list = "close_list";
+	const string private_message = "private_message";
+	const string report_player = "report_player";
+	const string report_confirm = "report_confirm";
+	const string friend_request = "friend_request";
+	const string friend_request_received = "friend_request_received";
+	const string friend_accept = "friend_accept";
+	const string friend_decline = "friend_decline";
+	const string friend_remove = "friend_remove";
+	const string friend_list = "friend_list";
+	const string pending_requests = "pending_requests";
+	const string password_required = "password_required";
+	const string password_submit = "password_submit";
+	const string room_closed = "room_closed";
+	const string game_invite = "game_invite";                 // Client sends game invite to a friend.
+	const string game_invite_received = "game_invite_received"; // Server notifies client of incoming invite.
+	const string game_invite_response = "game_invite_response"; // Client accepts/declines an invite.
+
+	// AI bot management.
+	const string add_bot = "add_bot";                           // Host requests to add an AI player to the room.
+	const string remove_bot = "remove_bot";                     // Host requests to remove an AI player.
+}
