@@ -1,0 +1,970 @@
+// D&D 5e Battle Manager - Server Side
+// Wires the combat engine into the server framework.
+// Handles all combat message routing, roll requests, broadcasting, and monster AI.
+
+#include "combat_engine.nvgt"
+
+// Pending roll context stored between request and result.
+class pending_roll {
+	uint combatant_id;
+	string player_username;
+	int roll_type;           // ROLL_INITIATIVE, ROLL_ATTACK, etc.
+	int dice_sides = 20;
+	int modifier = 0;
+	string reason = "";
+	// Attack context (used when roll_type == ROLL_ATTACK or ROLL_DAMAGE)
+	uint target_id = 0;
+	int attack_bonus = 0;
+	bool has_advantage = false;
+	bool has_disadvantage = false;
+	// Damage context (used when chaining attack -> damage)
+	int damage_dice_count = 1;
+	int damage_dice_sides = 6;
+	int damage_modifier = 0;
+	int damage_type = DMG_SLASHING;
+	bool is_crit = false;
+}
+
+class battle_manager {
+	battle@ combat;
+	user@[] players;          // All players in this battle (mirrors room.players at start)
+	pending_roll@ current_roll;
+	bool initiative_phase = false;
+	uint initiative_index = 0;  // Which combatant we are rolling initiative for
+
+	battle_manager() {
+		@combat = null;
+		@current_roll = null;
+	}
+
+	// ---- Broadcasting ----
+
+	void broadcast_to_battle(json_object@ msg) {
+		if (@msg == null) return;
+		for (uint i = 0; i < players.length(); i++) {
+			if (@players[i] != null) {
+				try { players[i].send(msg); } catch {}
+			}
+		}
+	}
+
+	void broadcast_announce(string text, bool interrupt = false) {
+		broadcast_to_battle({{"type", message_types::announce}, {"text", text}, {"interrupt", interrupt}});
+	}
+
+	void broadcast_roll(string roller_name, string reason, int natural_roll, int modifier, int total, string outcome) {
+		string mod_text = "";
+		if (modifier > 0) mod_text = " plus " + modifier;
+		else if (modifier < 0) mod_text = " minus " + (-modifier);
+		string text = roller_name + " rolls " + reason + ". Natural " + natural_roll + mod_text + ", total " + total + ". " + outcome;
+		if (natural_roll == 20) text = roller_name + " rolls " + reason + ". Natural 20!" + mod_text + ", total " + total + ". " + outcome;
+		else if (natural_roll == 1) text = roller_name + " rolls " + reason + ". Natural 1!" + mod_text + ", total " + total + ". " + outcome;
+		broadcast_to_battle({{"type", message_types::announce}, {"text", text}, {"interrupt", false}});
+	}
+
+	void broadcast_state() {
+		if (@combat == null) return;
+		json_object@ state = combat.build_state_json();
+		broadcast_to_battle(state);
+	}
+
+	// ---- Roll Request Helpers ----
+
+	// Send a roll request to a specific player. Bots auto-resolve immediately.
+	// Returns true if the roll was sent to a real player (awaiting response).
+	// Returns false if it was auto-resolved (bot).
+	bool request_roll(user@ u, combatant@ c, int roll_type, int dice_sides, int modifier, string reason, uint target_id = 0) {
+		if (@u == null or @c == null) return false;
+
+		pending_roll pr;
+		pr.combatant_id = c.id;
+		pr.player_username = c.is_player ? c.player_username : c.name;
+		pr.roll_type = roll_type;
+		pr.dice_sides = dice_sides;
+		pr.modifier = modifier;
+		pr.reason = reason;
+		pr.target_id = target_id;
+		@current_roll = pr;
+
+		// Bots and monsters auto-roll immediately.
+		if (u.is_bot or !c.is_player) {
+			int natural = random(1, dice_sides);
+			process_roll_result(natural);
+			return false;
+		}
+
+		// Send roll_request to the human player.
+		u.send({
+			{"type", message_types::roll_request},
+			{"roll_type", roll_type},
+			{"dice", dice_sides},
+			{"modifier", modifier},
+			{"reason", reason}
+		});
+		return true;
+	}
+
+	// Find the user object for a given combatant.
+	user@ find_user_for_combatant(combatant@ c) {
+		if (@c == null) return null;
+		if (!c.is_player) {
+			// Monsters use the first player as proxy (auto-rolled anyway).
+			if (players.length() > 0) return players[0];
+			return null;
+		}
+		for (uint i = 0; i < players.length(); i++) {
+			if (@players[i] != null and players[i].username == c.player_username) return players[i];
+		}
+		return null;
+	}
+
+	// ---- Game Start ----
+
+	void start_game(user@ host) {
+		if (@host == null or @host.room == null) return;
+
+		// Copy room players into battle manager.
+		players.resize(0);
+		for (uint i = 0; i < host.room.players.length(); i++) {
+			players.insert_last(host.room.players[i]);
+		}
+
+		// Create battle instance.
+		@combat = battle();
+		combat.battle_active = true;
+
+		// Add each player/bot as a combatant.
+		for (uint i = 0; i < players.length(); i++) {
+			combatant c;
+			c.name = players[i].username;
+			c.is_player = true;
+			c.player_username = players[i].username;
+			c.max_hp = 20;
+			c.current_hp = 20;
+			c.armor_class = 14;
+			c.speed = DEFAULT_SPEED;
+			c.initiative_bonus = 2;
+			c.proficiency = 2;
+			c.level = 1;
+			c.ability_scores = {10, 14, 12, 10, 10, 10};
+			c.main_hand = "Longsword";
+			c.main_hand_damage_dice = 8;
+			c.main_hand_damage_count = 1;
+			c.main_hand_damage_type = DMG_SLASHING;
+			c.main_hand_range = 5;
+			// Position players in a line on the left.
+			c.x = 1;
+			c.y = int(i) + 1;
+			combat.add_combatant(c);
+		}
+
+		broadcast_announce("Battle begins! Rolling initiative.", true);
+		broadcast_to_battle({{"type", message_types::game_start_battle}});
+
+		// Start initiative phase.
+		initiative_phase = true;
+		initiative_index = 0;
+		request_next_initiative();
+	}
+
+	// ---- Initiative Phase ----
+
+	void request_next_initiative() {
+		if (@combat == null) return;
+
+		// Skip dead combatants.
+		while (initiative_index < combat.combatants.length() and !combat.combatants[initiative_index].is_alive()) {
+			initiative_index++;
+		}
+
+		if (initiative_index >= combat.combatants.length()) {
+			// All initiative rolls collected. Sort and start combat.
+			finish_initiative();
+			return;
+		}
+
+		combatant@ c = combat.combatants[initiative_index];
+		int mod = c.get_ability_mod(ABILITY_DEX);
+		user@ u = find_user_for_combatant(c);
+
+		pending_roll pr;
+		pr.combatant_id = c.id;
+		pr.player_username = c.is_player ? c.player_username : c.name;
+		pr.roll_type = ROLL_INITIATIVE;
+		pr.dice_sides = 20;
+		pr.modifier = mod;
+		pr.reason = "initiative";
+		@current_roll = pr;
+
+		if (@u != null and !u.is_bot and c.is_player) {
+			// Human player: send roll request.
+			u.send({
+				{"type", message_types::roll_request},
+				{"roll_type", ROLL_INITIATIVE},
+				{"dice", 20},
+				{"modifier", mod},
+				{"reason", "initiative"}
+			});
+		} else {
+			// Bot/monster: auto-roll.
+			int natural = random(1, 20);
+			process_roll_result(natural);
+		}
+	}
+
+	void finish_initiative() {
+		if (@combat == null) return;
+		initiative_phase = false;
+
+		// Build initiative order from stored rolls.
+		combat.initiative_order.resize(0);
+		for (uint i = 0; i < combat.combatants.length(); i++) {
+			if (combat.combatants[i].is_alive()) {
+				combat.initiative_order.insert_last(int(i));
+			}
+		}
+		// Sort descending by initiative_roll.
+		for (uint i = 0; i < combat.initiative_order.length(); i++) {
+			for (uint j = i + 1; j < combat.initiative_order.length(); j++) {
+				if (combat.combatants[combat.initiative_order[j]].initiative_roll > combat.combatants[combat.initiative_order[i]].initiative_roll) {
+					int temp = combat.initiative_order[i];
+					combat.initiative_order[i] = combat.initiative_order[j];
+					combat.initiative_order[j] = temp;
+				}
+			}
+		}
+
+		// Broadcast initiative order.
+		string order_text = "Initiative order: ";
+		for (uint i = 0; i < combat.initiative_order.length(); i++) {
+			combatant@ c = combat.combatants[combat.initiative_order[i]];
+			if (i > 0) order_text += ", ";
+			order_text += c.name + " (" + c.initiative_roll + ")";
+		}
+		broadcast_announce(order_text, true);
+
+		// Send initiative_order message.
+		json_array init_arr;
+		for (uint i = 0; i < combat.initiative_order.length(); i++) {
+			init_arr.add(combat.initiative_order[i]);
+		}
+		broadcast_to_battle({{"type", message_types::initiative_order}, {"order", init_arr}});
+
+		// Start first turn.
+		combat.current_turn_index = -1;
+		combat.round_number = 0;
+		advance_turn();
+	}
+
+	// ---- Turn Management ----
+
+	void advance_turn() {
+		if (@combat == null or !combat.battle_active) return;
+
+		combat.advance_turn();
+		combatant@ c = combat.current_combatant();
+		if (@c == null) return;
+
+		// Skip dead combatants.
+		if (c.is_dead) {
+			advance_turn();
+			return;
+		}
+
+		// Announce turn start.
+		string round_text = "";
+		if (combat.current_turn_index == 0) {
+			round_text = "Round " + combat.round_number + "! ";
+		}
+		broadcast_announce(round_text + c.name + "'s turn.", true);
+
+		// Send turn_start to the active player.
+		user@ u = find_user_for_combatant(c);
+		if (@u != null) {
+			u.send({
+				{"type", message_types::turn_start},
+				{"combatant_id", c.id},
+				{"name", c.name},
+				{"hp", c.current_hp},
+				{"max_hp", c.max_hp},
+				{"movement", c.movement_remaining},
+				{"has_action", c.has_action},
+				{"has_bonus_action", c.has_bonus_action}
+			});
+		}
+
+		broadcast_state();
+
+		// Death save check: unconscious player at 0 HP.
+		if (c.current_hp == 0 and c.has_condition(COND_UNCONSCIOUS) and !c.is_dead and !c.is_stable and c.is_player) {
+			request_roll(u, c, ROLL_DEATH_SAVE, 20, 0, "death saving throw");
+			return;
+		}
+
+		// If it is a monster/bot turn, the tick function handles AI actions.
+	}
+
+	void handle_turn_end(user@ u) {
+		if (@combat == null or @u == null) return;
+		combatant@ c = combat.current_combatant();
+		if (@c == null) return;
+		// Only the active combatant's player can end the turn.
+		if (c.is_player and c.player_username != u.username) return;
+
+		broadcast_announce(c.name + " ends their turn.");
+		advance_turn();
+	}
+
+	// ---- Roll Result Processing ----
+
+	void process_roll_result(int natural_roll) {
+		if (@current_roll == null or @combat == null) return;
+
+		pending_roll@ pr = current_roll;
+		@current_roll = null;
+
+		int total = natural_roll + pr.modifier;
+		combatant@ c = combat.get_combatant(pr.combatant_id);
+		if (@c == null) return;
+
+		if (pr.roll_type == ROLL_INITIATIVE) {
+			c.initiative_roll = total;
+			broadcast_roll(pr.player_username, "initiative", natural_roll, pr.modifier, total, "");
+			initiative_index++;
+			request_next_initiative();
+		}
+
+		else if (pr.roll_type == ROLL_ATTACK) {
+			combatant@ target = combat.get_combatant(pr.target_id);
+			if (@target == null) return;
+
+			bool is_crit = (natural_roll == 20);
+			bool is_fumble = (natural_roll == 1);
+			bool hit = false;
+			string outcome = "";
+
+			if (is_crit) {
+				hit = true;
+				outcome = "Critical hit!";
+			} else if (is_fumble) {
+				hit = false;
+				outcome = "Miss!";
+			} else {
+				hit = total >= target.armor_class;
+				outcome = hit ? "Hit!" : "Miss! Needed " + target.armor_class + ".";
+			}
+
+			broadcast_roll(c.name, "to attack " + target.name, natural_roll, pr.modifier, total, outcome);
+
+			if (hit) {
+				// Chain into damage roll.
+				int dmg_mod = c.get_ability_mod(ABILITY_STR);
+				if (c.main_hand_finesse) {
+					int dex_mod = c.get_ability_mod(ABILITY_DEX);
+					if (dex_mod > dmg_mod) dmg_mod = dex_mod;
+				}
+
+				pending_roll dmg_pr;
+				dmg_pr.combatant_id = c.id;
+				dmg_pr.player_username = c.is_player ? c.player_username : c.name;
+				dmg_pr.roll_type = ROLL_DAMAGE;
+				dmg_pr.dice_sides = c.main_hand_damage_dice;
+				dmg_pr.modifier = dmg_mod;
+				dmg_pr.reason = "damage";
+				dmg_pr.target_id = target.id;
+				dmg_pr.damage_dice_count = c.main_hand_damage_count;
+				dmg_pr.damage_dice_sides = c.main_hand_damage_dice;
+				dmg_pr.damage_modifier = dmg_mod;
+				dmg_pr.damage_type = c.main_hand_damage_type;
+				dmg_pr.is_crit = is_crit;
+				@current_roll = dmg_pr;
+
+				user@ u = find_user_for_combatant(c);
+				if (@u != null and !u.is_bot and c.is_player) {
+					u.send({
+						{"type", message_types::roll_request},
+						{"roll_type", ROLL_DAMAGE},
+						{"dice", c.main_hand_damage_dice},
+						{"modifier", dmg_mod},
+						{"reason", "damage"}
+					});
+				} else {
+					// Auto-roll damage for bots/monsters.
+					int rolls = is_crit ? c.main_hand_damage_count * 2 : c.main_hand_damage_count;
+					int dmg_natural = 0;
+					for (int di = 0; di < rolls; di++) dmg_natural += random(1, c.main_hand_damage_dice);
+					process_roll_result(dmg_natural);
+				}
+			}
+			// Miss: turn continues, player can take other actions or end turn.
+		}
+
+		else if (pr.roll_type == ROLL_DAMAGE) {
+			combatant@ target = combat.get_combatant(pr.target_id);
+			if (@target == null) return;
+
+			int total_damage = natural_roll + pr.damage_modifier;
+			if (total_damage < 1) total_damage = 1;
+
+			string dmg_type_name = "damage";
+			if (pr.damage_type >= 0 and pr.damage_type < int(DAMAGE_TYPE_NAMES.length())) {
+				dmg_type_name = DAMAGE_TYPE_NAMES[pr.damage_type] + " damage";
+			}
+
+			broadcast_roll(c.name, "damage", natural_roll, pr.damage_modifier, total_damage, total_damage + " " + dmg_type_name + " to " + target.name + ".");
+			combat.apply_damage(target, total_damage, pr.damage_type, c);
+
+			// Announce HP or death.
+			if (target.is_dead) {
+				broadcast_announce(target.name + " has been slain!", true);
+				broadcast_to_battle({{"type", message_types::creature_died}, {"name", target.name}, {"id", target.id}});
+			} else if (target.current_hp == 0 and target.has_condition(COND_UNCONSCIOUS)) {
+				broadcast_announce(target.name + " falls unconscious!", true);
+			} else {
+				broadcast_announce(target.name + " has " + target.current_hp + " of " + target.max_hp + " HP remaining.");
+			}
+
+			broadcast_state();
+
+			// Check if battle is over.
+			if (combat.check_battle_over()) {
+				end_battle();
+			}
+		}
+
+		else if (pr.roll_type == ROLL_DEATH_SAVE) {
+			string outcome = "";
+			if (natural_roll == 20) outcome = "Natural 20! " + c.name + " regains 1 HP and is back in the fight!";
+			else if (natural_roll == 1) outcome = "Natural 1! Two failures!";
+			else if (natural_roll >= DEATH_SAVE_DC) outcome = "Success!";
+			else outcome = "Failure!";
+
+			broadcast_roll(c.name, "death saving throw", natural_roll, 0, natural_roll, outcome);
+			combat.process_death_save(c, natural_roll);
+
+			if (c.is_dead) {
+				broadcast_announce(c.name + " has died.", true);
+				broadcast_to_battle({{"type", message_types::creature_died}, {"name", c.name}, {"id", c.id}});
+			} else if (c.is_stable) {
+				broadcast_announce(c.name + " has stabilized.");
+				broadcast_to_battle({{"type", message_types::creature_stabilized}, {"name", c.name}, {"id", c.id}});
+			} else {
+				broadcast_announce(c.name + " has " + c.death_save_successes + " successes and " + c.death_save_failures + " failures.");
+			}
+
+			broadcast_state();
+
+			if (combat.check_battle_over()) {
+				end_battle();
+				return;
+			}
+			// Death save consumed the turn. Advance.
+			advance_turn();
+		}
+
+		else if (pr.roll_type == ROLL_ABILITY_CHECK) {
+			// Used for contested checks (shove/grapple). Outcome handled by caller context.
+			broadcast_roll(c.name, pr.reason, natural_roll, pr.modifier, total, "Total: " + total + ".");
+		}
+	}
+
+	// ---- Action Handlers ----
+
+	void handle_attack(user@ u, json_object@ msg) {
+		if (@combat == null or @u == null) return;
+		combatant@ c = combat.current_combatant();
+		if (@c == null or !c.is_player or c.player_username != u.username) return;
+		if (!c.has_action) { u.send({{"type", message_types::error}, {"text", "No action remaining."}}); return; }
+
+		uint target_id = 0;
+		if (msg.exists("target_id")) target_id = uint(msg["target_id"]);
+		combatant@ target = combat.get_combatant(target_id);
+		if (@target == null or target.is_dead) { u.send({{"type", message_types::error}, {"text", "Invalid target."}}); return; }
+
+		// Range check.
+		int dist = feet_distance(c.x, c.y, target.x, target.y);
+		if (dist > c.main_hand_range) {
+			u.send({{"type", message_types::error}, {"text", "Target is out of range. Distance: " + dist + " feet, range: " + c.main_hand_range + " feet."}});
+			return;
+		}
+
+		c.has_action = false;
+		c.used_action = true;
+
+		// Calculate attack bonus: ability mod + proficiency.
+		int ability_mod = c.get_ability_mod(ABILITY_STR);
+		if (c.main_hand_finesse) {
+			int dex_mod = c.get_ability_mod(ABILITY_DEX);
+			if (dex_mod > ability_mod) ability_mod = dex_mod;
+		}
+		int atk_bonus = ability_mod + c.proficiency;
+		// 2024 Exhaustion penalty applied in roll processing.
+		atk_bonus -= c.exhaustion_level * 2;
+
+		// Determine advantage/disadvantage.
+		bool adv = false;
+		bool disadv = false;
+		if (target.has_condition(COND_PRONE) and dist <= 5) adv = true;
+		if (target.has_condition(COND_PRONE) and dist > 5) disadv = true;
+		if (target.has_condition(COND_PARALYZED) or target.has_condition(COND_STUNNED)) adv = true;
+		if (target.has_condition(COND_UNCONSCIOUS)) adv = true;
+		if (c.has_condition(COND_BLINDED)) disadv = true;
+		if (c.has_condition(COND_POISONED)) disadv = true;
+		if (target.is_dodging and !c.has_condition(COND_BLINDED)) disadv = true;
+
+		// Store attack context in pending roll.
+		pending_roll pr;
+		pr.combatant_id = c.id;
+		pr.player_username = c.player_username;
+		pr.roll_type = ROLL_ATTACK;
+		pr.dice_sides = 20;
+		pr.modifier = atk_bonus;
+		pr.reason = "to attack " + target.name;
+		pr.target_id = target_id;
+		pr.has_advantage = adv;
+		pr.has_disadvantage = disadv;
+		@current_roll = pr;
+
+		// Request the roll.
+		u.send({
+			{"type", message_types::roll_request},
+			{"roll_type", ROLL_ATTACK},
+			{"dice", 20},
+			{"modifier", atk_bonus},
+			{"reason", "attack roll against " + target.name}
+		});
+	}
+
+	void handle_move(user@ u, json_object@ msg) {
+		if (@combat == null or @u == null) return;
+		combatant@ c = combat.current_combatant();
+		if (@c == null or !c.is_player or c.player_username != u.username) return;
+
+		int dx = 0, dy = 0;
+		if (msg.exists("dx")) dx = int(msg["dx"]);
+		if (msg.exists("dy")) dy = int(msg["dy"]);
+
+		int move_cost = (dx != 0 and dy != 0) ? 5 : 5;  // Simplified: 5 ft per tile.
+		if (c.movement_remaining < move_cost) {
+			u.send({{"type", message_types::error}, {"text", "Not enough movement. " + c.movement_remaining + " feet remaining."}});
+			return;
+		}
+
+		int new_x = c.x + dx;
+		int new_y = c.y + dy;
+		if (new_x < 0 or new_x >= combat.map_width or new_y < 0 or new_y >= combat.map_height) {
+			u.send({{"type", message_types::error}, {"text", "Cannot move outside the battlefield."}});
+			return;
+		}
+
+		c.x = new_x;
+		c.y = new_y;
+		c.movement_remaining -= move_cost;
+		c.has_moved = true;
+
+		broadcast_state();
+	}
+
+	void handle_dodge(user@ u) {
+		if (@combat == null or @u == null) return;
+		combatant@ c = combat.current_combatant();
+		if (@c == null or !c.is_player or c.player_username != u.username) return;
+		if (!c.has_action) { u.send({{"type", message_types::error}, {"text", "No action remaining."}}); return; }
+
+		c.has_action = false;
+		c.used_action = true;
+		c.is_dodging = true;
+		c.add_condition(COND_DODGING);
+		broadcast_announce(c.name + " takes the Dodge action.");
+	}
+
+	void handle_dash(user@ u) {
+		if (@combat == null or @u == null) return;
+		combatant@ c = combat.current_combatant();
+		if (@c == null or !c.is_player or c.player_username != u.username) return;
+		if (!c.has_action) { u.send({{"type", message_types::error}, {"text", "No action remaining."}}); return; }
+
+		c.has_action = false;
+		c.used_action = true;
+		c.movement_remaining += c.speed;
+		broadcast_announce(c.name + " takes the Dash action. " + c.movement_remaining + " feet of movement remaining.");
+	}
+
+	void handle_disengage(user@ u) {
+		if (@combat == null or @u == null) return;
+		combatant@ c = combat.current_combatant();
+		if (@c == null or !c.is_player or c.player_username != u.username) return;
+		if (!c.has_action) { u.send({{"type", message_types::error}, {"text", "No action remaining."}}); return; }
+
+		c.has_action = false;
+		c.used_action = true;
+		c.took_disengage = true;
+		broadcast_announce(c.name + " takes the Disengage action.");
+	}
+
+	void handle_help(user@ u, json_object@ msg) {
+		if (@combat == null or @u == null) return;
+		combatant@ c = combat.current_combatant();
+		if (@c == null or !c.is_player or c.player_username != u.username) return;
+		if (!c.has_action) { u.send({{"type", message_types::error}, {"text", "No action remaining."}}); return; }
+
+		c.has_action = false;
+		c.used_action = true;
+		// Help grants advantage to the next ally attacking the target.
+		// Simplified: just announce it.
+		string target_name = "an ally";
+		if (msg.exists("target_id")) {
+			combatant@ target = combat.get_combatant(uint(msg["target_id"]));
+			if (@target != null) target_name = target.name;
+		}
+		broadcast_announce(c.name + " takes the Help action, assisting against " + target_name + ".");
+	}
+
+	void handle_hide(user@ u) {
+		if (@combat == null or @u == null) return;
+		combatant@ c = combat.current_combatant();
+		if (@c == null or !c.is_player or c.player_username != u.username) return;
+		if (!c.has_action) { u.send({{"type", message_types::error}, {"text", "No action remaining."}}); return; }
+
+		c.has_action = false;
+		c.used_action = true;
+
+		// Stealth check vs passive perception of enemies.
+		int stealth_mod = c.get_ability_mod(ABILITY_DEX) + (c.proficiency);
+		request_roll(u, c, ROLL_ABILITY_CHECK, 20, stealth_mod, "Stealth check to hide");
+		// Result processing would set c.is_hidden based on enemy passive perception.
+		// For now, simplified: set hidden on success.
+		c.is_hidden = true;
+		c.add_condition(COND_HIDDEN);
+		broadcast_announce(c.name + " attempts to hide.");
+	}
+
+	void handle_shove(user@ u, json_object@ msg) {
+		if (@combat == null or @u == null) return;
+		combatant@ c = combat.current_combatant();
+		if (@c == null or !c.is_player or c.player_username != u.username) return;
+		if (!c.has_action) { u.send({{"type", message_types::error}, {"text", "No action remaining."}}); return; }
+
+		uint target_id = 0;
+		if (msg.exists("target_id")) target_id = uint(msg["target_id"]);
+		combatant@ target = combat.get_combatant(target_id);
+		if (@target == null or target.is_dead) { u.send({{"type", message_types::error}, {"text", "Invalid target."}}); return; }
+
+		int dist = feet_distance(c.x, c.y, target.x, target.y);
+		if (dist > 5) { u.send({{"type", message_types::error}, {"text", "Target must be within 5 feet."}}); return; }
+
+		c.has_action = false;
+		c.used_action = true;
+
+		// Contested check: attacker Athletics vs target Athletics or Acrobatics.
+		int atk_mod = c.get_ability_mod(ABILITY_STR) + c.proficiency;
+		int def_athletics = target.get_ability_mod(ABILITY_STR) + target.proficiency;
+		int def_acrobatics = target.get_ability_mod(ABILITY_DEX) + target.proficiency;
+		int def_mod = def_athletics > def_acrobatics ? def_athletics : def_acrobatics;
+
+		int atk_roll = random(1, 20) + atk_mod;
+		int def_roll = random(1, 20) + def_mod;
+
+		broadcast_roll(c.name, "Athletics to shove " + target.name, atk_roll - atk_mod, atk_mod, atk_roll, "");
+		broadcast_roll(target.name, "to resist shove", def_roll - def_mod, def_mod, def_roll, "");
+
+		if (atk_roll >= def_roll) {
+			// Shove success: knock prone or push 5 feet.
+			bool knock_prone = true;
+			if (msg.exists("push") and bool(msg["push"])) knock_prone = false;
+
+			if (knock_prone) {
+				target.add_condition(COND_PRONE);
+				broadcast_announce(c.name + " shoves " + target.name + " prone!");
+			} else {
+				// Push 5 feet away.
+				int push_dx = 0, push_dy = 0;
+				if (target.x > c.x) push_dx = 1;
+				else if (target.x < c.x) push_dx = -1;
+				if (target.y > c.y) push_dy = 1;
+				else if (target.y < c.y) push_dy = -1;
+				target.x += push_dx;
+				target.y += push_dy;
+				broadcast_announce(c.name + " pushes " + target.name + " back 5 feet!");
+			}
+		} else {
+			broadcast_announce(c.name + " fails to shove " + target.name + ".");
+		}
+		broadcast_state();
+	}
+
+	void handle_grapple(user@ u, json_object@ msg) {
+		if (@combat == null or @u == null) return;
+		combatant@ c = combat.current_combatant();
+		if (@c == null or !c.is_player or c.player_username != u.username) return;
+		if (!c.has_action) { u.send({{"type", message_types::error}, {"text", "No action remaining."}}); return; }
+
+		uint target_id = 0;
+		if (msg.exists("target_id")) target_id = uint(msg["target_id"]);
+		combatant@ target = combat.get_combatant(target_id);
+		if (@target == null or target.is_dead) { u.send({{"type", message_types::error}, {"text", "Invalid target."}}); return; }
+
+		int dist = feet_distance(c.x, c.y, target.x, target.y);
+		if (dist > 5) { u.send({{"type", message_types::error}, {"text", "Target must be within 5 feet."}}); return; }
+
+		c.has_action = false;
+		c.used_action = true;
+
+		// Contested: Athletics vs Athletics or Acrobatics.
+		int atk_mod = c.get_ability_mod(ABILITY_STR) + c.proficiency;
+		int def_athletics = target.get_ability_mod(ABILITY_STR) + target.proficiency;
+		int def_acrobatics = target.get_ability_mod(ABILITY_DEX) + target.proficiency;
+		int def_mod = def_athletics > def_acrobatics ? def_athletics : def_acrobatics;
+
+		int atk_roll = random(1, 20) + atk_mod;
+		int def_roll = random(1, 20) + def_mod;
+
+		broadcast_roll(c.name, "Athletics to grapple " + target.name, atk_roll - atk_mod, atk_mod, atk_roll, "");
+		broadcast_roll(target.name, "to resist grapple", def_roll - def_mod, def_mod, def_roll, "");
+
+		if (atk_roll >= def_roll) {
+			target.add_condition(COND_GRAPPLED);
+			broadcast_announce(c.name + " grapples " + target.name + "!");
+		} else {
+			broadcast_announce(c.name + " fails to grapple " + target.name + ".");
+		}
+		broadcast_state();
+	}
+
+	// ---- Scanning and Targeting ----
+
+	void handle_scan(user@ u, json_object@ msg) {
+		if (@combat == null or @u == null) return;
+		combatant@ c = null;
+		// Find this player's combatant.
+		for (uint i = 0; i < combat.combatants.length(); i++) {
+			if (combat.combatants[i].is_player and combat.combatants[i].player_username == u.username) {
+				@c = combat.combatants[i];
+				break;
+			}
+		}
+		if (@c == null) return;
+
+		string direction = "north";
+		if (msg.exists("direction")) direction = string(msg["direction"]);
+
+		// Find creatures in the specified direction.
+		json_array results;
+		for (uint i = 0; i < combat.combatants.length(); i++) {
+			combatant@ other = combat.combatants[i];
+			if (@other == @c or other.is_dead) continue;
+
+			bool matches = false;
+			if (direction == "north" and other.y < c.y) matches = true;
+			else if (direction == "south" and other.y > c.y) matches = true;
+			else if (direction == "east" and other.x > c.x) matches = true;
+			else if (direction == "west" and other.x < c.x) matches = true;
+
+			if (matches) {
+				int dist = feet_distance(c.x, c.y, other.x, other.y);
+				json_object entry;
+				entry["id"] = other.id;
+				entry["name"] = other.name;
+				entry["distance"] = dist;
+				entry["is_player"] = other.is_player;
+				entry["hp"] = other.current_hp;
+				entry["max_hp"] = other.max_hp;
+				results.add(entry);
+			}
+		}
+
+		u.send({{"type", message_types::scan_result}, {"direction", direction}, {"creatures", results}});
+	}
+
+	void handle_set_target(user@ u, json_object@ msg) {
+		if (@combat == null or @u == null or !msg.exists("target_id")) return;
+		uint target_id = uint(msg["target_id"]);
+		combatant@ target = combat.get_combatant(target_id);
+		if (@target == null) { u.send({{"type", message_types::error}, {"text", "Invalid target."}}); return; }
+
+		// Send target info back to the player.
+		json_object info;
+		info["type"] = message_types::target_info;
+		info["id"] = target.id;
+		info["name"] = target.name;
+		info["hp"] = target.current_hp;
+		info["max_hp"] = target.max_hp;
+		info["ac"] = target.armor_class;
+		info["is_player"] = target.is_player;
+
+		// Find player's combatant for distance calculation.
+		for (uint i = 0; i < combat.combatants.length(); i++) {
+			if (combat.combatants[i].is_player and combat.combatants[i].player_username == u.username) {
+				info["distance"] = feet_distance(combat.combatants[i].x, combat.combatants[i].y, target.x, target.y);
+				break;
+			}
+		}
+
+		json_array cond_arr;
+		for (uint i = 0; i < target.conditions.length(); i++) {
+			cond_arr.add(CONDITION_NAMES[target.conditions[i]]);
+		}
+		info["conditions"] = cond_arr;
+		u.send(info);
+	}
+
+	// ---- Monster AI Tick ----
+
+	void tick() {
+		if (@combat == null or !combat.battle_active) return;
+		if (@current_roll != null) return;  // Waiting for a roll.
+
+		combatant@ c = combat.current_combatant();
+		if (@c == null or c.is_player or c.is_dead) return;
+
+		// Simple monster AI: find nearest alive player, move toward them, attack if in range.
+		combatant@ nearest = null;
+		int nearest_dist = 9999;
+
+		for (uint i = 0; i < combat.combatants.length(); i++) {
+			combatant@ other = combat.combatants[i];
+			if (!other.is_player or other.is_dead or other.current_hp == 0) continue;
+			int dist = feet_distance(c.x, c.y, other.x, other.y);
+			if (dist < nearest_dist) {
+				nearest_dist = dist;
+				@nearest = other;
+			}
+		}
+
+		if (@nearest == null) {
+			// No targets: end turn.
+			broadcast_announce(c.name + " has no targets and ends its turn.");
+			advance_turn();
+			return;
+		}
+
+		// Move toward the nearest player.
+		while (c.movement_remaining >= FEET_PER_TILE and nearest_dist > c.main_hand_range) {
+			int dx = 0, dy = 0;
+			if (nearest.x > c.x) dx = 1;
+			else if (nearest.x < c.x) dx = -1;
+			if (nearest.y > c.y) dy = 1;
+			else if (nearest.y < c.y) dy = -1;
+
+			// Move one axis at a time.
+			if (dx != 0) {
+				c.x += dx;
+				c.movement_remaining -= FEET_PER_TILE;
+			} else if (dy != 0) {
+				c.y += dy;
+				c.movement_remaining -= FEET_PER_TILE;
+			} else {
+				break;
+			}
+			nearest_dist = feet_distance(c.x, c.y, nearest.x, nearest.y);
+		}
+
+		// Attack if in range and has action.
+		if (c.has_action and nearest_dist <= c.main_hand_range) {
+			c.has_action = false;
+			c.used_action = true;
+
+			int ability_mod = c.get_ability_mod(ABILITY_STR);
+			int atk_bonus = ability_mod + c.proficiency;
+			atk_bonus -= c.exhaustion_level * 2;
+
+			broadcast_announce(c.name + " attacks " + nearest.name + "!");
+
+			// Set up attack roll (auto-resolved since monster).
+			pending_roll pr;
+			pr.combatant_id = c.id;
+			pr.player_username = c.name;
+			pr.roll_type = ROLL_ATTACK;
+			pr.dice_sides = 20;
+			pr.modifier = atk_bonus;
+			pr.reason = "to attack " + nearest.name;
+			pr.target_id = nearest.id;
+			pr.has_advantage = false;
+			pr.has_disadvantage = false;
+			@current_roll = pr;
+
+			int natural = random(1, 20);
+			process_roll_result(natural);
+			return;  // process_roll_result may chain into damage.
+		}
+
+		// End monster turn.
+		broadcast_announce(c.name + " ends its turn.");
+		advance_turn();
+	}
+
+	// ---- Battle End ----
+
+	void end_battle() {
+		if (@combat == null) return;
+		combat.battle_active = false;
+
+		// Determine winner.
+		string winner = "Nobody";
+		for (uint i = 0; i < combat.combatants.length(); i++) {
+			if (combat.combatants[i].is_alive()) {
+				winner = combat.combatants[i].name;
+				break;
+			}
+		}
+
+		broadcast_announce("Battle is over! " + winner + " is victorious!", true);
+		broadcast_to_battle({{"type", message_types::game_end_battle}, {"winner", winner}});
+		broadcast_state();
+	}
+
+	// ---- Message Router ----
+
+	void handle_message(user@ u, json_object@ msg) {
+		if (@u == null or @msg == null or !msg.exists("type")) return;
+		string msg_type = msg["type"];
+
+		if (msg_type == message_types::start_game) {
+			start_game(u);
+		}
+		else if (msg_type == message_types::roll_result) {
+			if (@current_roll == null) return;
+			// Verify the roller is the expected player.
+			if (current_roll.player_username != u.username) return;
+			// Server rolls the dice; client just confirms they pressed Roll.
+			int natural = random(1, current_roll.dice_sides);
+			process_roll_result(natural);
+		}
+		else if (msg_type == message_types::action_attack) {
+			handle_attack(u, msg);
+		}
+		else if (msg_type == message_types::action_move) {
+			handle_move(u, msg);
+		}
+		else if (msg_type == message_types::action_dodge) {
+			handle_dodge(u);
+		}
+		else if (msg_type == message_types::action_dash) {
+			handle_dash(u);
+		}
+		else if (msg_type == message_types::action_disengage) {
+			handle_disengage(u);
+		}
+		else if (msg_type == message_types::action_help) {
+			handle_help(u, msg);
+		}
+		else if (msg_type == message_types::action_hide) {
+			handle_hide(u);
+		}
+		else if (msg_type == message_types::action_shove) {
+			handle_shove(u, msg);
+		}
+		else if (msg_type == message_types::action_grapple) {
+			handle_grapple(u, msg);
+		}
+		else if (msg_type == message_types::turn_end) {
+			handle_turn_end(u);
+		}
+		else if (msg_type == message_types::scan_direction) {
+			handle_scan(u, msg);
+		}
+		else if (msg_type == message_types::set_target) {
+			handle_set_target(u, msg);
+		}
+	}
+}

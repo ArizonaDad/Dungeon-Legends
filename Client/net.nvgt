@@ -193,6 +193,97 @@ void handle_message(json_object@ msg)
 		pending_view = "";
 		start_game_pending = true;
 	}
+	// === COMBAT MESSAGE ROUTING ===
+	else if (msg_type == message_types::game_start_battle) {
+		start_game_pending = true;
+		pending_view = "battle";
+		speak("Battle starting!", true);
+	}
+	else if (msg_type == message_types::game_state) {
+		parse_game_state(msg);
+	}
+	else if (msg_type == message_types::turn_start) {
+		string name = msg.exists("name") ? string(msg["name"]) : "";
+		bool is_me = msg.exists("is_you") ? bool(msg["is_you"]) : false;
+		current_turn_index = msg.exists("turn_index") ? int(msg["turn_index"]) : -1;
+		current_round = msg.exists("round") ? int(msg["round"]) : 0;
+		is_my_turn = is_me;
+		speak_turn_start(name, is_me);
+	}
+	else if (msg_type == message_types::roll_request) {
+		string reason = msg.exists("reason") ? string(msg["reason"]) : "Roll";
+		int dice = msg.exists("dice") ? int(msg["dice"]) : 20;
+		int modifier = msg.exists("modifier") ? int(msg["modifier"]) : 0;
+		prompt_roll(reason, dice, modifier);
+	}
+	else if (msg_type == message_types::roll_result) {
+		// Server broadcasts roll results to ALL players - spoken via TTS
+		int natural_roll = msg.exists("natural") ? int(msg["natural"]) : 0;
+		int total = msg.exists("total") ? int(msg["total"]) : 0;
+		string outcome = msg.exists("outcome") ? string(msg["outcome"]) : "";
+		show_roll_result(natural_roll, total, outcome);
+	}
+	else if (msg_type == message_types::initiative_order) {
+		parse_game_state(msg);
+		speak_initiative_order();
+	}
+	else if (msg_type == message_types::damage_dealt) {
+		string attacker = msg.exists("attacker") ? string(msg["attacker"]) : "";
+		string target = msg.exists("target") ? string(msg["target"]) : "";
+		int amount = msg.exists("amount") ? int(msg["amount"]) : 0;
+		string dmg_type = msg.exists("damage_type") ? string(msg["damage_type"]) : "";
+		bool is_crit = msg.exists("is_crit") ? bool(msg["is_crit"]) : false;
+		on_damage_dealt(attacker, target, amount, dmg_type, is_crit);
+	}
+	else if (msg_type == message_types::healing_done) {
+		string source = msg.exists("source") ? string(msg["source"]) : "";
+		string target = msg.exists("target") ? string(msg["target"]) : "";
+		int amount = msg.exists("amount") ? int(msg["amount"]) : 0;
+		on_healing_done(source, target, amount);
+	}
+	else if (msg_type == message_types::condition_applied) {
+		string target = msg.exists("target") ? string(msg["target"]) : "";
+		string condition = msg.exists("condition") ? string(msg["condition"]) : "";
+		on_condition_applied(target, condition);
+	}
+	else if (msg_type == message_types::condition_removed) {
+		string target = msg.exists("target") ? string(msg["target"]) : "";
+		string condition = msg.exists("condition") ? string(msg["condition"]) : "";
+		on_condition_removed(target, condition);
+	}
+	else if (msg_type == message_types::creature_died) {
+		string name = msg.exists("name") ? string(msg["name"]) : "";
+		bool is_player = msg.exists("is_player") ? bool(msg["is_player"]) : false;
+		on_creature_died(name, is_player);
+	}
+	else if (msg_type == message_types::death_save) {
+		string name = msg.exists("name") ? string(msg["name"]) : "";
+		int roll = msg.exists("roll") ? int(msg["roll"]) : 0;
+		string outcome = msg.exists("outcome") ? string(msg["outcome"]) : "";
+		on_death_save_result(name, roll, outcome);
+	}
+	else if (msg_type == message_types::scan_result) {
+		if (msg.exists("results")) {
+			receive_scan_results(msg["results"]);
+		}
+	}
+	else if (msg_type == message_types::game_end_battle) {
+		string result = msg.exists("result") ? string(msg["result"]) : "";
+		battle_active = false;
+		on_battle_end(result);
+	}
+	else if (msg_type == message_types::wave_start) {
+		int wave = msg.exists("wave") ? int(msg["wave"]) : 0;
+		on_wave_start(wave);
+	}
+	else if (msg_type == message_types::spell_effect) {
+		string text = msg.exists("text") ? string(msg["text"]) : "";
+		if (text != "") speak(text, false);
+	}
+	else if (msg_type == message_types::monster_action) {
+		string text = msg.exists("text") ? string(msg["text"]) : "";
+		if (text != "") speak(text, false);
+	}
 	else if (msg_type == message_types::leave_room) {
 		if (msg.exists("close")) {
 			game = false;
