@@ -36,8 +36,9 @@ void main()
 		alert("Tabletop Tavern is already running", "Sorry, only one instance of the game can be run at a time.");
 		exit();
 	}
-	show_window("TableTop Tavern.");
+	show_window("Souls MMO.");
 	install_keyhook();
+	set_sound_global_hrtf(true);
 	config.set_encryption("Libertos918!!!");
 	config.setup("Libertos Gaming", "Master Dungeon", false);
 	if (!connect()) {
@@ -133,6 +134,19 @@ bool main_screen_loop()
 				wait(50);
 				show_player_context_menu(msg_user, false);
 			}
+		}
+	}
+	// Tab: switch between chat history and chat input
+	if (key_pressed(KEY_TAB)) {
+		if (focus == f_main_history) {
+			main_screen.form.focus(f_main_chat);
+			speak("Chat message.", false);
+		} else if (focus == f_main_chat or focus == f_main_chat_send) {
+			main_screen.form.focus(f_main_history);
+			speak("Chat history.", false);
+		} else {
+			main_screen.form.focus(f_main_history);
+			speak("Chat history.", false);
 		}
 	}
 	if (key_pressed(KEY_F4)) {

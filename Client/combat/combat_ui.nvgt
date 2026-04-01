@@ -586,9 +586,6 @@ void reset_combat_state() {
 // ============================================================
 
 void combat_game_loop() {
-	// Enable HRTF 3D spatial audio
-	set_sound_global_hrtf(true);
-	speak("3D audio enabled.", false);
 	speak("Entering combat. I J K L to scan for creatures. F for actions on your turn. H for status. O for initiative order.", true);
 
 	while (battle_active) {
@@ -672,8 +669,6 @@ void combat_game_loop() {
 		}
 	}
 
-	// Restore audio - disable HRTF when leaving combat
-	set_sound_global_hrtf(false);
 	speak("Combat ended.", true);
 	reset_combat_state();
 }
