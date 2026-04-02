@@ -93,6 +93,22 @@ void main_menu()
 			summary += "Strength " + created_ability_scores[0] + ". Dexterity " + created_ability_scores[1] + ". Constitution " + created_ability_scores[2] + ". ";
 			summary += "Intelligence " + created_ability_scores[3] + ". Wisdom " + created_ability_scores[4] + ". Charisma " + created_ability_scores[5] + ". ";
 			summary += "Weapon: " + created_weapon + ".";
+			if (created_cantrips.length() > 0) {
+				summary += " Cantrips: ";
+				for (uint ci = 0; ci < created_cantrips.length(); ci++) {
+					if (ci > 0) summary += ", ";
+					summary += created_cantrips[ci];
+				}
+				summary += ".";
+			}
+			if (created_spells.length() > 0) {
+				summary += " Spells: ";
+				for (uint ci = 0; ci < created_spells.length(); ci++) {
+					if (ci > 0) summary += ", ";
+					summary += created_spells[ci];
+				}
+				summary += ".";
+			}
 			speak(summary, true);
 		}
 		else if (res == create_room) {

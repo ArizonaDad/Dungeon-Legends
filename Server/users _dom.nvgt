@@ -772,6 +772,8 @@ void handle_user_message(user@ u, json_object@ msg)
 			if (msg.exists("wis")) char_data["wis"] = msg["wis"];
 			if (msg.exists("cha")) char_data["cha"] = msg["cha"];
 			if (msg.exists("weapon")) char_data["weapon"] = msg["weapon"];
+			if (msg.exists("cantrips")) char_data["cantrips"] = msg["cantrips"];
+			if (msg.exists("spells")) char_data["spells"] = msg["spells"];
 			data["character"] = char_data;
 			u.account.commit();
 			u.send({{"type", message_types::announce}, {"text", "Character saved."}, {"interrupt", false}});

@@ -6,6 +6,105 @@ string created_char_class = "";
 int created_char_level = 1;
 int[] created_ability_scores = {10,10,10,10,10,10};
 string created_weapon = "Longsword";
+string[] created_cantrips;
+string[] created_spells;
+
+void spell_selection_step() {
+    string lc = created_char_class.lower();
+    bool is_full_caster = (lc == "bard" or lc == "cleric" or lc == "druid" or lc == "sorcerer" or lc == "wizard");
+    bool is_half_caster = (lc == "paladin" or lc == "ranger" or lc == "artificer");
+    bool is_warlock = (lc == "warlock");
+
+    if (!is_full_caster and !is_half_caster and !is_warlock) {
+        speak(created_char_class + " does not use spells.", false);
+        return;
+    }
+
+    // Calculate max spell level
+    int max_spell_level = 0;
+    if (is_full_caster) max_spell_level = (created_char_level + 1) / 2;
+    else if (is_half_caster) max_spell_level = (created_char_level + 3) / 4;
+    else if (is_warlock) max_spell_level = (created_char_level + 1) / 2;
+    if (is_full_caster and max_spell_level > 9) max_spell_level = 9;
+    if ((is_half_caster or is_warlock) and max_spell_level > 5) max_spell_level = 5;
+    if (max_spell_level < 1) max_spell_level = 1;
+
+    // Calculate cantrips known
+    int cantrips_to_pick = 2;
+    if (lc == "sorcerer") cantrips_to_pick = 4;
+    else if (lc == "cleric" or lc == "wizard") cantrips_to_pick = 3;
+    if (lc == "artificer" and created_char_level >= 14) cantrips_to_pick = 4;
+    else if (lc == "artificer" and created_char_level >= 10) cantrips_to_pick = 3;
+    else if (created_char_level >= 10) cantrips_to_pick += 2;
+    else if (created_char_level >= 4) cantrips_to_pick += 1;
+
+    int spells_to_pick = 6;
+
+    speak("Spell selection. You can learn " + cantrips_to_pick + " cantrips and " + spells_to_pick + " spells up to level " + max_spell_level + ".", true);
+
+    created_cantrips.resize(0);
+    created_spells.resize(0);
+
+    // Build the available spell list for this class and level
+    build_spell_list_for_class(created_char_class, created_char_level);
+
+    // CANTRIP SELECTION
+    speak("Choose " + cantrips_to_pick + " cantrips.", true);
+    for (int cp = 0; cp < cantrips_to_pick; cp++) {
+        menu@ cm = setup_sub_menu("Choose cantrip " + (cp + 1) + " of " + cantrips_to_pick + ".");
+        int count = 0;
+        string[] cantrip_ids;
+        for (uint si = 0; si < available_spells.length(); si++) {
+            if (available_spells[si].level == 0) {
+                bool already = false;
+                for (uint ci = 0; ci < created_cantrips.length(); ci++) {
+                    if (created_cantrips[ci] == available_spells[si].id) { already = true; break; }
+                }
+                if (!already) {
+                    cm.add_item(available_spells[si].name + ". " + available_spells[si].description);
+                    cantrip_ids.insert_last(available_spells[si].id);
+                    count++;
+                }
+            }
+        }
+        if (count == 0) { speak("No more cantrips available.", false); break; }
+        int pick = cm.run();
+        if (pick >= 0 and pick < int(cantrip_ids.length())) {
+            created_cantrips.insert_last(cantrip_ids[pick]);
+            speak("Learned " + cantrip_ids[pick] + ".", false);
+        }
+    }
+
+    // LEVELED SPELL SELECTION
+    speak("Choose up to " + spells_to_pick + " leveled spells.", true);
+    for (int sp = 0; sp < spells_to_pick; sp++) {
+        menu@ sm = setup_sub_menu("Choose spell " + (sp + 1) + " of " + spells_to_pick + ". Or press escape to finish.");
+        int count = 0;
+        string[] spell_ids;
+        for (uint si = 0; si < available_spells.length(); si++) {
+            if (available_spells[si].level > 0 and available_spells[si].level <= max_spell_level) {
+                bool already = false;
+                for (uint ci = 0; ci < created_spells.length(); ci++) {
+                    if (created_spells[ci] == available_spells[si].id) { already = true; break; }
+                }
+                if (!already) {
+                    sm.add_item("Level " + available_spells[si].level + ": " + available_spells[si].name + ". " + available_spells[si].description);
+                    spell_ids.insert_last(available_spells[si].id);
+                    count++;
+                }
+            }
+        }
+        if (count == 0) { speak("No more spells available at your level.", false); break; }
+        int pick = sm.run();
+        if (pick < 0) { speak("Spell selection complete.", false); break; }
+        if (pick < int(spell_ids.length())) {
+            created_spells.insert_last(spell_ids[pick]);
+            speak("Learned " + spell_ids[pick] + ".", false);
+        }
+    }
+
+    speak("You know " + created_cantrips.length() + " cantrips and " + created_spells.length() + " spells.", false);
+}
 
 void character_creation_menu() {
     speak("Character creation. Let's build your champion.", true);
@@ -203,8 +302,28 @@ void character_creation_menu() {
     created_weapon = weapon_names[weapon_pick];
     speak("You chose " + created_weapon + ".", true);
 
-    // Step 7: Summary
-    speak("Character summary. " + created_char_name + ". " + created_char_race + " " + created_char_class + ", level " + created_char_level + ". Strength " + created_ability_scores[0] + ". Dexterity " + created_ability_scores[1] + ". Constitution " + created_ability_scores[2] + ". Intelligence " + created_ability_scores[3] + ". Wisdom " + created_ability_scores[4] + ". Charisma " + created_ability_scores[5] + ". Weapon: " + created_weapon + ". Press enter to confirm.", true);
+    // Step 7: Spell Selection
+    spell_selection_step();
+
+    // Step 8: Summary
+    string spell_summary = "";
+    if (created_cantrips.length() > 0) {
+        spell_summary += " Cantrips: ";
+        for (uint ci = 0; ci < created_cantrips.length(); ci++) {
+            if (ci > 0) spell_summary += ", ";
+            spell_summary += created_cantrips[ci];
+        }
+        spell_summary += ".";
+    }
+    if (created_spells.length() > 0) {
+        spell_summary += " Spells: ";
+        for (uint ci = 0; ci < created_spells.length(); ci++) {
+            if (ci > 0) spell_summary += ", ";
+            spell_summary += created_spells[ci];
+        }
+        spell_summary += ".";
+    }
+    speak("Character summary. " + created_char_name + ". " + created_char_race + " " + created_char_class + ", level " + created_char_level + ". Strength " + created_ability_scores[0] + ". Dexterity " + created_ability_scores[1] + ". Constitution " + created_ability_scores[2] + ". Intelligence " + created_ability_scores[3] + ". Wisdom " + created_ability_scores[4] + ". Charisma " + created_ability_scores[5] + ". Weapon: " + created_weapon + "." + spell_summary + " Press enter to confirm.", true);
 
     // Wait for confirmation
     while (true) {
@@ -215,6 +334,18 @@ void character_creation_menu() {
             speak("Character creation cancelled.", true);
             return;
         }
+    }
+
+    // Build comma-separated spell strings for network send
+    string cantrip_str = "";
+    for (uint ci = 0; ci < created_cantrips.length(); ci++) {
+        if (ci > 0) cantrip_str += ",";
+        cantrip_str += created_cantrips[ci];
+    }
+    string spell_str = "";
+    for (uint ci = 0; ci < created_spells.length(); ci++) {
+        if (ci > 0) spell_str += ",";
+        spell_str += created_spells[ci];
     }
 
     // Send to server
@@ -230,7 +361,9 @@ void character_creation_menu() {
         {"int", created_ability_scores[3]},
         {"wis", created_ability_scores[4]},
         {"cha", created_ability_scores[5]},
-        {"weapon", created_weapon}
+        {"weapon", created_weapon},
+        {"cantrips", cantrip_str},
+        {"spells", spell_str}
     });
     speak("Character created! " + created_char_name + ", " + created_char_race + " " + created_char_class + ", level " + created_char_level + ".", true);
 }
