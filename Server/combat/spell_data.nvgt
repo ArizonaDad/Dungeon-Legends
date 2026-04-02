@@ -1,0 +1,145 @@
+#include "../../common/combat_constants.nvgt"
+#include "combat_engine.nvgt"
+
+class spell_def {
+    string id;
+    string name;
+    int level;              // 0 = cantrip, 1-9 = spell level
+    string school;          // evocation, necromancy, etc.
+    int casting_time;       // 0=action, 1=bonus action, 2=reaction
+    int range;              // in feet, 0=self, 5=touch
+    bool concentration;
+    int duration_rounds;    // 0=instant, -1=until dispelled
+    int save_type;          // -1=none (attack roll), ABILITY_DEX, ABILITY_CON, etc.
+    int save_dc_ability;    // which ability mod to use for DC calculation
+    // Damage/healing
+    int damage_dice;
+    int damage_count;
+    int damage_type;        // DMG_FIRE, DMG_RADIANT, etc.
+    bool is_healing;
+    int healing_dice;
+    int healing_count;
+    // Scaling
+    int upcast_extra_dice;  // extra dice per spell level above base
+    bool scales_with_level; // cantrips scale at 5/11/17
+    // Targets
+    int max_targets;        // 1=single, 0=self, 3=magic missile etc.
+    bool is_aoe;
+    int aoe_radius;         // in feet
+    // Description for TTS
+    string description;
+    // Which classes can use this spell
+    string class_list;      // comma separated: "wizard,sorcerer,cleric"
+}
+
+spell_def@[] SPELL_DEFS;
+
+void init_spell_defs() {
+    // CANTRIPS (level 0)
+    { spell_def s; s.id="fire_bolt"; s.name="Fire Bolt"; s.level=0; s.school="evocation"; s.casting_time=0; s.range=120; s.concentration=false; s.duration_rounds=0; s.save_type=-1; s.damage_dice=10; s.damage_count=1; s.damage_type=DMG_FIRE; s.is_healing=false; s.scales_with_level=true; s.max_targets=1; s.description="Hurl a mote of fire. Ranged spell attack. 1d10 fire damage, scales at levels 5, 11, 17."; s.class_list="wizard,sorcerer,artificer"; SPELL_DEFS.insert_last(s); }
+
+    { spell_def s; s.id="sacred_flame"; s.name="Sacred Flame"; s.level=0; s.school="evocation"; s.casting_time=0; s.range=60; s.concentration=false; s.duration_rounds=0; s.save_type=ABILITY_DEX; s.damage_dice=8; s.damage_count=1; s.damage_type=DMG_RADIANT; s.is_healing=false; s.scales_with_level=true; s.max_targets=1; s.description="Flame descends on a creature. DEX save or 1d8 radiant damage. No cover benefit."; s.class_list="cleric"; SPELL_DEFS.insert_last(s); }
+
+    { spell_def s; s.id="eldritch_blast"; s.name="Eldritch Blast"; s.level=0; s.school="evocation"; s.casting_time=0; s.range=120; s.concentration=false; s.duration_rounds=0; s.save_type=-1; s.damage_dice=10; s.damage_count=1; s.damage_type=DMG_FORCE; s.is_healing=false; s.scales_with_level=true; s.max_targets=1; s.description="Beam of crackling energy. Ranged spell attack. 1d10 force damage. Extra beams at 5, 11, 17."; s.class_list="warlock"; SPELL_DEFS.insert_last(s); }
+
+    { spell_def s; s.id="toll_the_dead"; s.name="Toll the Dead"; s.level=0; s.school="necromancy"; s.casting_time=0; s.range=60; s.concentration=false; s.duration_rounds=0; s.save_type=ABILITY_WIS; s.damage_dice=8; s.damage_count=1; s.damage_type=DMG_NECROTIC; s.is_healing=false; s.scales_with_level=true; s.max_targets=1; s.description="Point at a creature and a dolorous bell sounds. WIS save or 1d8 necrotic, 1d12 if already wounded."; s.class_list="cleric,wizard"; SPELL_DEFS.insert_last(s); }
+
+    { spell_def s; s.id="vicious_mockery"; s.name="Vicious Mockery"; s.level=0; s.school="enchantment"; s.casting_time=0; s.range=60; s.concentration=false; s.duration_rounds=0; s.save_type=ABILITY_WIS; s.damage_dice=6; s.damage_count=1; s.damage_type=DMG_PSYCHIC; s.is_healing=false; s.scales_with_level=true; s.max_targets=1; s.description="Unleash a string of insults. WIS save or 1d6 psychic damage and disadvantage on next attack."; s.class_list="bard"; SPELL_DEFS.insert_last(s); }
+
+    // LEVEL 1 SPELLS
+    { spell_def s; s.id="magic_missile"; s.name="Magic Missile"; s.level=1; s.school="evocation"; s.casting_time=0; s.range=120; s.concentration=false; s.duration_rounds=0; s.save_type=-1; s.damage_dice=4; s.damage_count=3; s.damage_type=DMG_FORCE; s.is_healing=false; s.upcast_extra_dice=1; s.max_targets=3; s.description="Three darts of magical force. Each deals 1d4 plus 1 force damage. Auto-hit. Extra dart per level upcast."; s.class_list="wizard,sorcerer"; SPELL_DEFS.insert_last(s); }
+
+    { spell_def s; s.id="shield"; s.name="Shield"; s.level=1; s.school="abjuration"; s.casting_time=2; s.range=0; s.concentration=false; s.duration_rounds=1; s.save_type=-1; s.damage_dice=0; s.damage_count=0; s.is_healing=false; s.max_targets=0; s.description="Reaction. Plus 5 to AC until start of your next turn. Blocks Magic Missile."; s.class_list="wizard,sorcerer"; SPELL_DEFS.insert_last(s); }
+
+    { spell_def s; s.id="cure_wounds"; s.name="Cure Wounds"; s.level=1; s.school="evocation"; s.casting_time=0; s.range=5; s.concentration=false; s.duration_rounds=0; s.save_type=-1; s.is_healing=true; s.healing_dice=8; s.healing_count=2; s.upcast_extra_dice=2; s.max_targets=1; s.description="Touch a creature to restore 2d8 plus spellcasting modifier hit points. Extra 2d8 per level upcast."; s.class_list="bard,cleric,druid,paladin,ranger,artificer"; SPELL_DEFS.insert_last(s); }
+
+    { spell_def s; s.id="healing_word"; s.name="Healing Word"; s.level=1; s.school="evocation"; s.casting_time=1; s.range=60; s.concentration=false; s.duration_rounds=0; s.save_type=-1; s.is_healing=true; s.healing_dice=4; s.healing_count=2; s.upcast_extra_dice=2; s.max_targets=1; s.description="Bonus action. Restore 2d4 plus spellcasting modifier hit points at range. Extra 2d4 per level upcast."; s.class_list="bard,cleric,druid"; SPELL_DEFS.insert_last(s); }
+
+    { spell_def s; s.id="thunderwave"; s.name="Thunderwave"; s.level=1; s.school="evocation"; s.casting_time=0; s.range=0; s.concentration=false; s.duration_rounds=0; s.save_type=ABILITY_CON; s.damage_dice=8; s.damage_count=2; s.damage_type=DMG_THUNDER; s.is_healing=false; s.upcast_extra_dice=1; s.is_aoe=true; s.aoe_radius=15; s.max_targets=4; s.description="Wave of thunderous force. CON save or 2d8 thunder and pushed 10 feet. Extra 1d8 per level."; s.class_list="bard,druid,sorcerer,wizard"; SPELL_DEFS.insert_last(s); }
+
+    { spell_def s; s.id="guiding_bolt"; s.name="Guiding Bolt"; s.level=1; s.school="evocation"; s.casting_time=0; s.range=120; s.concentration=false; s.duration_rounds=0; s.save_type=-1; s.damage_dice=6; s.damage_count=4; s.damage_type=DMG_RADIANT; s.is_healing=false; s.upcast_extra_dice=1; s.max_targets=1; s.description="Flash of light streaks toward target. Ranged spell attack. 4d6 radiant. Next attack against target has advantage."; s.class_list="cleric"; SPELL_DEFS.insert_last(s); }
+
+    { spell_def s; s.id="bless"; s.name="Bless"; s.level=1; s.school="enchantment"; s.casting_time=0; s.range=30; s.concentration=true; s.duration_rounds=10; s.save_type=-1; s.damage_dice=0; s.damage_count=0; s.is_healing=false; s.max_targets=3; s.description="Up to 3 creatures add 1d4 to attack rolls and saving throws for 1 minute. Concentration."; s.class_list="cleric,paladin"; SPELL_DEFS.insert_last(s); }
+
+    // LEVEL 2 SPELLS
+    { spell_def s; s.id="spiritual_weapon"; s.name="Spiritual Weapon"; s.level=2; s.school="evocation"; s.casting_time=1; s.range=60; s.concentration=true; s.duration_rounds=10; s.save_type=-1; s.damage_dice=8; s.damage_count=1; s.damage_type=DMG_FORCE; s.is_healing=false; s.upcast_extra_dice=1; s.max_targets=1; s.description="Bonus action. Spectral weapon attacks as bonus action each turn. 1d8 plus modifier force. Concentration in 2024."; s.class_list="cleric"; SPELL_DEFS.insert_last(s); }
+
+    { spell_def s; s.id="misty_step"; s.name="Misty Step"; s.level=2; s.school="conjuration"; s.casting_time=1; s.range=0; s.concentration=false; s.duration_rounds=0; s.save_type=-1; s.damage_dice=0; s.damage_count=0; s.is_healing=false; s.max_targets=0; s.description="Bonus action. Teleport 30 feet to an unoccupied space you can see."; s.class_list="sorcerer,warlock,wizard"; SPELL_DEFS.insert_last(s); }
+
+    { spell_def s; s.id="hold_person"; s.name="Hold Person"; s.level=2; s.school="enchantment"; s.casting_time=0; s.range=60; s.concentration=true; s.duration_rounds=10; s.save_type=ABILITY_WIS; s.damage_dice=0; s.damage_count=0; s.is_healing=false; s.max_targets=1; s.description="Target humanoid makes WIS save or is paralyzed. Repeat save at end of each turn. Concentration."; s.class_list="bard,cleric,druid,sorcerer,warlock,wizard"; SPELL_DEFS.insert_last(s); }
+
+    { spell_def s; s.id="scorching_ray"; s.name="Scorching Ray"; s.level=2; s.school="evocation"; s.casting_time=0; s.range=120; s.concentration=false; s.duration_rounds=0; s.save_type=-1; s.damage_dice=6; s.damage_count=2; s.damage_type=DMG_FIRE; s.is_healing=false; s.upcast_extra_dice=0; s.max_targets=3; s.description="Three rays of fire. Ranged spell attack for each. 2d6 fire per ray. Extra ray per level upcast."; s.class_list="sorcerer,wizard"; SPELL_DEFS.insert_last(s); }
+
+    // LEVEL 3 SPELLS
+    { spell_def s; s.id="fireball"; s.name="Fireball"; s.level=3; s.school="evocation"; s.casting_time=0; s.range=150; s.concentration=false; s.duration_rounds=0; s.save_type=ABILITY_DEX; s.damage_dice=6; s.damage_count=8; s.damage_type=DMG_FIRE; s.is_healing=false; s.upcast_extra_dice=1; s.is_aoe=true; s.aoe_radius=20; s.max_targets=8; s.description="Bright streak explodes in flame. DEX save. 8d6 fire damage, half on success. Extra 1d6 per level."; s.class_list="sorcerer,wizard"; SPELL_DEFS.insert_last(s); }
+
+    { spell_def s; s.id="counterspell"; s.name="Counterspell"; s.level=3; s.school="abjuration"; s.casting_time=2; s.range=60; s.concentration=false; s.duration_rounds=0; s.save_type=ABILITY_CON; s.damage_dice=0; s.damage_count=0; s.is_healing=false; s.max_targets=1; s.description="Reaction. Interrupt a spell being cast. In 2024, target makes CON save or spell fails."; s.class_list="sorcerer,warlock,wizard"; SPELL_DEFS.insert_last(s); }
+
+    { spell_def s; s.id="spirit_guardians"; s.name="Spirit Guardians"; s.level=3; s.school="conjuration"; s.casting_time=0; s.range=0; s.concentration=true; s.duration_rounds=100; s.save_type=ABILITY_WIS; s.damage_dice=8; s.damage_count=3; s.damage_type=DMG_RADIANT; s.is_healing=false; s.upcast_extra_dice=1; s.is_aoe=true; s.aoe_radius=15; s.max_targets=8; s.description="Spirits protect you in 15ft radius. WIS save or 3d8 radiant when entering or starting turn. Half speed. Concentration."; s.class_list="cleric"; SPELL_DEFS.insert_last(s); }
+
+    { spell_def s; s.id="revivify"; s.name="Revivify"; s.level=3; s.school="necromancy"; s.casting_time=0; s.range=5; s.concentration=false; s.duration_rounds=0; s.save_type=-1; s.is_healing=true; s.healing_dice=0; s.healing_count=0; s.max_targets=1; s.description="Touch a creature that died within 1 minute. It returns to life with 1 hit point. Requires 300gp diamond."; s.class_list="cleric,paladin,druid,ranger,artificer"; SPELL_DEFS.insert_last(s); }
+
+    { spell_def s; s.id="haste"; s.name="Haste"; s.level=3; s.school="transmutation"; s.casting_time=0; s.range=30; s.concentration=true; s.duration_rounds=10; s.save_type=-1; s.damage_dice=0; s.damage_count=0; s.is_healing=false; s.max_targets=1; s.description="Target doubles speed, plus 2 AC, advantage on DEX saves, extra action each turn. Concentration."; s.class_list="sorcerer,wizard,artificer"; SPELL_DEFS.insert_last(s); }
+
+    // LEVEL 4
+    { spell_def s; s.id="banishment"; s.name="Banishment"; s.level=4; s.school="abjuration"; s.casting_time=0; s.range=60; s.concentration=true; s.duration_rounds=10; s.save_type=ABILITY_CHA; s.damage_dice=0; s.damage_count=0; s.is_healing=false; s.max_targets=1; s.description="CHA save or banished to a harmless demiplane. Concentration 1 minute."; s.class_list="cleric,paladin,sorcerer,warlock,wizard"; SPELL_DEFS.insert_last(s); }
+
+    // LEVEL 5
+    { spell_def s; s.id="heal"; s.name="Heal"; s.level=6; s.school="evocation"; s.casting_time=0; s.range=60; s.concentration=false; s.duration_rounds=0; s.save_type=-1; s.is_healing=true; s.healing_dice=0; s.healing_count=0; s.max_targets=1; s.description="Restore 70 hit points and cure blindness, deafness, and disease."; s.class_list="cleric,druid"; SPELL_DEFS.insert_last(s); }
+}
+
+spell_def@ get_spell(string id) {
+    for (uint i = 0; i < SPELL_DEFS.length(); i++) {
+        if (SPELL_DEFS[i].id == id) return SPELL_DEFS[i];
+    }
+    return null;
+}
+
+// Get spells available to a specific class
+void get_class_spells(string class_name, int max_level, spell_def@[]@ out_spells) {
+    out_spells.resize(0);
+    string lower_class = class_name;
+    // Simple lowercase (NVGT may not have .lower())
+    for (uint i = 0; i < SPELL_DEFS.length(); i++) {
+        if (SPELL_DEFS[i].level > max_level) continue;
+        // Check if class is in the spell's class_list
+        if (SPELL_DEFS[i].class_list.find(lower_class.lower()) >= 0) {
+            out_spells.insert_last(SPELL_DEFS[i]);
+        }
+    }
+}
+
+// Calculate cantrip scaling: extra dice at levels 5, 11, 17
+int cantrip_dice_count(int base_count, int caster_level) {
+    if (caster_level >= 17) return base_count + 3;
+    if (caster_level >= 11) return base_count + 2;
+    if (caster_level >= 5) return base_count + 1;
+    return base_count;
+}
+
+// Calculate spell save DC: 8 + proficiency + spellcasting ability mod
+int spell_save_dc(combatant@ caster) {
+    if (@caster == null) return 10;
+    int mod = 0;
+    // Use highest mental stat as spellcasting ability (simplified)
+    int int_mod = caster.get_ability_mod(ABILITY_INT);
+    int wis_mod = caster.get_ability_mod(ABILITY_WIS);
+    int cha_mod = caster.get_ability_mod(ABILITY_CHA);
+    mod = int_mod;
+    if (wis_mod > mod) mod = wis_mod;
+    if (cha_mod > mod) mod = cha_mod;
+    return 8 + caster.proficiency + mod;
+}
+
+// Calculate spell attack bonus
+int spell_attack_bonus(combatant@ caster) {
+    if (@caster == null) return 0;
+    int mod = 0;
+    int int_mod = caster.get_ability_mod(ABILITY_INT);
+    int wis_mod = caster.get_ability_mod(ABILITY_WIS);
+    int cha_mod = caster.get_ability_mod(ABILITY_CHA);
+    mod = int_mod;
+    if (wis_mod > mod) mod = wis_mod;
+    if (cha_mod > mod) mod = cha_mod;
+    return mod + caster.proficiency;
+}

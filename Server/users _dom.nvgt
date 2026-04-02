@@ -753,7 +753,7 @@ void handle_user_message(user@ u, json_object@ msg)
 		}
 		// Create battle manager and start combat on server
 		@u.room.bm = battle_manager();
-		u.room.bm.start_game(u);
+		u.room.bm.start_game(u, mode, scenario);
 	}
 
 	// --- Character Creation (save to account) ---

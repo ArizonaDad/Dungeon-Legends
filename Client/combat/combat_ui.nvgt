@@ -2,6 +2,7 @@
 // Handles turn display, Roll button prompts, action menus, targeting, TTS feedback.
 
 #include "../../common/combat_constants.nvgt"
+#include "spell_menu.nvgt"
 
 // Client-side view of a combatant
 class combat_entity {
@@ -198,8 +199,12 @@ void show_action_menu() {
 }
 
 void show_spell_menu() {
-	speak("Spell casting not yet implemented. Choose another action.", true);
-	// TODO: Build spell selection menu from character's known spells.
+	// Build spell list based on character class and level
+	build_spell_list_for_class(created_char_class, created_char_level);
+	string spell_id = show_spell_selection_menu();
+	if (spell_id == "") return;
+	// Send cast request to server
+	send({{"type", message_types::action_cast}, {"spell", spell_id}, {"target", current_target_id}});
 }
 
 // ============================================================

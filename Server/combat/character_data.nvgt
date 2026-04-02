@@ -447,6 +447,14 @@ void apply_weapon(character_sheet@ cs, string weapon) {
     }
 }
 
+void finalize_character(character_sheet@ cs) {
+    apply_racial_bonuses(cs);
+    apply_class_defaults(cs);
+    apply_weapon(cs, cs.weapon_name);
+    calculate_hp(cs);
+    calculate_ac(cs);
+}
+
 combatant@ create_player_combatant(character_sheet@ cs, string player_username, int x, int y) {
     combatant c;
     c.name = cs.name;

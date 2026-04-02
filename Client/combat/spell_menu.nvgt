@@ -1,0 +1,103 @@
+#include "../../common/combat_constants.nvgt"
+
+// Client-side spell selection for combat
+// Called from show_spell_menu() in combat_ui.nvgt
+
+// Simplified spell data for client display
+class client_spell {
+    string id;
+    string name;
+    int level;
+    string description;
+}
+
+client_spell[] available_spells;
+
+void build_spell_list_for_class(string class_name, int char_level) {
+    available_spells.resize(0);
+    // Cantrips available to all casters
+    string lc = class_name.lower();
+
+    // Build a basic spell list based on class
+    // Cantrips
+    if (lc == "wizard" or lc == "sorcerer" or lc == "artificer") {
+        { client_spell s; s.id = "fire_bolt"; s.name = "Fire Bolt"; s.level = 0; s.description = "Cantrip. 1d10 fire. Ranged spell attack. 120 feet."; available_spells.insert_last(s); }
+    }
+    if (lc == "cleric") {
+        { client_spell s; s.id = "sacred_flame"; s.name = "Sacred Flame"; s.level = 0; s.description = "Cantrip. 1d8 radiant. DEX save. 60 feet."; available_spells.insert_last(s); }
+        { client_spell s; s.id = "toll_the_dead"; s.name = "Toll the Dead"; s.level = 0; s.description = "Cantrip. 1d8 necrotic, 1d12 if wounded. WIS save. 60 feet."; available_spells.insert_last(s); }
+    }
+    if (lc == "warlock") {
+        { client_spell s; s.id = "eldritch_blast"; s.name = "Eldritch Blast"; s.level = 0; s.description = "Cantrip. 1d10 force. Ranged spell attack. 120 feet."; available_spells.insert_last(s); }
+    }
+    if (lc == "bard") {
+        { client_spell s; s.id = "vicious_mockery"; s.name = "Vicious Mockery"; s.level = 0; s.description = "Cantrip. 1d6 psychic. WIS save. Disadvantage on next attack."; available_spells.insert_last(s); }
+    }
+
+    // Level 1+ spells (if they have slots)
+    if (char_level >= 1) {
+        if (lc == "wizard" or lc == "sorcerer") {
+            { client_spell s; s.id = "magic_missile"; s.name = "Magic Missile"; s.level = 1; s.description = "Level 1. 3 darts, 1d4+1 force each. Auto-hit."; available_spells.insert_last(s); }
+            { client_spell s; s.id = "shield"; s.name = "Shield"; s.level = 1; s.description = "Level 1. Reaction. +5 AC until next turn."; available_spells.insert_last(s); }
+            { client_spell s; s.id = "thunderwave"; s.name = "Thunderwave"; s.level = 1; s.description = "Level 1. 2d8 thunder. CON save. Push 10 feet."; available_spells.insert_last(s); }
+        }
+        if (lc == "cleric") {
+            { client_spell s; s.id = "cure_wounds"; s.name = "Cure Wounds"; s.level = 1; s.description = "Level 1. Touch. 2d8 + modifier healing."; available_spells.insert_last(s); }
+            { client_spell s; s.id = "healing_word"; s.name = "Healing Word"; s.level = 1; s.description = "Level 1. Bonus action. 2d4 + modifier healing. 60 feet."; available_spells.insert_last(s); }
+            { client_spell s; s.id = "guiding_bolt"; s.name = "Guiding Bolt"; s.level = 1; s.description = "Level 1. 4d6 radiant. Next attack has advantage."; available_spells.insert_last(s); }
+            { client_spell s; s.id = "bless"; s.name = "Bless"; s.level = 1; s.description = "Level 1. 3 targets add 1d4 to attacks and saves. Concentration."; available_spells.insert_last(s); }
+        }
+        if (lc == "bard" or lc == "druid" or lc == "ranger") {
+            { client_spell s; s.id = "cure_wounds"; s.name = "Cure Wounds"; s.level = 1; s.description = "Level 1. Touch. 2d8 + modifier healing."; available_spells.insert_last(s); }
+            { client_spell s; s.id = "healing_word"; s.name = "Healing Word"; s.level = 1; s.description = "Level 1. Bonus action. 2d4 + modifier healing. 60 feet."; available_spells.insert_last(s); }
+            { client_spell s; s.id = "thunderwave"; s.name = "Thunderwave"; s.level = 1; s.description = "Level 1. 2d8 thunder. CON save. Push 10 feet."; available_spells.insert_last(s); }
+        }
+        if (lc == "paladin") {
+            { client_spell s; s.id = "cure_wounds"; s.name = "Cure Wounds"; s.level = 1; s.description = "Level 1. Touch. 2d8 + modifier healing."; available_spells.insert_last(s); }
+            { client_spell s; s.id = "bless"; s.name = "Bless"; s.level = 1; s.description = "Level 1. 3 targets add 1d4 to attacks and saves. Concentration."; available_spells.insert_last(s); }
+        }
+    }
+    // Level 2
+    if (char_level >= 3) {
+        if (lc == "cleric") {
+            { client_spell s; s.id = "spiritual_weapon"; s.name = "Spiritual Weapon"; s.level = 2; s.description = "Level 2. Bonus action. 1d8+mod force per turn. Concentration."; available_spells.insert_last(s); }
+            { client_spell s; s.id = "hold_person"; s.name = "Hold Person"; s.level = 2; s.description = "Level 2. WIS save or paralyzed. Concentration."; available_spells.insert_last(s); }
+        }
+        if (lc == "wizard" or lc == "sorcerer") {
+            { client_spell s; s.id = "scorching_ray"; s.name = "Scorching Ray"; s.level = 2; s.description = "Level 2. 3 rays, 2d6 fire each. Spell attack."; available_spells.insert_last(s); }
+            { client_spell s; s.id = "misty_step"; s.name = "Misty Step"; s.level = 2; s.description = "Level 2. Bonus action. Teleport 30 feet."; available_spells.insert_last(s); }
+            { client_spell s; s.id = "hold_person"; s.name = "Hold Person"; s.level = 2; s.description = "Level 2. WIS save or paralyzed. Concentration."; available_spells.insert_last(s); }
+        }
+    }
+    // Level 3
+    if (char_level >= 5) {
+        if (lc == "wizard" or lc == "sorcerer") {
+            { client_spell s; s.id = "fireball"; s.name = "Fireball"; s.level = 3; s.description = "Level 3. 8d6 fire in 20ft radius. DEX save."; available_spells.insert_last(s); }
+            { client_spell s; s.id = "counterspell"; s.name = "Counterspell"; s.level = 3; s.description = "Level 3. Reaction. Negate a spell being cast. CON save."; available_spells.insert_last(s); }
+            { client_spell s; s.id = "haste"; s.name = "Haste"; s.level = 3; s.description = "Level 3. Double speed, +2 AC, extra action. Concentration."; available_spells.insert_last(s); }
+        }
+        if (lc == "cleric") {
+            { client_spell s; s.id = "spirit_guardians"; s.name = "Spirit Guardians"; s.level = 3; s.description = "Level 3. 3d8 radiant in 15ft radius around you. Concentration."; available_spells.insert_last(s); }
+            { client_spell s; s.id = "revivify"; s.name = "Revivify"; s.level = 3; s.description = "Level 3. Revive a creature that died within 1 minute with 1 HP."; available_spells.insert_last(s); }
+        }
+    }
+}
+
+// Display the spell selection menu and return the chosen spell ID
+string show_spell_selection_menu() {
+    if (available_spells.length() == 0) {
+        speak("No spells available for your class.", true);
+        return "";
+    }
+
+    menu@ m = setup_sub_menu("Choose a spell to cast.");
+    for (uint i = 0; i < available_spells.length(); i++) {
+        m.add_item(available_spells[i].name + ". " + available_spells[i].description);
+    }
+    int res = m.run();
+    if (res < 0 or res >= int(available_spells.length())) {
+        speak("Cancelled.", true);
+        return "";
+    }
+    return available_spells[res].id;
+}

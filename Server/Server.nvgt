@@ -9,6 +9,7 @@
 #include "combat/character_data.nvgt"
 #include "combat/monster_data.nvgt"
 #include "combat/wave_system.nvgt"
+#include "combat/spell_data.nvgt"
 network net;           // Low-level network object.
 server svr;            // Our server wrapper.
 room_manager rooms;    // Manages all open rooms.
@@ -39,8 +40,9 @@ void main()
 	}
 	println("[SERVER] Server started successfully. Listening on port 10500.");
 	init_monster_defs();
+	init_spell_defs();
 	init_wave_scenarios();
-	println("[SERVER] Monster defs and wave scenarios loaded.");
+	println("[SERVER] Monster defs, spell defs, and wave scenarios loaded.");
 	svr.run();
 }
 // server class  Manages the network listener and main event loop.

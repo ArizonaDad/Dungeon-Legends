@@ -3,6 +3,9 @@
 // Handles all combat message routing, roll requests, broadcasting, and monster AI.
 
 #include "combat_engine.nvgt"
+#include "character_data.nvgt"
+#include "monster_data.nvgt"
+#include "wave_system.nvgt"
 
 // Pending roll context stored between request and result.
 class pending_roll {
@@ -31,6 +34,7 @@ class battle_manager {
 	pending_roll@ current_roll;
 	bool initiative_phase = false;
 	uint initiative_index = 0;  // Which combatant we are rolling initiative for
+	string scenario_id = "";
 
 	battle_manager() {
 		@combat = null;
@@ -120,7 +124,7 @@ class battle_manager {
 
 	// ---- Game Start ----
 
-	void start_game(user@ host) {
+	void start_game(user@ host, string mode = "pvp", string scenario = "") {
 		if (@host == null or @host.room == null) return;
 
 		// Copy room players into battle manager.
@@ -133,29 +137,58 @@ class battle_manager {
 		@combat = battle();
 		combat.battle_active = true;
 
-		// Add each player/bot as a combatant.
+		combat.mode = mode;
+		scenario_id = scenario;
+
+		// Add each player/bot as a combatant from their character sheet.
 		for (uint i = 0; i < players.length(); i++) {
-			combatant c;
-			c.name = players[i].username;
-			c.is_player = true;
-			c.player_username = players[i].username;
-			c.max_hp = 20;
-			c.current_hp = 20;
-			c.armor_class = 14;
-			c.speed = DEFAULT_SPEED;
-			c.initiative_bonus = 2;
-			c.proficiency = 2;
-			c.level = 1;
-			c.ability_scores = {10, 14, 12, 10, 10, 10};
-			c.main_hand = "Longsword";
-			c.main_hand_damage_dice = 8;
-			c.main_hand_damage_count = 1;
-			c.main_hand_damage_type = DMG_SLASHING;
-			c.main_hand_range = 5;
-			// Position players in a line on the left.
-			c.x = 1;
-			c.y = int(i) + 1;
+			// Load character from account data
+			character_sheet cs;
+			bool has_char = false;
+			if (@players[i].account != null) {
+				json_object@ data = players[i].account.data;
+				if (data.exists("character")) {
+					json_object@ ch = data["character"];
+					cs.name = ch.exists("name") ? string(ch["name"]) : players[i].username;
+					cs.race = ch.exists("race") ? string(ch["race"]) : "Human";
+					cs.class_name = ch.exists("class") ? string(ch["class"]) : "Fighter";
+					cs.level = ch.exists("level") ? int(ch["level"]) : 1;
+					cs.strength = ch.exists("str") ? int(ch["str"]) : 10;
+					cs.dexterity = ch.exists("dex") ? int(ch["dex"]) : 10;
+					cs.constitution = ch.exists("con") ? int(ch["con"]) : 10;
+					cs.intelligence = ch.exists("int") ? int(ch["int"]) : 10;
+					cs.wisdom = ch.exists("wis") ? int(ch["wis"]) : 10;
+					cs.charisma = ch.exists("cha") ? int(ch["cha"]) : 10;
+					cs.weapon_name = ch.exists("weapon") ? string(ch["weapon"]) : "Longsword";
+					has_char = true;
+				}
+			}
+			if (!has_char) {
+				// Default character for players without one
+				cs.name = players[i].username;
+				cs.race = "Human";
+				cs.class_name = "Fighter";
+				cs.level = 1;
+				cs.strength = 15; cs.dexterity = 14; cs.constitution = 13;
+				cs.intelligence = 10; cs.wisdom = 12; cs.charisma = 8;
+				cs.weapon_name = "Longsword";
+			}
+			// Apply all class/race/weapon defaults and calculate HP/AC
+			finalize_character(cs);
+			// Create combatant from character sheet
+			combatant@ c = create_player_combatant(cs, players[i].username, 1, int(i) + 1);
 			combat.add_combatant(c);
+		}
+
+		// If wave mode, spawn first wave of monsters
+		if (mode == "wave" and scenario != "") {
+			wave_scenario@ ws = get_scenario(scenario);
+			if (@ws != null and ws.waves.length() > 0) {
+				combat.mode = "wave";
+				combat.wave_number = 1;
+				spawn_wave(combat, ws.waves[0], combat.map_width);
+				broadcast_announce("Wave 1! " + ws.name + ".", false);
+			}
 		}
 
 		broadcast_announce("Battle begins! Rolling initiative.", true);
@@ -433,12 +466,32 @@ class battle_manager {
 				}
 			}
 			if (!any_monster_alive) {
-				combat.wave_number++;
-				broadcast_announce("Wave " + (combat.wave_number - 1) + " complete!", true);
-				broadcast_to_battle({{"type", message_types::wave_complete}, {"wave", combat.wave_number - 1}});
+				broadcast_announce("Wave " + combat.wave_number + " complete!", true);
+				broadcast_to_battle({{"type", message_types::wave_complete}, {"wave", combat.wave_number}});
 				broadcast_state();
-				// TODO: Spawn next wave from wave_system, or declare victory if no more waves.
-				// For now, signal victory after clearing last wave.
+
+				if (combat.mode == "wave") {
+					wave_scenario@ ws = get_scenario(scenario_id);
+					if (@ws != null and combat.wave_number < int(ws.waves.length())) {
+						// Remove dead monsters from combatants
+						for (int ri = int(combat.combatants.length()) - 1; ri >= 0; ri--) {
+							if (!combat.combatants[ri].is_player) combat.combatants.remove_at(ri);
+						}
+						// Spawn next wave
+						spawn_wave(combat, ws.waves[combat.wave_number], combat.map_width);
+						combat.wave_number++;
+						broadcast_to_battle({{"type", message_types::wave_start}, {"wave", combat.wave_number}});
+						broadcast_announce("Wave " + combat.wave_number + "!", true);
+						// Re-roll initiative with new monsters
+						combat.start_initiative();
+						initiative_phase = true;
+						initiative_index = 0;
+						request_next_initiative();
+						return; // Don't end battle
+					}
+				}
+
+				// No more waves or not wave mode — victory
 				broadcast_announce("Victory! All waves cleared!", true);
 				combat.battle_active = false;
 				broadcast_to_battle({{"type", message_types::game_end_battle}, {"winner", "players"}, {"mode", combat.mode}, {"result", "victory"}});
