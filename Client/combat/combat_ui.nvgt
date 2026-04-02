@@ -91,7 +91,7 @@ void prompt_roll(string reason, int dice, int modifier) {
 	if (modifier > 0) mod_text = " plus " + modifier;
 	else if (modifier < 0) mod_text = " minus " + (-modifier);
 
-	speak(reason + ". Press R to roll a d " + dice + mod_text + ".", true);
+	speak(reason + ". Press R to roll a d " + dice + mod_text + ".", false);
 }
 
 bool check_roll_input() {
@@ -563,6 +563,28 @@ void parse_game_state(json_object@ msg) {
 	}
 }
 
+void show_combat_help() {
+	menu@ m = setup_sub_menu("Combat Help.");
+	m.add_item("W A S D. Move your character on your turn. Each step is 5 feet.");
+	m.add_item("I J K L. Scan for creatures. I north, K south, J west, L east.");
+	m.add_item("Left and right bracket keys. Cycle through scan targets.");
+	m.add_item("Enter. Lock onto scanned target.");
+	m.add_item("F. Open action menu on your turn. Attack, cast spell, dodge, dash, and more.");
+	m.add_item("R. Roll dice when prompted. Server tells you what to roll.");
+	m.add_item("H. Hear your current status. Health, AC, conditions, position.");
+	m.add_item("O. Hear initiative order. Who goes when.");
+	m.add_item("T. Hear info about your current target.");
+	m.add_item("Tab. Switch between chat and chat history.");
+	m.add_item("Escape. Forfeit the battle. Press twice to confirm.");
+	m.add_item("Turn structure. Move up to your speed, then take an action. You can move before or after your action.");
+	m.add_item("Actions. Attack, Cast a Spell, Dodge, Dash, Disengage, Help, Hide, Ready, Shove, Grapple.");
+	m.add_item("Dodge. Attacks against you have disadvantage until your next turn.");
+	m.add_item("Dash. Double your movement this turn.");
+	m.add_item("Disengage. Move without provoking opportunity attacks.");
+	m.add_item("Death saves. At 0 health, roll d 20 each turn. 10 or higher is a success. 3 successes to stabilize, 3 failures to die. Natural 20 revives you with 1 health.");
+	m.run();
+}
+
 void reset_combat_state() {
 	combat_entities.resize(0);
 	initiative_order.resize(0);
@@ -606,12 +628,23 @@ void combat_game_loop() {
 		else if (key_pressed(KEY_J)) scan_direction("west");
 		else if (key_pressed(KEY_L)) scan_direction("east");
 
-		// Target cycling and locking
+		// Tab: switch between chat and chat history (same as main menu)
 		else if (key_pressed(KEY_TAB)) {
-			if (keyboard_modifiers & KEYMOD_SHIFT != 0) cycle_scan(-1);
-			else cycle_scan(1);
+			if (@main_screen != null) {
+				int focus = main_screen.form.get_current_focus();
+				if (focus == f_main_history) {
+					main_screen.form.focus(f_main_chat);
+					speak("Chat message.", false);
+				} else {
+					main_screen.form.focus(f_main_history);
+					speak("Chat history.", false);
+				}
+			}
 		}
-		else if (key_pressed(KEY_RETURN) and scan_results.length() > 0) lock_target();
+		// Target cycling with bracket keys, Enter to lock
+		else if (key_pressed(KEY_LEFTBRACKET)) cycle_scan(-1);
+		else if (key_pressed(KEY_RIGHTBRACKET)) cycle_scan(1);
+		else if (key_pressed(KEY_RETURN) and scan_results.length() > 0 and !is_my_turn) lock_target();
 
 		// Movement (WASD) - only on your turn
 		else if (is_my_turn) {
@@ -633,7 +666,8 @@ void combat_game_loop() {
 		}
 
 		// Info keys (available any time during combat)
-		if (key_pressed(KEY_H)) speak_my_status();
+		if (key_pressed(KEY_F1)) show_combat_help();
+		else if (key_pressed(KEY_H)) speak_my_status();
 		else if (key_pressed(KEY_O)) speak_initiative_order();
 		else if (key_pressed(KEY_T) and current_target_id > 0) {
 			// Re-announce current target info

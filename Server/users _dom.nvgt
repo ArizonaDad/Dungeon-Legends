@@ -756,6 +756,29 @@ void handle_user_message(user@ u, json_object@ msg)
 		u.room.bm.start_game(u);
 	}
 
+	// --- Character Creation (save to account) ---
+	else if (msg_type == message_types::character_create) {
+		if (@u.account != null) {
+			json_object@ data = u.account.data;
+			json_object char_data;
+			if (msg.exists("name")) char_data["name"] = msg["name"];
+			if (msg.exists("race")) char_data["race"] = msg["race"];
+			if (msg.exists("class")) char_data["class"] = msg["class"];
+			if (msg.exists("level")) char_data["level"] = msg["level"];
+			if (msg.exists("str")) char_data["str"] = msg["str"];
+			if (msg.exists("dex")) char_data["dex"] = msg["dex"];
+			if (msg.exists("con")) char_data["con"] = msg["con"];
+			if (msg.exists("int")) char_data["int"] = msg["int"];
+			if (msg.exists("wis")) char_data["wis"] = msg["wis"];
+			if (msg.exists("cha")) char_data["cha"] = msg["cha"];
+			if (msg.exists("weapon")) char_data["weapon"] = msg["weapon"];
+			data["character"] = char_data;
+			u.account.commit();
+			u.send({{"type", message_types::announce}, {"text", "Character saved."}, {"interrupt", false}});
+			println("[CHAR] " + u.username + " created character: " + string(msg["name"]));
+		}
+	}
+
 	// --- Combat Message Routing (forward to battle_manager) ---
 	else if (msg_type == message_types::roll_result) {
 		if (@u.room != null and @u.room.bm != null and @u.room.bm.current_roll != null) {
