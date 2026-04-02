@@ -187,6 +187,239 @@ void calculate_ac(character_sheet@ cs) {
     }
 }
 
+void apply_racial_bonuses(character_sheet@ cs) {
+    string r = cs.race;
+    // 2024 PHB Core Species
+    if (r == "Aasimar") {
+        cs.charisma += 2; cs.wisdom += 1;
+    } else if (r == "Dragonborn") {
+        cs.strength += 2; cs.charisma += 1;
+    } else if (r == "Dwarf") {
+        cs.constitution += 2; cs.wisdom += 1;
+        cs.speed = 25;
+    } else if (r == "Elf") {
+        cs.dexterity += 2; cs.wisdom += 1;
+    } else if (r == "Gnome") {
+        cs.intelligence += 2; cs.constitution += 1;
+    } else if (r == "Goliath") {
+        cs.strength += 2; cs.constitution += 1;
+    } else if (r == "Halfling") {
+        cs.dexterity += 2; cs.charisma += 1;
+    } else if (r == "Human") {
+        // Versatile: +2 to highest, +1 to second highest
+        // Find highest and second highest ability
+        int[] scores = {cs.strength, cs.dexterity, cs.constitution, cs.intelligence, cs.wisdom, cs.charisma};
+        int best = 0; int second = 0;
+        for (int i = 1; i < 6; i++) {
+            if (scores[i] > scores[best]) { second = best; best = i; }
+            else if (scores[i] > scores[second] || second == best) second = i;
+        }
+        if (best == 0) cs.strength += 2;
+        else if (best == 1) cs.dexterity += 2;
+        else if (best == 2) cs.constitution += 2;
+        else if (best == 3) cs.intelligence += 2;
+        else if (best == 4) cs.wisdom += 2;
+        else if (best == 5) cs.charisma += 2;
+        if (second == 0) cs.strength += 1;
+        else if (second == 1) cs.dexterity += 1;
+        else if (second == 2) cs.constitution += 1;
+        else if (second == 3) cs.intelligence += 1;
+        else if (second == 4) cs.wisdom += 1;
+        else if (second == 5) cs.charisma += 1;
+    } else if (r == "Orc") {
+        cs.strength += 2; cs.constitution += 1;
+    } else if (r == "Tiefling") {
+        cs.charisma += 2; cs.intelligence += 1;
+    }
+    // Supplemental Species
+    else if (r == "Aarakocra") {
+        cs.dexterity += 2; cs.wisdom += 1;
+    } else if (r == "Bugbear") {
+        cs.strength += 2; cs.dexterity += 1;
+    } else if (r == "Centaur") {
+        cs.strength += 2; cs.wisdom += 1;
+        cs.speed = 40;
+    } else if (r == "Changeling") {
+        cs.charisma += 2; cs.dexterity += 1;
+    } else if (r == "Firbolg") {
+        cs.wisdom += 2; cs.strength += 1;
+    } else if (r == "Genasi (Air)") {
+        cs.constitution += 2; cs.dexterity += 1;
+    } else if (r == "Genasi (Earth)") {
+        cs.constitution += 2; cs.strength += 1;
+    } else if (r == "Genasi (Fire)") {
+        cs.constitution += 2; cs.intelligence += 1;
+    } else if (r == "Genasi (Water)") {
+        cs.constitution += 2; cs.wisdom += 1;
+    } else if (r == "Githyanki") {
+        cs.strength += 2; cs.intelligence += 1;
+    } else if (r == "Githzerai") {
+        cs.wisdom += 2; cs.intelligence += 1;
+    } else if (r == "Goblin") {
+        cs.dexterity += 2; cs.constitution += 1;
+    } else if (r == "Hobgoblin") {
+        cs.constitution += 2; cs.intelligence += 1;
+    } else if (r == "Kenku") {
+        cs.dexterity += 2; cs.wisdom += 1;
+    } else if (r == "Kobold") {
+        cs.dexterity += 2; cs.intelligence += 1;
+    } else if (r == "Lizardfolk") {
+        cs.constitution += 2; cs.wisdom += 1;
+    } else if (r == "Minotaur") {
+        cs.strength += 2; cs.constitution += 1;
+    } else if (r == "Owlin") {
+        cs.wisdom += 2; cs.dexterity += 1;
+    } else if (r == "Satyr") {
+        cs.charisma += 2; cs.dexterity += 1;
+        cs.speed = 35;
+    } else if (r == "Shifter") {
+        cs.dexterity += 2; cs.wisdom += 1;
+    } else if (r == "Tabaxi") {
+        cs.dexterity += 2; cs.charisma += 1;
+    } else if (r == "Tortle") {
+        cs.strength += 2; cs.wisdom += 1;
+    } else if (r == "Warforged") {
+        cs.constitution += 2; cs.strength += 1;
+    }
+}
+
+void apply_weapon(character_sheet@ cs, string weapon) {
+    cs.weapon_name = weapon;
+    // Defaults
+    cs.weapon_damage_count = 1;
+    cs.weapon_damage_dice = 4;
+    cs.weapon_damage_type = DMG_BLUDGEONING;
+    cs.weapon_range = 5;
+    cs.weapon_finesse = false;
+    int mastery = MASTERY_NONE;
+
+    // === Simple Melee ===
+    if (weapon == "Club") {
+        cs.weapon_damage_dice = 4; cs.weapon_damage_type = DMG_BLUDGEONING;
+        cs.weapon_range = 5; mastery = MASTERY_SLOW;
+    } else if (weapon == "Dagger") {
+        cs.weapon_damage_dice = 4; cs.weapon_damage_type = DMG_PIERCING;
+        cs.weapon_range = 5; cs.weapon_finesse = true; mastery = MASTERY_NICK;
+    } else if (weapon == "Greatclub") {
+        cs.weapon_damage_dice = 8; cs.weapon_damage_type = DMG_BLUDGEONING;
+        cs.weapon_range = 5; mastery = MASTERY_PUSH;
+    } else if (weapon == "Handaxe") {
+        cs.weapon_damage_dice = 6; cs.weapon_damage_type = DMG_SLASHING;
+        cs.weapon_range = 5; mastery = MASTERY_VEX;
+    } else if (weapon == "Javelin") {
+        cs.weapon_damage_dice = 6; cs.weapon_damage_type = DMG_PIERCING;
+        cs.weapon_range = 5; mastery = MASTERY_SLOW;
+    } else if (weapon == "Light Hammer") {
+        cs.weapon_damage_dice = 4; cs.weapon_damage_type = DMG_BLUDGEONING;
+        cs.weapon_range = 5; mastery = MASTERY_NICK;
+    } else if (weapon == "Mace") {
+        cs.weapon_damage_dice = 6; cs.weapon_damage_type = DMG_BLUDGEONING;
+        cs.weapon_range = 5; mastery = MASTERY_SAP;
+    } else if (weapon == "Quarterstaff") {
+        cs.weapon_damage_dice = 6; cs.weapon_damage_type = DMG_BLUDGEONING;
+        cs.weapon_range = 5; mastery = MASTERY_TOPPLE;
+    } else if (weapon == "Sickle") {
+        cs.weapon_damage_dice = 4; cs.weapon_damage_type = DMG_SLASHING;
+        cs.weapon_range = 5; mastery = MASTERY_NICK;
+    } else if (weapon == "Spear") {
+        cs.weapon_damage_dice = 6; cs.weapon_damage_type = DMG_PIERCING;
+        cs.weapon_range = 5; mastery = MASTERY_SAP;
+    }
+    // === Simple Ranged ===
+    else if (weapon == "Dart") {
+        cs.weapon_damage_dice = 4; cs.weapon_damage_type = DMG_PIERCING;
+        cs.weapon_range = 20; cs.weapon_finesse = true; mastery = MASTERY_VEX;
+    } else if (weapon == "Light Crossbow") {
+        cs.weapon_damage_dice = 8; cs.weapon_damage_type = DMG_PIERCING;
+        cs.weapon_range = 80; mastery = MASTERY_SLOW;
+    } else if (weapon == "Shortbow") {
+        cs.weapon_damage_dice = 6; cs.weapon_damage_type = DMG_PIERCING;
+        cs.weapon_range = 80; mastery = MASTERY_VEX;
+    } else if (weapon == "Sling") {
+        cs.weapon_damage_dice = 4; cs.weapon_damage_type = DMG_BLUDGEONING;
+        cs.weapon_range = 30; mastery = MASTERY_SLOW;
+    }
+    // === Martial Melee ===
+    else if (weapon == "Battleaxe") {
+        cs.weapon_damage_dice = 8; cs.weapon_damage_type = DMG_SLASHING;
+        cs.weapon_range = 5; mastery = MASTERY_TOPPLE;
+    } else if (weapon == "Flail") {
+        cs.weapon_damage_dice = 8; cs.weapon_damage_type = DMG_BLUDGEONING;
+        cs.weapon_range = 5; mastery = MASTERY_SAP;
+    } else if (weapon == "Glaive") {
+        cs.weapon_damage_dice = 10; cs.weapon_damage_type = DMG_SLASHING;
+        cs.weapon_range = 10; mastery = MASTERY_GRAZE;
+    } else if (weapon == "Greataxe") {
+        cs.weapon_damage_dice = 12; cs.weapon_damage_type = DMG_SLASHING;
+        cs.weapon_range = 5; mastery = MASTERY_CLEAVE;
+    } else if (weapon == "Greatsword") {
+        cs.weapon_damage_count = 2; cs.weapon_damage_dice = 6;
+        cs.weapon_damage_type = DMG_SLASHING;
+        cs.weapon_range = 5; mastery = MASTERY_GRAZE;
+    } else if (weapon == "Halberd") {
+        cs.weapon_damage_dice = 10; cs.weapon_damage_type = DMG_SLASHING;
+        cs.weapon_range = 10; mastery = MASTERY_CLEAVE;
+    } else if (weapon == "Lance") {
+        cs.weapon_damage_dice = 10; cs.weapon_damage_type = DMG_PIERCING;
+        cs.weapon_range = 10; mastery = MASTERY_TOPPLE;
+    } else if (weapon == "Longsword") {
+        cs.weapon_damage_dice = 8; cs.weapon_damage_type = DMG_SLASHING;
+        cs.weapon_range = 5; mastery = MASTERY_SAP;
+    } else if (weapon == "Maul") {
+        cs.weapon_damage_count = 2; cs.weapon_damage_dice = 6;
+        cs.weapon_damage_type = DMG_BLUDGEONING;
+        cs.weapon_range = 5; mastery = MASTERY_TOPPLE;
+    } else if (weapon == "Morningstar") {
+        cs.weapon_damage_dice = 8; cs.weapon_damage_type = DMG_PIERCING;
+        cs.weapon_range = 5; mastery = MASTERY_SAP;
+    } else if (weapon == "Pike") {
+        cs.weapon_damage_dice = 10; cs.weapon_damage_type = DMG_PIERCING;
+        cs.weapon_range = 10; mastery = MASTERY_PUSH;
+    } else if (weapon == "Rapier") {
+        cs.weapon_damage_dice = 8; cs.weapon_damage_type = DMG_PIERCING;
+        cs.weapon_range = 5; cs.weapon_finesse = true; mastery = MASTERY_VEX;
+    } else if (weapon == "Scimitar") {
+        cs.weapon_damage_dice = 6; cs.weapon_damage_type = DMG_SLASHING;
+        cs.weapon_range = 5; cs.weapon_finesse = true; mastery = MASTERY_NICK;
+    } else if (weapon == "Shortsword") {
+        cs.weapon_damage_dice = 6; cs.weapon_damage_type = DMG_PIERCING;
+        cs.weapon_range = 5; cs.weapon_finesse = true; mastery = MASTERY_VEX;
+    } else if (weapon == "Trident") {
+        cs.weapon_damage_dice = 8; cs.weapon_damage_type = DMG_PIERCING;
+        cs.weapon_range = 5; mastery = MASTERY_TOPPLE;
+    } else if (weapon == "War Pick") {
+        cs.weapon_damage_dice = 8; cs.weapon_damage_type = DMG_PIERCING;
+        cs.weapon_range = 5; mastery = MASTERY_SAP;
+    } else if (weapon == "Warhammer") {
+        cs.weapon_damage_dice = 8; cs.weapon_damage_type = DMG_BLUDGEONING;
+        cs.weapon_range = 5; mastery = MASTERY_PUSH;
+    } else if (weapon == "Whip") {
+        cs.weapon_damage_dice = 4; cs.weapon_damage_type = DMG_SLASHING;
+        cs.weapon_range = 10; cs.weapon_finesse = true; mastery = MASTERY_SLOW;
+    }
+    // === Martial Ranged ===
+    else if (weapon == "Blowgun") {
+        cs.weapon_damage_count = 0; cs.weapon_damage_dice = 1;
+        cs.weapon_damage_type = DMG_PIERCING;
+        cs.weapon_range = 25; mastery = MASTERY_VEX;
+    } else if (weapon == "Hand Crossbow") {
+        cs.weapon_damage_dice = 6; cs.weapon_damage_type = DMG_PIERCING;
+        cs.weapon_range = 30; mastery = MASTERY_VEX;
+    } else if (weapon == "Heavy Crossbow") {
+        cs.weapon_damage_dice = 10; cs.weapon_damage_type = DMG_PIERCING;
+        cs.weapon_range = 100; mastery = MASTERY_PUSH;
+    } else if (weapon == "Longbow") {
+        cs.weapon_damage_dice = 8; cs.weapon_damage_type = DMG_PIERCING;
+        cs.weapon_range = 150; mastery = MASTERY_SLOW;
+    } else if (weapon == "Musket") {
+        cs.weapon_damage_dice = 12; cs.weapon_damage_type = DMG_PIERCING;
+        cs.weapon_range = 40; mastery = MASTERY_SLOW;
+    } else if (weapon == "Pistol") {
+        cs.weapon_damage_dice = 10; cs.weapon_damage_type = DMG_PIERCING;
+        cs.weapon_range = 30; mastery = MASTERY_VEX;
+    }
+}
+
 combatant@ create_player_combatant(character_sheet@ cs, string player_username, int x, int y) {
     combatant c;
     c.name = cs.name;

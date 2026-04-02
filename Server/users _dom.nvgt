@@ -736,6 +736,27 @@ void handle_user_message(user@ u, json_object@ msg)
 		}
 	}
 
+	else if (msg_type == message_types::start_game) {
+		if (@u.room == null) return;
+		if (u.room.players.length() == 0) return;
+		if (u.room.started) {
+			u.send({{"type", message_types::announce}, {"text", "Game already started."}, {"interrupt", true}});
+			return;
+		}
+		// Only host can start (first player in room)
+		if (u.room.players[0].username != u.username) {
+			u.send({{"type", message_types::announce}, {"text", "Only the host can start the game."}, {"interrupt", true}});
+			return;
+		}
+		u.room.started = true;
+		string mode = msg.exists("mode") ? string(msg["mode"]) : "pvp";
+		string scenario = msg.exists("scenario") ? string(msg["scenario"]) : "";
+		// Send start_game to all players with mode info
+		for (uint i = 0; i < u.room.players.length(); i++) {
+			u.room.players[i].send({{"type", message_types::start_game}, {"mode", mode}, {"scenario", scenario}});
+		}
+	}
+
 	// --- Game Invites ---
 
 	else if (msg_type == message_types::game_invite and msg.exists("target")) {
