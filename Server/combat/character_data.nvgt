@@ -28,6 +28,15 @@ class character_sheet {
     int weapon_damage_type = DMG_BLUDGEONING;
     int weapon_range = 5; bool weapon_finesse = false;
     bool has_unarmored_defense = false;
+    bool has_heroic_inspiration = false;
+    int flying_speed = 0;
+    int swim_speed = 0;
+    int natural_ac_override = 0;
+    bool darkvision = false;
+    int darkvision_range = 0;
+    bool magic_resistance = false;
+    bool poison_resistance = false;
+    bool fire_resistance = false;
 }
 
 void apply_class_defaults(character_sheet@ cs) {
@@ -176,7 +185,10 @@ void calculate_hp(character_sheet@ cs) {
 
 void calculate_ac(character_sheet@ cs) {
     int dex_mod = ability_modifier(cs.dexterity);
-    if (cs.has_unarmored_defense) {
+    if (cs.natural_ac_override > 0) {
+        if (cs.race == "Tortle") cs.armor_class = 17; // flat, no DEX
+        else if (cs.race == "Lizardfolk") cs.armor_class = 13 + dex_mod;
+    } else if (cs.has_unarmored_defense) {
         if (cs.class_name == "Barbarian") {
             cs.armor_class = 10 + dex_mod + ability_modifier(cs.constitution);
         } else if (cs.class_name == "Monk") {
@@ -185,6 +197,7 @@ void calculate_ac(character_sheet@ cs) {
     } else {
         cs.armor_class = 10 + dex_mod; // No armor default
     }
+    if (cs.race == "Warforged") cs.armor_class += 1;
 }
 
 void apply_racial_bonuses(character_sheet@ cs) {
@@ -197,10 +210,15 @@ void apply_racial_bonuses(character_sheet@ cs) {
     } else if (r == "Dwarf") {
         cs.constitution += 2; cs.wisdom += 1;
         cs.speed = 25;
+        cs.darkvision = true; cs.darkvision_range = 60;
+        cs.poison_resistance = true;
     } else if (r == "Elf") {
         cs.dexterity += 2; cs.wisdom += 1;
+        cs.darkvision = true; cs.darkvision_range = 60;
     } else if (r == "Gnome") {
         cs.intelligence += 2; cs.constitution += 1;
+        cs.darkvision = true; cs.darkvision_range = 60;
+        cs.magic_resistance = true;
     } else if (r == "Goliath") {
         cs.strength += 2; cs.constitution += 1;
     } else if (r == "Halfling") {
@@ -226,14 +244,18 @@ void apply_racial_bonuses(character_sheet@ cs) {
         else if (second == 3) cs.intelligence += 1;
         else if (second == 4) cs.wisdom += 1;
         else if (second == 5) cs.charisma += 1;
+        cs.has_heroic_inspiration = true;
     } else if (r == "Orc") {
         cs.strength += 2; cs.constitution += 1;
     } else if (r == "Tiefling") {
         cs.charisma += 2; cs.intelligence += 1;
+        cs.darkvision = true; cs.darkvision_range = 60;
+        cs.fire_resistance = true;
     }
     // Supplemental Species
     else if (r == "Aarakocra") {
         cs.dexterity += 2; cs.wisdom += 1;
+        cs.flying_speed = 30;
     } else if (r == "Bugbear") {
         cs.strength += 2; cs.dexterity += 1;
     } else if (r == "Centaur") {
@@ -251,6 +273,7 @@ void apply_racial_bonuses(character_sheet@ cs) {
         cs.constitution += 2; cs.intelligence += 1;
     } else if (r == "Genasi (Water)") {
         cs.constitution += 2; cs.wisdom += 1;
+        cs.swim_speed = 30;
     } else if (r == "Githyanki") {
         cs.strength += 2; cs.intelligence += 1;
     } else if (r == "Githzerai") {
@@ -265,19 +288,23 @@ void apply_racial_bonuses(character_sheet@ cs) {
         cs.dexterity += 2; cs.intelligence += 1;
     } else if (r == "Lizardfolk") {
         cs.constitution += 2; cs.wisdom += 1;
+        cs.natural_ac_override = 13;
     } else if (r == "Minotaur") {
         cs.strength += 2; cs.constitution += 1;
     } else if (r == "Owlin") {
         cs.wisdom += 2; cs.dexterity += 1;
+        cs.flying_speed = 30;
     } else if (r == "Satyr") {
         cs.charisma += 2; cs.dexterity += 1;
         cs.speed = 35;
+        cs.magic_resistance = true;
     } else if (r == "Shifter") {
         cs.dexterity += 2; cs.wisdom += 1;
     } else if (r == "Tabaxi") {
         cs.dexterity += 2; cs.charisma += 1;
     } else if (r == "Tortle") {
         cs.strength += 2; cs.wisdom += 1;
+        cs.natural_ac_override = 17;
     } else if (r == "Warforged") {
         cs.constitution += 2; cs.strength += 1;
     }

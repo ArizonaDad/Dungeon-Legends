@@ -232,5 +232,5 @@ void character_creation_menu() {
         {"cha", created_ability_scores[5]},
         {"weapon", created_weapon}
     });
-    speak("Character created! Waiting for battle to begin.", true);
+    speak("Character created! " + created_char_name + ", " + created_char_race + " " + created_char_class + ", level " + created_char_level + ".", true);
 }

@@ -73,15 +73,27 @@ void main_menu()
 		@m = main_screen;
 		int total = 7;
 		int create_char = m.add_item("Create Character. 1 of " + total);
-		int create_room = m.add_item("Create a lobby! 2 of " + total);
-		int join = m.add_item("Join a game! 3 of " + total);
-		int social = m.add_item("Friends. 4 of " + total);
-		int CHECK_ONLINE = m.add_item("Check who is online. 5 of " + total);
-		int About = m.add_item("About us. 6 of " + total);
-		int quit = m.add_item("Quit. 7 of " + total);
+		int view_char = -1;
+		if (created_char_class != "") {
+			total = 8;
+			view_char = m.add_item("View My Character. 2 of " + total);
+		}
+		int create_room = m.add_item("Create a lobby! " + (total == 8 ? "3" : "2") + " of " + total);
+		int join = m.add_item("Join a game! " + (total == 8 ? "4" : "3") + " of " + total);
+		int social = m.add_item("Friends. " + (total == 8 ? "5" : "4") + " of " + total);
+		int CHECK_ONLINE = m.add_item("Check who is online. " + (total == 8 ? "6" : "5") + " of " + total);
+		int About = m.add_item("About us. " + (total == 8 ? "7" : "6") + " of " + total);
+		int quit = m.add_item("Quit. " + (total == 8 ? "8" : "7") + " of " + total);
 		int res = m.run();
 		if (res == create_char) {
 			character_creation_menu();
+		}
+		else if (view_char >= 0 and res == view_char) {
+			string summary = created_char_name + ". " + created_char_race + " " + created_char_class + ", level " + created_char_level + ". ";
+			summary += "Strength " + created_ability_scores[0] + ". Dexterity " + created_ability_scores[1] + ". Constitution " + created_ability_scores[2] + ". ";
+			summary += "Intelligence " + created_ability_scores[3] + ". Wisdom " + created_ability_scores[4] + ". Charisma " + created_ability_scores[5] + ". ";
+			summary += "Weapon: " + created_weapon + ".";
+			speak(summary, true);
 		}
 		else if (res == create_room) {
 			string name, password;
