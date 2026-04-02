@@ -752,8 +752,115 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.room.players[i].send({{"type", message_types::start_game}, {"mode", mode}, {"scenario", scenario}});
 		}
 		// Create battle manager and start combat on server
-		battle_manager bm;
-		bm.start_game(u);
+		@u.room.bm = battle_manager();
+		u.room.bm.start_game(u);
+	}
+
+	// --- Combat Message Routing (forward to battle_manager) ---
+	else if (msg_type == message_types::roll_result) {
+		if (@u.room != null and @u.room.bm != null and @u.room.bm.current_roll != null) {
+			// Player pressed Roll — server rolls the dice
+			int natural = random(1, u.room.bm.current_roll.dice_sides);
+			u.room.bm.process_roll_result(natural);
+		}
+	}
+	else if (msg_type == message_types::turn_end) {
+		if (@u.room != null and @u.room.bm != null) {
+			u.room.bm.handle_turn_end(u);
+		}
+	}
+	else if (msg_type == message_types::action_attack) {
+		if (@u.room != null and @u.room.bm != null) {
+			u.room.bm.handle_attack(u, msg);
+		}
+	}
+	else if (msg_type == message_types::action_move) {
+		if (@u.room != null and @u.room.bm != null and @u.room.bm.combat != null) {
+			combatant@ c = u.room.bm.combat.current_combatant();
+			if (@c != null and c.player_username == u.username) {
+				int ddx = msg.exists("dx") ? int(msg["dx"]) : 0;
+				int ddy = msg.exists("dy") ? int(msg["dy"]) : 0;
+				if (c.movement_remaining >= FEET_PER_TILE) {
+					c.x += ddx;
+					c.y += ddy;
+					c.movement_remaining -= FEET_PER_TILE;
+					u.room.bm.broadcast_announce(c.name + " moves. " + c.movement_remaining + " feet remaining.", false);
+					u.room.bm.broadcast_state();
+				} else {
+					u.send({{"type", message_types::announce}, {"text", "No movement remaining."}, {"interrupt", true}});
+				}
+			}
+		}
+	}
+	else if (msg_type == message_types::action_dodge) {
+		if (@u.room != null and @u.room.bm != null and @u.room.bm.combat != null) {
+			combatant@ c = u.room.bm.combat.current_combatant();
+			if (@c != null and c.player_username == u.username and c.has_action) {
+				c.is_dodging = true;
+				c.has_action = false;
+				c.used_action = true;
+				u.room.bm.broadcast_announce(c.name + " takes the Dodge action.", false);
+			}
+		}
+	}
+	else if (msg_type == message_types::action_dash) {
+		if (@u.room != null and @u.room.bm != null and @u.room.bm.combat != null) {
+			combatant@ c = u.room.bm.combat.current_combatant();
+			if (@c != null and c.player_username == u.username and c.has_action) {
+				c.movement_remaining += c.speed;
+				c.has_action = false;
+				c.used_action = true;
+				u.room.bm.broadcast_announce(c.name + " takes the Dash action. " + c.movement_remaining + " feet of movement.", false);
+			}
+		}
+	}
+	else if (msg_type == message_types::action_disengage) {
+		if (@u.room != null and @u.room.bm != null and @u.room.bm.combat != null) {
+			combatant@ c = u.room.bm.combat.current_combatant();
+			if (@c != null and c.player_username == u.username and c.has_action) {
+				c.took_disengage = true;
+				c.has_action = false;
+				c.used_action = true;
+				u.room.bm.broadcast_announce(c.name + " takes the Disengage action.", false);
+			}
+		}
+	}
+	else if (msg_type == message_types::scan_direction) {
+		if (@u.room != null and @u.room.bm != null and @u.room.bm.combat != null) {
+			string dir = msg.exists("dir") ? string(msg["dir"]) : "";
+			// Find this player's combatant
+			combatant@ me = null;
+			for (uint ci = 0; ci < u.room.bm.combat.combatants.length(); ci++) {
+				if (u.room.bm.combat.combatants[ci].player_username == u.username) {
+					@me = u.room.bm.combat.combatants[ci];
+					break;
+				}
+			}
+			if (@me != null) {
+				json_array results;
+				for (uint ci = 0; ci < u.room.bm.combat.combatants.length(); ci++) {
+					combatant@ t = u.room.bm.combat.combatants[ci];
+					if (t.id == me.id or t.is_dead) continue;
+					int dx = t.x - me.x;
+					int dy = t.y - me.y;
+					bool in_dir = false;
+					if (dir == "north" and dy > 0) in_dir = true;
+					else if (dir == "south" and dy < 0) in_dir = true;
+					else if (dir == "east" and dx > 0) in_dir = true;
+					else if (dir == "west" and dx < 0) in_dir = true;
+					if (in_dir) {
+						json_object r;
+						r["id"] = int(t.id);
+						r["name"] = t.name;
+						r["dist"] = feet_distance(me.x, me.y, t.x, t.y);
+						r["hp_pct"] = t.max_hp > 0 ? (t.current_hp * 100 / t.max_hp) : 0;
+						r["is_player"] = t.is_player;
+						results.add(r);
+					}
+				}
+				u.send({{"type", message_types::scan_result}, {"results", results}});
+			}
+		}
 	}
 
 	// --- Game Invites ---

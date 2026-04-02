@@ -55,6 +55,7 @@ class room
 	bool get_is_private() const property { return !password.empty(); }
 	user@[] players;             // Players currently in the room.
 	bool started = false;        // True once a game has been started.
+	battle_manager@ bm = null;   // Active battle manager (null when no game running).
 	// Close this room and remove it from the global rooms list.
 	void close_room()
 	{

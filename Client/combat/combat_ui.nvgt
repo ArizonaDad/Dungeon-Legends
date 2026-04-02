@@ -586,6 +586,8 @@ void reset_combat_state() {
 // ============================================================
 
 void combat_game_loop() {
+	battle_active = true;
+	is_my_turn = false;
 	speak("Entering combat. I J K L to scan for creatures. F for actions on your turn. H for status. O for initiative order.", true);
 
 	while (battle_active) {
