@@ -9,16 +9,79 @@ string created_weapon = "Longsword";
 string[] created_cantrips;
 string[] created_spells;
 
+int get_cantrips_known(string class_name, int level) {
+    string lc = class_name.lower();
+    if (lc == "sorcerer") { if (level >= 10) return 6; if (level >= 4) return 5; return 4; }
+    if (lc == "wizard") { if (level >= 10) return 5; if (level >= 4) return 4; return 3; }
+    if (lc == "cleric") { if (level >= 10) return 5; if (level >= 4) return 4; return 3; }
+    if (lc == "druid") { if (level >= 10) return 4; if (level >= 4) return 3; return 2; }
+    if (lc == "bard") { if (level >= 10) return 4; if (level >= 4) return 3; return 2; }
+    if (lc == "warlock") { if (level >= 10) return 4; if (level >= 4) return 3; return 2; }
+    if (lc == "artificer") { if (level >= 14) return 4; if (level >= 10) return 3; return 2; }
+    return 0; // non-caster
+}
+
+int get_prepared_spells(string class_name, int level) {
+    string lc = class_name.lower();
+    if (lc == "barbarian" or lc == "fighter" or lc == "monk" or lc == "rogue") return 0;
+    // Full casters
+    if (lc == "bard" or lc == "sorcerer" or lc == "cleric" or lc == "druid" or lc == "wizard") {
+        if (level >= 19) return 15;
+        if (level >= 17) return 15;
+        if (level >= 15) return 14;
+        if (level >= 13) return 13;
+        if (level >= 11) return 12;
+        if (level >= 10) return 12;
+        if (level >= 9) return 11;
+        if (level >= 7) return 10;
+        if (level >= 5) return 9;
+        if (level >= 4) return 7;
+        if (level >= 3) return 6;
+        if (level >= 2) return 5;
+        return 4;
+    }
+    // Warlock (pact magic)
+    if (lc == "warlock") {
+        if (level >= 19) return 9;
+        if (level >= 15) return 9;
+        if (level >= 13) return 8;
+        if (level >= 11) return 8;
+        if (level >= 9) return 7;
+        if (level >= 7) return 6;
+        if (level >= 5) return 5;
+        if (level >= 3) return 3;
+        return 2;
+    }
+    // Half casters
+    if (lc == "paladin" or lc == "ranger" or lc == "artificer") {
+        if (level >= 19) return 10;
+        if (level >= 17) return 10;
+        if (level >= 15) return 9;
+        if (level >= 13) return 8;
+        if (level >= 11) return 7;
+        if (level >= 9) return 6;
+        if (level >= 7) return 5;
+        if (level >= 5) return 4;
+        if (level >= 3) return 3;
+        return 2;
+    }
+    return 0;
+}
+
 void spell_selection_step() {
+    int cantrips_to_pick = get_cantrips_known(created_char_class, created_char_level);
+    int spells_to_pick = get_prepared_spells(created_char_class, created_char_level);
+
+    // Non-casters skip spell selection entirely
+    if (cantrips_to_pick == 0 and spells_to_pick == 0) {
+        speak(created_char_class + " does not use spells.", false);
+        return;
+    }
+
     string lc = created_char_class.lower();
     bool is_full_caster = (lc == "bard" or lc == "cleric" or lc == "druid" or lc == "sorcerer" or lc == "wizard");
     bool is_half_caster = (lc == "paladin" or lc == "ranger" or lc == "artificer");
     bool is_warlock = (lc == "warlock");
-
-    if (!is_full_caster and !is_half_caster and !is_warlock) {
-        speak(created_char_class + " does not use spells.", false);
-        return;
-    }
 
     // Calculate max spell level
     int max_spell_level = 0;
@@ -29,21 +92,16 @@ void spell_selection_step() {
     if ((is_half_caster or is_warlock) and max_spell_level > 5) max_spell_level = 5;
     if (max_spell_level < 1) max_spell_level = 1;
 
-    // Calculate cantrips known
-    int cantrips_to_pick = 2;
-    if (lc == "sorcerer") cantrips_to_pick = 4;
-    else if (lc == "cleric" or lc == "wizard") cantrips_to_pick = 3;
-    if (lc == "artificer" and created_char_level >= 14) cantrips_to_pick = 4;
-    else if (lc == "artificer" and created_char_level >= 10) cantrips_to_pick = 3;
-    else if (created_char_level >= 10) cantrips_to_pick += 2;
-    else if (created_char_level >= 4) cantrips_to_pick += 1;
-
-    int spells_to_pick = 6;
-
-    speak("Spell selection. You can learn " + cantrips_to_pick + " cantrips and " + spells_to_pick + " spells up to level " + max_spell_level + ".", true);
-
     created_cantrips.resize(0);
     created_spells.resize(0);
+
+    // Species bonus cantrips
+    if (created_char_race == "Tiefling") {
+        created_cantrips.insert_last("thaumaturgy");
+        speak("Your Tiefling heritage grants you the Thaumaturgy cantrip.", false);
+    }
+
+    speak("Spell selection for " + created_char_class + " level " + created_char_level + ". You can learn " + cantrips_to_pick + " cantrips and prepare " + spells_to_pick + " spells up to level " + max_spell_level + ".", true);
 
     // Build the available spell list for this class and level
     build_spell_list_for_class(created_char_class, created_char_level);
