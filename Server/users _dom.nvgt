@@ -744,14 +744,16 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.send({{"type", message_types::announce}, {"text", "Only the host can start the game."}, {"interrupt", true}});
 			return;
 		}
-		// Allow restarting (reset started flag)
 		u.room.started = true;
 		string mode = msg.exists("mode") ? string(msg["mode"]) : "pvp";
 		string scenario = msg.exists("scenario") ? string(msg["scenario"]) : "";
-		// Send start_game to all players with mode info
+		// Send start_game to all players — client will enter combat loop
 		for (uint i = 0; i < u.room.players.length(); i++) {
 			u.room.players[i].send({{"type", message_types::start_game}, {"mode", mode}, {"scenario", scenario}});
 		}
+		// Create battle manager and start combat on server
+		battle_manager bm;
+		bm.start_game(u);
 	}
 
 	// --- Game Invites ---
