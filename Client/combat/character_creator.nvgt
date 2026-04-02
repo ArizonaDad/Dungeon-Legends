@@ -1,0 +1,144 @@
+#include "../../common/combat_constants.nvgt"
+
+string created_char_name = "";
+string created_char_race = "";
+string created_char_class = "";
+int created_char_level = 1;
+int[] created_ability_scores = {10,10,10,10,10,10};
+string created_weapon = "Longsword";
+
+void character_creation_menu() {
+    speak("Character creation. Let's build your champion.", true);
+
+    // Step 1: Name
+    // (use input box or just assign a default for now)
+    created_char_name = username + "'s Character";
+    speak("Your character name is " + created_char_name + ".", false);
+
+    // Step 2: Race
+    menu@ race_menu = setup_sub_menu("Choose your race.");
+    string[] races = {"Human", "Elf", "Dwarf", "Halfling", "Gnome", "Half-Elf", "Half-Orc", "Tiefling", "Dragonborn"};
+    string[] race_desc = {
+        "Human. Versatile and adaptive. Plus 1 to all ability scores.",
+        "Elf. Graceful and long-lived. Plus 2 Dexterity.",
+        "Dwarf. Stout and resilient. Plus 2 Constitution.",
+        "Halfling. Small and lucky. Plus 2 Dexterity.",
+        "Gnome. Clever and curious. Plus 2 Intelligence.",
+        "Half-Elf. Charismatic and versatile. Plus 2 Charisma, plus 1 to two others.",
+        "Half-Orc. Strong and enduring. Plus 2 Strength, plus 1 Constitution.",
+        "Tiefling. Infernal heritage. Plus 2 Charisma, plus 1 Intelligence.",
+        "Dragonborn. Draconic ancestry. Plus 2 Strength, plus 1 Charisma."
+    };
+    for (uint i = 0; i < races.length(); i++) race_menu.add_item(race_desc[i]);
+    int race_pick = race_menu.run();
+    if (race_pick < 0) race_pick = 0;
+    created_char_race = races[race_pick];
+    speak("You chose " + created_char_race + ".", true);
+
+    // Step 3: Class
+    menu@ class_menu = setup_sub_menu("Choose your class.");
+    string[] classes = {"Barbarian","Bard","Cleric","Druid","Fighter","Monk","Paladin","Ranger","Rogue","Sorcerer","Warlock","Wizard","Artificer"};
+    string[] class_desc = {
+        "Barbarian. D 12 hit die. Rages in battle for extra damage and resistance.",
+        "Bard. D 8 hit die. Charisma caster. Inspires allies with magic and music.",
+        "Cleric. D 8 hit die. Wisdom caster. Divine magic, healing, and armor.",
+        "Druid. D 8 hit die. Wisdom caster. Nature magic and wild shape.",
+        "Fighter. D 10 hit die. Master of weapons. Action Surge and Extra Attacks.",
+        "Monk. D 8 hit die. Martial artist with discipline points for special techniques.",
+        "Paladin. D 10 hit die. Holy warrior. Charisma caster with divine smite.",
+        "Ranger. D 10 hit die. Wilderness warrior. Wisdom caster with favored enemies.",
+        "Rogue. D 8 hit die. Stealthy striker. Sneak Attack for massive single-target damage.",
+        "Sorcerer. D 6 hit die. Charisma caster. Innate magic with metamagic.",
+        "Warlock. D 8 hit die. Charisma caster. Pact magic with eldritch invocations.",
+        "Wizard. D 6 hit die. Intelligence caster. Largest spell list. Arcane mastery.",
+        "Artificer. D 8 hit die. Intelligence caster. Magical inventor with infusions."
+    };
+    for (uint i = 0; i < classes.length(); i++) class_menu.add_item(class_desc[i]);
+    int class_pick = class_menu.run();
+    if (class_pick < 0) class_pick = 0;
+    created_char_class = classes[class_pick];
+    speak("You chose " + created_char_class + ".", true);
+
+    // Step 4: Level
+    menu@ level_menu = setup_sub_menu("Choose your level. 1 through 20.");
+    for (int lv = 1; lv <= 20; lv++) level_menu.add_item("Level " + lv);
+    int level_pick = level_menu.run();
+    created_char_level = level_pick >= 0 ? level_pick + 1 : 1;
+    speak("Level " + created_char_level + ".", true);
+
+    // Step 5: Ability Scores (Standard Array: 15, 14, 13, 12, 10, 8)
+    int[] standard = {15, 14, 13, 12, 10, 8};
+    bool[] used = {false, false, false, false, false, false};
+    speak("Assign ability scores using the standard array: 15, 14, 13, 12, 10, 8.", true);
+    for (int a = 0; a < 6; a++) {
+        string ability_name = ABILITY_NAMES[a];
+        string available = "";
+        for (uint s = 0; s < 6; s++) {
+            if (!used[s]) available += standard[s] + ", ";
+        }
+        menu@ score_menu = setup_sub_menu("Assign a score to " + ability_name + ". Available: " + available);
+        for (uint s = 0; s < 6; s++) {
+            if (!used[s]) score_menu.add_item("" + standard[s]);
+        }
+        int pick = score_menu.run();
+        // Map pick back to unused index
+        int count = 0;
+        for (uint s = 0; s < 6; s++) {
+            if (!used[s]) {
+                if (count == pick) {
+                    created_ability_scores[a] = standard[s];
+                    used[s] = true;
+                    break;
+                }
+                count++;
+            }
+        }
+        speak(ability_name + " set to " + created_ability_scores[a] + ".", false);
+    }
+
+    // Step 6: Weapon
+    menu@ weapon_menu = setup_sub_menu("Choose your weapon.");
+    weapon_menu.add_item("Longsword. 1 d 8 slashing. Melee.");
+    weapon_menu.add_item("Greataxe. 1 d 12 slashing. Melee. Heavy.");
+    weapon_menu.add_item("Rapier. 1 d 8 piercing. Melee. Finesse.");
+    weapon_menu.add_item("Longbow. 1 d 8 piercing. Ranged 150 feet.");
+    weapon_menu.add_item("Light Crossbow. 1 d 8 piercing. Ranged 80 feet.");
+    weapon_menu.add_item("Mace. 1 d 6 bludgeoning. Melee.");
+    weapon_menu.add_item("Dagger. 1 d 4 piercing. Melee. Finesse. Thrown.");
+    int weapon_pick = weapon_menu.run();
+    if (weapon_pick < 0) weapon_pick = 0;
+    string[] weapon_names = {"Longsword","Greataxe","Rapier","Longbow","Light Crossbow","Mace","Dagger"};
+    created_weapon = weapon_names[weapon_pick];
+    speak("You chose " + created_weapon + ".", true);
+
+    // Step 7: Summary
+    speak("Character summary. " + created_char_name + ". " + created_char_race + " " + created_char_class + ", level " + created_char_level + ". Strength " + created_ability_scores[0] + ". Dexterity " + created_ability_scores[1] + ". Constitution " + created_ability_scores[2] + ". Intelligence " + created_ability_scores[3] + ". Wisdom " + created_ability_scores[4] + ". Charisma " + created_ability_scores[5] + ". Weapon: " + created_weapon + ". Press enter to confirm.", true);
+
+    // Wait for confirmation
+    while (true) {
+        wait(10);
+        network_loop();
+        if (key_pressed(KEY_RETURN)) break;
+        if (key_pressed(KEY_ESCAPE)) {
+            speak("Character creation cancelled.", true);
+            return;
+        }
+    }
+
+    // Send to server
+    send({
+        {"type", message_types::character_create},
+        {"name", created_char_name},
+        {"race", created_char_race},
+        {"class", created_char_class},
+        {"level", created_char_level},
+        {"str", created_ability_scores[0]},
+        {"dex", created_ability_scores[1]},
+        {"con", created_ability_scores[2]},
+        {"int", created_ability_scores[3]},
+        {"wis", created_ability_scores[4]},
+        {"cha", created_ability_scores[5]},
+        {"weapon", created_weapon}
+    });
+    speak("Character created! Waiting for battle to begin.", true);
+}

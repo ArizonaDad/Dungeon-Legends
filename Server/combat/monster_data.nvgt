@@ -1,0 +1,656 @@
+// D&D 5e Monster Data - SRD Stat Blocks
+// Defines monster templates and a factory to create combatants from them.
+
+#include "combat_engine.nvgt"
+
+class monster_def {
+    string id;
+    string name;
+    string type;
+    int size = SIZE_MEDIUM;
+    int ac;
+    int hp;
+    int speed = 30;
+    int str = 10; int dex = 10; int con = 10;
+    int intelligence = 10; int wis = 10; int cha = 10;
+    string attack_name = "Attack";
+    int attack_bonus = 0;
+    int damage_dice = 4;
+    int damage_count = 1;
+    int damage_mod = 0;
+    int damage_type = DMG_SLASHING;
+    int attack_range = 5;
+    string attack2_name = "";
+    int attack2_bonus = 0;
+    int attack2_dice = 0;
+    int attack2_count = 0;
+    int attack2_mod = 0;
+    int attack2_type = 0;
+    int attack2_range = 0;
+    bool has_multiattack = false;
+    int multiattack_count = 1;
+    int xp = 50;
+    string description = "";
+}
+
+monster_def@[] MONSTER_DEFS;
+
+void init_monster_defs() {
+    // --- CR 1/8 ---
+    {
+        monster_def d;
+        d.id = "kobold";
+        d.name = "Kobold";
+        d.type = "humanoid";
+        d.size = SIZE_SMALL;
+        d.ac = 12;
+        d.hp = 5;
+        d.speed = 30;
+        d.str = 7; d.dex = 15; d.con = 9;
+        d.intelligence = 8; d.wis = 7; d.cha = 8;
+        d.attack_name = "Dagger";
+        d.attack_bonus = 4;
+        d.damage_dice = 4;
+        d.damage_count = 1;
+        d.damage_mod = 2;
+        d.damage_type = DMG_PIERCING;
+        d.attack_range = 5;
+        d.xp = 25;
+        d.description = "A small reptilian humanoid with a cowardly but cunning nature.";
+        MONSTER_DEFS.insert_last(d);
+    }
+
+    // --- CR 1/4 ---
+    {
+        monster_def d;
+        d.id = "goblin";
+        d.name = "Goblin";
+        d.type = "humanoid";
+        d.size = SIZE_SMALL;
+        d.ac = 15;
+        d.hp = 7;
+        d.speed = 30;
+        d.str = 8; d.dex = 14; d.con = 10;
+        d.intelligence = 10; d.wis = 8; d.cha = 8;
+        d.attack_name = "Scimitar";
+        d.attack_bonus = 4;
+        d.damage_dice = 6;
+        d.damage_count = 1;
+        d.damage_mod = 2;
+        d.damage_type = DMG_SLASHING;
+        d.attack_range = 5;
+        d.xp = 50;
+        d.description = "A small, black-hearted humanoid found in dungeons and dark forests.";
+        MONSTER_DEFS.insert_last(d);
+    }
+    {
+        monster_def d;
+        d.id = "skeleton";
+        d.name = "Skeleton";
+        d.type = "undead";
+        d.size = SIZE_MEDIUM;
+        d.ac = 13;
+        d.hp = 13;
+        d.speed = 30;
+        d.str = 10; d.dex = 14; d.con = 15;
+        d.intelligence = 6; d.wis = 8; d.cha = 5;
+        d.attack_name = "Shortsword";
+        d.attack_bonus = 4;
+        d.damage_dice = 6;
+        d.damage_count = 1;
+        d.damage_mod = 2;
+        d.damage_type = DMG_PIERCING;
+        d.attack_range = 5;
+        d.attack2_name = "Shortbow";
+        d.attack2_bonus = 4;
+        d.attack2_dice = 6;
+        d.attack2_count = 1;
+        d.attack2_mod = 2;
+        d.attack2_type = DMG_PIERCING;
+        d.attack2_range = 80;
+        d.xp = 50;
+        d.description = "An animated pile of bones wielding rusted weapons.";
+        MONSTER_DEFS.insert_last(d);
+    }
+    {
+        monster_def d;
+        d.id = "zombie";
+        d.name = "Zombie";
+        d.type = "undead";
+        d.size = SIZE_MEDIUM;
+        d.ac = 8;
+        d.hp = 22;
+        d.speed = 20;
+        d.str = 13; d.dex = 6; d.con = 16;
+        d.intelligence = 3; d.wis = 6; d.cha = 5;
+        d.attack_name = "Slam";
+        d.attack_bonus = 3;
+        d.damage_dice = 6;
+        d.damage_count = 1;
+        d.damage_mod = 1;
+        d.damage_type = DMG_BLUDGEONING;
+        d.attack_range = 5;
+        d.xp = 50;
+        d.description = "A shambling corpse driven by dark magic.";
+        MONSTER_DEFS.insert_last(d);
+    }
+    {
+        monster_def d;
+        d.id = "wolf";
+        d.name = "Wolf";
+        d.type = "beast";
+        d.size = SIZE_MEDIUM;
+        d.ac = 13;
+        d.hp = 11;
+        d.speed = 40;
+        d.str = 12; d.dex = 15; d.con = 12;
+        d.intelligence = 3; d.wis = 12; d.cha = 6;
+        d.attack_name = "Bite";
+        d.attack_bonus = 4;
+        d.damage_dice = 4;
+        d.damage_count = 2;
+        d.damage_mod = 2;
+        d.damage_type = DMG_PIERCING;
+        d.attack_range = 5;
+        d.xp = 50;
+        d.description = "A pack hunter that knocks prey prone.";
+        MONSTER_DEFS.insert_last(d);
+    }
+
+    // --- CR 1/2 ---
+    {
+        monster_def d;
+        d.id = "orc";
+        d.name = "Orc";
+        d.type = "humanoid";
+        d.size = SIZE_MEDIUM;
+        d.ac = 13;
+        d.hp = 15;
+        d.speed = 30;
+        d.str = 16; d.dex = 12; d.con = 16;
+        d.intelligence = 7; d.wis = 11; d.cha = 10;
+        d.attack_name = "Greataxe";
+        d.attack_bonus = 5;
+        d.damage_dice = 12;
+        d.damage_count = 1;
+        d.damage_mod = 3;
+        d.damage_type = DMG_SLASHING;
+        d.attack_range = 5;
+        d.xp = 100;
+        d.description = "A savage raider driven by fury and aggression.";
+        MONSTER_DEFS.insert_last(d);
+    }
+
+    // --- CR 1 ---
+    {
+        monster_def d;
+        d.id = "ghoul";
+        d.name = "Ghoul";
+        d.type = "undead";
+        d.size = SIZE_MEDIUM;
+        d.ac = 12;
+        d.hp = 22;
+        d.speed = 30;
+        d.str = 13; d.dex = 15; d.con = 10;
+        d.intelligence = 7; d.wis = 10; d.cha = 6;
+        d.attack_name = "Claws";
+        d.attack_bonus = 4;
+        d.damage_dice = 4;
+        d.damage_count = 2;
+        d.damage_mod = 2;
+        d.damage_type = DMG_SLASHING;
+        d.attack_range = 5;
+        d.attack2_name = "Bite";
+        d.attack2_bonus = 2;
+        d.attack2_dice = 6;
+        d.attack2_count = 2;
+        d.attack2_mod = 2;
+        d.attack2_type = DMG_PIERCING;
+        d.attack2_range = 5;
+        d.has_multiattack = true;
+        d.multiattack_count = 2;
+        d.xp = 200;
+        d.description = "A ravenous undead that paralyzes its prey with a touch.";
+        MONSTER_DEFS.insert_last(d);
+    }
+
+    // --- CR 2 ---
+    {
+        monster_def d;
+        d.id = "ogre";
+        d.name = "Ogre";
+        d.type = "giant";
+        d.size = SIZE_LARGE;
+        d.ac = 11;
+        d.hp = 59;
+        d.speed = 40;
+        d.str = 19; d.dex = 8; d.con = 16;
+        d.intelligence = 5; d.wis = 7; d.cha = 7;
+        d.attack_name = "Greatclub";
+        d.attack_bonus = 6;
+        d.damage_dice = 8;
+        d.damage_count = 2;
+        d.damage_mod = 4;
+        d.damage_type = DMG_BLUDGEONING;
+        d.attack_range = 5;
+        d.xp = 450;
+        d.description = "A hulking brute that smashes anything in its path.";
+        MONSTER_DEFS.insert_last(d);
+    }
+
+    // --- CR 3 ---
+    {
+        monster_def d;
+        d.id = "owlbear";
+        d.name = "Owlbear";
+        d.type = "monstrosity";
+        d.size = SIZE_LARGE;
+        d.ac = 13;
+        d.hp = 59;
+        d.speed = 40;
+        d.str = 20; d.dex = 12; d.con = 17;
+        d.intelligence = 3; d.wis = 12; d.cha = 7;
+        d.attack_name = "Beak";
+        d.attack_bonus = 7;
+        d.damage_dice = 10;
+        d.damage_count = 1;
+        d.damage_mod = 5;
+        d.damage_type = DMG_PIERCING;
+        d.attack_range = 5;
+        d.attack2_name = "Claws";
+        d.attack2_bonus = 7;
+        d.attack2_dice = 8;
+        d.attack2_count = 2;
+        d.attack2_mod = 5;
+        d.attack2_type = DMG_SLASHING;
+        d.attack2_range = 5;
+        d.has_multiattack = true;
+        d.multiattack_count = 2;
+        d.xp = 700;
+        d.description = "A ferocious predator with the body of a bear and the head of an owl.";
+        MONSTER_DEFS.insert_last(d);
+    }
+    {
+        monster_def d;
+        d.id = "basilisk";
+        d.name = "Basilisk";
+        d.type = "monstrosity";
+        d.size = SIZE_MEDIUM;
+        d.ac = 15;
+        d.hp = 52;
+        d.speed = 20;
+        d.str = 16; d.dex = 8; d.con = 15;
+        d.intelligence = 2; d.wis = 8; d.cha = 7;
+        d.attack_name = "Bite";
+        d.attack_bonus = 5;
+        d.damage_dice = 6;
+        d.damage_count = 2;
+        d.damage_mod = 3;
+        d.damage_type = DMG_PIERCING;
+        d.attack_range = 5;
+        d.xp = 700;
+        d.description = "An eight-legged reptile whose gaze turns flesh to stone.";
+        MONSTER_DEFS.insert_last(d);
+    }
+
+    // --- CR 5 ---
+    {
+        monster_def d;
+        d.id = "troll";
+        d.name = "Troll";
+        d.type = "giant";
+        d.size = SIZE_LARGE;
+        d.ac = 15;
+        d.hp = 84;
+        d.speed = 30;
+        d.str = 18; d.dex = 13; d.con = 20;
+        d.intelligence = 7; d.wis = 9; d.cha = 7;
+        d.attack_name = "Claw";
+        d.attack_bonus = 7;
+        d.damage_dice = 6;
+        d.damage_count = 2;
+        d.damage_mod = 4;
+        d.damage_type = DMG_SLASHING;
+        d.attack_range = 5;
+        d.attack2_name = "Bite";
+        d.attack2_bonus = 7;
+        d.attack2_dice = 6;
+        d.attack2_count = 1;
+        d.attack2_mod = 4;
+        d.attack2_type = DMG_PIERCING;
+        d.attack2_range = 5;
+        d.has_multiattack = true;
+        d.multiattack_count = 3;
+        d.xp = 1800;
+        d.description = "A loathsome giant that regenerates wounds unless burned.";
+        MONSTER_DEFS.insert_last(d);
+    }
+
+    // --- CR 6 ---
+    {
+        monster_def d;
+        d.id = "young_white_dragon";
+        d.name = "Young White Dragon";
+        d.type = "dragon";
+        d.size = SIZE_LARGE;
+        d.ac = 17;
+        d.hp = 133;
+        d.speed = 40;
+        d.str = 18; d.dex = 10; d.con = 18;
+        d.intelligence = 6; d.wis = 11; d.cha = 12;
+        d.attack_name = "Bite";
+        d.attack_bonus = 7;
+        d.damage_dice = 10;
+        d.damage_count = 2;
+        d.damage_mod = 4;
+        d.damage_type = DMG_PIERCING;
+        d.attack_range = 10;
+        d.attack2_name = "Claw";
+        d.attack2_bonus = 7;
+        d.attack2_dice = 6;
+        d.attack2_count = 2;
+        d.attack2_mod = 4;
+        d.attack2_type = DMG_SLASHING;
+        d.attack2_range = 5;
+        d.has_multiattack = true;
+        d.multiattack_count = 3;
+        d.xp = 2300;
+        d.description = "A young dragon wreathed in frost and cruelty.";
+        MONSTER_DEFS.insert_last(d);
+    }
+    {
+        monster_def d;
+        d.id = "medusa";
+        d.name = "Medusa";
+        d.type = "monstrosity";
+        d.size = SIZE_MEDIUM;
+        d.ac = 15;
+        d.hp = 127;
+        d.speed = 30;
+        d.str = 10; d.dex = 15; d.con = 16;
+        d.intelligence = 12; d.wis = 13; d.cha = 15;
+        d.attack_name = "Snake Hair";
+        d.attack_bonus = 5;
+        d.damage_dice = 4;
+        d.damage_count = 1;
+        d.damage_mod = 2;
+        d.damage_type = DMG_PIERCING;
+        d.attack_range = 5;
+        d.attack2_name = "Shortsword";
+        d.attack2_bonus = 5;
+        d.attack2_dice = 6;
+        d.attack2_count = 1;
+        d.attack2_mod = 2;
+        d.attack2_type = DMG_PIERCING;
+        d.attack2_range = 5;
+        d.has_multiattack = true;
+        d.multiattack_count = 3;
+        d.xp = 2300;
+        d.description = "A cursed creature whose gaze petrifies the unwary.";
+        MONSTER_DEFS.insert_last(d);
+    }
+
+    // --- CR 7 ---
+    {
+        monster_def d;
+        d.id = "stone_giant";
+        d.name = "Stone Giant";
+        d.type = "giant";
+        d.size = SIZE_HUGE;
+        d.ac = 17;
+        d.hp = 126;
+        d.speed = 40;
+        d.str = 23; d.dex = 15; d.con = 20;
+        d.intelligence = 10; d.wis = 12; d.cha = 9;
+        d.attack_name = "Greatclub";
+        d.attack_bonus = 9;
+        d.damage_dice = 8;
+        d.damage_count = 3;
+        d.damage_mod = 6;
+        d.damage_type = DMG_BLUDGEONING;
+        d.attack_range = 15;
+        d.attack2_name = "Rock";
+        d.attack2_bonus = 9;
+        d.attack2_dice = 10;
+        d.attack2_count = 4;
+        d.attack2_mod = 6;
+        d.attack2_type = DMG_BLUDGEONING;
+        d.attack2_range = 60;
+        d.has_multiattack = true;
+        d.multiattack_count = 2;
+        d.xp = 2900;
+        d.description = "A reclusive giant that hurls boulders with deadly precision.";
+        MONSTER_DEFS.insert_last(d);
+    }
+
+    // --- CR 10 ---
+    {
+        monster_def d;
+        d.id = "young_red_dragon";
+        d.name = "Young Red Dragon";
+        d.type = "dragon";
+        d.size = SIZE_LARGE;
+        d.ac = 18;
+        d.hp = 178;
+        d.speed = 40;
+        d.str = 23; d.dex = 10; d.con = 21;
+        d.intelligence = 14; d.wis = 11; d.cha = 19;
+        d.attack_name = "Bite";
+        d.attack_bonus = 10;
+        d.damage_dice = 10;
+        d.damage_count = 2;
+        d.damage_mod = 6;
+        d.damage_type = DMG_PIERCING;
+        d.attack_range = 10;
+        d.attack2_name = "Claw";
+        d.attack2_bonus = 10;
+        d.attack2_dice = 6;
+        d.attack2_count = 2;
+        d.attack2_mod = 6;
+        d.attack2_type = DMG_SLASHING;
+        d.attack2_range = 5;
+        d.has_multiattack = true;
+        d.multiattack_count = 3;
+        d.xp = 5900;
+        d.description = "A fearsome young dragon wreathed in flames and arrogance.";
+        MONSTER_DEFS.insert_last(d);
+    }
+
+    // --- CR 13 ---
+    {
+        monster_def d;
+        d.id = "beholder";
+        d.name = "Beholder";
+        d.type = "aberration";
+        d.size = SIZE_LARGE;
+        d.ac = 18;
+        d.hp = 180;
+        d.speed = 0;
+        d.str = 10; d.dex = 14; d.con = 18;
+        d.intelligence = 17; d.wis = 15; d.cha = 17;
+        d.attack_name = "Bite";
+        d.attack_bonus = 5;
+        d.damage_dice = 6;
+        d.damage_count = 4;
+        d.damage_mod = 0;
+        d.damage_type = DMG_PIERCING;
+        d.attack_range = 5;
+        d.attack2_name = "Eye Ray";
+        d.attack2_bonus = 7;
+        d.attack2_dice = 10;
+        d.attack2_count = 3;
+        d.attack2_mod = 0;
+        d.attack2_type = DMG_FORCE;
+        d.attack2_range = 120;
+        d.has_multiattack = true;
+        d.multiattack_count = 3;
+        d.xp = 10000;
+        d.description = "A floating sphere of malice with a central eye and deadly eye stalks.";
+        MONSTER_DEFS.insert_last(d);
+    }
+
+    // --- CR 14 ---
+    {
+        monster_def d;
+        d.id = "adult_black_dragon";
+        d.name = "Adult Black Dragon";
+        d.type = "dragon";
+        d.size = SIZE_HUGE;
+        d.ac = 19;
+        d.hp = 195;
+        d.speed = 40;
+        d.str = 23; d.dex = 14; d.con = 21;
+        d.intelligence = 14; d.wis = 13; d.cha = 17;
+        d.attack_name = "Bite";
+        d.attack_bonus = 11;
+        d.damage_dice = 10;
+        d.damage_count = 2;
+        d.damage_mod = 6;
+        d.damage_type = DMG_PIERCING;
+        d.attack_range = 10;
+        d.attack2_name = "Claw";
+        d.attack2_bonus = 11;
+        d.attack2_dice = 6;
+        d.attack2_count = 2;
+        d.attack2_mod = 6;
+        d.attack2_type = DMG_SLASHING;
+        d.attack2_range = 5;
+        d.has_multiattack = true;
+        d.multiattack_count = 3;
+        d.xp = 11500;
+        d.description = "A cunning adult dragon that lurks in swamps and ruins.";
+        MONSTER_DEFS.insert_last(d);
+    }
+
+    // --- CR 17 ---
+    {
+        monster_def d;
+        d.id = "adult_red_dragon";
+        d.name = "Adult Red Dragon";
+        d.type = "dragon";
+        d.size = SIZE_HUGE;
+        d.ac = 19;
+        d.hp = 256;
+        d.speed = 40;
+        d.str = 27; d.dex = 10; d.con = 25;
+        d.intelligence = 16; d.wis = 13; d.cha = 21;
+        d.attack_name = "Bite";
+        d.attack_bonus = 14;
+        d.damage_dice = 10;
+        d.damage_count = 2;
+        d.damage_mod = 8;
+        d.damage_type = DMG_PIERCING;
+        d.attack_range = 10;
+        d.attack2_name = "Claw";
+        d.attack2_bonus = 14;
+        d.attack2_dice = 6;
+        d.attack2_count = 2;
+        d.attack2_mod = 8;
+        d.attack2_type = DMG_SLASHING;
+        d.attack2_range = 5;
+        d.has_multiattack = true;
+        d.multiattack_count = 3;
+        d.xp = 18000;
+        d.description = "The most fearsome of chromatic dragons, wreathed in fire.";
+        MONSTER_DEFS.insert_last(d);
+    }
+
+    // --- CR 20 ---
+    {
+        monster_def d;
+        d.id = "pit_fiend";
+        d.name = "Pit Fiend";
+        d.type = "fiend";
+        d.size = SIZE_LARGE;
+        d.ac = 19;
+        d.hp = 300;
+        d.speed = 30;
+        d.str = 26; d.dex = 14; d.con = 24;
+        d.intelligence = 22; d.wis = 18; d.cha = 24;
+        d.attack_name = "Mace";
+        d.attack_bonus = 14;
+        d.damage_dice = 6;
+        d.damage_count = 2;
+        d.damage_mod = 8;
+        d.damage_type = DMG_BLUDGEONING;
+        d.attack_range = 10;
+        d.attack2_name = "Bite";
+        d.attack2_bonus = 14;
+        d.attack2_dice = 6;
+        d.attack2_count = 4;
+        d.attack2_mod = 8;
+        d.attack2_type = DMG_PIERCING;
+        d.attack2_range = 5;
+        d.has_multiattack = true;
+        d.multiattack_count = 4;
+        d.xp = 25000;
+        d.description = "A towering devil lord of the Nine Hells.";
+        MONSTER_DEFS.insert_last(d);
+    }
+
+    // --- CR 21 ---
+    {
+        monster_def d;
+        d.id = "lich";
+        d.name = "Lich";
+        d.type = "undead";
+        d.size = SIZE_MEDIUM;
+        d.ac = 17;
+        d.hp = 135;
+        d.speed = 30;
+        d.str = 11; d.dex = 16; d.con = 16;
+        d.intelligence = 20; d.wis = 14; d.cha = 16;
+        d.attack_name = "Paralyzing Touch";
+        d.attack_bonus = 12;
+        d.damage_dice = 6;
+        d.damage_count = 3;
+        d.damage_mod = 0;
+        d.damage_type = DMG_COLD;
+        d.attack_range = 5;
+        d.xp = 33000;
+        d.description = "An undead archmage sustained by a phylactery and dark pacts.";
+        MONSTER_DEFS.insert_last(d);
+    }
+}
+
+monster_def@ get_monster_def(string id) {
+    for (uint i = 0; i < MONSTER_DEFS.length(); i++) {
+        if (MONSTER_DEFS[i].id == id) return MONSTER_DEFS[i];
+    }
+    return null;
+}
+
+// Factory: create a combatant from a monster definition placed at grid position (x, y)
+combatant@ create_monster_combatant(monster_def@ def, int x, int y) {
+    if (@def == null) return null;
+    combatant c;
+    c.name = def.name;
+    c.is_player = false;
+    c.player_username = "";
+    c.x = x;
+    c.y = y;
+    c.size = def.size;
+    c.max_hp = def.hp;
+    c.current_hp = def.hp;
+    c.armor_class = def.ac;
+    c.speed = def.speed;
+    c.initiative_bonus = ability_modifier(def.dex);
+
+    // Ability scores: STR DEX CON INT WIS CHA
+    c.ability_scores = {def.str, def.dex, def.con, def.intelligence, def.wis, def.cha};
+
+    // Equip primary attack
+    c.main_hand = def.attack_name;
+    c.main_hand_damage_dice = def.damage_dice;
+    c.main_hand_damage_count = def.damage_count;
+    c.main_hand_damage_type = def.damage_type;
+    c.main_hand_range = def.attack_range;
+    c.main_hand_finesse = false;
+
+    // Extra attacks from multiattack (subtract 1 for the base attack)
+    if (def.has_multiattack and def.multiattack_count > 1) {
+        c.extra_attacks = def.multiattack_count - 1;
+    }
+
+    return c;
+}

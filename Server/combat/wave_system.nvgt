@@ -1,0 +1,150 @@
+#include "combat_engine.nvgt"
+#include "monster_data.nvgt"
+
+class wave_encounter {
+    int wave_number;
+    string[] monster_ids;
+    int[] monster_counts;
+}
+
+class wave_scenario {
+    string id;
+    string name;
+    string description;
+    int recommended_level;
+    int recommended_players;
+    wave_encounter@[] waves;
+}
+
+wave_scenario@[] WAVE_SCENARIOS;
+
+void init_wave_scenarios() {
+    // Scenario 1: Goblin Ambush (Level 1-3)
+    {
+        wave_scenario s;
+        s.id = "goblin_ambush";
+        s.name = "Goblin Ambush";
+        s.description = "A pack of goblins has set up camp in the forest. Clear them out!";
+        s.recommended_level = 2;
+        s.recommended_players = 2;
+
+        wave_encounter w1;
+        w1.wave_number = 1;
+        w1.monster_ids = {"goblin","goblin","goblin"};
+        w1.monster_counts = {1,1,1};
+        s.waves.insert_last(w1);
+
+        wave_encounter w2;
+        w2.wave_number = 2;
+        w2.monster_ids = {"goblin","goblin","goblin","goblin","wolf"};
+        w2.monster_counts = {1,1,1,1,1};
+        s.waves.insert_last(w2);
+
+        wave_encounter w3;
+        w3.wave_number = 3;
+        w3.monster_ids = {"goblin","goblin","ogre"};
+        w3.monster_counts = {1,1,1};
+        s.waves.insert_last(w3);
+
+        WAVE_SCENARIOS.insert_last(s);
+    }
+
+    // Scenario 2: Crypt of the Undead (Level 3-5)
+    {
+        wave_scenario s;
+        s.id = "crypt_undead";
+        s.name = "Crypt of the Undead";
+        s.description = "An ancient crypt has been disturbed. The dead are rising!";
+        s.recommended_level = 4;
+        s.recommended_players = 3;
+
+        wave_encounter w1;
+        w1.wave_number = 1;
+        w1.monster_ids = {"skeleton","skeleton","skeleton","skeleton"};
+        w1.monster_counts = {1,1,1,1};
+        s.waves.insert_last(w1);
+
+        wave_encounter w2;
+        w2.wave_number = 2;
+        w2.monster_ids = {"zombie","zombie","zombie","skeleton","skeleton"};
+        w2.monster_counts = {1,1,1,1,1};
+        s.waves.insert_last(w2);
+
+        wave_encounter w3;
+        w3.wave_number = 3;
+        w3.monster_ids = {"ghoul","ghoul","ghoul","ghoul"};
+        w3.monster_counts = {1,1,1,1};
+        s.waves.insert_last(w3);
+
+        wave_encounter w4;
+        w4.wave_number = 4;
+        w4.monster_ids = {"troll"};
+        w4.monster_counts = {1};
+        s.waves.insert_last(w4);
+
+        WAVE_SCENARIOS.insert_last(s);
+    }
+
+    // Scenario 3: Dragon's Challenge (Level 5-10)
+    {
+        wave_scenario s;
+        s.id = "dragon_challenge";
+        s.name = "Dragon's Challenge";
+        s.description = "A young dragon terrorizes the land. Face its minions and the beast itself!";
+        s.recommended_level = 7;
+        s.recommended_players = 4;
+
+        wave_encounter w1;
+        w1.wave_number = 1;
+        w1.monster_ids = {"kobold","kobold","basilisk"};
+        w1.monster_counts = {1,1,1};
+        s.waves.insert_last(w1);
+
+        wave_encounter w2;
+        w2.wave_number = 2;
+        w2.monster_ids = {"ogre","ogre","ogre"};
+        w2.monster_counts = {1,1,1};
+        s.waves.insert_last(w2);
+
+        wave_encounter w3;
+        w3.wave_number = 3;
+        w3.monster_ids = {"owlbear","wolf","wolf"};
+        w3.monster_counts = {1,1,1};
+        s.waves.insert_last(w3);
+
+        wave_encounter w4;
+        w4.wave_number = 4;
+        w4.monster_ids = {"young_white_dragon"};
+        w4.monster_counts = {1};
+        s.waves.insert_last(w4);
+
+        WAVE_SCENARIOS.insert_last(s);
+    }
+}
+
+wave_scenario@ get_scenario(string id) {
+    for (uint i = 0; i < WAVE_SCENARIOS.length(); i++) {
+        if (WAVE_SCENARIOS[i].id == id) return WAVE_SCENARIOS[i];
+    }
+    return null;
+}
+
+// Spawn all monsters for a specific wave into a battle
+void spawn_wave(battle@ b, wave_encounter@ wave, int map_width) {
+    if (@b == null or @wave == null) return;
+    int spawn_y = map_width - 2; // Spawn near top of map
+    int spawn_x = 2;
+    for (uint i = 0; i < wave.monster_ids.length(); i++) {
+        monster_def@ def = get_monster_def(wave.monster_ids[i]);
+        if (@def == null) continue;
+        combatant@ c = create_monster_combatant(def, spawn_x, spawn_y);
+        if (@c != null) {
+            b.add_combatant(c);
+        }
+        spawn_x += 3; // Space them out
+        if (spawn_x >= map_width - 2) {
+            spawn_x = 2;
+            spawn_y -= 2;
+        }
+    }
+}

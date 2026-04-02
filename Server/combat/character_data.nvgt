@@ -1,0 +1,215 @@
+#include "../../common/combat_constants.nvgt"
+
+class character_sheet {
+    string name;
+    string race;
+    string class_name;
+    string subclass;
+    int level = 1;
+    int strength = 10; int dexterity = 10; int constitution = 10;
+    int intelligence = 10; int wisdom = 10; int charisma = 10;
+    int max_hp = 10;
+    int armor_class = 10;
+    int speed = 30;
+    int hit_die = 8;
+    bool is_caster = false;
+    int spellcasting_ability = -1;
+    int[] spell_slots_max = {0,0,0,0,0,0,0,0,0,0};
+    int[] save_profs = {0,0,0,0,0,0};
+    int extra_attacks = 0;
+    int rage_count = 0; int rage_damage = 0;
+    int ki_points = 0; int sorcery_points = 0;
+    int sneak_attack_dice = 0;
+    int action_surge_uses = 0;
+    int channel_divinity_uses = 0;
+    int lay_on_hands_pool = 0;
+    string weapon_name = "Unarmed";
+    int weapon_damage_dice = 4; int weapon_damage_count = 1;
+    int weapon_damage_type = DMG_BLUDGEONING;
+    int weapon_range = 5; bool weapon_finesse = false;
+    bool has_unarmored_defense = false;
+}
+
+void apply_class_defaults(character_sheet@ cs) {
+    // Switch on class_name, set hit_die, saves, caster, level-based resources
+    string c = cs.class_name;
+    if (c == "Barbarian") {
+        cs.hit_die = 12; cs.save_profs = {1,0,1,0,0,0}; // STR, CON
+        cs.has_unarmored_defense = true;
+        cs.rage_count = 2; cs.rage_damage = 2;
+        if (cs.level >= 3) cs.rage_count = 3;
+        if (cs.level >= 6) cs.rage_count = 4;
+        if (cs.level >= 9) cs.rage_damage = 3;
+        if (cs.level >= 12) cs.rage_count = 5;
+        if (cs.level >= 16) cs.rage_damage = 4;
+        if (cs.level >= 17) cs.rage_count = 6;
+        if (cs.level >= 5) cs.extra_attacks = 1;
+    } else if (c == "Bard") {
+        cs.hit_die = 8; cs.save_profs = {0,1,0,0,0,1}; // DEX, CHA
+        cs.is_caster = true; cs.spellcasting_ability = ABILITY_CHA;
+        apply_full_caster_slots(cs);
+    } else if (c == "Cleric") {
+        cs.hit_die = 8; cs.save_profs = {0,0,0,0,1,1}; // WIS, CHA
+        cs.is_caster = true; cs.spellcasting_ability = ABILITY_WIS;
+        cs.channel_divinity_uses = 1;
+        if (cs.level >= 6) cs.channel_divinity_uses = 2;
+        if (cs.level >= 18) cs.channel_divinity_uses = 3;
+        apply_full_caster_slots(cs);
+    } else if (c == "Druid") {
+        cs.hit_die = 8; cs.save_profs = {0,0,0,1,1,0}; // INT, WIS
+        cs.is_caster = true; cs.spellcasting_ability = ABILITY_WIS;
+        apply_full_caster_slots(cs);
+    } else if (c == "Fighter") {
+        cs.hit_die = 10; cs.save_profs = {1,0,1,0,0,0}; // STR, CON
+        cs.action_surge_uses = 1;
+        if (cs.level >= 17) cs.action_surge_uses = 2;
+        if (cs.level >= 5) cs.extra_attacks = 1;
+        if (cs.level >= 11) cs.extra_attacks = 2;
+        if (cs.level >= 17) cs.extra_attacks = 3;
+        if (cs.level >= 20) cs.extra_attacks = 4;
+    } else if (c == "Monk") {
+        cs.hit_die = 8; cs.save_profs = {1,1,0,0,0,0}; // STR, DEX
+        cs.has_unarmored_defense = true;
+        cs.ki_points = cs.level >= 2 ? cs.level : 0;
+        if (cs.level >= 5) cs.extra_attacks = 1;
+    } else if (c == "Paladin") {
+        cs.hit_die = 10; cs.save_profs = {0,0,0,0,1,1}; // WIS, CHA
+        cs.is_caster = true; cs.spellcasting_ability = ABILITY_CHA;
+        cs.lay_on_hands_pool = cs.level * 5;
+        if (cs.level >= 5) cs.extra_attacks = 1;
+        apply_half_caster_slots(cs);
+    } else if (c == "Ranger") {
+        cs.hit_die = 10; cs.save_profs = {1,1,0,0,0,0}; // STR, DEX
+        cs.is_caster = true; cs.spellcasting_ability = ABILITY_WIS;
+        if (cs.level >= 5) cs.extra_attacks = 1;
+        apply_half_caster_slots(cs);
+    } else if (c == "Rogue") {
+        cs.hit_die = 8; cs.save_profs = {0,1,0,1,0,0}; // DEX, INT
+        cs.sneak_attack_dice = (cs.level + 1) / 2;
+    } else if (c == "Sorcerer") {
+        cs.hit_die = 6; cs.save_profs = {0,0,1,0,0,1}; // CON, CHA
+        cs.is_caster = true; cs.spellcasting_ability = ABILITY_CHA;
+        cs.sorcery_points = cs.level >= 2 ? cs.level : 0;
+        apply_full_caster_slots(cs);
+    } else if (c == "Warlock") {
+        cs.hit_die = 8; cs.save_profs = {0,0,0,0,1,1}; // WIS, CHA
+        cs.is_caster = true; cs.spellcasting_ability = ABILITY_CHA;
+        // Pact magic handled separately
+    } else if (c == "Wizard") {
+        cs.hit_die = 6; cs.save_profs = {0,0,0,1,1,0}; // INT, WIS
+        cs.is_caster = true; cs.spellcasting_ability = ABILITY_INT;
+        apply_full_caster_slots(cs);
+    } else if (c == "Artificer") {
+        cs.hit_die = 8; cs.save_profs = {0,0,1,1,0,0}; // CON, INT
+        cs.is_caster = true; cs.spellcasting_ability = ABILITY_INT;
+        apply_half_caster_slots(cs);
+    }
+}
+
+void apply_full_caster_slots(character_sheet@ cs) {
+    // Index 0=cantrip(unused), 1-9=spell levels
+    int[][] table = {
+        {0,2,0,0,0,0,0,0,0,0}, // level 1
+        {0,3,0,0,0,0,0,0,0,0}, // level 2
+        {0,4,2,0,0,0,0,0,0,0}, // 3
+        {0,4,3,0,0,0,0,0,0,0}, // 4
+        {0,4,3,2,0,0,0,0,0,0}, // 5
+        {0,4,3,3,0,0,0,0,0,0}, // 6
+        {0,4,3,3,1,0,0,0,0,0}, // 7
+        {0,4,3,3,2,0,0,0,0,0}, // 8
+        {0,4,3,3,3,1,0,0,0,0}, // 9
+        {0,4,3,3,3,2,0,0,0,0}, // 10
+        {0,4,3,3,3,2,1,0,0,0}, // 11
+        {0,4,3,3,3,2,1,0,0,0}, // 12
+        {0,4,3,3,3,2,1,1,0,0}, // 13
+        {0,4,3,3,3,2,1,1,0,0}, // 14
+        {0,4,3,3,3,2,1,1,1,0}, // 15
+        {0,4,3,3,3,2,1,1,1,0}, // 16
+        {0,4,3,3,3,2,1,1,1,1}, // 17
+        {0,4,3,3,3,3,1,1,1,1}, // 18
+        {0,4,3,3,3,3,2,1,1,1}, // 19
+        {0,4,3,3,3,3,2,2,1,1}, // 20
+    };
+    int idx = cs.level - 1;
+    if (idx < 0) idx = 0;
+    if (idx > 19) idx = 19;
+    cs.spell_slots_max = table[idx];
+}
+
+void apply_half_caster_slots(character_sheet@ cs) {
+    int[][] table = {
+        {0,2,0,0,0,0,0,0,0,0}, // 1
+        {0,2,0,0,0,0,0,0,0,0}, // 2
+        {0,3,0,0,0,0,0,0,0,0}, // 3
+        {0,3,0,0,0,0,0,0,0,0}, // 4
+        {0,4,2,0,0,0,0,0,0,0}, // 5
+        {0,4,2,0,0,0,0,0,0,0}, // 6
+        {0,4,3,0,0,0,0,0,0,0}, // 7
+        {0,4,3,0,0,0,0,0,0,0}, // 8
+        {0,4,3,2,0,0,0,0,0,0}, // 9
+        {0,4,3,2,0,0,0,0,0,0}, // 10
+        {0,4,3,3,0,0,0,0,0,0}, // 11
+        {0,4,3,3,0,0,0,0,0,0}, // 12
+        {0,4,3,3,1,0,0,0,0,0}, // 13
+        {0,4,3,3,1,0,0,0,0,0}, // 14
+        {0,4,3,3,2,0,0,0,0,0}, // 15
+        {0,4,3,3,2,0,0,0,0,0}, // 16
+        {0,4,3,3,3,1,0,0,0,0}, // 17
+        {0,4,3,3,3,1,0,0,0,0}, // 18
+        {0,4,3,3,3,2,0,0,0,0}, // 19
+        {0,4,3,3,3,2,0,0,0,0}, // 20
+    };
+    int idx = cs.level - 1;
+    if (idx < 0) idx = 0;
+    if (idx > 19) idx = 19;
+    cs.spell_slots_max = table[idx];
+}
+
+void calculate_hp(character_sheet@ cs) {
+    int con_mod = ability_modifier(cs.constitution);
+    cs.max_hp = cs.hit_die + con_mod; // Level 1: max die + CON
+    for (int i = 2; i <= cs.level; i++) {
+        cs.max_hp += (cs.hit_die / 2 + 1) + con_mod; // Avg per level
+    }
+    if (cs.max_hp < 1) cs.max_hp = 1;
+}
+
+void calculate_ac(character_sheet@ cs) {
+    int dex_mod = ability_modifier(cs.dexterity);
+    if (cs.has_unarmored_defense) {
+        if (cs.class_name == "Barbarian") {
+            cs.armor_class = 10 + dex_mod + ability_modifier(cs.constitution);
+        } else if (cs.class_name == "Monk") {
+            cs.armor_class = 10 + dex_mod + ability_modifier(cs.wisdom);
+        }
+    } else {
+        cs.armor_class = 10 + dex_mod; // No armor default
+    }
+}
+
+combatant@ create_player_combatant(character_sheet@ cs, string player_username, int x, int y) {
+    combatant c;
+    c.name = cs.name;
+    c.is_player = true;
+    c.player_username = player_username;
+    c.x = x; c.y = y;
+    c.max_hp = cs.max_hp;
+    c.current_hp = cs.max_hp;
+    c.armor_class = cs.armor_class;
+    c.speed = cs.speed;
+    c.level = cs.level;
+    c.proficiency = proficiency_bonus(cs.level);
+    c.ability_scores = {cs.strength, cs.dexterity, cs.constitution, cs.intelligence, cs.wisdom, cs.charisma};
+    c.save_proficiencies = cs.save_profs;
+    c.initiative_bonus = ability_modifier(cs.dexterity);
+    c.extra_attacks = cs.extra_attacks;
+    c.main_hand = cs.weapon_name;
+    c.main_hand_damage_dice = cs.weapon_damage_dice;
+    c.main_hand_damage_count = cs.weapon_damage_count;
+    c.main_hand_damage_type = cs.weapon_damage_type;
+    c.main_hand_range = cs.weapon_range;
+    c.main_hand_finesse = cs.weapon_finesse;
+    c.spell_slots_max = cs.spell_slots_max;
+    c.spell_slots_current = cs.spell_slots_max;
+    return c;
+}
