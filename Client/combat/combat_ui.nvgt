@@ -145,7 +145,14 @@ void show_action_menu() {
 			speak("No target selected. Scan with I J K L and press Enter to lock a target.", true);
 			return;
 		}
-		send({{"type", message_types::action_attack}, {"target", current_target_id}});
+		combat_entity@ atk_target = get_entity(current_target_id);
+		if (@atk_target != null) {
+			combat_entity@ atk_me = get_entity(my_combatant_id);
+			int atk_dist = 0;
+			if (@atk_me != null) atk_dist = feet_distance(atk_me.x, atk_me.y, atk_target.x, atk_target.y);
+			speak("Attacking " + atk_target.name + ", " + atk_dist + " feet away.", false);
+		}
+		send({{"type", message_types::action_attack}, {"target_id", current_target_id}});
 	} else if (res == cast_opt) {
 		show_spell_menu();
 	} else if (res == dodge_opt) {

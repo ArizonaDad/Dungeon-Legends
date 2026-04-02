@@ -261,6 +261,13 @@ class battle_manager {
 	void advance_turn() {
 		if (@combat == null or !combat.battle_active) return;
 
+		// Remove Dodging condition from the combatant whose turn just ended.
+		combatant@ prev = combat.current_combatant();
+		if (@prev != null) {
+			prev.is_dodging = false;
+			prev.remove_condition(COND_DODGING);
+		}
+
 		combat.advance_turn();
 		combatant@ c = combat.current_combatant();
 		if (@c == null) return;
@@ -271,37 +278,416 @@ class battle_manager {
 			return;
 		}
 
-		// Announce turn start.
+		// Skip stable unconscious combatants (they do nothing on their turn).
+		if (c.is_stable and c.current_hp == 0) {
+			advance_turn();
+			return;
+		}
+
+		// Announce round and turn start to ALL players.
 		string round_text = "";
 		if (combat.current_turn_index == 0) {
 			round_text = "Round " + combat.round_number + "! ";
 		}
 		broadcast_announce(round_text + c.name + "'s turn.", true);
 
-		// Send turn_start to the active player.
-		user@ u = find_user_for_combatant(c);
-		if (@u != null) {
+		// Send turn_start to ALL players so everyone knows whose turn it is.
+		broadcast_to_battle({
+			{"type", message_types::turn_start},
+			{"combatant_id", c.id},
+			{"name", c.name},
+			{"hp", c.current_hp},
+			{"max_hp", c.max_hp},
+			{"movement", c.movement_remaining},
+			{"has_action", c.has_action},
+			{"has_bonus_action", c.has_bonus_action}
+		});
+
+		broadcast_state();
+
+		// Death save check: unconscious player at 0 HP needs to roll.
+		if (c.current_hp == 0 and c.has_condition(COND_UNCONSCIOUS) and !c.is_dead and !c.is_stable) {
+			user@ u = find_user_for_combatant(c);
+			if (c.is_player) {
+				request_roll(u, c, ROLL_DEATH_SAVE, 20, 0, "death saving throw");
+			} else {
+				// Monsters at 0 HP are dead (shouldn't reach here, but safety).
+				c.is_dead = true;
+				advance_turn();
+			}
+			return;
+		}
+
+		// If it is a monster's turn, auto-play it immediately.
+		if (!c.is_player) {
+			execute_monster_turn(c);
+			return;
+		}
+	}
+
+	// ---- Concentration Check ----
+
+	void check_concentration(combatant@ target, int damage) {
+		if (@target == null or @combat == null) return;
+		if (!target.is_concentrating) return;
+		if (target.is_dead or target.current_hp <= 0) {
+			// Concentration automatically broken at 0 HP.
+			target.is_concentrating = false;
+			target.remove_condition(COND_CONCENTRATING);
+			broadcast_announce(target.name + "'s concentration on " + target.concentration_spell + " is broken!");
+			broadcast_to_battle({{"type", message_types::concentration_check}, {"name", target.name}, {"spell", target.concentration_spell}, {"broken", true}});
+			target.concentration_spell = "";
+			broadcast_state();
+			return;
+		}
+
+		// DC = max(10, damage / 2).
+		int dc = damage / 2;
+		if (dc < 10) dc = 10;
+		int con_mod = target.get_save_bonus(ABILITY_CON);
+
+		user@ u = find_user_for_combatant(target);
+		if (target.is_player and @u != null and !u.is_bot) {
+			// Request CON save from the player.
+			pending_roll pr;
+			pr.combatant_id = target.id;
+			pr.player_username = target.player_username;
+			pr.roll_type = ROLL_CONCENTRATION;
+			pr.dice_sides = 20;
+			pr.modifier = con_mod;
+			pr.reason = "Constitution save to maintain concentration (DC " + dc + ")";
+			pr.target_id = uint(dc);  // Store DC in target_id field for processing.
+			@current_roll = pr;
+
 			u.send({
-				{"type", message_types::turn_start},
-				{"combatant_id", c.id},
-				{"name", c.name},
-				{"hp", c.current_hp},
-				{"max_hp", c.max_hp},
-				{"movement", c.movement_remaining},
-				{"has_action", c.has_action},
-				{"has_bonus_action", c.has_bonus_action}
+				{"type", message_types::roll_request},
+				{"roll_type", ROLL_CONCENTRATION},
+				{"dice", 20},
+				{"modifier", con_mod},
+				{"reason", "Constitution save to maintain concentration on " + target.concentration_spell + " (DC " + dc + ")"}
 			});
+		} else {
+			// Auto-roll for monsters/bots.
+			int natural = random(1, 20);
+			int total = natural + con_mod;
+			bool success = total >= dc;
+			string outcome = success ? "Maintains concentration!" : "Concentration broken!";
+			broadcast_roll(target.name, "Constitution save (DC " + dc + ")", natural, con_mod, total, outcome);
+
+			if (!success) {
+				target.is_concentrating = false;
+				target.remove_condition(COND_CONCENTRATING);
+				broadcast_announce(target.name + "'s concentration on " + target.concentration_spell + " is broken!");
+				broadcast_to_battle({{"type", message_types::concentration_check}, {"name", target.name}, {"spell", target.concentration_spell}, {"broken", true}});
+				target.concentration_spell = "";
+			} else {
+				broadcast_to_battle({{"type", message_types::concentration_check}, {"name", target.name}, {"spell", target.concentration_spell}, {"broken", false}});
+			}
+			broadcast_state();
+		}
+	}
+
+	// ---- Battle End Detection ----
+
+	void check_battle_end() {
+		if (@combat == null or !combat.battle_active) return;
+		if (!combat.check_battle_over()) return;
+
+		if (combat.mode == "pvp") {
+			// PvP: find the last player standing.
+			string winner = "Nobody";
+			for (uint i = 0; i < combat.combatants.length(); i++) {
+				if (combat.combatants[i].is_alive() and combat.combatants[i].is_player) {
+					winner = combat.combatants[i].name;
+					break;
+				}
+			}
+			combat.battle_active = false;
+			broadcast_announce("Battle is over! " + winner + " is victorious!", true);
+			broadcast_to_battle({{"type", message_types::game_end_battle}, {"winner", winner}, {"mode", "pvp"}});
+			broadcast_state();
+		} else if (combat.mode == "wave" or combat.mode == "boss") {
+			// Check if all players are dead.
+			bool any_player_alive = false;
+			for (uint i = 0; i < combat.combatants.length(); i++) {
+				if (combat.combatants[i].is_player and combat.combatants[i].is_alive()) {
+					any_player_alive = true;
+					break;
+				}
+			}
+			if (!any_player_alive) {
+				// Total party kill.
+				combat.battle_active = false;
+				broadcast_announce("All players have fallen! Defeat!", true);
+				broadcast_to_battle({{"type", message_types::game_end_battle}, {"winner", "monsters"}, {"mode", combat.mode}, {"result", "defeat"}});
+				broadcast_state();
+				return;
+			}
+
+			// All monsters dead = wave complete.
+			bool any_monster_alive = false;
+			for (uint i = 0; i < combat.combatants.length(); i++) {
+				if (!combat.combatants[i].is_player and combat.combatants[i].is_alive()) {
+					any_monster_alive = true;
+					break;
+				}
+			}
+			if (!any_monster_alive) {
+				combat.wave_number++;
+				broadcast_announce("Wave " + (combat.wave_number - 1) + " complete!", true);
+				broadcast_to_battle({{"type", message_types::wave_complete}, {"wave", combat.wave_number - 1}});
+				broadcast_state();
+				// TODO: Spawn next wave from wave_system, or declare victory if no more waves.
+				// For now, signal victory after clearing last wave.
+				broadcast_announce("Victory! All waves cleared!", true);
+				combat.battle_active = false;
+				broadcast_to_battle({{"type", message_types::game_end_battle}, {"winner", "players"}, {"mode", combat.mode}, {"result", "victory"}});
+				broadcast_state();
+			}
+		}
+	}
+
+	// ---- Opportunity Attacks ----
+
+	void check_opportunity_attacks(combatant@ mover, int old_x, int old_y, int new_x, int new_y) {
+		if (@mover == null or @combat == null) return;
+		// Disengage prevents opportunity attacks.
+		if (mover.took_disengage) return;
+
+		for (uint i = 0; i < combat.combatants.length(); i++) {
+			combatant@ enemy = combat.combatants[i];
+			if (@enemy == null or enemy.is_dead or !enemy.is_alive()) continue;
+			if (!enemy.is_conscious()) continue;
+			// Cannot make opportunity attack against yourself.
+			if (enemy.id == mover.id) continue;
+			// Must be on the opposite side (in PvP, all players are enemies to each other).
+			if (combat.mode != "pvp" and enemy.is_player == mover.is_player) continue;
+			// Must have reaction available.
+			if (!enemy.has_reaction) continue;
+			// Must have been in melee range before the move (5ft = adjacent tile).
+			int old_dist = feet_distance(old_x, old_y, enemy.x, enemy.y);
+			int new_dist = feet_distance(new_x, new_y, enemy.x, enemy.y);
+			int reach = enemy.main_hand_range;
+			if (reach < 5) reach = 5;
+			// Opportunity attack triggers when leaving reach.
+			if (old_dist <= reach and new_dist > reach) {
+				// This enemy gets an opportunity attack.
+				enemy.has_reaction = false;
+				broadcast_announce(enemy.name + " makes an opportunity attack against " + mover.name + "!");
+
+				// Calculate attack bonus.
+				int ability_mod = enemy.get_ability_mod(ABILITY_STR);
+				if (enemy.main_hand_finesse) {
+					int dex_mod = enemy.get_ability_mod(ABILITY_DEX);
+					if (dex_mod > ability_mod) ability_mod = dex_mod;
+				}
+				int atk_bonus = ability_mod + enemy.proficiency;
+				atk_bonus -= enemy.exhaustion_level * 2;
+
+				if (!enemy.is_player) {
+					// Monster: auto-resolve the opportunity attack immediately.
+					int natural = random(1, 20);
+					bool is_crit = (natural == 20);
+					bool is_fumble = (natural == 1);
+					int total = natural + atk_bonus;
+					bool hit = false;
+					string outcome = "";
+
+					if (is_crit) { hit = true; outcome = "Critical hit!"; }
+					else if (is_fumble) { hit = false; outcome = "Miss!"; }
+					else {
+						hit = total >= mover.armor_class;
+						outcome = hit ? "Hit!" : "Miss! Needed " + mover.armor_class + ".";
+					}
+
+					broadcast_roll(enemy.name, "opportunity attack against " + mover.name, natural, atk_bonus, total, outcome);
+					broadcast_to_battle({{"type", message_types::reaction_opportunity}, {"attacker_id", enemy.id}, {"target_id", mover.id}, {"hit", hit}});
+
+					if (hit) {
+						// Roll damage.
+						int dmg_mod = enemy.get_ability_mod(ABILITY_STR);
+						if (enemy.main_hand_finesse) {
+							int dex_mod_d = enemy.get_ability_mod(ABILITY_DEX);
+							if (dex_mod_d > dmg_mod) dmg_mod = dex_mod_d;
+						}
+						int rolls = is_crit ? enemy.main_hand_damage_count * 2 : enemy.main_hand_damage_count;
+						int dmg_natural = 0;
+						for (int di = 0; di < rolls; di++) dmg_natural += random(1, enemy.main_hand_damage_dice);
+						int total_damage = dmg_natural + dmg_mod;
+						if (total_damage < 1) total_damage = 1;
+
+						string dmg_type_name = "damage";
+						if (enemy.main_hand_damage_type >= 0 and enemy.main_hand_damage_type < int(DAMAGE_TYPE_NAMES.length())) {
+							dmg_type_name = DAMAGE_TYPE_NAMES[enemy.main_hand_damage_type] + " damage";
+						}
+
+						broadcast_roll(enemy.name, "opportunity attack damage", dmg_natural, dmg_mod, total_damage, total_damage + " " + dmg_type_name + " to " + mover.name + ".");
+						combat.apply_damage(mover, total_damage, enemy.main_hand_damage_type, enemy);
+						check_concentration(mover, total_damage);
+
+						if (mover.is_dead) {
+							broadcast_announce(mover.name + " has been slain!", true);
+							broadcast_to_battle({{"type", message_types::creature_died}, {"name", mover.name}, {"id", mover.id}});
+						} else if (mover.current_hp == 0 and mover.has_condition(COND_UNCONSCIOUS)) {
+							broadcast_announce(mover.name + " falls unconscious!", true);
+						} else {
+							broadcast_announce(mover.name + " has " + mover.current_hp + " of " + mover.max_hp + " HP remaining.");
+						}
+						broadcast_state();
+						check_battle_end();
+					}
+				} else {
+					// Player: request the opportunity attack roll from the player.
+					user@ opp_user = find_user_for_combatant(enemy);
+					if (@opp_user != null) {
+						pending_roll pr;
+						pr.combatant_id = enemy.id;
+						pr.player_username = enemy.player_username;
+						pr.roll_type = ROLL_ATTACK;
+						pr.dice_sides = 20;
+						pr.modifier = atk_bonus;
+						pr.reason = "opportunity attack against " + mover.name;
+						pr.target_id = mover.id;
+						pr.has_advantage = false;
+						pr.has_disadvantage = false;
+						@current_roll = pr;
+
+						opp_user.send({
+							{"type", message_types::roll_request},
+							{"roll_type", ROLL_ATTACK},
+							{"dice", 20},
+							{"modifier", atk_bonus},
+							{"reason", "opportunity attack against " + mover.name}
+						});
+						broadcast_to_battle({{"type", message_types::reaction_opportunity}, {"attacker_id", enemy.id}, {"target_id", mover.id}});
+						// Only one opportunity attack per move step; return to let roll resolve.
+						return;
+					}
+				}
+			}
+		}
+	}
+
+	// ---- Monster AI Turn ----
+
+	void execute_monster_turn(combatant@ monster) {
+		if (@monster == null or @combat == null or monster.is_dead) return;
+
+		// Find nearest alive player (conscious preferred, unconscious as fallback).
+		combatant@ nearest = null;
+		int nearest_dist = 9999;
+
+		for (uint i = 0; i < combat.combatants.length(); i++) {
+			combatant@ other = combat.combatants[i];
+			if (!other.is_player or other.is_dead) continue;
+			// Prefer conscious targets.
+			if (other.current_hp == 0) continue;
+			int dist = feet_distance(monster.x, monster.y, other.x, other.y);
+			if (dist < nearest_dist) {
+				nearest_dist = dist;
+				@nearest = other;
+			}
+		}
+
+		// Fallback: target unconscious players if no conscious ones.
+		if (@nearest == null) {
+			for (uint i = 0; i < combat.combatants.length(); i++) {
+				combatant@ other = combat.combatants[i];
+				if (!other.is_player or other.is_dead) continue;
+				int dist = feet_distance(monster.x, monster.y, other.x, other.y);
+				if (dist < nearest_dist) {
+					nearest_dist = dist;
+					@nearest = other;
+				}
+			}
+		}
+
+		if (@nearest == null) {
+			// No targets: end turn.
+			broadcast_announce(monster.name + " has no targets and ends its turn.");
+			advance_turn();
+			return;
+		}
+
+		// Step 1: Move toward the nearest player (up to speed, 1 tile per 5ft).
+		while (monster.movement_remaining >= FEET_PER_TILE and nearest_dist > monster.main_hand_range) {
+			int old_x = monster.x;
+			int old_y = monster.y;
+			int dx = 0;
+			int dy = 0;
+			if (nearest.x > monster.x) dx = 1;
+			else if (nearest.x < monster.x) dx = -1;
+			if (nearest.y > monster.y) dy = 1;
+			else if (nearest.y < monster.y) dy = -1;
+
+			// Move one axis at a time (prefer x-axis, then y-axis).
+			if (dx != 0) {
+				monster.x += dx;
+				monster.movement_remaining -= FEET_PER_TILE;
+			} else if (dy != 0) {
+				monster.y += dy;
+				monster.movement_remaining -= FEET_PER_TILE;
+			} else {
+				break;
+			}
+
+			// Check opportunity attacks from moving.
+			check_opportunity_attacks(monster, old_x, old_y, monster.x, monster.y);
+			if (monster.is_dead or monster.current_hp == 0) return;
+
+			nearest_dist = feet_distance(monster.x, monster.y, nearest.x, nearest.y);
 		}
 
 		broadcast_state();
 
-		// Death save check: unconscious player at 0 HP.
-		if (c.current_hp == 0 and c.has_condition(COND_UNCONSCIOUS) and !c.is_dead and !c.is_stable and c.is_player) {
-			request_roll(u, c, ROLL_DEATH_SAVE, 20, 0, "death saving throw");
-			return;
+		// Step 2: Attack if in melee range and has action.
+		if (monster.has_action and nearest_dist <= monster.main_hand_range) {
+			monster.has_action = false;
+			monster.used_action = true;
+
+			int ability_mod = monster.get_ability_mod(ABILITY_STR);
+			int atk_bonus = ability_mod + monster.proficiency;
+			atk_bonus -= monster.exhaustion_level * 2;
+
+			// Determine advantage/disadvantage.
+			bool adv = false;
+			bool disadv = false;
+			if (nearest.has_condition(COND_PRONE) and nearest_dist <= 5) adv = true;
+			if (nearest.has_condition(COND_PARALYZED) or nearest.has_condition(COND_STUNNED)) adv = true;
+			if (nearest.has_condition(COND_UNCONSCIOUS)) adv = true;
+			if (monster.has_condition(COND_BLINDED)) disadv = true;
+			if (monster.has_condition(COND_POISONED)) disadv = true;
+			if (nearest.is_dodging and !monster.has_condition(COND_BLINDED)) disadv = true;
+
+			broadcast_announce(monster.name + " attacks " + nearest.name + "!");
+
+			// Set up attack roll (auto-resolved since monster).
+			pending_roll pr;
+			pr.combatant_id = monster.id;
+			pr.player_username = monster.name;
+			pr.roll_type = ROLL_ATTACK;
+			pr.dice_sides = 20;
+			pr.modifier = atk_bonus;
+			pr.reason = "to attack " + nearest.name;
+			pr.target_id = nearest.id;
+			pr.has_advantage = adv;
+			pr.has_disadvantage = disadv;
+			@current_roll = pr;
+
+			// Auto-roll with advantage/disadvantage.
+			int roll1 = random(1, 20);
+			int roll2 = random(1, 20);
+			int natural = roll1;
+			if (adv and !disadv) natural = roll1 > roll2 ? roll1 : roll2;
+			else if (disadv and !adv) natural = roll1 < roll2 ? roll1 : roll2;
+
+			process_roll_result(natural);
+			return;  // process_roll_result may chain into damage.
 		}
 
-		// If it is a monster/bot turn, the tick function handles AI actions.
+		// Step 3: End monster turn.
+		broadcast_announce(monster.name + " ends its turn.");
+		advance_turn();
 	}
 
 	void handle_turn_end(user@ u) {
@@ -312,6 +698,7 @@ class battle_manager {
 		if (c.is_player and c.player_username != u.username) return;
 
 		broadcast_announce(c.name + " ends their turn.");
+		broadcast_state();
 		advance_turn();
 	}
 
@@ -424,12 +811,13 @@ class battle_manager {
 				broadcast_announce(target.name + " has " + target.current_hp + " of " + target.max_hp + " HP remaining.");
 			}
 
+			// Concentration check on damage.
+			check_concentration(target, total_damage);
+
 			broadcast_state();
 
 			// Check if battle is over.
-			if (combat.check_battle_over()) {
-				end_battle();
-			}
+			check_battle_end();
 		}
 
 		else if (pr.roll_type == ROLL_DEATH_SAVE) {
@@ -454,12 +842,29 @@ class battle_manager {
 
 			broadcast_state();
 
-			if (combat.check_battle_over()) {
-				end_battle();
-				return;
-			}
+			check_battle_end();
+			if (!combat.battle_active) return;
 			// Death save consumed the turn. Advance.
 			advance_turn();
+		}
+
+		else if (pr.roll_type == ROLL_CONCENTRATION) {
+			// Concentration save result. DC is stored in pr.target_id.
+			int dc = int(pr.target_id);
+			bool success = total >= dc;
+			string outcome = success ? "Maintains concentration!" : "Concentration broken!";
+			broadcast_roll(c.name, "Constitution save (DC " + dc + ")", natural_roll, pr.modifier, total, outcome);
+
+			if (!success) {
+				c.is_concentrating = false;
+				c.remove_condition(COND_CONCENTRATING);
+				broadcast_announce(c.name + "'s concentration on " + c.concentration_spell + " is broken!");
+				broadcast_to_battle({{"type", message_types::concentration_check}, {"name", c.name}, {"spell", c.concentration_spell}, {"broken", true}});
+				c.concentration_spell = "";
+			} else {
+				broadcast_to_battle({{"type", message_types::concentration_check}, {"name", c.name}, {"spell", c.concentration_spell}, {"broken", false}});
+			}
+			broadcast_state();
 		}
 
 		else if (pr.roll_type == ROLL_ABILITY_CHECK) {
@@ -511,6 +916,29 @@ class battle_manager {
 		if (c.has_condition(COND_BLINDED)) disadv = true;
 		if (c.has_condition(COND_POISONED)) disadv = true;
 		if (target.is_dodging and !c.has_condition(COND_BLINDED)) disadv = true;
+		if (target.has_condition(COND_INVISIBLE)) disadv = true;
+		if (c.has_condition(COND_FRIGHTENED)) disadv = true;
+		if (c.has_condition(COND_RESTRAINED)) disadv = true;
+		if (target.has_condition(COND_RESTRAINED)) adv = true;
+		// Ranged attack disadvantage: hostile within 5ft
+		if (c.main_hand_range > 5) {
+			for (uint ri = 0; ri < combat.combatants.length(); ri++) {
+				combatant@ nearby = combat.combatants[ri];
+				if (@nearby == null or nearby.is_dead or nearby.id == c.id) continue;
+				if (nearby.is_player == c.is_player) continue; // same side = ally
+				if (feet_distance(c.x, c.y, nearby.x, nearby.y) <= 5) {
+					disadv = true;
+					break;
+				}
+			}
+		}
+		// Can't attack what you can't see
+		if (!combat.can_see(c, target)) {
+			u.send({{"type", message_types::announce}, {"text", "You cannot see that target."}, {"interrupt", true}});
+			c.has_action = true;
+			c.used_action = false;
+			return;
+		}
 
 		// Store attack context in pending roll.
 		pending_roll pr;
@@ -557,10 +985,15 @@ class battle_manager {
 			return;
 		}
 
+		int old_x = c.x;
+		int old_y = c.y;
 		c.x = new_x;
 		c.y = new_y;
 		c.movement_remaining -= move_cost;
 		c.has_moved = true;
+
+		// Check for opportunity attacks from enemies.
+		check_opportunity_attacks(c, old_x, old_y, new_x, new_y);
 
 		broadcast_state();
 	}
@@ -576,6 +1009,7 @@ class battle_manager {
 		c.is_dodging = true;
 		c.add_condition(COND_DODGING);
 		broadcast_announce(c.name + " takes the Dodge action.");
+		broadcast_state();
 	}
 
 	void handle_dash(user@ u) {
@@ -588,6 +1022,7 @@ class battle_manager {
 		c.used_action = true;
 		c.movement_remaining += c.speed;
 		broadcast_announce(c.name + " takes the Dash action. " + c.movement_remaining + " feet of movement remaining.");
+		broadcast_state();
 	}
 
 	void handle_disengage(user@ u) {
@@ -600,6 +1035,7 @@ class battle_manager {
 		c.used_action = true;
 		c.took_disengage = true;
 		broadcast_announce(c.name + " takes the Disengage action.");
+		broadcast_state();
 	}
 
 	void handle_help(user@ u, json_object@ msg) {
@@ -618,6 +1054,7 @@ class battle_manager {
 			if (@target != null) target_name = target.name;
 		}
 		broadcast_announce(c.name + " takes the Help action, assisting against " + target_name + ".");
+		broadcast_state();
 	}
 
 	void handle_hide(user@ u) {
@@ -637,6 +1074,7 @@ class battle_manager {
 		c.is_hidden = true;
 		c.add_condition(COND_HIDDEN);
 		broadcast_announce(c.name + " attempts to hide.");
+		broadcast_state();
 	}
 
 	void handle_shove(user@ u, json_object@ msg) {
@@ -808,7 +1246,7 @@ class battle_manager {
 		u.send(info);
 	}
 
-	// ---- Monster AI Tick ----
+	// ---- Monster AI Tick (fallback safety net) ----
 
 	void tick() {
 		if (@combat == null or !combat.battle_active) return;
@@ -817,100 +1255,15 @@ class battle_manager {
 		combatant@ c = combat.current_combatant();
 		if (@c == null or c.is_player or c.is_dead) return;
 
-		// Simple monster AI: find nearest alive player, move toward them, attack if in range.
-		combatant@ nearest = null;
-		int nearest_dist = 9999;
-
-		for (uint i = 0; i < combat.combatants.length(); i++) {
-			combatant@ other = combat.combatants[i];
-			if (!other.is_player or other.is_dead or other.current_hp == 0) continue;
-			int dist = feet_distance(c.x, c.y, other.x, other.y);
-			if (dist < nearest_dist) {
-				nearest_dist = dist;
-				@nearest = other;
-			}
-		}
-
-		if (@nearest == null) {
-			// No targets: end turn.
-			broadcast_announce(c.name + " has no targets and ends its turn.");
-			advance_turn();
-			return;
-		}
-
-		// Move toward the nearest player.
-		while (c.movement_remaining >= FEET_PER_TILE and nearest_dist > c.main_hand_range) {
-			int dx = 0, dy = 0;
-			if (nearest.x > c.x) dx = 1;
-			else if (nearest.x < c.x) dx = -1;
-			if (nearest.y > c.y) dy = 1;
-			else if (nearest.y < c.y) dy = -1;
-
-			// Move one axis at a time.
-			if (dx != 0) {
-				c.x += dx;
-				c.movement_remaining -= FEET_PER_TILE;
-			} else if (dy != 0) {
-				c.y += dy;
-				c.movement_remaining -= FEET_PER_TILE;
-			} else {
-				break;
-			}
-			nearest_dist = feet_distance(c.x, c.y, nearest.x, nearest.y);
-		}
-
-		// Attack if in range and has action.
-		if (c.has_action and nearest_dist <= c.main_hand_range) {
-			c.has_action = false;
-			c.used_action = true;
-
-			int ability_mod = c.get_ability_mod(ABILITY_STR);
-			int atk_bonus = ability_mod + c.proficiency;
-			atk_bonus -= c.exhaustion_level * 2;
-
-			broadcast_announce(c.name + " attacks " + nearest.name + "!");
-
-			// Set up attack roll (auto-resolved since monster).
-			pending_roll pr;
-			pr.combatant_id = c.id;
-			pr.player_username = c.name;
-			pr.roll_type = ROLL_ATTACK;
-			pr.dice_sides = 20;
-			pr.modifier = atk_bonus;
-			pr.reason = "to attack " + nearest.name;
-			pr.target_id = nearest.id;
-			pr.has_advantage = false;
-			pr.has_disadvantage = false;
-			@current_roll = pr;
-
-			int natural = random(1, 20);
-			process_roll_result(natural);
-			return;  // process_roll_result may chain into damage.
-		}
-
-		// End monster turn.
-		broadcast_announce(c.name + " ends its turn.");
-		advance_turn();
+		// Monster turns are now handled by execute_monster_turn called from advance_turn.
+		// This tick serves as a safety net in case a monster turn stalls.
+		execute_monster_turn(c);
 	}
 
-	// ---- Battle End ----
+	// ---- Battle End (legacy wrapper) ----
 
 	void end_battle() {
-		if (@combat == null) return;
-		combat.battle_active = false;
-
-		// Determine winner.
-		string winner = "Nobody";
-		for (uint i = 0; i < combat.combatants.length(); i++) {
-			if (combat.combatants[i].is_alive()) {
-				winner = combat.combatants[i].name;
-				break;
-			}
-		}
-
-		broadcast_announce("Battle is over! " + winner + " is victorious!", true);
-		broadcast_to_battle({{"type", message_types::game_end_battle}, {"winner", winner}});
-		broadcast_state();
+		check_battle_end();
 	}
 
 	// ---- Message Router ----
