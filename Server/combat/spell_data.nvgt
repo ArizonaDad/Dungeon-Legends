@@ -78,7 +78,7 @@ void init_spell_defs() {
     { spell_def s; s.id="friends"; s.name="Friends"; s.level=0; s.school="enchantment"; s.casting_time=0; s.range=0; s.concentration=true; s.duration_rounds=10; s.save_type=-1; s.damage_dice=0; s.damage_count=0; s.is_healing=false; s.max_targets=1; s.description="Advantage on CHA checks against one creature. Concentration. Creature becomes hostile after."; s.class_list="bard,sorcerer,warlock,wizard"; SPELL_DEFS.insert_last(s); }
 
     // LEVEL 1 SPELLS
-    { spell_def s; s.id="magic_missile"; s.name="Magic Missile"; s.level=1; s.school="evocation"; s.casting_time=0; s.range=120; s.concentration=false; s.duration_rounds=0; s.save_type=-1; s.damage_dice=4; s.damage_count=3; s.damage_type=DMG_FORCE; s.is_healing=false; s.upcast_extra_dice=1; s.max_targets=3; s.description="Three darts of magical force. Each deals 1d4 plus 1 force damage. Auto-hit. Extra dart per level upcast."; s.class_list="wizard,sorcerer"; SPELL_DEFS.insert_last(s); }
+    { spell_def s; s.id="magic_missile"; s.name="Magic Missile"; s.level=1; s.school="evocation"; s.casting_time=0; s.range=120; s.concentration=false; s.duration_rounds=0; s.save_type=-1; s.damage_dice=0; s.damage_count=0; s.damage_type=DMG_FORCE; s.is_healing=false; s.upcast_extra_dice=1; s.max_targets=3; s.description="Three darts of magical force. Each deals 1d4 plus 1 force damage. Auto-hit. Extra dart per level upcast."; s.class_list="wizard,sorcerer"; SPELL_DEFS.insert_last(s); }
 
     { spell_def s; s.id="shield"; s.name="Shield"; s.level=1; s.school="abjuration"; s.casting_time=2; s.range=0; s.concentration=false; s.duration_rounds=1; s.save_type=-1; s.damage_dice=0; s.damage_count=0; s.is_healing=false; s.max_targets=0; s.description="Reaction. Plus 5 to AC until start of your next turn. Blocks Magic Missile."; s.class_list="wizard,sorcerer"; SPELL_DEFS.insert_last(s); }
 
@@ -92,12 +92,48 @@ void init_spell_defs() {
 
     { spell_def s; s.id="bless"; s.name="Bless"; s.level=1; s.school="enchantment"; s.casting_time=0; s.range=30; s.concentration=true; s.duration_rounds=10; s.save_type=-1; s.damage_dice=0; s.damage_count=0; s.is_healing=false; s.max_targets=3; s.description="Up to 3 creatures add 1d4 to attack rolls and saving throws for 1 minute. Concentration."; s.class_list="cleric,paladin"; SPELL_DEFS.insert_last(s); }
 
+    { spell_def s; s.id="burning_hands"; s.name="Burning Hands"; s.level=1; s.school="evocation"; s.casting_time=0; s.range=0; s.concentration=false; s.duration_rounds=0; s.save_type=ABILITY_DEX; s.damage_dice=6; s.damage_count=3; s.damage_type=DMG_FIRE; s.is_healing=false; s.upcast_extra_dice=1; s.is_aoe=true; s.aoe_radius=15; s.max_targets=4; s.description="A sheet of flame erupts from your hands. DEX save or 3d6 fire damage. Extra 1d6 per level upcast."; s.class_list="sorcerer,wizard"; SPELL_DEFS.insert_last(s); }
+
+    { spell_def s; s.id="charm_person"; s.name="Charm Person"; s.level=1; s.school="enchantment"; s.casting_time=0; s.range=30; s.concentration=false; s.duration_rounds=10; s.save_type=ABILITY_WIS; s.damage_dice=0; s.damage_count=0; s.is_healing=false; s.max_targets=1; s.description="A Humanoid makes a Wisdom save or is charmed by you for 1 hour."; s.class_list="bard,sorcerer,warlock,wizard"; SPELL_DEFS.insert_last(s); }
+
+    { spell_def s; s.id="color_spray"; s.name="Color Spray"; s.level=1; s.school="illusion"; s.casting_time=0; s.range=15; s.concentration=false; s.duration_rounds=1; s.save_type=-1; s.damage_dice=0; s.damage_count=0; s.is_healing=false; s.max_targets=4; s.description="A dazzling cone of light overwhelms nearby creatures."; s.class_list="bard,sorcerer,wizard"; SPELL_DEFS.insert_last(s); }
+
+    { spell_def s; s.id="detect_magic"; s.name="Detect Magic"; s.level=1; s.school="divination"; s.casting_time=0; s.range=0; s.concentration=true; s.duration_rounds=100; s.save_type=-1; s.damage_dice=0; s.damage_count=0; s.is_healing=false; s.max_targets=0; s.description="Sense the presence of magic for up to 10 minutes. Concentration."; s.class_list="bard,cleric,druid,paladin,ranger,sorcerer,wizard,artificer"; SPELL_DEFS.insert_last(s); }
+
+    { spell_def s; s.id="disguise_self"; s.name="Disguise Self"; s.level=1; s.school="illusion"; s.casting_time=0; s.range=0; s.concentration=false; s.duration_rounds=600; s.save_type=-1; s.damage_dice=0; s.damage_count=0; s.is_healing=false; s.max_targets=0; s.description="Alter your appearance for 1 hour."; s.class_list="bard,sorcerer,wizard"; SPELL_DEFS.insert_last(s); }
+
+    { spell_def s; s.id="dissonant_whispers"; s.name="Dissonant Whispers"; s.level=1; s.school="enchantment"; s.casting_time=0; s.range=60; s.concentration=false; s.duration_rounds=0; s.save_type=ABILITY_WIS; s.damage_dice=6; s.damage_count=3; s.damage_type=DMG_PSYCHIC; s.is_healing=false; s.upcast_extra_dice=1; s.max_targets=1; s.description="A creature makes a Wisdom save or takes 3d6 psychic damage and must flee."; s.class_list="bard"; SPELL_DEFS.insert_last(s); }
+
+    { spell_def s; s.id="ensnaring_strike"; s.name="Ensnaring Strike"; s.level=1; s.school="conjuration"; s.casting_time=1; s.range=0; s.concentration=true; s.duration_rounds=10; s.save_type=-1; s.damage_dice=0; s.damage_count=0; s.is_healing=false; s.max_targets=1; s.description="Bonus action. Your next weapon hit can conjure vines that restrain the target. Concentration."; s.class_list="ranger"; SPELL_DEFS.insert_last(s); }
+
+    { spell_def s; s.id="heroism"; s.name="Heroism"; s.level=1; s.school="enchantment"; s.casting_time=0; s.range=5; s.concentration=true; s.duration_rounds=10; s.save_type=-1; s.damage_dice=0; s.damage_count=0; s.is_healing=false; s.max_targets=1; s.description="A willing creature becomes fearless and gains temporary hit points each round. Concentration."; s.class_list="bard,paladin"; SPELL_DEFS.insert_last(s); }
+
+    { spell_def s; s.id="hex"; s.name="Hex"; s.level=1; s.school="enchantment"; s.casting_time=1; s.range=90; s.concentration=true; s.duration_rounds=100; s.save_type=-1; s.damage_dice=0; s.damage_count=0; s.is_healing=false; s.max_targets=1; s.description="Bonus action. Curse a creature to take extra damage from your attacks. Concentration."; s.class_list="warlock"; SPELL_DEFS.insert_last(s); }
+
+    { spell_def s; s.id="hunters_mark"; s.name="Hunter's Mark"; s.level=1; s.school="divination"; s.casting_time=1; s.range=90; s.concentration=true; s.duration_rounds=100; s.save_type=-1; s.damage_dice=0; s.damage_count=0; s.is_healing=false; s.max_targets=1; s.description="Bonus action. Mark a creature so your weapon hits deal extra damage. Concentration."; s.class_list="ranger"; SPELL_DEFS.insert_last(s); }
+
+    { spell_def s; s.id="longstrider"; s.name="Longstrider"; s.level=1; s.school="transmutation"; s.casting_time=0; s.range=10; s.concentration=false; s.duration_rounds=-1; s.save_type=-1; s.damage_dice=0; s.damage_count=0; s.is_healing=false; s.max_targets=1; s.description="Increase a creature's Speed by 10 feet for the rest of the battle."; s.class_list="bard,druid,ranger,wizard,artificer"; SPELL_DEFS.insert_last(s); }
+
+    { spell_def s; s.id="mage_armor"; s.name="Mage Armor"; s.level=1; s.school="abjuration"; s.casting_time=0; s.range=5; s.concentration=false; s.duration_rounds=-1; s.save_type=-1; s.damage_dice=0; s.damage_count=0; s.is_healing=false; s.max_targets=1; s.description="Protect an unarmored creature with a base AC of 13 plus Dexterity modifier."; s.class_list="sorcerer,wizard"; SPELL_DEFS.insert_last(s); }
+
+    { spell_def s; s.id="sanctuary"; s.name="Sanctuary"; s.level=1; s.school="abjuration"; s.casting_time=1; s.range=30; s.concentration=false; s.duration_rounds=10; s.save_type=ABILITY_WIS; s.damage_dice=0; s.damage_count=0; s.is_healing=false; s.max_targets=1; s.description="Protect a creature so attackers must first pass a Wisdom save to target it."; s.class_list="cleric,paladin"; SPELL_DEFS.insert_last(s); }
+
+    { spell_def s; s.id="sleep"; s.name="Sleep"; s.level=1; s.school="enchantment"; s.casting_time=0; s.range=90; s.concentration=false; s.duration_rounds=10; s.save_type=-1; s.damage_dice=0; s.damage_count=0; s.is_healing=false; s.max_targets=5; s.description="A wave of soothing magic can put creatures to sleep."; s.class_list="bard,sorcerer,wizard"; SPELL_DEFS.insert_last(s); }
+
+    { spell_def s; s.id="silent_image"; s.name="Silent Image"; s.level=1; s.school="illusion"; s.casting_time=0; s.range=60; s.concentration=true; s.duration_rounds=10; s.save_type=-1; s.damage_dice=0; s.damage_count=0; s.is_healing=false; s.max_targets=0; s.description="Create a convincing visual illusion. Concentration."; s.class_list="bard,sorcerer,wizard"; SPELL_DEFS.insert_last(s); }
+
+    { spell_def s; s.id="tashas_hideous_laughter"; s.name="Tasha's Hideous Laughter"; s.level=1; s.school="enchantment"; s.casting_time=0; s.range=30; s.concentration=true; s.duration_rounds=10; s.save_type=ABILITY_WIS; s.damage_dice=0; s.damage_count=0; s.is_healing=false; s.max_targets=1; s.description="A creature that fails its Wisdom save collapses in laughter. Concentration."; s.class_list="bard,wizard"; SPELL_DEFS.insert_last(s); }
+
     // LEVEL 2 SPELLS
-    { spell_def s; s.id="spiritual_weapon"; s.name="Spiritual Weapon"; s.level=2; s.school="evocation"; s.casting_time=1; s.range=60; s.concentration=true; s.duration_rounds=10; s.save_type=-1; s.damage_dice=8; s.damage_count=1; s.damage_type=DMG_FORCE; s.is_healing=false; s.upcast_extra_dice=1; s.max_targets=1; s.description="Bonus action. Spectral weapon attacks as bonus action each turn. 1d8 plus modifier force. Concentration in 2024."; s.class_list="cleric"; SPELL_DEFS.insert_last(s); }
+    { spell_def s; s.id="spiritual_weapon"; s.name="Spiritual Weapon"; s.level=2; s.school="evocation"; s.casting_time=1; s.range=60; s.concentration=false; s.duration_rounds=10; s.save_type=-1; s.damage_dice=8; s.damage_count=1; s.damage_type=DMG_FORCE; s.is_healing=false; s.upcast_extra_dice=1; s.max_targets=1; s.description="Bonus action. Spectral weapon attacks as bonus action each turn. 1d8 plus modifier force."; s.class_list="cleric"; SPELL_DEFS.insert_last(s); }
+
+    { spell_def s; s.id="lesser_restoration"; s.name="Lesser Restoration"; s.level=2; s.school="abjuration"; s.casting_time=0; s.range=5; s.concentration=false; s.duration_rounds=0; s.save_type=-1; s.damage_dice=0; s.damage_count=0; s.is_healing=false; s.max_targets=1; s.description="End one Poisoned, Paralyzed, Blinded, or Deafened condition on a creature."; s.class_list="bard,cleric,druid,paladin,ranger,artificer"; SPELL_DEFS.insert_last(s); }
 
     { spell_def s; s.id="misty_step"; s.name="Misty Step"; s.level=2; s.school="conjuration"; s.casting_time=1; s.range=0; s.concentration=false; s.duration_rounds=0; s.save_type=-1; s.damage_dice=0; s.damage_count=0; s.is_healing=false; s.max_targets=0; s.description="Bonus action. Teleport 30 feet to an unoccupied space you can see."; s.class_list="sorcerer,warlock,wizard"; SPELL_DEFS.insert_last(s); }
 
     { spell_def s; s.id="hold_person"; s.name="Hold Person"; s.level=2; s.school="enchantment"; s.casting_time=0; s.range=60; s.concentration=true; s.duration_rounds=10; s.save_type=ABILITY_WIS; s.damage_dice=0; s.damage_count=0; s.is_healing=false; s.max_targets=1; s.description="Target humanoid makes WIS save or is paralyzed. Repeat save at end of each turn. Concentration."; s.class_list="bard,cleric,druid,sorcerer,warlock,wizard"; SPELL_DEFS.insert_last(s); }
+
+    { spell_def s; s.id="pass_without_trace"; s.name="Pass without Trace"; s.level=2; s.school="abjuration"; s.casting_time=0; s.range=30; s.concentration=true; s.duration_rounds=100; s.save_type=-1; s.damage_dice=0; s.damage_count=0; s.is_healing=false; s.max_targets=6; s.description="A veil of shadows grants you and allies plus 10 to Hide checks. Concentration."; s.class_list="druid,ranger"; SPELL_DEFS.insert_last(s); }
 
     { spell_def s; s.id="scorching_ray"; s.name="Scorching Ray"; s.level=2; s.school="evocation"; s.casting_time=0; s.range=120; s.concentration=false; s.duration_rounds=0; s.save_type=-1; s.damage_dice=6; s.damage_count=2; s.damage_type=DMG_FIRE; s.is_healing=false; s.upcast_extra_dice=0; s.max_targets=3; s.description="Three rays of fire. Ranged spell attack for each. 2d6 fire per ray. Extra ray per level upcast."; s.class_list="sorcerer,wizard"; SPELL_DEFS.insert_last(s); }
 
@@ -126,15 +162,20 @@ spell_def@ get_spell(string id) {
     return null;
 }
 
+bool spell_list_contains(string csv, string value) {
+    string haystack = "," + csv.lower() + ",";
+    string needle = "," + value.lower() + ",";
+    return haystack.find(needle) >= 0;
+}
+
 // Get spells available to a specific class
 void get_class_spells(string class_name, int max_level, spell_def@[]@ out_spells) {
     out_spells.resize(0);
-    string lower_class = class_name;
     // Simple lowercase (NVGT may not have .lower())
     for (uint i = 0; i < SPELL_DEFS.length(); i++) {
         if (SPELL_DEFS[i].level > max_level) continue;
         // Check if class is in the spell's class_list
-        if (SPELL_DEFS[i].class_list.find(lower_class.lower()) >= 0) {
+        if (spell_list_contains(SPELL_DEFS[i].class_list, class_name)) {
             out_spells.insert_last(SPELL_DEFS[i]);
         }
     }
@@ -149,28 +190,23 @@ int cantrip_dice_count(int base_count, int caster_level) {
 }
 
 // Calculate spell save DC: 8 + proficiency + spellcasting ability mod
-int spell_save_dc(combatant@ caster) {
+int spell_save_dc(combatant@ caster, string spell_id = "") {
     if (@caster == null) return 10;
-    int mod = 0;
-    // Use highest mental stat as spellcasting ability (simplified)
-    int int_mod = caster.get_ability_mod(ABILITY_INT);
-    int wis_mod = caster.get_ability_mod(ABILITY_WIS);
-    int cha_mod = caster.get_ability_mod(ABILITY_CHA);
-    mod = int_mod;
-    if (wis_mod > mod) mod = wis_mod;
-    if (cha_mod > mod) mod = cha_mod;
+    int spell_ability = caster.spellcasting_ability;
+    int override_ability = spell_id != "" ? caster.get_spellcasting_override_ability(spell_id) : -1;
+    if (override_ability >= 0) spell_ability = override_ability;
+    if (spell_ability < 0 or spell_ability > 5) spell_ability = ABILITY_INT;
+    int mod = caster.get_ability_mod(spell_ability);
     return 8 + caster.proficiency + mod;
 }
 
 // Calculate spell attack bonus
-int spell_attack_bonus(combatant@ caster) {
+int spell_attack_bonus(combatant@ caster, string spell_id = "") {
     if (@caster == null) return 0;
-    int mod = 0;
-    int int_mod = caster.get_ability_mod(ABILITY_INT);
-    int wis_mod = caster.get_ability_mod(ABILITY_WIS);
-    int cha_mod = caster.get_ability_mod(ABILITY_CHA);
-    mod = int_mod;
-    if (wis_mod > mod) mod = wis_mod;
-    if (cha_mod > mod) mod = cha_mod;
+    int spell_ability = caster.spellcasting_ability;
+    int override_ability = spell_id != "" ? caster.get_spellcasting_override_ability(spell_id) : -1;
+    if (override_ability >= 0) spell_ability = override_ability;
+    if (spell_ability < 0 or spell_ability > 5) spell_ability = ABILITY_INT;
+    int mod = caster.get_ability_mod(spell_ability);
     return mod + caster.proficiency;
 }

@@ -1,183 +1,824 @@
 #include "../../common/combat_constants.nvgt"
+#include "../../common/feat_data.nvgt"
 
 string created_char_name = "";
 string created_char_race = "";
 string created_char_class = "";
+string created_char_subclass = "";
+string created_char_background = "";
 int created_char_level = 1;
 int[] created_ability_scores = {10,10,10,10,10,10};
 string created_weapon = "Longsword";
 string[] created_cantrips;
 string[] created_spells;
+string[] created_bonus_cantrips;
+string[] created_bonus_spells;
+string[] created_char_feats;
+string[] created_char_skill_proficiencies;
+string[] created_char_tool_proficiencies;
+string[] created_spellcasting_override_spells;
+int[] created_spellcasting_override_abilities;
+string[] created_free_cast_spells;
+bool creation_back_requested = false;
+int[] created_pre_progression_ability_scores = {10,10,10,10,10,10};
 
-int get_cantrips_known(string class_name, int level) {
-    string lc = class_name.lower();
-    if (lc == "sorcerer") { if (level >= 10) return 6; if (level >= 4) return 5; return 4; }
-    if (lc == "wizard") { if (level >= 10) return 5; if (level >= 4) return 4; return 3; }
-    if (lc == "cleric") { if (level >= 10) return 5; if (level >= 4) return 4; return 3; }
-    if (lc == "druid") { if (level >= 10) return 4; if (level >= 4) return 3; return 2; }
-    if (lc == "bard") { if (level >= 10) return 4; if (level >= 4) return 3; return 2; }
-    if (lc == "warlock") { if (level >= 10) return 4; if (level >= 4) return 3; return 2; }
-    if (lc == "artificer") { if (level >= 14) return 4; if (level >= 10) return 3; return 2; }
-    return 0; // non-caster
+void add_text_pair(string[]@ names, string[]@ descriptions, string name, string description) {
+    names.insert_last(name);
+    descriptions.insert_last(description);
 }
 
-int get_prepared_spells(string class_name, int level) {
+int progression_value(int[]@ values, int level) {
+    if (@values == null or values.length() == 0) return 0;
+    int index = level - 1;
+    if (index < 0) index = 0;
+    if (index >= int(values.length())) index = values.length() - 1;
+    return values[index];
+}
+
+bool string_array_contains(string[]@ values, string needle) {
+    if (@values == null) return false;
+    for (uint i = 0; i < values.length(); i++) {
+        if (values[i] == needle) return true;
+    }
+    return false;
+}
+
+void add_spell_id_once(string[]@ values, string spell_id) {
+    if (@values == null or spell_id == "") return;
+    if (!string_array_contains(values, spell_id)) values.insert_last(spell_id);
+}
+
+string join_spell_names(string[]@ spell_ids) {
+    if (@spell_ids == null or spell_ids.length() == 0) return "";
+    string result = "";
+    for (uint i = 0; i < spell_ids.length(); i++) {
+        if (i > 0) result += ", ";
+        result += spell_display_name(spell_ids[i]);
+    }
+    return result;
+}
+
+string join_string_list(string[]@ values) {
+    if (@values == null or values.length() == 0) return "";
+    string result = "";
+    for (uint i = 0; i < values.length(); i++) {
+        if (i > 0) result += ", ";
+        result += values[i];
+    }
+    return result;
+}
+
+string join_csv_list(string[]@ values) {
+    if (@values == null or values.length() == 0) return "";
+    string result = "";
+    for (uint i = 0; i < values.length(); i++) {
+        if (values[i] == "") continue;
+        if (result != "") result += ",";
+        result += values[i];
+    }
+    return result;
+}
+
+void parse_csv_into_string_array(string csv, string[]@ out_values) {
+    out_values.resize(0);
+    if (csv == "" or @out_values == null) return;
+    string[]@ parts = csv.split(",");
+    for (uint i = 0; i < parts.length(); i++) {
+        if (parts[i] != "") out_values.insert_last(parts[i]);
+    }
+}
+
+void clear_creation_back_request() {
+    creation_back_requested = false;
+}
+
+bool creation_should_go_back() {
+    return creation_back_requested;
+}
+
+int creation_menu_run(menu@ m) {
+    int pick = creation_menu_run(m);
+    if (pick < 0) creation_back_requested = true;
+    return pick;
+}
+
+string join_spell_override_specs() {
+    if (created_spellcasting_override_spells.length() == 0) return "";
+    string result = "";
+    for (uint i = 0; i < created_spellcasting_override_spells.length(); i++) {
+        if (i > 0) result += ",";
+        result += created_spellcasting_override_spells[i] + ":" + ability_key_from_id(created_spellcasting_override_abilities[i]);
+    }
+    return result;
+}
+
+void add_tool_proficiency_once(string tool_name) {
+    if (tool_name == "") return;
+    if (!string_array_contains(created_char_tool_proficiencies, tool_name)) created_char_tool_proficiencies.insert_last(tool_name);
+}
+
+void add_skill_proficiency_once(string skill_name) {
+    if (skill_name == "") return;
+    if (!string_array_contains(created_char_skill_proficiencies, skill_name)) created_char_skill_proficiencies.insert_last(skill_name);
+}
+
+void add_spell_override_once(string spell_id, int ability_id) {
+    if (spell_id == "" or ability_id < 0 or ability_id > 5) return;
+    for (uint i = 0; i < created_spellcasting_override_spells.length(); i++) {
+        if (created_spellcasting_override_spells[i] == spell_id) {
+            created_spellcasting_override_abilities[i] = ability_id;
+            return;
+        }
+    }
+    created_spellcasting_override_spells.insert_last(spell_id);
+    created_spellcasting_override_abilities.insert_last(ability_id);
+}
+
+bool feat_selected(string feat_id) {
+    return string_array_contains(created_char_feats, feat_id);
+}
+
+int count_selected_feat(string feat_id) {
+    int count = 0;
+    for (uint i = 0; i < created_char_feats.length(); i++) {
+        if (created_char_feats[i] == feat_id) count++;
+    }
+    return count;
+}
+
+bool character_has_spellcasting_feature_for_creation() {
+    string lc = created_char_class.lower();
+    if (lc == "bard" or lc == "cleric" or lc == "druid" or lc == "paladin" or lc == "ranger" or lc == "sorcerer" or lc == "warlock" or lc == "wizard" or lc == "artificer") return true;
+    return is_third_caster_subclass_choice(created_char_class, created_char_subclass) and created_char_level >= 3;
+}
+
+bool character_has_fighting_style_feature() {
+    if (created_char_class == "Fighter" and created_char_level >= 1) return true;
+    if (created_char_class == "Paladin" and created_char_level >= 2) return true;
+    if (created_char_class == "Ranger" and created_char_level >= 2) return true;
+    return false;
+}
+
+int count_general_feat_slots(string class_name, int level) {
+    int count = 0;
+    if (level >= 4) count++;
+    if (level >= 8) count++;
+    if (level >= 12) count++;
+    if (level >= 16) count++;
+    if (level >= 19) count++;
+    if (class_name == "Fighter") {
+        if (level >= 6) count++;
+        if (level >= 14) count++;
+    } else if (class_name == "Rogue") {
+        if (level >= 10) count++;
+    }
+    return count;
+}
+
+bool can_raise_ability_score(int ability_id, int cap = 20) {
+    if (ability_id < 0 or ability_id >= int(created_ability_scores.length())) return false;
+    return created_ability_scores[ability_id] < cap;
+}
+
+void apply_ability_increase(int ability_id, int amount, int cap = 20) {
+    if (ability_id < 0 or ability_id >= int(created_ability_scores.length()) or amount <= 0) return;
+    created_ability_scores[ability_id] += amount;
+    if (created_ability_scores[ability_id] > cap) created_ability_scores[ability_id] = cap;
+}
+
+int choose_ability_from_ids(string prompt, int[]@ ability_ids) {
+    menu@ m = setup_sub_menu(prompt);
+    int[] options;
+    for (uint i = 0; i < ability_ids.length(); i++) {
+        int ability_id = ability_ids[i];
+        if (ability_id < 0 or ability_id > 5) continue;
+        m.add_item(ABILITY_NAMES[ability_id] + ". Current score " + created_ability_scores[ability_id] + ".");
+        options.insert_last(ability_id);
+    }
+    int pick = m.run();
+    if (pick < 0 or pick >= int(options.length())) return -1;
+    return options[pick];
+}
+
+void choose_skill_proficiencies_step(int picks, string prompt) {
+    if (picks <= 0) return;
+    init_feat_data();
+    for (int choice = 0; choice < picks; choice++) {
+        menu@ m = setup_sub_menu(prompt + " " + (choice + 1) + " of " + picks + ".");
+        string[] option_names;
+        for (uint i = 0; i < SKILL_CHOICES.length(); i++) {
+            if (string_array_contains(created_char_skill_proficiencies, SKILL_CHOICES[i].name)) continue;
+            m.add_item(SKILL_CHOICES[i].name + ". " + SKILL_CHOICES[i].description);
+            option_names.insert_last(SKILL_CHOICES[i].name);
+        }
+        if (option_names.length() == 0) {
+            speak("No more skills are available to choose.", false);
+            return;
+        }
+        int pick = creation_menu_run(m);
+        if (pick < 0 or pick >= int(option_names.length())) return;
+        add_skill_proficiency_once(option_names[pick]);
+        speak(option_names[pick] + " proficiency gained.", false);
+    }
+}
+
+void choose_skilled_proficiencies_step() {
+    string[] tool_options = {
+        "Artisan's Tools",
+        "Calligrapher's Supplies",
+        "Gaming Set",
+        "Healer's Kit",
+        "Musical Instrument",
+        "Thieves' Tools"
+    };
+    for (int choice = 0; choice < 3; choice++) {
+        menu@ m = setup_sub_menu("Choose Skilled proficiency " + (choice + 1) + " of 3.");
+        string[] entry_types;
+        string[] entry_values;
+        for (uint i = 0; i < SKILL_CHOICES.length(); i++) {
+            if (string_array_contains(created_char_skill_proficiencies, SKILL_CHOICES[i].name)) continue;
+            m.add_item("Skill: " + SKILL_CHOICES[i].name + ". " + SKILL_CHOICES[i].description);
+            entry_types.insert_last("skill");
+            entry_values.insert_last(SKILL_CHOICES[i].name);
+        }
+        for (uint i = 0; i < tool_options.length(); i++) {
+            if (string_array_contains(created_char_tool_proficiencies, tool_options[i])) continue;
+            m.add_item("Tool: " + tool_options[i] + ".");
+            entry_types.insert_last("tool");
+            entry_values.insert_last(tool_options[i]);
+        }
+        if (entry_values.length() == 0) {
+            speak("No more skills or tools are available to choose.", false);
+            return;
+        }
+        int pick = creation_menu_run(m);
+        if (pick < 0 or pick >= int(entry_values.length())) return;
+        if (entry_types[pick] == "skill") {
+            add_skill_proficiency_once(entry_values[pick]);
+            speak(entry_values[pick] + " proficiency gained.", false);
+        } else {
+            add_tool_proficiency_once(entry_values[pick]);
+            speak(entry_values[pick] + " proficiency gained.", false);
+        }
+    }
+}
+
+int choose_spellcasting_ability_for_magic_initiate() {
+    int[] options = {ABILITY_INT, ABILITY_WIS, ABILITY_CHA};
+    return choose_ability_from_ids("Choose the spellcasting ability for this Magic Initiate feat.", options);
+}
+
+void choose_magic_initiate_step(string feat_id) {
+    string list_class = feat_magic_initiate_list_class(feat_id);
+    if (list_class == "") return;
+    int ability_id = choose_spellcasting_ability_for_magic_initiate();
+    if (ability_id < 0) ability_id = ABILITY_INT;
+    build_spell_list_for_character(list_class == "cleric" ? "Cleric" : (list_class == "druid" ? "Druid" : "Wizard"), "", 1);
+
+    for (int pick_index = 0; pick_index < 2; pick_index++) {
+        menu@ m = setup_sub_menu("Choose Magic Initiate cantrip " + (pick_index + 1) + " of 2 from the " + list_class + " list.");
+        string[] spell_ids;
+        for (uint i = 0; i < available_spells.length(); i++) {
+            client_spell@ spell = available_spells[i];
+            if (@spell == null or spell.level != 0) continue;
+            if (string_array_contains(created_bonus_cantrips, spell.id)) continue;
+            m.add_item(spell.name + ". " + spell.description);
+            spell_ids.insert_last(spell.id);
+        }
+        int pick = creation_menu_run(m);
+        if (pick < 0 or pick >= int(spell_ids.length())) return;
+        add_spell_id_once(created_bonus_cantrips, spell_ids[pick]);
+        add_spell_override_once(spell_ids[pick], ability_id);
+        speak("Learned " + spell_display_name(spell_ids[pick]) + " from Magic Initiate.", false);
+    }
+
+    menu@ spell_menu = setup_sub_menu("Choose your Magic Initiate level 1 spell from the " + list_class + " list.");
+    string[] spell_ids;
+    for (uint i = 0; i < available_spells.length(); i++) {
+        client_spell@ spell = available_spells[i];
+        if (@spell == null or spell.level != 1) continue;
+        if (string_array_contains(created_bonus_spells, spell.id)) continue;
+        spell_menu.add_item(spell.name + ". " + spell.description);
+        spell_ids.insert_last(spell.id);
+    }
+    int spell_pick = creation_menu_run(spell_menu);
+    if (spell_pick < 0 or spell_pick >= int(spell_ids.length())) return;
+    add_spell_id_once(created_bonus_spells, spell_ids[spell_pick]);
+    add_spell_override_once(spell_ids[spell_pick], ability_id);
+    add_spell_id_once(created_free_cast_spells, spell_ids[spell_pick]);
+    speak("Prepared " + spell_display_name(spell_ids[spell_pick]) + " from Magic Initiate.", false);
+}
+
+void apply_asi_step(string reason, int cap = 20, int[]@ restricted_ids = null, bool allow_double = true) {
+    int[] options;
+    if (@restricted_ids != null and restricted_ids.length() > 0) {
+        for (uint i = 0; i < restricted_ids.length(); i++) {
+            if (restricted_ids[i] >= 0 and restricted_ids[i] <= 5) options.insert_last(restricted_ids[i]);
+        }
+    } else {
+        options = {ABILITY_STR, ABILITY_DEX, ABILITY_CON, ABILITY_INT, ABILITY_WIS, ABILITY_CHA};
+    }
+
+    menu@ mode_menu = setup_sub_menu(reason + " Choose how to distribute the increase.");
+    int plus_two_opt = mode_menu.add_item("Increase one ability score by 2.");
+    int split_opt = mode_menu.add_item("Increase two ability scores by 1 each.");
+    int mode = creation_menu_run(mode_menu);
+    if (creation_should_go_back()) return;
+    if (mode == plus_two_opt and allow_double) {
+        int first = choose_ability_from_ids("Choose the ability score to increase by 2.", options);
+        if (first >= 0) {
+            apply_ability_increase(first, 2, cap);
+            speak(ABILITY_NAMES[first] + " increased to " + created_ability_scores[first] + ".", false);
+        }
+        return;
+    }
+
+    int first = choose_ability_from_ids("Choose the first ability score to increase by 1.", options);
+    if (first < 0) return;
+    apply_ability_increase(first, 1, cap);
+    int[] remaining;
+    for (uint i = 0; i < options.length(); i++) {
+        if (options[i] != first) remaining.insert_last(options[i]);
+    }
+    int second = choose_ability_from_ids("Choose the second ability score to increase by 1.", remaining);
+    if (second >= 0) apply_ability_increase(second, 1, cap);
+    speak("Updated scores: " + ABILITY_NAMES[first] + " " + created_ability_scores[first] + (second >= 0 ? ", " + ABILITY_NAMES[second] + " " + created_ability_scores[second] : "") + ".", false);
+}
+
+bool can_take_feat_now(string feat_id, bool origin_only = false, bool for_general_slot = false) {
+    feat_choice_def@ feat = get_feat_choice(feat_id);
+    if (@feat == null) return false;
+    if (origin_only and feat.category != FEAT_CATEGORY_ORIGIN) return false;
+    if (!feat.repeatable and feat_selected(feat_id)) return false;
+    if (created_char_level < feat.min_level) return false;
+    if (feat.requires_fighting_style_feature and !character_has_fighting_style_feature()) return false;
+    if (feat.requires_spellcasting and !character_has_spellcasting_feature_for_creation()) return false;
+    if (feat.id == "grappler" and created_ability_scores[ABILITY_STR] < 13 and created_ability_scores[ABILITY_DEX] < 13) return false;
+    if (feat.id == "boon_of_irresistible_offense" and created_char_level < 19) return false;
+    if (feat.id == "boon_of_combat_prowess" and created_char_level < 19) return false;
+    if (feat.id == "boon_of_spell_recall" and (created_char_level < 19 or !character_has_spellcasting_feature_for_creation())) return false;
+    if (feat.id == "boon_of_truesight" and created_char_level < 19) return false;
+    if (feat_is_magic_initiate(feat_id) and feat_selected(feat_id)) return false;
+    return true;
+}
+
+string feat_display_name(string feat_id) {
+    feat_choice_def@ feat = get_feat_choice(feat_id);
+    if (@feat == null) return feat_id;
+    return feat.name;
+}
+
+string join_feat_names(string[]@ feat_ids) {
+    if (@feat_ids == null or feat_ids.length() == 0) return "";
+    string result = "";
+    for (uint i = 0; i < feat_ids.length(); i++) {
+        if (i > 0) result += ", ";
+        result += feat_display_name(feat_ids[i]);
+    }
+    return result;
+}
+
+void gain_feat(string feat_id, bool announce = true) {
+    feat_choice_def@ feat = get_feat_choice(feat_id);
+    if (@feat == null) return;
+    if (!feat.repeatable and feat_selected(feat_id)) return;
+    created_char_feats.insert_last(feat_id);
+    if (announce) speak("Gained feat: " + feat.name + ".", true);
+
+    if (feat_id == "skilled") {
+        choose_skilled_proficiencies_step();
+    } else if (feat_is_magic_initiate(feat_id)) {
+        choose_magic_initiate_step(feat_id);
+    } else if (feat_id == "grappler") {
+        int[] grapple_ids = {ABILITY_STR, ABILITY_DEX};
+        int ability_id = choose_ability_from_ids("Grappler increases Strength or Dexterity by 1.", grapple_ids);
+        if (ability_id >= 0) {
+            apply_ability_increase(ability_id, 1, 20);
+            speak(ABILITY_NAMES[ability_id] + " increased to " + created_ability_scores[ability_id] + ".", false);
+        }
+    } else if (feat_id == "ability_score_improvement") {
+        apply_asi_step("Ability Score Improvement.", 20);
+    } else if (feat_id == "boon_of_combat_prowess" or feat_id == "boon_of_truesight") {
+        int[] any_ids = {ABILITY_STR, ABILITY_DEX, ABILITY_CON, ABILITY_INT, ABILITY_WIS, ABILITY_CHA};
+        int ability_id = choose_ability_from_ids(feat.name + " increases one ability score by 1.", any_ids);
+        if (ability_id >= 0) apply_ability_increase(ability_id, 1, 30);
+    } else if (feat_id == "boon_of_irresistible_offense") {
+        int[] offense_ids = {ABILITY_STR, ABILITY_DEX};
+        int ability_id = choose_ability_from_ids("Boon of Irresistible Offense increases Strength or Dexterity by 1.", offense_ids);
+        if (ability_id >= 0) apply_ability_increase(ability_id, 1, 30);
+    } else if (feat_id == "boon_of_spell_recall") {
+        int[] mental_ids = {ABILITY_INT, ABILITY_WIS, ABILITY_CHA};
+        int ability_id = choose_ability_from_ids("Boon of Spell Recall increases Intelligence, Wisdom, or Charisma by 1.", mental_ids);
+        if (ability_id >= 0) apply_ability_increase(ability_id, 1, 30);
+    }
+}
+
+void choose_origin_feat_step(string prompt) {
+    init_feat_data();
+    menu@ m = setup_sub_menu(prompt);
+    string[] feat_ids;
+    for (uint i = 0; i < FEAT_CHOICES.length(); i++) {
+        feat_choice_def@ feat = FEAT_CHOICES[i];
+        if (@feat == null or feat.category != FEAT_CATEGORY_ORIGIN) continue;
+        if (!can_take_feat_now(feat.id, true, false)) continue;
+        m.add_item(feat.name + ". " + feat.description);
+        feat_ids.insert_last(feat.id);
+    }
+    int pick = creation_menu_run(m);
+    if (pick < 0 or pick >= int(feat_ids.length())) return;
+    gain_feat(feat_ids[pick], true);
+}
+
+void choose_background_step() {
+    init_feat_data();
+    menu@ background_menu = setup_sub_menu("Choose your background. Backgrounds now provide your ability score increases and your starting feat.");
+    string[] background_ids;
+    for (uint i = 0; i < BACKGROUND_CHOICES.length(); i++) {
+        background_choice_def@ bg = BACKGROUND_CHOICES[i];
+        if (@bg == null) continue;
+        background_menu.add_item(bg.description);
+        background_ids.insert_last(bg.id);
+    }
+    int pick = creation_menu_run(background_menu);
+    if (pick < 0 or pick >= int(background_ids.length())) return;
+    created_char_background = background_ids[pick];
+    background_choice_def@ selected = get_background_choice(created_char_background);
+    if (@selected != null) speak("You chose the " + selected.name + " background.", true);
+}
+
+void apply_background_ability_scores_step() {
+    background_choice_def@ bg = get_background_choice(created_char_background);
+    if (@bg == null) return;
+    string[]@ keys = bg.ability_csv.split(",");
+    int[] options;
+    string option_text = "";
+    for (uint i = 0; i < keys.length(); i++) {
+        int ability_id = ability_id_from_key(keys[i]);
+        if (ability_id < 0) continue;
+        options.insert_last(ability_id);
+        if (option_text != "") option_text += ", ";
+        option_text += ABILITY_NAMES[ability_id];
+    }
+    apply_asi_step("Background ability increases from " + bg.name + ". Choose from " + option_text + ".", 20, options, true);
+}
+
+void apply_background_training_and_feat_step() {
+    background_choice_def@ bg = get_background_choice(created_char_background);
+    if (@bg == null) return;
+    for (uint i = 0; i < bg.skills.length(); i++) add_skill_proficiency_once(bg.skills[i]);
+    add_tool_proficiency_once(bg.tool_name);
+    speak(bg.name + " grants skills: " + join_string_list(bg.skills) + ".", false);
+    if (bg.tool_name != "") speak(bg.name + " grants tool proficiency with " + bg.tool_name + ".", false);
+    if (bg.feat_id != "") gain_feat(bg.feat_id, true);
+}
+
+void apply_human_species_step() {
+    if (created_char_race != "Human") return;
+    speak("Human traits: Skillful and Versatile. Choose one skill proficiency and one extra Origin feat.", true);
+    choose_skill_proficiencies_step(1, "Choose your Human skill proficiency.");
+    choose_origin_feat_step("Choose your extra Human Origin feat.");
+}
+
+void choose_fighting_style_step() {
+    if (!character_has_fighting_style_feature()) return;
+    menu@ m = setup_sub_menu("Choose your Fighting Style feat.");
+    string[] feat_ids;
+    string[] choices = {"archery", "defense", "great_weapon_fighting", "two_weapon_fighting"};
+    for (uint i = 0; i < choices.length(); i++) {
+        if (!can_take_feat_now(choices[i], false, false)) continue;
+        feat_choice_def@ feat = get_feat_choice(choices[i]);
+        if (@feat == null) continue;
+        m.add_item(feat.name + ". " + feat.description);
+        feat_ids.insert_last(choices[i]);
+    }
+    int pick = creation_menu_run(m);
+    if (pick < 0 or pick >= int(feat_ids.length())) return;
+    gain_feat(feat_ids[pick], true);
+}
+
+void choose_general_feat_steps() {
+    int picks = count_general_feat_slots(created_char_class, created_char_level);
+    if (picks <= 0) return;
+    init_feat_data();
+    for (int feat_pick = 0; feat_pick < picks; feat_pick++) {
+        menu@ m = setup_sub_menu("Choose feat " + (feat_pick + 1) + " of " + picks + ".");
+        string[] feat_ids;
+        for (uint i = 0; i < FEAT_CHOICES.length(); i++) {
+            feat_choice_def@ feat = FEAT_CHOICES[i];
+            if (@feat == null) continue;
+            if (!can_take_feat_now(feat.id, false, true)) continue;
+            m.add_item(feat.name + ". " + feat.description);
+            feat_ids.insert_last(feat.id);
+        }
+        int pick = creation_menu_run(m);
+        if (pick < 0 or pick >= int(feat_ids.length())) return;
+        gain_feat(feat_ids[pick], true);
+    }
+}
+
+bool is_third_caster_subclass_choice(string class_name, string subclass_name) {
+    return (class_name == "Fighter" and subclass_name == "Eldritch Knight") or (class_name == "Rogue" and subclass_name == "Arcane Trickster");
+}
+
+int get_cantrips_known(string class_name, string subclass_name, int level) {
     string lc = class_name.lower();
-    if (lc == "barbarian" or lc == "fighter" or lc == "monk" or lc == "rogue") return 0;
-    // Full casters
-    if (lc == "bard" or lc == "sorcerer" or lc == "cleric" or lc == "druid" or lc == "wizard") {
-        if (level >= 19) return 15;
-        if (level >= 17) return 15;
-        if (level >= 15) return 14;
-        if (level >= 13) return 13;
-        if (level >= 11) return 12;
-        if (level >= 10) return 12;
-        if (level >= 9) return 11;
-        if (level >= 7) return 10;
-        if (level >= 5) return 9;
-        if (level >= 4) return 7;
-        if (level >= 3) return 6;
-        if (level >= 2) return 5;
-        return 4;
-    }
-    // Warlock (pact magic)
-    if (lc == "warlock") {
-        if (level >= 19) return 9;
-        if (level >= 15) return 9;
-        if (level >= 13) return 8;
-        if (level >= 11) return 8;
-        if (level >= 9) return 7;
-        if (level >= 7) return 6;
-        if (level >= 5) return 5;
-        if (level >= 3) return 3;
-        return 2;
-    }
-    // Half casters
-    if (lc == "paladin" or lc == "ranger" or lc == "artificer") {
-        if (level >= 19) return 10;
-        if (level >= 17) return 10;
-        if (level >= 15) return 9;
-        if (level >= 13) return 8;
-        if (level >= 11) return 7;
-        if (level >= 9) return 6;
-        if (level >= 7) return 5;
-        if (level >= 5) return 4;
-        if (level >= 3) return 3;
+    if (lc == "bard") { if (level >= 10) return 4; if (level >= 4) return 3; return 2; }
+    if (lc == "cleric") { if (level >= 10) return 5; if (level >= 4) return 4; return 3; }
+    if (lc == "druid") { if (level >= 10) return 4; if (level >= 4) return 3; return 2; }
+    if (lc == "sorcerer") { if (level >= 10) return 6; if (level >= 4) return 5; return 4; }
+    if (lc == "warlock") { if (level >= 10) return 4; if (level >= 4) return 3; return 2; }
+    if (lc == "wizard") { if (level >= 10) return 5; if (level >= 4) return 4; return 3; }
+    if (lc == "artificer") { if (level >= 14) return 4; if (level >= 10) return 3; return 2; }
+    if (is_third_caster_subclass_choice(class_name, subclass_name) and level >= 3) {
+        if (level >= 10) return 3;
         return 2;
     }
     return 0;
 }
 
-void spell_selection_step() {
-    int cantrips_to_pick = get_cantrips_known(created_char_class, created_char_level);
-    int spells_to_pick = get_prepared_spells(created_char_class, created_char_level);
+int get_prepared_spells(string class_name, string subclass_name, int level) {
+    string lc = class_name.lower();
+    int[] bard_prepared = {4,5,6,7,9,10,11,12,14,15,16,16,17,17,18,18,19,20,21,22};
+    int[] cleric_prepared = {4,5,6,7,9,10,11,12,14,15,16,16,17,17,18,18,19,20,21,22};
+    int[] druid_prepared = {4,5,6,7,9,10,11,12,14,15,16,16,17,17,18,18,19,20,21,22};
+    int[] sorcerer_prepared = {2,4,6,7,9,10,11,12,14,15,16,16,17,17,18,18,19,20,21,22};
+    int[] warlock_prepared = {2,3,4,5,6,7,8,9,10,10,11,11,12,12,13,13,14,14,15,15};
+    int[] wizard_prepared = {4,5,6,7,9,10,11,12,14,15,16,16,17,18,19,21,22,23,24,25};
+    int[] half_caster_prepared = {2,3,4,5,6,6,7,7,9,9,10,10,11,11,12,12,14,14,15,15};
+    int[] third_caster_known = {0,0,3,4,4,4,5,6,6,7,8,8,9,10,10,11,11,11,12,13};
 
-    // Non-casters skip spell selection entirely
+    if (lc == "bard") return progression_value(bard_prepared, level);
+    if (lc == "cleric") return progression_value(cleric_prepared, level);
+    if (lc == "druid") return progression_value(druid_prepared, level);
+    if (lc == "sorcerer") return progression_value(sorcerer_prepared, level);
+    if (lc == "wizard") return progression_value(wizard_prepared, level);
+    if (lc == "warlock") {
+        return progression_value(warlock_prepared, level);
+    }
+    if (lc == "paladin" or lc == "ranger" or lc == "artificer") {
+        return progression_value(half_caster_prepared, level);
+    }
+    if (is_third_caster_subclass_choice(class_name, subclass_name)) return progression_value(third_caster_known, level);
+    return 0;
+}
+
+string get_restricted_school_csv(string class_name, string subclass_name) {
+    if (class_name == "Fighter" and subclass_name == "Eldritch Knight") return "abjuration,evocation";
+    if (class_name == "Rogue" and subclass_name == "Arcane Trickster") return "enchantment,illusion";
+    return "";
+}
+
+int get_any_school_spell_allowance(string class_name, string subclass_name, int level) {
+    if (!is_third_caster_subclass_choice(class_name, subclass_name)) return 0;
+    if (level >= 20) return 4;
+    if (level >= 14) return 3;
+    if (level >= 8) return 2;
+    if (level >= 3) return 1;
+    return 0;
+}
+
+void choose_spell_group(string prompt, int picks, int min_level, int max_level, string school_filter, string[]@ selected_spells) {
+    if (picks <= 0 or @selected_spells == null) return;
+
+    for (int pick_index = 0; pick_index < picks; pick_index++) {
+        menu@ spell_menu = setup_sub_menu(prompt + " " + (pick_index + 1) + " of " + picks + ".");
+        string[] spell_ids;
+
+        for (uint si = 0; si < available_spells.length(); si++) {
+            client_spell@ spell = available_spells[si];
+            if (@spell == null) continue;
+            if (spell.level < min_level or spell.level > max_level) continue;
+            if (!client_spell_has_any_school(spell, school_filter)) continue;
+            if (string_array_contains(selected_spells, spell.id)) continue;
+            spell_menu.add_item("Level " + spell.level + ": " + spell.name + ". " + spell.description);
+            spell_ids.insert_last(spell.id);
+        }
+
+        if (spell_ids.length() == 0) {
+            speak("No more spells are available for that choice.", false);
+            break;
+        }
+
+        int pick = creation_menu_run(spell_menu);
+        if (pick < 0 or pick >= int(spell_ids.length())) {
+            speak("Selection finished early.", false);
+            break;
+        }
+
+        selected_spells.insert_last(spell_ids[pick]);
+        speak("Learned " + spell_display_name(spell_ids[pick]) + ".", false);
+    }
+}
+
+void choose_cantrip_group(int picks) {
+    if (picks <= 0) return;
+
+    for (int pick_index = 0; pick_index < picks; pick_index++) {
+        menu@ cantrip_menu = setup_sub_menu("Choose cantrip " + (pick_index + 1) + " of " + picks + ".");
+        string[] cantrip_ids;
+
+        for (uint si = 0; si < available_spells.length(); si++) {
+            client_spell@ spell = available_spells[si];
+            if (@spell == null or spell.level != 0) continue;
+            if (string_array_contains(created_cantrips, spell.id)) continue;
+            cantrip_menu.add_item(spell.name + ". " + spell.description);
+            cantrip_ids.insert_last(spell.id);
+        }
+
+        if (cantrip_ids.length() == 0) {
+            speak("No more cantrips are available.", false);
+            break;
+        }
+
+        int pick = creation_menu_run(cantrip_menu);
+        if (pick < 0 or pick >= int(cantrip_ids.length())) {
+            speak("Cantrip selection finished early.", false);
+            break;
+        }
+
+        created_cantrips.insert_last(cantrip_ids[pick]);
+        speak("Learned " + spell_display_name(cantrip_ids[pick]) + ".", false);
+    }
+}
+
+void append_auto_granted_cantrips() {
+    if (created_char_race == "Tiefling") {
+        add_spell_id_once(created_cantrips, "thaumaturgy");
+        speak("Your Tiefling heritage grants you Thaumaturgy.", false);
+    }
+    if (created_char_class == "Rogue" and created_char_subclass == "Arcane Trickster") {
+        add_spell_id_once(created_cantrips, "mage_hand");
+        speak("Arcane Trickster grants you Mage Hand automatically.", false);
+    }
+}
+
+void spell_selection_step() {
+    int cantrips_to_pick = get_cantrips_known(created_char_class, created_char_subclass, created_char_level);
+    int spells_to_pick = get_prepared_spells(created_char_class, created_char_subclass, created_char_level);
+    int max_spell_level = get_max_spell_level_for_character(created_char_class, created_char_subclass, created_char_level);
+
     if (cantrips_to_pick == 0 and spells_to_pick == 0) {
-        speak(created_char_class + " does not use spells.", false);
+        created_cantrips = created_bonus_cantrips;
+        created_spells = created_bonus_spells;
+        append_auto_granted_cantrips();
+        if (created_cantrips.length() == 0 and created_spells.length() == 0) speak(created_char_class + " currently has no spell selection at this level.", false);
         return;
     }
 
-    string lc = created_char_class.lower();
-    bool is_full_caster = (lc == "bard" or lc == "cleric" or lc == "druid" or lc == "sorcerer" or lc == "wizard");
-    bool is_half_caster = (lc == "paladin" or lc == "ranger" or lc == "artificer");
-    bool is_warlock = (lc == "warlock");
+    created_cantrips = created_bonus_cantrips;
+    created_spells = created_bonus_spells;
+    append_auto_granted_cantrips();
 
-    // Calculate max spell level
-    int max_spell_level = 0;
-    if (is_full_caster) max_spell_level = (created_char_level + 1) / 2;
-    else if (is_half_caster) max_spell_level = (created_char_level + 3) / 4;
-    else if (is_warlock) max_spell_level = (created_char_level + 1) / 2;
-    if (is_full_caster and max_spell_level > 9) max_spell_level = 9;
-    if ((is_half_caster or is_warlock) and max_spell_level > 5) max_spell_level = 5;
-    if (max_spell_level < 1) max_spell_level = 1;
+    build_spell_list_for_character(created_char_class, created_char_subclass, created_char_level);
 
-    created_cantrips.resize(0);
-    created_spells.resize(0);
+    string intro = "Spell selection for " + created_char_class;
+    if (created_char_subclass != "") intro += " " + created_char_subclass;
+    intro += " at level " + created_char_level + ".";
+    if (cantrips_to_pick > 0) intro += " Choose " + cantrips_to_pick + " cantrips.";
+    if (spells_to_pick > 0) intro += " Choose " + spells_to_pick + " spells up to level " + max_spell_level + ".";
+    speak(intro, true);
 
-    // Species bonus cantrips
-    if (created_char_race == "Tiefling") {
-        created_cantrips.insert_last("thaumaturgy");
-        speak("Your Tiefling heritage grants you the Thaumaturgy cantrip.", false);
+    if (created_bonus_cantrips.length() > 0 or created_bonus_spells.length() > 0) {
+        string bonus_text = "";
+        if (created_bonus_cantrips.length() > 0) bonus_text += "Bonus cantrips: " + join_spell_names(created_bonus_cantrips) + ". ";
+        if (created_bonus_spells.length() > 0) bonus_text += "Bonus spells: " + join_spell_names(created_bonus_spells) + ".";
+        speak(bonus_text, false);
+    }
+    if (created_cantrips.length() > created_bonus_cantrips.length()) {
+        speak("Automatic cantrips: " + join_spell_names(created_cantrips) + ".", false);
     }
 
-    speak("Spell selection for " + created_char_class + " level " + created_char_level + ". You can learn " + cantrips_to_pick + " cantrips and prepare " + spells_to_pick + " spells up to level " + max_spell_level + ".", true);
+    choose_cantrip_group(cantrips_to_pick);
 
-    // Build the available spell list for this class and level
-    build_spell_list_for_class(created_char_class, created_char_level);
+    if (spells_to_pick > 0) {
+        string restricted_schools = get_restricted_school_csv(created_char_class, created_char_subclass);
+        if (restricted_schools != "") {
+            int any_school_allowance = get_any_school_spell_allowance(created_char_class, created_char_subclass, created_char_level);
+            if (any_school_allowance > spells_to_pick) any_school_allowance = spells_to_pick;
+            int restricted_picks = spells_to_pick - any_school_allowance;
 
-    // CANTRIP SELECTION
-    speak("Choose " + cantrips_to_pick + " cantrips.", true);
-    for (int cp = 0; cp < cantrips_to_pick; cp++) {
-        menu@ cm = setup_sub_menu("Choose cantrip " + (cp + 1) + " of " + cantrips_to_pick + ".");
-        int count = 0;
-        string[] cantrip_ids;
-        for (uint si = 0; si < available_spells.length(); si++) {
-            if (available_spells[si].level == 0) {
-                bool already = false;
-                for (uint ci = 0; ci < created_cantrips.length(); ci++) {
-                    if (created_cantrips[ci] == available_spells[si].id) { already = true; break; }
-                }
-                if (!already) {
-                    cm.add_item(available_spells[si].name + ". " + available_spells[si].description);
-                    cantrip_ids.insert_last(available_spells[si].id);
-                    count++;
-                }
+            if (restricted_picks > 0) {
+                string school_text = restricted_schools;
+                if (restricted_schools == "abjuration,evocation") school_text = "abjuration or evocation";
+                else if (restricted_schools == "enchantment,illusion") school_text = "enchantment or illusion";
+                speak("First choose " + restricted_picks + " subclass spell" + (restricted_picks == 1 ? "" : "s") + " from " + school_text + ".", true);
+                choose_spell_group("Choose restricted spell", restricted_picks, 1, max_spell_level, restricted_schools, created_spells);
             }
-        }
-        if (count == 0) { speak("No more cantrips available.", false); break; }
-        int pick = cm.run();
-        if (pick >= 0 and pick < int(cantrip_ids.length())) {
-            created_cantrips.insert_last(cantrip_ids[pick]);
-            speak("Learned " + cantrip_ids[pick] + ".", false);
-        }
-    }
-
-    // LEVELED SPELL SELECTION
-    speak("Choose up to " + spells_to_pick + " leveled spells.", true);
-    for (int sp = 0; sp < spells_to_pick; sp++) {
-        menu@ sm = setup_sub_menu("Choose spell " + (sp + 1) + " of " + spells_to_pick + ". Or press escape to finish.");
-        int count = 0;
-        string[] spell_ids;
-        for (uint si = 0; si < available_spells.length(); si++) {
-            if (available_spells[si].level > 0 and available_spells[si].level <= max_spell_level) {
-                bool already = false;
-                for (uint ci = 0; ci < created_spells.length(); ci++) {
-                    if (created_spells[ci] == available_spells[si].id) { already = true; break; }
-                }
-                if (!already) {
-                    sm.add_item("Level " + available_spells[si].level + ": " + available_spells[si].name + ". " + available_spells[si].description);
-                    spell_ids.insert_last(available_spells[si].id);
-                    count++;
-                }
+            if (any_school_allowance > 0) {
+                speak("Now choose " + any_school_allowance + " spell" + (any_school_allowance == 1 ? "" : "s") + " from any school on the list.", true);
+                choose_spell_group("Choose flexible spell", any_school_allowance, 1, max_spell_level, "", created_spells);
             }
-        }
-        if (count == 0) { speak("No more spells available at your level.", false); break; }
-        int pick = sm.run();
-        if (pick < 0) { speak("Spell selection complete.", false); break; }
-        if (pick < int(spell_ids.length())) {
-            created_spells.insert_last(spell_ids[pick]);
-            speak("Learned " + spell_ids[pick] + ".", false);
+        } else {
+            choose_spell_group("Choose spell", spells_to_pick, 1, max_spell_level, "", created_spells);
         }
     }
 
-    speak("You know " + created_cantrips.length() + " cantrips and " + created_spells.length() + " spells.", false);
+    speak("You now have " + created_cantrips.length() + " cantrips and " + created_spells.length() + " prepared or known spells.", false);
 }
 
-void character_creation_menu() {
-    speak("Character creation. Let's build your champion.", true);
+void get_subclass_options(string class_name, string[]@ names, string[]@ descriptions) {
+    names.resize(0);
+    descriptions.resize(0);
 
-    // Step 1: Name
-    created_char_name = username + "'s Character";
-    speak("Your character name is " + created_char_name + ".", false);
+    if (class_name == "Barbarian") {
+        add_text_pair(names, descriptions, "Berserker", "Berserker. Unleash reckless fury and hit harder while raging.");
+        add_text_pair(names, descriptions, "Wild Heart", "Wild Heart. Channel primal animal power while raging.");
+        add_text_pair(names, descriptions, "World Tree", "World Tree. Draw on the roots of Yggdrasil to control the battlefield.");
+        add_text_pair(names, descriptions, "Zealot", "Zealot. Fight with divine fury and relentless determination.");
+    } else if (class_name == "Bard") {
+        add_text_pair(names, descriptions, "College of Dance", "College of Dance. Turn movement and rhythm into magical performance.");
+        add_text_pair(names, descriptions, "College of Glamour", "College of Glamour. Beguile and command with fey majesty.");
+        add_text_pair(names, descriptions, "College of Lore", "College of Lore. Master wide-ranging knowledge and cutting words.");
+        add_text_pair(names, descriptions, "College of Valor", "College of Valor. Support allies while fighting in the thick of battle.");
+    } else if (class_name == "Cleric") {
+        add_text_pair(names, descriptions, "Life Domain", "Life Domain. Restore, preserve, and protect life.");
+        add_text_pair(names, descriptions, "Light Domain", "Light Domain. Wield radiant fire against darkness.");
+        add_text_pair(names, descriptions, "Trickery Domain", "Trickery Domain. Use stealth, illusion, and deceit.");
+        add_text_pair(names, descriptions, "War Domain", "War Domain. Lead the charge with martial divine power.");
+    } else if (class_name == "Druid") {
+        add_text_pair(names, descriptions, "Circle of the Land", "Circle of the Land. Draw deeper magic from a chosen environment.");
+        add_text_pair(names, descriptions, "Circle of the Moon", "Circle of the Moon. Focus on stronger Wild Shape forms.");
+        add_text_pair(names, descriptions, "Circle of the Sea", "Circle of the Sea. Command waves, storms, and flowing movement.");
+        add_text_pair(names, descriptions, "Circle of the Stars", "Circle of the Stars. Read the heavens and take on stellar forms.");
+    } else if (class_name == "Fighter") {
+        add_text_pair(names, descriptions, "Battle Master", "Battle Master. Control combat with maneuvers and tactical superiority.");
+        add_text_pair(names, descriptions, "Champion", "Champion. Focus on straightforward martial excellence and critical hits.");
+        add_text_pair(names, descriptions, "Eldritch Knight", "Eldritch Knight. Blend weapon mastery with Wizard spellcasting.");
+        add_text_pair(names, descriptions, "Psi Warrior", "Psi Warrior. Fight with disciplined psionic power.");
+    } else if (class_name == "Monk") {
+        add_text_pair(names, descriptions, "Warrior of Mercy", "Warrior of Mercy. Heal allies and harm foes with mystical medicine.");
+        add_text_pair(names, descriptions, "Warrior of Shadow", "Warrior of Shadow. Move unseen and strike from darkness.");
+        add_text_pair(names, descriptions, "Warrior of the Elements", "Warrior of the Elements. Channel elemental force through martial arts.");
+        add_text_pair(names, descriptions, "Warrior of the Open Hand", "Warrior of the Open Hand. Perfect classic martial arts technique.");
+    } else if (class_name == "Paladin") {
+        add_text_pair(names, descriptions, "Oath of Devotion", "Oath of Devotion. Embody honesty, courage, and justice.");
+        add_text_pair(names, descriptions, "Oath of Glory", "Oath of Glory. Pursue heroic achievement and inspiring deeds.");
+        add_text_pair(names, descriptions, "Oath of the Ancients", "Oath of the Ancients. Preserve light, life, and beauty.");
+        add_text_pair(names, descriptions, "Oath of Vengeance", "Oath of Vengeance. Hunt down the wicked with relentless purpose.");
+    } else if (class_name == "Ranger") {
+        add_text_pair(names, descriptions, "Beast Master", "Beast Master. Fight alongside a trusted animal companion.");
+        add_text_pair(names, descriptions, "Fey Wanderer", "Fey Wanderer. Blend martial skill with beguiling fey magic.");
+        add_text_pair(names, descriptions, "Gloom Stalker", "Gloom Stalker. Dominate darkness, ambushes, and the unseen hunt.");
+        add_text_pair(names, descriptions, "Hunter", "Hunter. Specialize in techniques for bringing down dangerous foes.");
+    } else if (class_name == "Rogue") {
+        add_text_pair(names, descriptions, "Arcane Trickster", "Arcane Trickster. Mix stealth, legerdemain, and Wizard magic.");
+        add_text_pair(names, descriptions, "Assassin", "Assassin. Strike decisively with disguise, poison, and precision.");
+        add_text_pair(names, descriptions, "Soulknife", "Soulknife. Manifest psionic blades and uncanny mental talent.");
+        add_text_pair(names, descriptions, "Thief", "Thief. Excel at speed, infiltration, and using objects expertly.");
+    } else if (class_name == "Sorcerer") {
+        add_text_pair(names, descriptions, "Aberrant Sorcery", "Aberrant Sorcery. Mutate your magic with psychic and alien influence.");
+        add_text_pair(names, descriptions, "Clockwork Sorcery", "Clockwork Sorcery. Impose order and balance with lawful magic.");
+        add_text_pair(names, descriptions, "Draconic Sorcery", "Draconic Sorcery. Carry the power and resilience of dragons.");
+        add_text_pair(names, descriptions, "Wild Magic Sorcery", "Wild Magic Sorcery. Unpredictable surges twist your spellcasting.");
+    } else if (class_name == "Warlock") {
+        add_text_pair(names, descriptions, "Archfey Patron", "Archfey Patron. Gain beguiling power from a mighty fey being.");
+        add_text_pair(names, descriptions, "Celestial Patron", "Celestial Patron. Channel radiant aid from a heavenly power.");
+        add_text_pair(names, descriptions, "Fiend Patron", "Fiend Patron. Bargain with infernal might for destructive magic.");
+        add_text_pair(names, descriptions, "Great Old One Patron", "Great Old One Patron. Draw unsettling power from a distant mind.");
+    } else if (class_name == "Wizard") {
+        add_text_pair(names, descriptions, "Abjurer", "Abjurer. Focus on wards, protection, and magical negation.");
+        add_text_pair(names, descriptions, "Diviner", "Diviner. Read fate and twist probabilities.");
+        add_text_pair(names, descriptions, "Evoker", "Evoker. Specialize in direct elemental and force magic.");
+        add_text_pair(names, descriptions, "Illusionist", "Illusionist. Deceive the senses with convincing magical illusions.");
+    } else if (class_name == "Artificer") {
+        add_text_pair(names, descriptions, "Alchemist", "Alchemist. Solve problems with restorative and transformative concoctions.");
+        add_text_pair(names, descriptions, "Armorer", "Armorer. Build a magical suit that changes how you fight.");
+        add_text_pair(names, descriptions, "Artillerist", "Artillerist. Bring arcane firearms and eldritch artillery to battle.");
+        add_text_pair(names, descriptions, "Battle Smith", "Battle Smith. Pair invention with martial skill and a steel companion.");
+    }
+}
 
-    // Step 2: Species
-    menu@ race_menu = setup_sub_menu("Choose your species.");
+void choose_subclass_step() {
+    created_char_subclass = "";
+    if (created_char_level < 3) {
+        speak("Subclass selection unlocks at level 3.", false);
+        return;
+    }
+
+    string[] subclass_names;
+    string[] subclass_descriptions;
+    get_subclass_options(created_char_class, subclass_names, subclass_descriptions);
+    if (subclass_names.length() == 0) return;
+
+    menu@ subclass_menu = setup_sub_menu("Choose your subclass.");
+    for (uint i = 0; i < subclass_descriptions.length(); i++) subclass_menu.add_item(subclass_descriptions[i]);
+    int pick = creation_menu_run(subclass_menu);
+    if (pick < 0 or pick >= int(subclass_names.length())) return;
+    created_char_subclass = subclass_names[pick];
+    speak("You chose " + created_char_subclass + ".", true);
+
+    if (created_char_subclass == "Eldritch Knight") {
+        speak("Eldritch Knight uses the Wizard spell list and gains limited spellcasting.", false);
+    } else if (created_char_subclass == "Arcane Trickster") {
+        speak("Arcane Trickster uses the Wizard spell list, gains Mage Hand automatically, and focuses on enchantment and illusion spells.", false);
+    }
+}
+
+bool choose_race_step() {
+    menu@ race_menu = setup_sub_menu("Choose your species. In this rules pass, ability score increases come from your background, not your species.");
     string[] races = {
-        // 2024 PHB Core (10)
         "Aasimar", "Dragonborn", "Dwarf", "Elf", "Gnome",
         "Goliath", "Halfling", "Human", "Orc", "Tiefling",
-        // Supplemental (23)
         "Aarakocra", "Bugbear", "Centaur", "Changeling", "Firbolg",
         "Genasi (Air)", "Genasi (Earth)", "Genasi (Fire)", "Genasi (Water)",
         "Githyanki", "Githzerai", "Goblin", "Hobgoblin", "Kenku",
@@ -185,7 +826,6 @@ void character_creation_menu() {
         "Shifter", "Tabaxi", "Tortle", "Warforged"
     };
     string[] race_desc = {
-        // 2024 PHB Core
         "Aasimar. Celestial heritage. Plus 2 Charisma, plus 1 Wisdom. Choose Necrotic Shroud, Radiant Consumption, or Radiant Soul.",
         "Dragonborn. Draconic ancestry. Plus 2 Strength, plus 1 Charisma. Breath weapon and damage resistance.",
         "Dwarf. Stout and resilient. Plus 2 Constitution, plus 1 Wisdom. Darkvision. Poison resistance. Speed 25 feet.",
@@ -193,10 +833,9 @@ void character_creation_menu() {
         "Gnome. Clever tinkerers. Plus 2 Intelligence, plus 1 Constitution. Darkvision. Advantage on INT, WIS, CHA saves versus magic.",
         "Goliath. Mountain-born giants. Plus 2 Strength, plus 1 Constitution. Powerful Build. Stone's Endurance.",
         "Halfling. Small and lucky. Plus 2 Dexterity, plus 1 Charisma. Reroll natural 1s. Brave.",
-        "Human. Versatile and ambitious. Plus 2 to one ability, plus 1 to another. Extra feat at level 1.",
+        "Human. Resourceful, Skillful, and Versatile. You gain Heroic Inspiration, one extra skill proficiency, and one extra Origin feat.",
         "Orc. Fierce warriors. Plus 2 Strength, plus 1 Constitution. Adrenaline Rush. Darkvision.",
         "Tiefling. Infernal bloodline. Plus 2 Charisma, plus 1 Intelligence. Fiendish Legacy spells. Fire resistance.",
-        // Supplemental
         "Aarakocra. Bird folk. Plus 2 Dexterity, plus 1 Wisdom. Flying speed 30 feet.",
         "Bugbear. Long-armed goblinoids. Plus 2 Strength, plus 1 Dexterity. Reach extends 5 feet.",
         "Centaur. Horse body. Plus 2 Strength, plus 1 Wisdom. Speed 40 feet. Charge attack.",
@@ -222,12 +861,14 @@ void character_creation_menu() {
         "Warforged. Living constructs. Plus 2 Constitution, plus 1 Strength. Plus 1 AC. Disease immunity."
     };
     for (uint i = 0; i < races.length(); i++) race_menu.add_item(race_desc[i]);
-    int race_pick = race_menu.run();
-    if (race_pick < 0) race_pick = 0;
+    int race_pick = creation_menu_run(race_menu);
+    if (race_pick < 0 or race_pick >= int(races.length())) return false;
     created_char_race = races[race_pick];
     speak("You chose " + created_char_race + ".", true);
+    return true;
+}
 
-    // Step 3: Class
+bool choose_class_step() {
     menu@ class_menu = setup_sub_menu("Choose your class.");
     string[] classes = {"Barbarian","Bard","Cleric","Druid","Fighter","Monk","Paladin","Ranger","Rogue","Sorcerer","Warlock","Wizard","Artificer"};
     string[] class_desc = {
@@ -236,115 +877,123 @@ void character_creation_menu() {
         "Cleric. D 8 hit die. Wisdom caster. Divine magic, healing, and armor.",
         "Druid. D 8 hit die. Wisdom caster. Nature magic and wild shape.",
         "Fighter. D 10 hit die. Master of weapons. Action Surge and Extra Attacks.",
-        "Monk. D 8 hit die. Martial artist with discipline points for special techniques.",
+        "Monk. D 8 hit die. Martial artist with Focus Points for special techniques.",
         "Paladin. D 10 hit die. Holy warrior. Charisma caster with divine smite.",
         "Ranger. D 10 hit die. Wilderness warrior. Wisdom caster with favored enemies.",
         "Rogue. D 8 hit die. Stealthy striker. Sneak Attack for massive single-target damage.",
         "Sorcerer. D 6 hit die. Charisma caster. Innate magic with metamagic.",
-        "Warlock. D 8 hit die. Charisma caster. Pact magic with eldritch invocations.",
+        "Warlock. D 8 hit die. Pact magic with eldritch invocations.",
         "Wizard. D 6 hit die. Intelligence caster. Largest spell list. Arcane mastery.",
         "Artificer. D 8 hit die. Intelligence caster. Magical inventor with infusions."
     };
     for (uint i = 0; i < classes.length(); i++) class_menu.add_item(class_desc[i]);
-    int class_pick = class_menu.run();
-    if (class_pick < 0) class_pick = 0;
+    int class_pick = creation_menu_run(class_menu);
+    if (class_pick < 0 or class_pick >= int(classes.length())) return false;
     created_char_class = classes[class_pick];
     speak("You chose " + created_char_class + ".", true);
+    return true;
+}
 
-    // Step 4: Level
+bool choose_level_step() {
     menu@ level_menu = setup_sub_menu("Choose your level. 1 through 20.");
     for (int lv = 1; lv <= 20; lv++) level_menu.add_item("Level " + lv);
-    int level_pick = level_menu.run();
-    created_char_level = level_pick >= 0 ? level_pick + 1 : 1;
+    int level_pick = creation_menu_run(level_menu);
+    if (level_pick < 0 or level_pick >= 20) return false;
+    created_char_level = level_pick + 1;
     speak("Level " + created_char_level + ".", true);
+    return true;
+}
 
-    // Step 5: Ability Scores (Standard Array: 15, 14, 13, 12, 10, 8)
+bool assign_ability_scores_step() {
+    int[] previous_scores = created_ability_scores;
     int[] standard = {15, 14, 13, 12, 10, 8};
     bool[] used = {false, false, false, false, false, false};
     speak("Assign ability scores using the standard array: 15, 14, 13, 12, 10, 8.", true);
     for (int a = 0; a < 6; a++) {
         string ability_name = ABILITY_NAMES[a];
         string available = "";
+        menu@ score_menu = setup_sub_menu("Assign a score to " + ability_name + ".");
+        int[] remaining_scores;
         for (uint s = 0; s < 6; s++) {
-            if (!used[s]) available += standard[s] + ", ";
+            if (used[s]) continue;
+            if (available != "") available += ", ";
+            available += standard[s];
+            score_menu.add_item("" + standard[s]);
+            remaining_scores.insert_last(standard[s]);
         }
-        menu@ score_menu = setup_sub_menu("Assign a score to " + ability_name + ". Available: " + available);
-        for (uint s = 0; s < 6; s++) {
-            if (!used[s]) score_menu.add_item("" + standard[s]);
+        score_menu.intro_text = "Assign a score to " + ability_name + ". Available: " + available + ".";
+        int pick = creation_menu_run(score_menu);
+        if (pick < 0 or pick >= int(remaining_scores.length())) {
+            created_ability_scores = previous_scores;
+            return false;
         }
-        int pick = score_menu.run();
-        int count = 0;
+        created_ability_scores[a] = remaining_scores[pick];
         for (uint s = 0; s < 6; s++) {
-            if (!used[s]) {
-                if (count == pick) {
-                    created_ability_scores[a] = standard[s];
-                    used[s] = true;
-                    break;
-                }
-                count++;
+            if (!used[s] and standard[s] == remaining_scores[pick]) {
+                used[s] = true;
+                break;
             }
         }
         speak(ability_name + " set to " + created_ability_scores[a] + ".", false);
     }
+    created_pre_progression_ability_scores = created_ability_scores;
+    return true;
+}
 
-    // Step 6: Weapon (organized by category)
+bool choose_weapon_step() {
     menu@ weapon_cat_menu = setup_sub_menu("Choose a weapon category.");
     weapon_cat_menu.add_item("Simple Melee Weapons.");
     weapon_cat_menu.add_item("Simple Ranged Weapons.");
     weapon_cat_menu.add_item("Martial Melee Weapons.");
     weapon_cat_menu.add_item("Martial Ranged Weapons.");
-    int cat_pick = weapon_cat_menu.run();
-    if (cat_pick < 0) cat_pick = 0;
+    int cat_pick = creation_menu_run(weapon_cat_menu);
+    if (cat_pick < 0 or cat_pick > 3) return false;
 
     menu@ weapon_menu;
     string[] weapon_names;
-
     if (cat_pick == 0) {
-        // Simple Melee
         @weapon_menu = setup_sub_menu("Choose a simple melee weapon.");
-        weapon_names = {"Club", "Dagger", "Greatclub", "Handaxe", "Javelin", "Light Hammer", "Mace", "Quarterstaff", "Sickle", "Spear"};
-        weapon_menu.add_item("Club. 1 d 4 bludgeoning. Light. Slow mastery.");
-        weapon_menu.add_item("Dagger. 1 d 4 piercing. Finesse. Light. Thrown 20 / 60. Nick mastery.");
-        weapon_menu.add_item("Greatclub. 1 d 8 bludgeoning. Two-handed. Push mastery.");
-        weapon_menu.add_item("Handaxe. 1 d 6 slashing. Light. Thrown 20 / 60. Vex mastery.");
-        weapon_menu.add_item("Javelin. 1 d 6 piercing. Thrown 30 / 120. Slow mastery.");
-        weapon_menu.add_item("Light Hammer. 1 d 4 bludgeoning. Light. Thrown 20 / 60. Nick mastery.");
-        weapon_menu.add_item("Mace. 1 d 6 bludgeoning. Sap mastery.");
-        weapon_menu.add_item("Quarterstaff. 1 d 6 bludgeoning. Versatile 1 d 8. Topple mastery.");
-        weapon_menu.add_item("Sickle. 1 d 4 slashing. Light. Nick mastery.");
-        weapon_menu.add_item("Spear. 1 d 6 piercing. Versatile 1 d 8. Thrown 20 / 60. Sap mastery.");
+        weapon_names = {"Unarmed", "Club", "Dagger", "Greatclub", "Handaxe", "Javelin", "Light Hammer", "Mace", "Quarterstaff", "Sickle", "Spear"};
+        weapon_menu.add_item("Unarmed. 1 bludgeoning by default. Range 5 feet.");
+        weapon_menu.add_item("Club. 1 d 4 bludgeoning. Range 5 feet. Light. Slow mastery.");
+        weapon_menu.add_item("Dagger. 1 d 4 piercing. Range 5 feet, thrown 20 / 60. Finesse. Light. Nick mastery.");
+        weapon_menu.add_item("Greatclub. 1 d 8 bludgeoning. Range 5 feet. Two-handed. Push mastery.");
+        weapon_menu.add_item("Handaxe. 1 d 6 slashing. Range 5 feet, thrown 20 / 60. Light. Vex mastery.");
+        weapon_menu.add_item("Javelin. 1 d 6 piercing. Range 5 feet, thrown 30 / 120. Slow mastery.");
+        weapon_menu.add_item("Light Hammer. 1 d 4 bludgeoning. Range 5 feet, thrown 20 / 60. Light. Nick mastery.");
+        weapon_menu.add_item("Mace. 1 d 6 bludgeoning. Range 5 feet. Sap mastery.");
+        weapon_menu.add_item("Quarterstaff. 1 d 6 bludgeoning. Range 5 feet. Versatile 1 d 8. Topple mastery.");
+        weapon_menu.add_item("Sickle. 1 d 4 slashing. Range 5 feet. Light. Nick mastery.");
+        weapon_menu.add_item("Spear. 1 d 6 piercing. Range 5 feet, thrown 20 / 60. Versatile 1 d 8. Sap mastery.");
     } else if (cat_pick == 1) {
-        // Simple Ranged
         @weapon_menu = setup_sub_menu("Choose a simple ranged weapon.");
         weapon_names = {"Dart", "Light Crossbow", "Shortbow", "Sling"};
-        weapon_menu.add_item("Dart. 1 d 4 piercing. Finesse. Thrown 20 / 60. Vex mastery.");
+        weapon_menu.add_item("Dart. 1 d 4 piercing. Range 20 / 60. Finesse. Vex mastery.");
         weapon_menu.add_item("Light Crossbow. 1 d 8 piercing. Range 80 / 320. Loading. Two-handed. Slow mastery.");
         weapon_menu.add_item("Shortbow. 1 d 6 piercing. Range 80 / 320. Two-handed. Vex mastery.");
         weapon_menu.add_item("Sling. 1 d 4 bludgeoning. Range 30 / 120. Slow mastery.");
     } else if (cat_pick == 2) {
-        // Martial Melee
         @weapon_menu = setup_sub_menu("Choose a martial melee weapon.");
         weapon_names = {"Battleaxe", "Flail", "Glaive", "Greataxe", "Greatsword", "Halberd", "Lance", "Longsword", "Maul", "Morningstar", "Pike", "Rapier", "Scimitar", "Shortsword", "Trident", "War Pick", "Warhammer", "Whip"};
-        weapon_menu.add_item("Battleaxe. 1 d 8 slashing. Versatile 1 d 10. Topple mastery.");
-        weapon_menu.add_item("Flail. 1 d 8 bludgeoning. Sap mastery.");
-        weapon_menu.add_item("Glaive. 1 d 10 slashing. Heavy. Reach. Two-handed. Graze mastery.");
-        weapon_menu.add_item("Greataxe. 1 d 12 slashing. Heavy. Two-handed. Cleave mastery.");
-        weapon_menu.add_item("Greatsword. 2 d 6 slashing. Heavy. Two-handed. Graze mastery.");
-        weapon_menu.add_item("Halberd. 1 d 10 slashing. Heavy. Reach. Two-handed. Cleave mastery.");
-        weapon_menu.add_item("Lance. 1 d 10 piercing. Reach. Topple mastery.");
-        weapon_menu.add_item("Longsword. 1 d 8 slashing. Versatile 1 d 10. Sap mastery.");
-        weapon_menu.add_item("Maul. 2 d 6 bludgeoning. Heavy. Two-handed. Topple mastery.");
-        weapon_menu.add_item("Morningstar. 1 d 8 piercing. Sap mastery.");
-        weapon_menu.add_item("Pike. 1 d 10 piercing. Heavy. Reach. Two-handed. Push mastery.");
-        weapon_menu.add_item("Rapier. 1 d 8 piercing. Finesse. Vex mastery.");
-        weapon_menu.add_item("Scimitar. 1 d 6 slashing. Finesse. Light. Nick mastery.");
-        weapon_menu.add_item("Shortsword. 1 d 6 piercing. Finesse. Light. Vex mastery.");
-        weapon_menu.add_item("Trident. 1 d 8 piercing. Versatile 1 d 10. Thrown 20 / 60. Topple mastery.");
-        weapon_menu.add_item("War Pick. 1 d 8 piercing. Versatile 1 d 10. Sap mastery.");
-        weapon_menu.add_item("Warhammer. 1 d 8 bludgeoning. Versatile 1 d 10. Push mastery.");
-        weapon_menu.add_item("Whip. 1 d 4 slashing. Finesse. Reach. Slow mastery.");
+        weapon_menu.add_item("Battleaxe. 1 d 8 slashing. Range 5 feet. Versatile 1 d 10. Topple mastery.");
+        weapon_menu.add_item("Flail. 1 d 8 bludgeoning. Range 5 feet. Sap mastery.");
+        weapon_menu.add_item("Glaive. 1 d 10 slashing. Range 10 feet. Heavy. Reach. Two-handed. Graze mastery.");
+        weapon_menu.add_item("Greataxe. 1 d 12 slashing. Range 5 feet. Heavy. Two-handed. Cleave mastery.");
+        weapon_menu.add_item("Greatsword. 2 d 6 slashing. Range 5 feet. Heavy. Two-handed. Graze mastery.");
+        weapon_menu.add_item("Halberd. 1 d 10 slashing. Range 10 feet. Heavy. Reach. Two-handed. Cleave mastery.");
+        weapon_menu.add_item("Lance. 1 d 10 piercing. Range 10 feet. Reach. Topple mastery.");
+        weapon_menu.add_item("Longsword. 1 d 8 slashing. Range 5 feet. Versatile 1 d 10. Sap mastery.");
+        weapon_menu.add_item("Maul. 2 d 6 bludgeoning. Range 5 feet. Heavy. Two-handed. Topple mastery.");
+        weapon_menu.add_item("Morningstar. 1 d 8 piercing. Range 5 feet. Sap mastery.");
+        weapon_menu.add_item("Pike. 1 d 10 piercing. Range 10 feet. Heavy. Reach. Two-handed. Push mastery.");
+        weapon_menu.add_item("Rapier. 1 d 8 piercing. Range 5 feet. Finesse. Vex mastery.");
+        weapon_menu.add_item("Scimitar. 1 d 6 slashing. Range 5 feet. Finesse. Light. Nick mastery.");
+        weapon_menu.add_item("Shortsword. 1 d 6 piercing. Range 5 feet. Finesse. Light. Vex mastery.");
+        weapon_menu.add_item("Trident. 1 d 8 piercing. Range 5 feet, thrown 20 / 60. Versatile 1 d 10. Topple mastery.");
+        weapon_menu.add_item("War Pick. 1 d 8 piercing. Range 5 feet. Versatile 1 d 10. Sap mastery.");
+        weapon_menu.add_item("Warhammer. 1 d 8 bludgeoning. Range 5 feet. Versatile 1 d 10. Push mastery.");
+        weapon_menu.add_item("Whip. 1 d 4 slashing. Range 10 feet. Finesse. Reach. Slow mastery.");
     } else {
-        // Martial Ranged
         @weapon_menu = setup_sub_menu("Choose a martial ranged weapon.");
         weapon_names = {"Blowgun", "Hand Crossbow", "Heavy Crossbow", "Longbow", "Musket", "Pistol"};
         weapon_menu.add_item("Blowgun. 1 piercing. Range 25 / 100. Loading. Vex mastery.");
@@ -355,42 +1004,144 @@ void character_creation_menu() {
         weapon_menu.add_item("Pistol. 1 d 10 piercing. Range 30 / 90. Loading. Vex mastery.");
     }
 
-    int weapon_pick = weapon_menu.run();
-    if (weapon_pick < 0) weapon_pick = 0;
+    int weapon_pick = creation_menu_run(weapon_menu);
+    if (weapon_pick < 0 or weapon_pick >= int(weapon_names.length())) return false;
     created_weapon = weapon_names[weapon_pick];
     speak("You chose " + created_weapon + ".", true);
+    return true;
+}
 
-    // Step 7: Spell Selection
+void reset_progression_choices() {
+    created_ability_scores = created_pre_progression_ability_scores;
+    created_char_feats.resize(0);
+    created_char_skill_proficiencies.resize(0);
+    created_char_tool_proficiencies.resize(0);
+    created_bonus_cantrips.resize(0);
+    created_bonus_spells.resize(0);
+    created_spellcasting_override_spells.resize(0);
+    created_spellcasting_override_abilities.resize(0);
+    created_free_cast_spells.resize(0);
+}
+
+bool apply_progression_choices_step() {
+    reset_progression_choices();
+    apply_background_ability_scores_step();
+    if (creation_should_go_back()) { reset_progression_choices(); return false; }
+    apply_background_training_and_feat_step();
+    if (creation_should_go_back()) { reset_progression_choices(); return false; }
+    apply_human_species_step();
+    if (creation_should_go_back()) { reset_progression_choices(); return false; }
+    choose_fighting_style_step();
+    if (creation_should_go_back()) { reset_progression_choices(); return false; }
+    choose_general_feat_steps();
+    if (creation_should_go_back()) { reset_progression_choices(); return false; }
+    return true;
+}
+
+bool choose_spell_selection_step() {
+    string[] previous_cantrips = created_cantrips;
+    string[] previous_spells = created_spells;
     spell_selection_step();
+    if (creation_should_go_back()) {
+        created_cantrips = previous_cantrips;
+        created_spells = previous_spells;
+        return false;
+    }
+    return true;
+}
 
-    // Step 8: Summary
+bool confirm_character_summary_step() {
+    clear_creation_back_request();
     string spell_summary = "";
     if (created_cantrips.length() > 0) {
         spell_summary += " Cantrips: ";
-        for (uint ci = 0; ci < created_cantrips.length(); ci++) {
-            if (ci > 0) spell_summary += ", ";
-            spell_summary += created_cantrips[ci];
-        }
+        spell_summary += join_spell_names(created_cantrips);
         spell_summary += ".";
     }
     if (created_spells.length() > 0) {
         spell_summary += " Spells: ";
-        for (uint ci = 0; ci < created_spells.length(); ci++) {
-            if (ci > 0) spell_summary += ", ";
-            spell_summary += created_spells[ci];
-        }
+        spell_summary += join_spell_names(created_spells);
         spell_summary += ".";
     }
-    speak("Character summary. " + created_char_name + ". " + created_char_race + " " + created_char_class + ", level " + created_char_level + ". Strength " + created_ability_scores[0] + ". Dexterity " + created_ability_scores[1] + ". Constitution " + created_ability_scores[2] + ". Intelligence " + created_ability_scores[3] + ". Wisdom " + created_ability_scores[4] + ". Charisma " + created_ability_scores[5] + ". Weapon: " + created_weapon + "." + spell_summary + " Press enter to confirm.", true);
-
-    // Wait for confirmation
+    string feat_summary = created_char_feats.length() > 0 ? " Feats: " + join_feat_names(created_char_feats) + "." : "";
+    string background_summary = "";
+    if (created_char_background != "") {
+        background_choice_def@ bg_summary = get_background_choice(created_char_background);
+        if (@bg_summary != null) background_summary = " Background: " + bg_summary.name + ".";
+    }
+    string subclass_summary = created_char_subclass != "" ? " " + created_char_subclass : "";
+    speak("Character summary. " + created_char_name + ". " + created_char_race + " " + created_char_class + subclass_summary + ", level " + created_char_level + "." + background_summary + " Strength " + created_ability_scores[0] + ". Dexterity " + created_ability_scores[1] + ". Constitution " + created_ability_scores[2] + ". Intelligence " + created_ability_scores[3] + ". Wisdom " + created_ability_scores[4] + ". Charisma " + created_ability_scores[5] + ". Weapon: " + created_weapon + "." + feat_summary + spell_summary + " Press enter to confirm, or Escape or Backspace to go back.", true);
     while (true) {
         wait(10);
         network_loop();
-        if (key_pressed(KEY_RETURN)) break;
-        if (key_pressed(KEY_ESCAPE)) {
-            speak("Character creation cancelled.", true);
-            return;
+        if (key_pressed(KEY_RETURN)) return true;
+        if (key_pressed(KEY_ESCAPE) or key_pressed(KEY_BACK)) {
+            creation_back_requested = true;
+            speak("Going back to spell selection.", true);
+            return false;
+        }
+    }
+    return false;
+}
+
+void character_creation_menu() {
+    init_feat_data();
+    created_char_background = "";
+    created_char_subclass = "";
+    created_char_feats.resize(0);
+    created_char_skill_proficiencies.resize(0);
+    created_char_tool_proficiencies.resize(0);
+    created_bonus_cantrips.resize(0);
+    created_bonus_spells.resize(0);
+    created_spellcasting_override_spells.resize(0);
+    created_spellcasting_override_abilities.resize(0);
+    created_free_cast_spells.resize(0);
+    created_cantrips.resize(0);
+    created_spells.resize(0);
+    clear_creation_back_request();
+    speak("Character creation. Let's build your champion.", true);
+
+    created_char_name = username + "'s Character";
+    speak("Your character name is " + created_char_name + ".", false);
+    int step = 2;
+    while (step <= 11) {
+        clear_creation_back_request();
+        if (step == 2) {
+            if (choose_race_step()) step = 3;
+            else {
+                speak("Character creation cancelled.", true);
+                return;
+            }
+        } else if (step == 3) {
+            if (choose_class_step()) step = 4;
+            else step = 2;
+        } else if (step == 4) {
+            if (choose_level_step()) step = 5;
+            else step = 3;
+        } else if (step == 5) {
+            created_char_subclass = "";
+            choose_subclass_step();
+            if (creation_should_go_back()) step = 4;
+            else step = 6;
+        } else if (step == 6) {
+            choose_background_step();
+            if (creation_should_go_back()) step = 5;
+            else step = 7;
+        } else if (step == 7) {
+            if (assign_ability_scores_step()) step = 8;
+            else step = 6;
+        } else if (step == 8) {
+            if (choose_weapon_step()) step = 9;
+            else step = 7;
+        } else if (step == 9) {
+            if (apply_progression_choices_step()) step = 10;
+            else step = 8;
+        } else if (step == 10) {
+            if (choose_spell_selection_step()) step = 11;
+            else step = 9;
+        } else if (step == 11) {
+            if (confirm_character_summary_step()) break;
+            step = 10;
         }
     }
 
@@ -412,6 +1163,8 @@ void character_creation_menu() {
         {"name", created_char_name},
         {"race", created_char_race},
         {"class", created_char_class},
+        {"subclass", created_char_subclass},
+        {"background", created_char_background},
         {"level", created_char_level},
         {"str", created_ability_scores[0]},
         {"dex", created_ability_scores[1]},
@@ -420,8 +1173,20 @@ void character_creation_menu() {
         {"wis", created_ability_scores[4]},
         {"cha", created_ability_scores[5]},
         {"weapon", created_weapon},
+        {"feats", join_csv_list(created_char_feats)},
+        {"skills", join_csv_list(created_char_skill_proficiencies)},
+        {"tools", join_csv_list(created_char_tool_proficiencies)},
+        {"spell_ability_overrides", join_spell_override_specs()},
+        {"free_cast_spells", join_csv_list(created_free_cast_spells)},
         {"cantrips", cantrip_str},
         {"spells", spell_str}
     });
-    speak("Character created! " + created_char_name + ", " + created_char_race + " " + created_char_class + ", level " + created_char_level + ".", true);
+    string created_summary = created_char_name + ", " + created_char_race + " " + created_char_class;
+    if (created_char_subclass != "") created_summary += " " + created_char_subclass;
+    if (created_char_background != "") {
+        background_choice_def@ bg = get_background_choice(created_char_background);
+        if (@bg != null) created_summary += ", " + bg.name + " background";
+    }
+    created_summary += ", level " + created_char_level + ".";
+    speak("Character created! " + created_summary, true);
 }

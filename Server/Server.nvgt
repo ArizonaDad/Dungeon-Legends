@@ -56,13 +56,14 @@ class server
 			return false;
 		}
 		println("[SERVER] Accounts loaded. Binding to port 10500...");
+		//return net.setup_server(2000, 32, 900);
 		return net.setup_local_server(10500, 255, 4095);
 	}
 	// Main event loop  runs until Escape is pressed.
 	void run()
 	{
-		show_window("server");
-		while (!key_pressed(KEY_ESCAPE)) {
+		//show_window("server");
+		while (true) {
 			wait(5);
 			const network_event@ event = net.request();
 			int events_this_tick = 0;

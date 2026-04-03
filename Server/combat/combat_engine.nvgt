@@ -2,6 +2,7 @@
 // Manages initiative, turns, actions, attacks, damage, conditions, death saves.
 
 #include "../../common/combat_constants.nvgt"
+#include "../../common/feat_data.nvgt"
 
 // A single combatant in battle (player or monster)
 class combatant {
@@ -26,8 +27,12 @@ class combatant {
 	// Ability scores
 	int[] ability_scores = {10, 10, 10, 10, 10, 10}; // STR DEX CON INT WIS CHA
 	int[] save_proficiencies = {0, 0, 0, 0, 0, 0};   // 1 = proficient
+	string class_name = "";
+	string subclass = "";
+	string background = "";
 	int level = 1;
 	int proficiency = 2;
+	int spellcasting_ability = -1;
 
 	// Turn state
 	int initiative_roll = 0;
@@ -57,10 +62,71 @@ class combatant {
 	bool took_disengage = false;
 	int readied_action = -1;       // -1 = none
 	string readied_trigger = "";
+	uint readied_target_id = 0;
+	bool shield_active = false;
+	int shield_ac_bonus = 0;
+	bool blessed = false;
+	uint bless_source_id = 0;
+	bool guiding_bolt_advantage = false;
+	uint guiding_bolt_source_id = 0;
+	int focus_points = 0;
+	int lay_on_hands_pool = 0;
+	int bardic_inspiration_uses = 0;
+	int bardic_inspiration_grant_die = 0;
+	int bardic_inspiration_die = 0;
+	uint bardic_inspiration_source_id = 0;
+	uint help_target_id = 0;
+	int hide_dc = 0;
+	bool hasted = false;
+	uint haste_source_id = 0;
+	bool haste_loses_next_turn = false;
+	int longstrider_bonus = 0;
+	int pass_without_trace_bonus = 0;
+	uint pass_without_trace_source_id = 0;
+	int mage_armor_bonus = 0;
+	uint heroism_source_id = 0;
+	int heroism_temp_hp_amount = 0;
+	uint hunters_mark_target_id = 0;
+	uint hex_target_id = 0;
+	bool wild_shape_active = false;
+	string wild_shape_form_id = "";
+	bool wild_shape_just_ended = false;
+	string wild_shape_saved_name = "";
+	int wild_shape_saved_size = SIZE_MEDIUM;
+	int wild_shape_saved_max_hp = 0;
+	int wild_shape_saved_current_hp = 0;
+	int wild_shape_saved_temp_hp = 0;
+	int wild_shape_saved_armor_class = 10;
+	int wild_shape_saved_speed = 30;
+	int wild_shape_saved_strength = 10;
+	int wild_shape_saved_dexterity = 10;
+	int wild_shape_saved_constitution = 10;
+	int wild_shape_saved_intelligence = 10;
+	int wild_shape_saved_wisdom = 10;
+	int wild_shape_saved_charisma = 10;
+	string wild_shape_saved_main_hand = "";
+	int wild_shape_saved_main_hand_damage_dice = 6;
+	int wild_shape_saved_main_hand_damage_count = 1;
+	int wild_shape_saved_main_hand_damage_type = DMG_SLASHING;
+	int wild_shape_saved_main_hand_range = 5;
+	bool wild_shape_saved_main_hand_finesse = false;
+	bool wild_shape_saved_main_hand_is_ranged = false;
+	int wild_shape_saved_monster_attack_bonus = 0;
+	int wild_shape_saved_monster_attack_damage_mod = 0;
+	string wild_shape_saved_monster_attack2_name = "";
+	int wild_shape_saved_monster_attack2_bonus = 0;
+	int wild_shape_saved_monster_attack2_dice = 0;
+	int wild_shape_saved_monster_attack2_count = 0;
+	int wild_shape_saved_monster_attack2_mod = 0;
+	int wild_shape_saved_monster_attack2_type = DMG_SLASHING;
+	int wild_shape_saved_monster_attack2_range = 0;
+	int wild_shape_saved_extra_attacks = 0;
 
 	// Spell slots (index 0 = cantrip, 1-9 = spell levels)
 	int[] spell_slots_max = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 	int[] spell_slots_current = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+	string[] known_cantrips;
+	string[] prepared_spells;
 
 	// Equipment
 	string main_hand = "";
@@ -70,7 +136,31 @@ class combatant {
 	int main_hand_damage_type = DMG_SLASHING;
 	int main_hand_range = 5;           // melee = 5, ranged = varies
 	bool main_hand_finesse = false;
+	bool main_hand_is_ranged = false;
+	int monster_attack_bonus = 0;
+	int monster_attack_damage_mod = 0;
+	string monster_attack2_name = "";
+	int monster_attack2_bonus = 0;
+	int monster_attack2_dice = 0;
+	int monster_attack2_count = 0;
+	int monster_attack2_mod = 0;
+	int monster_attack2_type = DMG_SLASHING;
+	int monster_attack2_range = 0;
 	int extra_attacks = 0;             // Extra Attack feature
+	int attacks_remaining_this_turn = 0; // Tracks remaining attacks in current Attack action
+	bool divine_smite_pending = false;    // Paladin: next melee hit adds radiant damage
+	int divine_smite_slot_level = 0;      // Spell slot level used for smite
+	string[] feats;
+	string[] skill_proficiencies;
+	string[] tool_proficiencies;
+	string[] spellcasting_override_spells;
+	int[] spellcasting_override_abilities;
+	string[] free_cast_spells;
+	int[] free_cast_uses_remaining;
+	uint grapple_source_id = 0;
+	bool savage_attacker_used = false;
+	bool combat_prowess_used = false;
+	bool tavern_brawler_push_used = false;
 
 	// Helpers
 	int get_ability_mod(int ability_id) {
@@ -104,6 +194,61 @@ class combatant {
 
 	bool is_alive() {
 		return current_hp > 0 and !is_dead;
+	}
+
+	bool knows_spell(string spell_id) {
+		for (uint i = 0; i < known_cantrips.length(); i++) {
+			if (known_cantrips[i] == spell_id) return true;
+		}
+		for (uint i = 0; i < prepared_spells.length(); i++) {
+			if (prepared_spells[i] == spell_id) return true;
+		}
+		return false;
+	}
+
+	bool has_feat(string feat_id) {
+		for (uint i = 0; i < feats.length(); i++) {
+			if (feats[i] == feat_id) return true;
+		}
+		return false;
+	}
+
+	bool has_skill_proficiency(string skill_name) {
+		for (uint i = 0; i < skill_proficiencies.length(); i++) {
+			if (skill_proficiencies[i] == skill_name) return true;
+		}
+		return false;
+	}
+
+	int get_skill_bonus(string skill_name, int ability_id) {
+		int bonus = get_ability_mod(ability_id);
+		if (has_skill_proficiency(skill_name)) bonus += proficiency;
+		bonus -= exhaustion_level * 2;
+		return bonus;
+	}
+
+	int get_spellcasting_override_ability(string spell_id) {
+		for (uint i = 0; i < spellcasting_override_spells.length() and i < spellcasting_override_abilities.length(); i++) {
+			if (spellcasting_override_spells[i] == spell_id) return spellcasting_override_abilities[i];
+		}
+		return -1;
+	}
+
+	int get_free_cast_uses_remaining(string spell_id) {
+		for (uint i = 0; i < free_cast_spells.length() and i < free_cast_uses_remaining.length(); i++) {
+			if (free_cast_spells[i] == spell_id) return free_cast_uses_remaining[i];
+		}
+		return 0;
+	}
+
+	bool use_free_cast(string spell_id) {
+		for (uint i = 0; i < free_cast_spells.length() and i < free_cast_uses_remaining.length(); i++) {
+			if (free_cast_spells[i] == spell_id and free_cast_uses_remaining[i] > 0) {
+				free_cast_uses_remaining[i]--;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	bool is_conscious() {
@@ -154,9 +299,9 @@ class battle {
 		return combatants[idx];
 	}
 
-	// Add a combatant to the battle
+	// Add a combatant to the battle (IDs start at 1, 0 = unset/invalid)
 	uint add_combatant(combatant@ c) {
-		c.id = combatants.length();
+		c.id = combatants.length() + 1;
 		combatants.insert_last(c);
 		return c.id;
 	}
@@ -225,6 +370,12 @@ class battle {
 		c.used_bonus_action = false;
 		c.is_dodging = false;
 		c.took_disengage = false;
+		c.attacks_remaining_this_turn = 0;
+		c.divine_smite_pending = false;
+		c.divine_smite_slot_level = 0;
+		c.savage_attacker_used = false;
+		c.combat_prowess_used = false;
+		c.tavern_brawler_push_used = false;
 
 		// Reaction resets at start of YOUR turn
 		c.has_reaction = true;
@@ -238,6 +389,45 @@ class battle {
 	}
 
 	// Apply damage to a combatant
+	void restore_wild_shape(combatant@ target, int overflow = 0) {
+		if (@target == null or !target.wild_shape_active) return;
+
+		target.name = target.wild_shape_saved_name;
+		target.size = target.wild_shape_saved_size;
+		target.max_hp = target.wild_shape_saved_max_hp;
+		target.current_hp = target.wild_shape_saved_current_hp - overflow;
+		target.temp_hp = target.wild_shape_saved_temp_hp;
+		target.armor_class = target.wild_shape_saved_armor_class;
+		target.speed = target.wild_shape_saved_speed;
+		target.ability_scores[ABILITY_STR] = target.wild_shape_saved_strength;
+		target.ability_scores[ABILITY_DEX] = target.wild_shape_saved_dexterity;
+		target.ability_scores[ABILITY_CON] = target.wild_shape_saved_constitution;
+		target.ability_scores[ABILITY_INT] = target.wild_shape_saved_intelligence;
+		target.ability_scores[ABILITY_WIS] = target.wild_shape_saved_wisdom;
+		target.ability_scores[ABILITY_CHA] = target.wild_shape_saved_charisma;
+		target.main_hand = target.wild_shape_saved_main_hand;
+		target.main_hand_damage_dice = target.wild_shape_saved_main_hand_damage_dice;
+		target.main_hand_damage_count = target.wild_shape_saved_main_hand_damage_count;
+		target.main_hand_damage_type = target.wild_shape_saved_main_hand_damage_type;
+		target.main_hand_range = target.wild_shape_saved_main_hand_range;
+		target.main_hand_finesse = target.wild_shape_saved_main_hand_finesse;
+		target.main_hand_is_ranged = target.wild_shape_saved_main_hand_is_ranged;
+		target.monster_attack_bonus = target.wild_shape_saved_monster_attack_bonus;
+		target.monster_attack_damage_mod = target.wild_shape_saved_monster_attack_damage_mod;
+		target.monster_attack2_name = target.wild_shape_saved_monster_attack2_name;
+		target.monster_attack2_bonus = target.wild_shape_saved_monster_attack2_bonus;
+		target.monster_attack2_dice = target.wild_shape_saved_monster_attack2_dice;
+		target.monster_attack2_count = target.wild_shape_saved_monster_attack2_count;
+		target.monster_attack2_mod = target.wild_shape_saved_monster_attack2_mod;
+		target.monster_attack2_type = target.wild_shape_saved_monster_attack2_type;
+		target.monster_attack2_range = target.wild_shape_saved_monster_attack2_range;
+		target.extra_attacks = target.wild_shape_saved_extra_attacks;
+		target.wild_shape_active = false;
+		target.wild_shape_form_id = "";
+		target.wild_shape_just_ended = true;
+		if (target.current_hp > target.max_hp) target.current_hp = target.max_hp;
+	}
+
 	void apply_damage(combatant@ target, int amount, int damage_type, combatant@ source = null) {
 		if (@target == null or target.is_dead) return;
 		if (amount <= 0) return;
@@ -255,6 +445,10 @@ class battle {
 		}
 
 		target.current_hp -= amount;
+		if (target.wild_shape_active and target.current_hp <= 0) {
+			int overflow = -target.current_hp;
+			restore_wild_shape(target, overflow);
+		}
 
 		// Concentration check
 		if (target.is_concentrating and target.current_hp > 0) {
@@ -315,8 +509,9 @@ class battle {
 	}
 
 	// Process a death saving throw result
-	void process_death_save(combatant@ c, int roll) {
+	void process_death_save(combatant@ c, int roll, int total = -1) {
 		if (@c == null or c.is_dead or c.current_hp > 0) return;
+		if (total < 0) total = roll;
 
 		if (roll == 1) {
 			// Natural 1 = 2 failures
@@ -327,7 +522,7 @@ class battle {
 			c.remove_condition(COND_UNCONSCIOUS);
 			c.death_save_successes = 0;
 			c.death_save_failures = 0;
-		} else if (roll >= DEATH_SAVE_DC) {
+		} else if (total >= DEATH_SAVE_DC) {
 			c.death_save_successes++;
 		} else {
 			c.death_save_failures++;
@@ -392,8 +587,17 @@ class battle {
 	bool can_see(combatant@ viewer, combatant@ target) {
 		if (@viewer == null or @target == null) return false;
 		if (viewer.has_condition(COND_BLINDED)) return false;
-		if (target.has_condition(COND_INVISIBLE) and !target.is_hidden) return false;
+		bool has_truesight = viewer.has_feat("boon_of_truesight") and feet_distance(viewer.x, viewer.y, target.x, target.y) <= 60;
+		if (has_truesight) return true;
+		if (target.has_condition(COND_INVISIBLE)) return false;
+		if (target.is_hidden and are_hostile(viewer, target)) return false;
 		return true;
+	}
+
+	bool are_hostile(combatant@ viewer, combatant@ target) {
+		if (@viewer == null or @target == null or viewer.id == target.id) return false;
+		if (mode == "pvp") return true;
+		return viewer.is_player != target.is_player;
 	}
 
 	// Check if battle is over (all of one side dead)
@@ -419,7 +623,7 @@ class battle {
 	}
 
 	// Get battle state as JSON for sending to clients
-	json_object@ build_state_json() {
+	json_object@ build_state_json(string viewer_username = "") {
 		json_object@ state = json_object();
 		state["type"] = message_types::game_state;
 		state["round"] = round_number;
@@ -444,6 +648,7 @@ class battle {
 			cobj["is_dead"] = c.is_dead;
 			cobj["is_stable"] = c.is_stable;
 			cobj["initiative"] = c.initiative_roll;
+			cobj["wild_shape_form"] = c.wild_shape_form_id;
 			// Conditions
 			json_array cond_arr;
 			for (uint j = 0; j < c.conditions.length(); j++) {
@@ -460,6 +665,23 @@ class battle {
 			init_arr.add(initiative_order[i]);
 		}
 		state["initiative_order"] = init_arr;
+
+		if (viewer_username != "") {
+			for (uint i = 0; i < combatants.length(); i++) {
+				combatant@ c = combatants[i];
+				if (!c.is_player or c.player_username != viewer_username) continue;
+				state["my_focus_points"] = c.focus_points;
+				state["my_lay_on_hands_pool"] = c.lay_on_hands_pool;
+				state["my_bardic_inspiration_uses"] = c.bardic_inspiration_uses;
+				state["my_bardic_inspiration_grant_die"] = c.bardic_inspiration_grant_die;
+				state["my_bardic_inspiration_die"] = c.bardic_inspiration_die;
+				state["my_is_hidden"] = c.is_hidden;
+				state["my_weapon_range"] = c.main_hand_range;
+				state["my_movement_remaining"] = c.movement_remaining;
+				state["my_speed"] = c.speed;
+				break;
+			}
+		}
 
 		return state;
 	}

@@ -50,6 +50,8 @@ namespace message_types
 	const string initiative_order = "initiative_order";       // Server sends initiative order to all.
 	const string roll_request = "roll_request";               // Server asks client to press Roll.
 	const string roll_result = "roll_result";                 // Client pressed Roll, server sends result.
+	const string bardic_prompt = "bardic_prompt";             // Server offers Bardic Inspiration after a failed roll.
+	const string bardic_response = "bardic_response";         // Client chooses whether to spend Bardic Inspiration.
 
 	// Actions
 	const string action_move = "action_move";                 // Client moves their character.

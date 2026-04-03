@@ -156,8 +156,74 @@ void init_monster_defs() {
         d.description = "A pack hunter that knocks prey prone.";
         MONSTER_DEFS.insert_last(d);
     }
+    {
+        monster_def d;
+        d.id = "giant_wolf_spider";
+        d.name = "Giant Wolf Spider";
+        d.type = "beast";
+        d.size = SIZE_MEDIUM;
+        d.ac = 13;
+        d.hp = 11;
+        d.speed = 40;
+        d.str = 12; d.dex = 16; d.con = 13;
+        d.intelligence = 3; d.wis = 12; d.cha = 4;
+        d.attack_name = "Bite";
+        d.attack_bonus = 3;
+        d.damage_dice = 6;
+        d.damage_count = 1;
+        d.damage_mod = 1;
+        d.damage_type = DMG_PIERCING;
+        d.attack_range = 5;
+        d.xp = 50;
+        d.description = "A large hunting spider that climbs and bites with venomous fangs.";
+        MONSTER_DEFS.insert_last(d);
+    }
+    {
+        monster_def d;
+        d.id = "giant_bat";
+        d.name = "Giant Bat";
+        d.type = "beast";
+        d.size = SIZE_LARGE;
+        d.ac = 13;
+        d.hp = 22;
+        d.speed = 60;
+        d.str = 15; d.dex = 16; d.con = 11;
+        d.intelligence = 2; d.wis = 12; d.cha = 6;
+        d.attack_name = "Bite";
+        d.attack_bonus = 4;
+        d.damage_dice = 6;
+        d.damage_count = 1;
+        d.damage_mod = 2;
+        d.damage_type = DMG_PIERCING;
+        d.attack_range = 5;
+        d.xp = 50;
+        d.description = "A large bat that swoops through the dark on silent wings.";
+        MONSTER_DEFS.insert_last(d);
+    }
 
     // --- CR 1/2 ---
+    {
+        monster_def d;
+        d.id = "crocodile";
+        d.name = "Crocodile";
+        d.type = "beast";
+        d.size = SIZE_LARGE;
+        d.ac = 12;
+        d.hp = 19;
+        d.speed = 30;
+        d.str = 15; d.dex = 10; d.con = 13;
+        d.intelligence = 2; d.wis = 10; d.cha = 5;
+        d.attack_name = "Bite";
+        d.attack_bonus = 4;
+        d.damage_dice = 10;
+        d.damage_count = 1;
+        d.damage_mod = 2;
+        d.damage_type = DMG_PIERCING;
+        d.attack_range = 5;
+        d.xp = 100;
+        d.description = "A lurking reptilian predator with a crushing bite.";
+        MONSTER_DEFS.insert_last(d);
+    }
     {
         monster_def d;
         d.id = "orc";
@@ -182,6 +248,28 @@ void init_monster_defs() {
     }
 
     // --- CR 1 ---
+    {
+        monster_def d;
+        d.id = "dire_wolf";
+        d.name = "Dire Wolf";
+        d.type = "beast";
+        d.size = SIZE_LARGE;
+        d.ac = 14;
+        d.hp = 37;
+        d.speed = 50;
+        d.str = 17; d.dex = 15; d.con = 15;
+        d.intelligence = 3; d.wis = 12; d.cha = 7;
+        d.attack_name = "Bite";
+        d.attack_bonus = 5;
+        d.damage_dice = 6;
+        d.damage_count = 2;
+        d.damage_mod = 3;
+        d.damage_type = DMG_PIERCING;
+        d.attack_range = 5;
+        d.xp = 200;
+        d.description = "A massive wolf with a bone-crushing bite and relentless speed.";
+        MONSTER_DEFS.insert_last(d);
+    }
     {
         monster_def d;
         d.id = "ghoul";
@@ -215,6 +303,28 @@ void init_monster_defs() {
     }
 
     // --- CR 2 ---
+    {
+        monster_def d;
+        d.id = "giant_constrictor_snake";
+        d.name = "Giant Constrictor Snake";
+        d.type = "beast";
+        d.size = SIZE_HUGE;
+        d.ac = 12;
+        d.hp = 60;
+        d.speed = 30;
+        d.str = 19; d.dex = 14; d.con = 12;
+        d.intelligence = 1; d.wis = 10; d.cha = 3;
+        d.attack_name = "Constrict";
+        d.attack_bonus = 6;
+        d.damage_dice = 8;
+        d.damage_count = 2;
+        d.damage_mod = 4;
+        d.damage_type = DMG_BLUDGEONING;
+        d.attack_range = 10;
+        d.xp = 450;
+        d.description = "A titanic serpent that crushes prey in its coils.";
+        MONSTER_DEFS.insert_last(d);
+    }
     {
         monster_def d;
         d.id = "ogre";
@@ -641,11 +751,23 @@ combatant@ create_monster_combatant(monster_def@ def, int x, int y) {
 
     // Equip primary attack
     c.main_hand = def.attack_name;
+    c.monster_attack_bonus = def.attack_bonus;
     c.main_hand_damage_dice = def.damage_dice;
     c.main_hand_damage_count = def.damage_count;
+    c.monster_attack_damage_mod = def.damage_mod;
     c.main_hand_damage_type = def.damage_type;
     c.main_hand_range = def.attack_range;
     c.main_hand_finesse = false;
+    c.main_hand_is_ranged = false;
+
+    // Store secondary attack data when the stat block defines one.
+    c.monster_attack2_name = def.attack2_name;
+    c.monster_attack2_bonus = def.attack2_bonus;
+    c.monster_attack2_dice = def.attack2_dice;
+    c.monster_attack2_count = def.attack2_count;
+    c.monster_attack2_mod = def.attack2_mod;
+    c.monster_attack2_type = def.attack2_type;
+    c.monster_attack2_range = def.attack2_range;
 
     // Extra attacks from multiattack (subtract 1 for the base attack)
     if (def.has_multiattack and def.multiattack_count > 1) {

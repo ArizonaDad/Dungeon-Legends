@@ -17,6 +17,89 @@ json_array@ json_array_remove_string(json_array@ arr, string value)
 	return result;
 }
 
+monster_def@ get_wild_shape_form_for_combatant(combatant@ c, string form_id)
+{
+	if (@c == null or c.class_name != "Druid" or c.level < 2) return null;
+	bool moon = c.subclass == "Circle of the Moon";
+	bool allow_swim = c.level >= 4;
+	bool allow_fly = c.level >= 8;
+
+	if (form_id == "wolf" or form_id == "giant_wolf_spider") return get_monster_def(form_id);
+	if (form_id == "giant_bat" and allow_fly) return get_monster_def(form_id);
+	if (form_id == "crocodile" and allow_swim) return get_monster_def(form_id);
+	if (form_id == "dire_wolf" and (moon or c.level >= 8)) return get_monster_def(form_id);
+	if (form_id == "giant_constrictor_snake" and moon and c.level >= 6) return get_monster_def(form_id);
+	return null;
+}
+
+void apply_wild_shape_form(combatant@ c, monster_def@ def)
+{
+	if (@c == null or @def == null) return;
+
+	c.wild_shape_saved_name = c.name;
+	c.wild_shape_saved_size = c.size;
+	c.wild_shape_saved_max_hp = c.max_hp;
+	c.wild_shape_saved_current_hp = c.current_hp;
+	c.wild_shape_saved_temp_hp = c.temp_hp;
+	c.wild_shape_saved_armor_class = c.armor_class;
+	c.wild_shape_saved_speed = c.speed;
+	c.wild_shape_saved_strength = c.ability_scores[ABILITY_STR];
+	c.wild_shape_saved_dexterity = c.ability_scores[ABILITY_DEX];
+	c.wild_shape_saved_constitution = c.ability_scores[ABILITY_CON];
+	c.wild_shape_saved_intelligence = c.ability_scores[ABILITY_INT];
+	c.wild_shape_saved_wisdom = c.ability_scores[ABILITY_WIS];
+	c.wild_shape_saved_charisma = c.ability_scores[ABILITY_CHA];
+	c.wild_shape_saved_main_hand = c.main_hand;
+	c.wild_shape_saved_main_hand_damage_dice = c.main_hand_damage_dice;
+	c.wild_shape_saved_main_hand_damage_count = c.main_hand_damage_count;
+	c.wild_shape_saved_main_hand_damage_type = c.main_hand_damage_type;
+	c.wild_shape_saved_main_hand_range = c.main_hand_range;
+	c.wild_shape_saved_main_hand_finesse = c.main_hand_finesse;
+	c.wild_shape_saved_main_hand_is_ranged = c.main_hand_is_ranged;
+	c.wild_shape_saved_monster_attack_bonus = c.monster_attack_bonus;
+	c.wild_shape_saved_monster_attack_damage_mod = c.monster_attack_damage_mod;
+	c.wild_shape_saved_monster_attack2_name = c.monster_attack2_name;
+	c.wild_shape_saved_monster_attack2_bonus = c.monster_attack2_bonus;
+	c.wild_shape_saved_monster_attack2_dice = c.monster_attack2_dice;
+	c.wild_shape_saved_monster_attack2_count = c.monster_attack2_count;
+	c.wild_shape_saved_monster_attack2_mod = c.monster_attack2_mod;
+	c.wild_shape_saved_monster_attack2_type = c.monster_attack2_type;
+	c.wild_shape_saved_monster_attack2_range = c.monster_attack2_range;
+	c.wild_shape_saved_extra_attacks = c.extra_attacks;
+
+	c.wild_shape_active = true;
+	c.wild_shape_just_ended = false;
+	c.wild_shape_form_id = def.id;
+	c.name = c.wild_shape_saved_name + " (" + def.name + ")";
+	c.size = def.size;
+	c.max_hp = def.hp;
+	c.current_hp = def.hp;
+	c.temp_hp = 0;
+	c.armor_class = def.ac;
+	c.speed = def.speed;
+	c.ability_scores[ABILITY_STR] = def.str;
+	c.ability_scores[ABILITY_DEX] = def.dex;
+	c.ability_scores[ABILITY_CON] = def.con;
+	c.main_hand = def.attack_name;
+	c.main_hand_damage_dice = def.damage_dice;
+	c.main_hand_damage_count = def.damage_count;
+	c.main_hand_damage_type = def.damage_type;
+	c.main_hand_range = def.attack_range;
+	c.main_hand_finesse = false;
+	c.main_hand_is_ranged = false;
+	c.monster_attack_bonus = def.attack_bonus;
+	c.monster_attack_damage_mod = def.damage_mod;
+	c.monster_attack2_name = def.attack2_name;
+	c.monster_attack2_bonus = def.attack2_bonus;
+	c.monster_attack2_dice = def.attack2_dice;
+	c.monster_attack2_count = def.attack2_count;
+	c.monster_attack2_mod = def.attack2_mod;
+	c.monster_attack2_type = def.attack2_type;
+	c.monster_attack2_range = def.attack2_range;
+	c.extra_attacks = (def.has_multiattack and def.multiattack_count > 1) ? def.multiattack_count - 1 : 0;
+	if (c.movement_remaining > c.speed) c.movement_remaining = c.speed;
+}
+
 class user_manager
 {
 	user@[] user_list;       // Every connected user.
@@ -156,7 +239,6 @@ class user
 		@room = r;
 		this.status = "in_room";
 		println("[ROOM] " + this.username + " joined room '" + r.name + "' (players=" + r.players.length() + ")");
-
 		// Tell everyone in the room.
 		this.send_to_room({{
 			"type", message_types::chat_message},
@@ -250,6 +332,34 @@ class user
 				if (pending.length() > 0) {
 					this.send({{"type", message_types::announce}, {"text", "You have " + pending.length() + " pending friend request" + (pending.length() == 1 ? "" : "s") + "!"}, {"interrupt", false}});
 				}
+			}
+			// Send saved character data to client on login.
+			if (data.exists("character")) {
+				json_object@ char_data = data["character"];
+				json_object@ char_msg = json_object();
+				char_msg["type"] = message_types::character_data;
+				if (char_data.exists("name")) char_msg["name"] = char_data["name"];
+				if (char_data.exists("race")) char_msg["race"] = char_data["race"];
+				if (char_data.exists("class")) char_msg["class"] = char_data["class"];
+				if (char_data.exists("subclass")) char_msg["subclass"] = char_data["subclass"];
+				if (char_data.exists("background")) char_msg["background"] = char_data["background"];
+				if (char_data.exists("level")) char_msg["level"] = char_data["level"];
+				if (char_data.exists("str")) char_msg["str"] = char_data["str"];
+				if (char_data.exists("dex")) char_msg["dex"] = char_data["dex"];
+				if (char_data.exists("con")) char_msg["con"] = char_data["con"];
+				if (char_data.exists("int")) char_msg["int"] = char_data["int"];
+				if (char_data.exists("wis")) char_msg["wis"] = char_data["wis"];
+				if (char_data.exists("cha")) char_msg["cha"] = char_data["cha"];
+				if (char_data.exists("weapon")) char_msg["weapon"] = char_data["weapon"];
+				if (char_data.exists("feats")) char_msg["feats"] = char_data["feats"];
+				if (char_data.exists("skills")) char_msg["skills"] = char_data["skills"];
+				if (char_data.exists("tools")) char_msg["tools"] = char_data["tools"];
+				if (char_data.exists("spell_ability_overrides")) char_msg["spell_ability_overrides"] = char_data["spell_ability_overrides"];
+				if (char_data.exists("free_cast_spells")) char_msg["free_cast_spells"] = char_data["free_cast_spells"];
+				if (char_data.exists("cantrips")) char_msg["cantrips"] = char_data["cantrips"];
+				if (char_data.exists("spells")) char_msg["spells"] = char_data["spells"];
+				this.send(char_msg);
+				println("[CHAR] Sent saved character to " + this.username);
 			}
 		}
 	}
@@ -764,6 +874,8 @@ void handle_user_message(user@ u, json_object@ msg)
 			if (msg.exists("name")) char_data["name"] = msg["name"];
 			if (msg.exists("race")) char_data["race"] = msg["race"];
 			if (msg.exists("class")) char_data["class"] = msg["class"];
+			if (msg.exists("subclass")) char_data["subclass"] = msg["subclass"];
+			if (msg.exists("background")) char_data["background"] = msg["background"];
 			if (msg.exists("level")) char_data["level"] = msg["level"];
 			if (msg.exists("str")) char_data["str"] = msg["str"];
 			if (msg.exists("dex")) char_data["dex"] = msg["dex"];
@@ -772,6 +884,11 @@ void handle_user_message(user@ u, json_object@ msg)
 			if (msg.exists("wis")) char_data["wis"] = msg["wis"];
 			if (msg.exists("cha")) char_data["cha"] = msg["cha"];
 			if (msg.exists("weapon")) char_data["weapon"] = msg["weapon"];
+			if (msg.exists("feats")) char_data["feats"] = msg["feats"];
+			if (msg.exists("skills")) char_data["skills"] = msg["skills"];
+			if (msg.exists("tools")) char_data["tools"] = msg["tools"];
+			if (msg.exists("spell_ability_overrides")) char_data["spell_ability_overrides"] = msg["spell_ability_overrides"];
+			if (msg.exists("free_cast_spells")) char_data["free_cast_spells"] = msg["free_cast_spells"];
 			if (msg.exists("cantrips")) char_data["cantrips"] = msg["cantrips"];
 			if (msg.exists("spells")) char_data["spells"] = msg["spells"];
 			data["character"] = char_data;
@@ -785,7 +902,20 @@ void handle_user_message(user@ u, json_object@ msg)
 	else if (msg_type == message_types::roll_result) {
 		if (@u.room != null and @u.room.bm != null and @u.room.bm.current_roll != null) {
 			// Player pressed Roll — server rolls the dice
-			int natural = random(1, u.room.bm.current_roll.dice_sides);
+			if (u.room.bm.current_roll.player_username != u.username) return;
+			int natural = 0;
+			if (u.room.bm.current_roll.roll_type == ROLL_DAMAGE) {
+				combatant@ roller = @u.room.bm.combat != null ? u.room.bm.combat.get_combatant(u.room.bm.current_roll.combatant_id) : null;
+				natural = u.room.bm.roll_attack_damage_natural(u.room.bm.current_roll.is_spell_effect ? null : roller, u.room.bm.current_roll);
+			}
+			else {
+				natural = random(1, u.room.bm.current_roll.dice_sides);
+			}
+			if (u.room.bm.current_roll.roll_type == ROLL_ATTACK and (u.room.bm.current_roll.has_advantage or u.room.bm.current_roll.has_disadvantage)) {
+				int second_roll = random(1, u.room.bm.current_roll.dice_sides);
+				if (u.room.bm.current_roll.has_advantage and !u.room.bm.current_roll.has_disadvantage and second_roll > natural) natural = second_roll;
+				else if (u.room.bm.current_roll.has_disadvantage and !u.room.bm.current_roll.has_advantage and second_roll < natural) natural = second_roll;
+			}
 			u.room.bm.process_roll_result(natural);
 		}
 	}
@@ -800,91 +930,299 @@ void handle_user_message(user@ u, json_object@ msg)
 		}
 	}
 	else if (msg_type == message_types::action_move) {
-		if (@u.room != null and @u.room.bm != null and @u.room.bm.combat != null) {
-			combatant@ c = u.room.bm.combat.current_combatant();
-			if (@c != null and c.player_username == u.username) {
-				int ddx = msg.exists("dx") ? int(msg["dx"]) : 0;
-				int ddy = msg.exists("dy") ? int(msg["dy"]) : 0;
-				if (c.movement_remaining >= FEET_PER_TILE) {
-					c.x += ddx;
-					c.y += ddy;
-					c.movement_remaining -= FEET_PER_TILE;
-					u.room.bm.broadcast_announce(c.name + " moves. " + c.movement_remaining + " feet remaining.", false);
-					u.room.bm.broadcast_state();
-				} else {
-					u.send({{"type", message_types::announce}, {"text", "No movement remaining."}, {"interrupt", true}});
-				}
-			}
+		if (@u.room != null and @u.room.bm != null) {
+			u.room.bm.handle_move(u, msg);
 		}
 	}
 	else if (msg_type == message_types::action_dodge) {
-		if (@u.room != null and @u.room.bm != null and @u.room.bm.combat != null) {
-			combatant@ c = u.room.bm.combat.current_combatant();
-			if (@c != null and c.player_username == u.username and c.has_action) {
-				c.is_dodging = true;
-				c.has_action = false;
-				c.used_action = true;
-				u.room.bm.broadcast_announce(c.name + " takes the Dodge action.", false);
-			}
+		if (@u.room != null and @u.room.bm != null) {
+			u.room.bm.handle_dodge(u);
 		}
 	}
 	else if (msg_type == message_types::action_dash) {
-		if (@u.room != null and @u.room.bm != null and @u.room.bm.combat != null) {
-			combatant@ c = u.room.bm.combat.current_combatant();
-			if (@c != null and c.player_username == u.username and c.has_action) {
-				c.movement_remaining += c.speed;
-				c.has_action = false;
-				c.used_action = true;
-				u.room.bm.broadcast_announce(c.name + " takes the Dash action. " + c.movement_remaining + " feet of movement.", false);
-			}
+		if (@u.room != null and @u.room.bm != null) {
+			u.room.bm.handle_dash(u);
 		}
 	}
 	else if (msg_type == message_types::action_disengage) {
-		if (@u.room != null and @u.room.bm != null and @u.room.bm.combat != null) {
-			combatant@ c = u.room.bm.combat.current_combatant();
-			if (@c != null and c.player_username == u.username and c.has_action) {
-				c.took_disengage = true;
-				c.has_action = false;
-				c.used_action = true;
-				u.room.bm.broadcast_announce(c.name + " takes the Disengage action.", false);
-			}
+		if (@u.room != null and @u.room.bm != null) {
+			u.room.bm.handle_disengage(u);
 		}
 	}
+	else if (msg_type == message_types::bonus_action) {
+		if (@u.room == null or @u.room.bm == null or @u.room.bm.combat == null) return;
+		combatant@ c = u.room.bm.combat.current_combatant();
+		if (@c == null or c.player_username != u.username) return;
+		string feature = msg.exists("feature") ? string(msg["feature"]) : "";
+		uint target_id = msg.exists("target_id") ? uint(int(msg["target_id"])) : (msg.exists("target") ? uint(int(msg["target"])) : 0);
+
+		if (feature == "rage") {
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			// Add rage damage bonus (stored in a simple flag)
+			c.add_condition(COND_DODGING); // reuse as "raging" marker temporarily
+			u.room.bm.broadcast_announce(c.name + " enters a RAGE! Advantage on STR, bonus damage, resistance to physical.", true);
+		}
+		else if (feature == "action_surge") {
+			// Action Surge is a free action (not bonus action). Restore action.
+			c.has_action = true;
+			c.used_action = false;
+			c.attacks_remaining_this_turn = 0; // Reset so new Attack action gets full extra attacks
+			u.room.bm.broadcast_announce(c.name + " uses Action Surge! Extra action this turn.", true);
+		}
+		else if (feature == "second_wind") {
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			int heal = random(1, 10) + c.level;
+			u.room.bm.combat.apply_healing(c, heal);
+			u.room.bm.broadcast_roll(c.name, "Second Wind healing", heal, c.level, heal, "");
+			u.room.bm.broadcast_announce(c.name + " uses Second Wind! Healed " + heal + " HP. Now at " + c.current_hp + ".", false);
+		}
+		else if (feature == "divine_smite") {
+			// Find lowest available spell slot (1-5 for smite)
+			int slot_used = -1;
+			for (int sl = 1; sl <= 5; sl++) {
+				if (c.spell_slots_current[sl] > 0) { slot_used = sl; break; }
+			}
+			if (slot_used < 0) {
+				u.send({{"type", message_types::announce}, {"text", "No spell slots available for Divine Smite."}, {"interrupt", true}});
+			} else {
+				c.spell_slots_current[slot_used]--;
+				c.divine_smite_pending = true;
+				c.divine_smite_slot_level = slot_used;
+				int smite_dice = slot_used + 1;
+				u.room.bm.broadcast_announce(c.name + " prepares Divine Smite (level " + slot_used + " slot, " + smite_dice + "d8 radiant on next hit)!", false);
+			}
+		}
+		else if (feature == "lay_on_hands") {
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
+			combatant@ target = target_id != 0 ? u.room.bm.combat.get_combatant(target_id) : c;
+			if (@target == null or target.is_dead) { u.send({{"type", message_types::announce}, {"text", "Choose a valid creature for Lay on Hands."}, {"interrupt", true}}); return; }
+			if (target.id != c.id) {
+				int dist = feet_distance(c.x, c.y, target.x, target.y);
+				if (dist > 5) { u.send({{"type", message_types::announce}, {"text", "Lay on Hands requires touch range."}, {"interrupt", true}}); return; }
+			}
+
+			int heal = msg.exists("amount") ? int(msg["amount"]) : 0;
+			if (heal < 0) heal = 0;
+			string cleanse_csv = msg.exists("cleanse_conditions") ? string(msg["cleanse_conditions"]) : "";
+			string[] requested_cleanses;
+			if (cleanse_csv != "") {
+				string[]@ parts = cleanse_csv.split(",");
+				for (uint i = 0; i < parts.length(); i++) {
+					if (parts[i] != "") requested_cleanses.insert_last(parts[i]);
+				}
+			}
+
+			int cleanse_cost = 0;
+			int[] conditions_to_remove;
+			string[] condition_names;
+			for (uint i = 0; i < requested_cleanses.length(); i++) {
+				string cond_name = requested_cleanses[i].lower();
+				int cond_id = 0;
+				if (cond_name == "poisoned") cond_id = COND_POISONED;
+				else if (c.level >= 14 and cond_name == "blinded") cond_id = COND_BLINDED;
+				else if (c.level >= 14 and cond_name == "charmed") cond_id = COND_CHARMED;
+				else if (c.level >= 14 and cond_name == "deafened") cond_id = COND_DEAFENED;
+				else if (c.level >= 14 and cond_name == "frightened") cond_id = COND_FRIGHTENED;
+				else if (c.level >= 14 and cond_name == "paralyzed") cond_id = COND_PARALYZED;
+				else if (c.level >= 14 and cond_name == "stunned") cond_id = COND_STUNNED;
+				if (cond_id == 0 or !target.has_condition(cond_id)) continue;
+
+				bool already_added = false;
+				for (uint ci = 0; ci < conditions_to_remove.length(); ci++) {
+					if (conditions_to_remove[ci] == cond_id) { already_added = true; break; }
+				}
+				if (already_added) continue;
+				conditions_to_remove.insert_last(cond_id);
+				condition_names.insert_last(CONDITION_NAMES[cond_id]);
+				cleanse_cost += 5;
+			}
+
+			int total_cost = heal + cleanse_cost;
+			if (total_cost <= 0) { u.send({{"type", message_types::announce}, {"text", "Choose healing or conditions to remove."}, {"interrupt", true}}); return; }
+			if (total_cost > c.lay_on_hands_pool) {
+				u.send({{"type", message_types::announce}, {"text", "You only have " + c.lay_on_hands_pool + " Lay on Hands points remaining."}, {"interrupt", true}});
+				return;
+			}
+
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.lay_on_hands_pool -= total_cost;
+			if (heal > 0) u.room.bm.combat.apply_healing(target, heal);
+			for (uint ci = 0; ci < conditions_to_remove.length(); ci++) {
+				target.remove_condition(conditions_to_remove[ci]);
+				u.room.bm.broadcast_to_battle({{"type", message_types::condition_removed}, {"target", target.name}, {"condition", condition_names[ci]}});
+			}
+
+			string text = c.name + " uses Lay on Hands on " + target.name + ".";
+			if (heal > 0) text += " Restored " + heal + " hit points.";
+			if (condition_names.length() > 0) {
+				text += " Removed ";
+				for (uint ci = 0; ci < condition_names.length(); ci++) {
+					if (ci > 0) text += ci == condition_names.length() - 1 ? " and " : ", ";
+					text += condition_names[ci];
+				}
+				text += ".";
+			}
+			text += " " + c.lay_on_hands_pool + " Lay on Hands points remain.";
+			u.room.bm.broadcast_announce(text, true);
+		}
+		else if (feature == "cunning_action") {
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			string action = msg.exists("action") ? string(msg["action"]) : "dash";
+			if (action == "dash") {
+				c.movement_remaining += c.speed;
+				u.room.bm.broadcast_announce(c.name + " uses Cunning Action: Dash! " + c.movement_remaining + " feet of movement.", false);
+			} else if (action == "disengage") {
+				c.took_disengage = true;
+				u.room.bm.broadcast_announce(c.name + " uses Cunning Action: Disengage!", false);
+			} else if (action == "hide") {
+				u.room.bm.request_hide_check(u, c);
+			}
+		}
+		else if (feature == "flurry_of_blows") {
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
+			if (c.focus_points <= 0) { u.send({{"type", message_types::announce}, {"text", "You need 1 Focus Point for Flurry of Blows."}, {"interrupt", true}}); return; }
+			combatant@ target = u.room.bm.combat.get_combatant(target_id);
+			if (@target == null or target.is_dead) { u.send({{"type", message_types::announce}, {"text", "No target."}, {"interrupt", true}}); return; }
+			int flurry_dist = feet_distance(c.x, c.y, target.x, target.y);
+			if (flurry_dist > 5) { u.send({{"type", message_types::announce}, {"text", "Target must be within 5 feet for Flurry of Blows."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			if (!u.room.bm.start_flurry_strike(c, target, 1)) {
+				c.has_bonus_action = true;
+				c.used_bonus_action = false;
+				u.send({{"type", message_types::announce}, {"text", "You cannot make that Flurry attack right now."}, {"interrupt", true}});
+				return;
+			}
+			c.focus_points--;
+			u.room.bm.broadcast_announce(c.name + " spends 1 Focus Point and unleashes Flurry of Blows!", true);
+		}
+		else if (feature == "bardic_inspiration") {
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
+			combatant@ target = u.room.bm.combat.get_combatant(target_id);
+			if (u.room.bm.combat.mode == "pvp") { u.send({{"type", message_types::announce}, {"text", "Bardic Inspiration requires an ally in this simulator."}, {"interrupt", true}}); return; }
+			if (@target == null or target.is_dead) { u.send({{"type", message_types::announce}, {"text", "Choose an ally for Bardic Inspiration."}, {"interrupt", true}}); return; }
+			if (target.id == c.id) { u.send({{"type", message_types::announce}, {"text", "You cannot inspire yourself."}, {"interrupt", true}}); return; }
+			if (target.is_player != c.is_player) { u.send({{"type", message_types::announce}, {"text", "Choose an ally for Bardic Inspiration."}, {"interrupt", true}}); return; }
+			int dist = feet_distance(c.x, c.y, target.x, target.y);
+			if (dist > 60) { u.send({{"type", message_types::announce}, {"text", "That ally is out of range for Bardic Inspiration."}, {"interrupt", true}}); return; }
+			if (c.bardic_inspiration_uses <= 0 or c.bardic_inspiration_grant_die <= 0) {
+				u.send({{"type", message_types::announce}, {"text", "You have no Bardic Inspiration uses remaining."}, {"interrupt", true}});
+				return;
+			}
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.bardic_inspiration_uses--;
+			u.room.bm.clear_bardic_inspiration(target, false);
+			target.bardic_inspiration_die = c.bardic_inspiration_grant_die;
+			target.bardic_inspiration_source_id = c.id;
+			u.room.bm.broadcast_announce(c.name + " grants Bardic Inspiration (" + u.room.bm.die_label(c.bardic_inspiration_grant_die) + ") to " + target.name + ". " + c.bardic_inspiration_uses + " use" + (c.bardic_inspiration_uses == 1 ? "" : "s") + " remain.", true);
+		}
+		else if (feature == "wild_shape") {
+			if (c.class_name != "Druid" or c.level < 2) {
+				u.send({{"type", message_types::announce}, {"text", "Your character cannot use Wild Shape yet."}, {"interrupt", true}});
+				return;
+			}
+
+			string form_id = msg.exists("form") ? string(msg["form"]) : "";
+			if (form_id == "revert") {
+				if (!c.wild_shape_active) {
+					u.send({{"type", message_types::announce}, {"text", "You are not currently in Wild Shape."}, {"interrupt", true}});
+					return;
+				}
+				if (!c.has_bonus_action) {
+					u.send({{"type", message_types::announce}, {"text", "You need a bonus action to revert from Wild Shape."}, {"interrupt", true}});
+					return;
+				}
+				c.has_bonus_action = false;
+				c.used_bonus_action = true;
+				string form_name = "beast form";
+				monster_def@ current_form = c.wild_shape_form_id != "" ? get_monster_def(c.wild_shape_form_id) : null;
+				if (@current_form != null) form_name = current_form.name;
+				u.room.bm.combat.restore_wild_shape(c, 0);
+				c.wild_shape_just_ended = false;
+				u.room.bm.broadcast_announce(c.name + " reverts from " + form_name + " form.", true);
+			} else {
+				bool moon = c.subclass == "Circle of the Moon";
+				if (moon) {
+					if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
+				} else {
+					if (!c.has_action) { u.send({{"type", message_types::announce}, {"text", "No action remaining."}, {"interrupt", true}}); return; }
+				}
+
+				monster_def@ form = get_wild_shape_form_for_combatant(c, form_id);
+				if (@form == null) {
+					u.send({{"type", message_types::announce}, {"text", "That Wild Shape form is not available to this druid."}, {"interrupt", true}});
+					return;
+				}
+
+				if (moon) {
+					c.has_bonus_action = false;
+					c.used_bonus_action = true;
+				} else {
+					c.has_action = false;
+					c.used_action = true;
+					c.attacks_remaining_this_turn = 0;
+				}
+
+				if (c.wild_shape_active) {
+					u.room.bm.combat.restore_wild_shape(c, 0);
+					c.wild_shape_just_ended = false;
+				}
+
+				string base_name = c.name;
+				apply_wild_shape_form(c, form);
+				string cost_text = moon ? "bonus action" : "action";
+				u.room.bm.broadcast_announce(base_name + " uses Wild Shape as a " + cost_text + " and becomes a " + form.name + "!", true);
+			}
+		}
+		u.room.bm.broadcast_state();
+	}
+
 	else if (msg_type == message_types::scan_direction) {
-		if (@u.room != null and @u.room.bm != null and @u.room.bm.combat != null) {
-			string dir = msg.exists("dir") ? string(msg["dir"]) : "";
-			// Find this player's combatant
-			combatant@ me = null;
-			for (uint ci = 0; ci < u.room.bm.combat.combatants.length(); ci++) {
-				if (u.room.bm.combat.combatants[ci].player_username == u.username) {
-					@me = u.room.bm.combat.combatants[ci];
-					break;
-				}
-			}
-			if (@me != null) {
-				json_array results;
-				for (uint ci = 0; ci < u.room.bm.combat.combatants.length(); ci++) {
-					combatant@ t = u.room.bm.combat.combatants[ci];
-					if (t.id == me.id or t.is_dead) continue;
-					int dx = t.x - me.x;
-					int dy = t.y - me.y;
-					bool in_dir = false;
-					if (dir == "north" and dy > 0) in_dir = true;
-					else if (dir == "south" and dy < 0) in_dir = true;
-					else if (dir == "east" and dx > 0) in_dir = true;
-					else if (dir == "west" and dx < 0) in_dir = true;
-					if (in_dir) {
-						json_object r;
-						r["id"] = int(t.id);
-						r["name"] = t.name;
-						r["dist"] = feet_distance(me.x, me.y, t.x, t.y);
-						r["hp_pct"] = t.max_hp > 0 ? (t.current_hp * 100 / t.max_hp) : 0;
-						r["is_player"] = t.is_player;
-						results.add(r);
-					}
-				}
-				u.send({{"type", message_types::scan_result}, {"results", results}});
-			}
+		if (@u.room != null and @u.room.bm != null) u.room.bm.handle_scan(u, msg);
+	}
+	else if (msg_type == message_types::bardic_response) {
+		if (@u.room != null and @u.room.bm != null) u.room.bm.handle_bardic_response(u, msg);
+	}
+	else if (msg_type == message_types::action_cast) {
+		if (@u.room != null and @u.room.bm != null) {
+			u.room.bm.handle_cast(u, msg);
+		}
+	}
+	else if (msg_type == message_types::action_help) {
+		if (@u.room != null and @u.room.bm != null) {
+			u.room.bm.handle_help(u, msg);
+		}
+	}
+	else if (msg_type == message_types::action_hide) {
+		if (@u.room != null and @u.room.bm != null) {
+			u.room.bm.handle_hide(u);
+		}
+	}
+	else if (msg_type == message_types::action_ready) {
+		if (@u.room != null and @u.room.bm != null) {
+			u.room.bm.handle_ready(u, msg);
+		}
+	}
+	else if (msg_type == message_types::action_shove) {
+		if (@u.room != null and @u.room.bm != null) {
+			u.room.bm.handle_shove(u, msg);
+		}
+	}
+	else if (msg_type == message_types::action_grapple) {
+		if (@u.room != null and @u.room.bm != null) {
+			u.room.bm.handle_grapple(u, msg);
+		}
+	}
+	else if (msg_type == message_types::set_target) {
+		if (@u.room != null and @u.room.bm != null) {
+			u.room.bm.handle_set_target(u, msg);
 		}
 	}
 

@@ -1,98 +1,231 @@
 #include "../../common/combat_constants.nvgt"
 
-// Client-side spell selection for combat
-// Called from show_spell_menu() in combat_ui.nvgt
+// Shared client spell catalog used by character creation and the combat spell menu.
 
-// Simplified spell data for client display
 class client_spell {
     string id;
     string name;
     int level;
+    string school;
     string description;
+    string class_list;
 }
 
-client_spell[] available_spells;
+client_spell@[] SPELL_CATALOG;
+client_spell@[] available_spells;
 
-void build_spell_list_for_class(string class_name, int char_level) {
-    available_spells.resize(0);
-    // Cantrips available to all casters
-    string lc = class_name.lower();
+void add_client_spell(string id, string name, int level, string school, string description, string class_list) {
+    client_spell s;
+    s.id = id;
+    s.name = name;
+    s.level = level;
+    s.school = school;
+    s.description = description;
+    s.class_list = class_list;
+    SPELL_CATALOG.insert_last(s);
+}
 
-    // Build a basic spell list based on class
-    // Cantrips
-    if (lc == "wizard" or lc == "sorcerer" or lc == "artificer") {
-        { client_spell s; s.id = "fire_bolt"; s.name = "Fire Bolt"; s.level = 0; s.description = "Cantrip. 1d10 fire. Ranged spell attack. 120 feet."; available_spells.insert_last(s); }
+void ensure_client_spell_catalog() {
+    if (SPELL_CATALOG.length() > 0) return;
+
+    add_client_spell("fire_bolt", "Fire Bolt", 0, "evocation", "Ranged spell attack. 1d10 fire damage. Scales at levels 5, 11, and 17.", "wizard,sorcerer,artificer");
+    add_client_spell("sacred_flame", "Sacred Flame", 0, "evocation", "Dexterity save or 1d8 radiant damage.", "cleric");
+    add_client_spell("eldritch_blast", "Eldritch Blast", 0, "evocation", "Ranged spell attack. 1d10 force damage. Extra beams at higher levels.", "warlock");
+    add_client_spell("toll_the_dead", "Toll the Dead", 0, "necromancy", "Wisdom save or 1d8 necrotic damage, or 1d12 if the target is wounded.", "cleric,wizard");
+    add_client_spell("vicious_mockery", "Vicious Mockery", 0, "enchantment", "Wisdom save or 1d6 psychic damage. The target has disadvantage on its next attack roll.", "bard");
+    add_client_spell("acid_splash", "Acid Splash", 0, "evocation", "Dexterity save or 1d6 acid damage. Can target two creatures close together.", "sorcerer,wizard,artificer");
+    add_client_spell("blade_ward", "Blade Ward", 0, "abjuration", "Gain resistance to bludgeoning, piercing, and slashing damage until the end of your next turn.", "bard,sorcerer,warlock,wizard");
+    add_client_spell("chill_touch", "Chill Touch", 0, "necromancy", "Ranged spell attack. 1d8 necrotic damage. The target can't regain hit points until your next turn.", "sorcerer,warlock,wizard");
+    add_client_spell("guidance", "Guidance", 0, "divination", "Touch a creature to add 1d4 to an ability check for 1 minute.", "cleric,druid,artificer");
+    add_client_spell("light", "Light", 0, "evocation", "Touch an object to make it shed light for 1 hour.", "bard,cleric,sorcerer,wizard,artificer");
+    add_client_spell("mage_hand", "Mage Hand", 0, "conjuration", "Create a spectral hand that manipulates objects at range.", "bard,sorcerer,warlock,wizard,artificer");
+    add_client_spell("mending", "Mending", 0, "transmutation", "Repair a single break or tear in an object.", "bard,cleric,druid,sorcerer,wizard,artificer");
+    add_client_spell("message", "Message", 0, "transmutation", "Whisper a message to a creature within range and receive a reply.", "bard,druid,sorcerer,wizard,artificer");
+    add_client_spell("minor_illusion", "Minor Illusion", 0, "illusion", "Create a small sound or image for 1 minute.", "bard,sorcerer,warlock,wizard");
+    add_client_spell("mind_sliver", "Mind Sliver", 0, "enchantment", "Intelligence save or 1d6 psychic damage. The target subtracts 1d4 from its next saving throw.", "sorcerer,warlock,wizard");
+    add_client_spell("poison_spray", "Poison Spray", 0, "conjuration", "Ranged spell attack. 1d12 poison damage.", "druid,sorcerer,warlock,wizard,artificer");
+    add_client_spell("prestidigitation", "Prestidigitation", 0, "transmutation", "Perform minor magical tricks such as lighting, cleaning, or sensory effects.", "bard,sorcerer,warlock,wizard,artificer");
+    add_client_spell("produce_flame", "Produce Flame", 0, "conjuration", "Create a flame in your hand. It can shed light or be hurled as a ranged spell attack for 1d8 fire.", "druid");
+    add_client_spell("ray_of_frost", "Ray of Frost", 0, "evocation", "Ranged spell attack. 1d8 cold damage, and the target's speed is reduced.", "sorcerer,wizard,artificer");
+    add_client_spell("resistance", "Resistance", 0, "abjuration", "Touch a creature to help it reduce incoming elemental harm for 1 minute.", "cleric,druid,artificer");
+    add_client_spell("shocking_grasp", "Shocking Grasp", 0, "evocation", "Melee spell attack. 1d8 lightning damage. Advantage against metal armor. The target loses its reaction.", "sorcerer,wizard,artificer");
+    add_client_spell("spare_the_dying", "Spare the Dying", 0, "necromancy", "Stabilize a creature at 0 hit points.", "cleric,druid");
+    add_client_spell("shillelagh", "Shillelagh", 0, "transmutation", "Bonus action. A club or quarterstaff uses your spellcasting ability and deals 1d8 force damage.", "druid");
+    add_client_spell("thorn_whip", "Thorn Whip", 0, "transmutation", "Melee spell attack at 30 feet. 1d6 piercing damage and pulls the target closer.", "druid,artificer");
+    add_client_spell("thunderclap", "Thunderclap", 0, "evocation", "Creatures within 5 feet make a Constitution save or take 1d6 thunder damage.", "bard,druid,sorcerer,warlock,wizard,artificer");
+    add_client_spell("true_strike", "True Strike", 0, "divination", "Use your weapon with magic for a radiant strike that scales like a cantrip.", "bard,sorcerer,warlock,wizard");
+    add_client_spell("word_of_radiance", "Word of Radiance", 0, "evocation", "Creatures within 5 feet make a Constitution save or take radiant damage.", "cleric");
+    add_client_spell("starry_wisp", "Starry Wisp", 0, "evocation", "Ranged spell attack. 1d8 radiant damage. The target glows and can't become invisible.", "bard,druid");
+    add_client_spell("sorcerous_burst", "Sorcerous Burst", 0, "evocation", "Ranged spell attack. 1d8 damage of a chosen type, with a chance to erupt for more.", "sorcerer");
+    add_client_spell("elementalism", "Elementalism", 0, "transmutation", "Manipulate air, earth, fire, or water for simple utility effects.", "druid,sorcerer,wizard");
+    add_client_spell("dancing_lights", "Dancing Lights", 0, "evocation", "Create up to four floating lights. Concentration, up to 1 minute.", "bard,sorcerer,wizard,artificer");
+    add_client_spell("druidcraft", "Druidcraft", 0, "transmutation", "Create small nature-themed magical effects.", "druid");
+    add_client_spell("thaumaturgy", "Thaumaturgy", 0, "transmutation", "Create a minor divine wonder such as a booming voice or trembling ground.", "cleric");
+    add_client_spell("friends", "Friends", 0, "enchantment", "Gain advantage on Charisma checks against one creature for 1 minute. Concentration.", "bard,sorcerer,warlock,wizard");
+
+    add_client_spell("magic_missile", "Magic Missile", 1, "evocation", "Three darts of force automatically hit for 1d4 plus 1 each. More darts when upcast.", "wizard,sorcerer");
+    add_client_spell("shield", "Shield", 1, "abjuration", "Reaction. Gain plus 5 AC until the start of your next turn.", "wizard,sorcerer");
+    add_client_spell("cure_wounds", "Cure Wounds", 1, "evocation", "Restore 2d8 plus your spellcasting modifier hit points to a touched creature.", "bard,cleric,druid,paladin,ranger,artificer");
+    add_client_spell("healing_word", "Healing Word", 1, "evocation", "Bonus action. Restore 2d4 plus your spellcasting modifier hit points at range.", "bard,cleric,druid");
+    add_client_spell("thunderwave", "Thunderwave", 1, "evocation", "Creatures nearby make a Constitution save or take 2d8 thunder damage and get pushed.", "bard,druid,sorcerer,wizard");
+    add_client_spell("guiding_bolt", "Guiding Bolt", 1, "evocation", "Ranged spell attack. 4d6 radiant damage, and the next attack against the target has advantage.", "cleric");
+    add_client_spell("bless", "Bless", 1, "enchantment", "Up to three creatures add 1d4 to attack rolls and saving throws. Concentration.", "cleric,paladin");
+    add_client_spell("burning_hands", "Burning Hands", 1, "evocation", "Creatures in a close burst make a Dexterity save or take 3d6 fire damage.", "sorcerer,wizard");
+    add_client_spell("charm_person", "Charm Person", 1, "enchantment", "Charm a Humanoid that fails a Wisdom save.", "bard,sorcerer,warlock,wizard");
+    add_client_spell("color_spray", "Color Spray", 1, "illusion", "A dazzling spray of light overwhelms creatures in front of you.", "bard,sorcerer,wizard");
+    add_client_spell("detect_magic", "Detect Magic", 1, "divination", "Sense magic for up to 10 minutes. Concentration.", "bard,cleric,druid,paladin,ranger,sorcerer,wizard,artificer");
+    add_client_spell("disguise_self", "Disguise Self", 1, "illusion", "Magically alter your appearance for 1 hour.", "bard,sorcerer,wizard");
+    add_client_spell("dissonant_whispers", "Dissonant Whispers", 1, "enchantment", "Wisdom save or 3d6 psychic damage and the target flees.", "bard");
+    add_client_spell("ensnaring_strike", "Ensnaring Strike", 1, "conjuration", "Bonus action. Your next weapon hit can conjure grasping vines. Concentration.", "ranger");
+    add_client_spell("heroism", "Heroism", 1, "enchantment", "A willing creature gains temporary hit points each round and can't be frightened. Concentration.", "bard,paladin");
+    add_client_spell("hex", "Hex", 1, "enchantment", "Curse a creature to deal extra damage to it and hinder one ability. Concentration.", "warlock");
+    add_client_spell("hunters_mark", "Hunter's Mark", 1, "divination", "Mark a target to deal extra damage when you hit it. Concentration.", "ranger");
+    add_client_spell("longstrider", "Longstrider", 1, "transmutation", "Increase a creature's speed by 10 feet for the rest of the battle.", "bard,druid,ranger,wizard,artificer");
+    add_client_spell("mage_armor", "Mage Armor", 1, "abjuration", "Protect an unarmored creature with a base AC of 13 plus Dexterity modifier.", "sorcerer,wizard");
+    add_client_spell("sanctuary", "Sanctuary", 1, "abjuration", "Ward a creature so attackers must pass a Wisdom save to target it.", "cleric,paladin");
+    add_client_spell("sleep", "Sleep", 1, "enchantment", "A wave of drowsy magic can knock creatures unconscious.", "bard,sorcerer,wizard");
+    add_client_spell("silent_image", "Silent Image", 1, "illusion", "Create a visual illusion within range. Concentration.", "bard,sorcerer,wizard");
+    add_client_spell("tashas_hideous_laughter", "Tasha's Hideous Laughter", 1, "enchantment", "Wisdom save or a creature collapses laughing. Concentration.", "bard,wizard");
+
+    add_client_spell("spiritual_weapon", "Spiritual Weapon", 2, "evocation", "Bonus action. Summon a spectral weapon that strikes for force damage.", "cleric");
+    add_client_spell("lesser_restoration", "Lesser Restoration", 2, "abjuration", "End one poisoned, paralyzed, blinded, or deafened condition on a creature.", "bard,cleric,druid,paladin,ranger,artificer");
+    add_client_spell("misty_step", "Misty Step", 2, "conjuration", "Bonus action. Teleport 30 feet to an unoccupied space you can see.", "sorcerer,warlock,wizard");
+    add_client_spell("hold_person", "Hold Person", 2, "enchantment", "A Humanoid makes a Wisdom save or becomes paralyzed. Concentration.", "bard,cleric,druid,sorcerer,warlock,wizard");
+    add_client_spell("pass_without_trace", "Pass without Trace", 2, "abjuration", "Concentration. You and your allies gain plus 10 to Hide checks.", "druid,ranger");
+    add_client_spell("scorching_ray", "Scorching Ray", 2, "evocation", "Create three rays of fire. Each requires a spell attack and deals 2d6 fire damage.", "sorcerer,wizard");
+
+    add_client_spell("fireball", "Fireball", 3, "evocation", "Creatures in a 20-foot radius make a Dexterity save or take 8d6 fire damage.", "sorcerer,wizard");
+    add_client_spell("counterspell", "Counterspell", 3, "abjuration", "Reaction. Interrupt a spell being cast.", "sorcerer,warlock,wizard");
+    add_client_spell("spirit_guardians", "Spirit Guardians", 3, "conjuration", "Hostile creatures near you make a Wisdom save or take radiant damage. Concentration.", "cleric");
+    add_client_spell("revivify", "Revivify", 3, "necromancy", "Return a creature that died within the last minute to life with 1 hit point.", "cleric,paladin,druid,ranger,artificer");
+    add_client_spell("haste", "Haste", 3, "transmutation", "Double a creature's speed, give it plus 2 AC, and grant an extra action. Concentration.", "sorcerer,wizard,artificer");
+
+    add_client_spell("banishment", "Banishment", 4, "abjuration", "Charisma save or a creature is banished. Concentration.", "cleric,paladin,sorcerer,warlock,wizard");
+    add_client_spell("heal", "Heal", 6, "evocation", "Restore 70 hit points and purge certain debilitating effects.", "cleric,druid");
+}
+
+client_spell@ find_client_spell(string id) {
+    ensure_client_spell_catalog();
+    for (uint i = 0; i < SPELL_CATALOG.length(); i++) {
+        if (SPELL_CATALOG[i].id == id) return SPELL_CATALOG[i];
     }
-    if (lc == "cleric") {
-        { client_spell s; s.id = "sacred_flame"; s.name = "Sacred Flame"; s.level = 0; s.description = "Cantrip. 1d8 radiant. DEX save. 60 feet."; available_spells.insert_last(s); }
-        { client_spell s; s.id = "toll_the_dead"; s.name = "Toll the Dead"; s.level = 0; s.description = "Cantrip. 1d8 necrotic, 1d12 if wounded. WIS save. 60 feet."; available_spells.insert_last(s); }
+    return null;
+}
+
+bool client_spell_has_class(client_spell@ spell, string class_name) {
+    if (@spell == null or class_name == "") return false;
+    string haystack = "," + spell.class_list.lower() + ",";
+    string needle = "," + class_name.lower() + ",";
+    return haystack.find(needle) >= 0;
+}
+
+bool client_spell_has_any_school(client_spell@ spell, string school_csv) {
+    if (@spell == null) return false;
+    if (school_csv == "") return true;
+    string haystack = "," + school_csv.lower() + ",";
+    string needle = "," + spell.school.lower() + ",";
+    return haystack.find(needle) >= 0;
+}
+
+bool is_third_caster_subclass(string class_name, string subclass_name) {
+    return (class_name == "Fighter" and subclass_name == "Eldritch Knight") or (class_name == "Rogue" and subclass_name == "Arcane Trickster");
+}
+
+string get_spell_list_class_for_character(string class_name, string subclass_name) {
+    if (is_third_caster_subclass(class_name, subclass_name)) return "wizard";
+    return class_name.lower();
+}
+
+int get_max_spell_level_for_character(string class_name, string subclass_name, int level) {
+    string lc = class_name.lower();
+    if (lc == "bard" or lc == "cleric" or lc == "druid" or lc == "sorcerer" or lc == "wizard") {
+        int max_level = (level + 1) / 2;
+        if (max_level > 9) max_level = 9;
+        return max_level;
     }
     if (lc == "warlock") {
-        { client_spell s; s.id = "eldritch_blast"; s.name = "Eldritch Blast"; s.level = 0; s.description = "Cantrip. 1d10 force. Ranged spell attack. 120 feet."; available_spells.insert_last(s); }
+        int[] slot_levels = {1,1,2,2,3,3,4,4,5,5,5,5,5,5,5,5,5,5,5,5};
+        int idx = level - 1;
+        if (idx < 0) idx = 0;
+        if (idx > 19) idx = 19;
+        return slot_levels[idx];
     }
-    if (lc == "bard") {
-        { client_spell s; s.id = "vicious_mockery"; s.name = "Vicious Mockery"; s.level = 0; s.description = "Cantrip. 1d6 psychic. WIS save. Disadvantage on next attack."; available_spells.insert_last(s); }
+    if (lc == "paladin" or lc == "ranger" or lc == "artificer") {
+        if (level >= 17) return 5;
+        if (level >= 13) return 4;
+        if (level >= 9) return 3;
+        if (level >= 5) return 2;
+        if (level >= 1) return 1;
+        return 0;
     }
+    if (is_third_caster_subclass(class_name, subclass_name)) {
+        if (level >= 19) return 4;
+        if (level >= 13) return 3;
+        if (level >= 7) return 2;
+        if (level >= 3) return 1;
+    }
+    return 0;
+}
 
-    // Level 1+ spells (if they have slots)
-    if (char_level >= 1) {
-        if (lc == "wizard" or lc == "sorcerer") {
-            { client_spell s; s.id = "magic_missile"; s.name = "Magic Missile"; s.level = 1; s.description = "Level 1. 3 darts, 1d4+1 force each. Auto-hit."; available_spells.insert_last(s); }
-            { client_spell s; s.id = "shield"; s.name = "Shield"; s.level = 1; s.description = "Level 1. Reaction. +5 AC until next turn."; available_spells.insert_last(s); }
-            { client_spell s; s.id = "thunderwave"; s.name = "Thunderwave"; s.level = 1; s.description = "Level 1. 2d8 thunder. CON save. Push 10 feet."; available_spells.insert_last(s); }
-        }
-        if (lc == "cleric") {
-            { client_spell s; s.id = "cure_wounds"; s.name = "Cure Wounds"; s.level = 1; s.description = "Level 1. Touch. 2d8 + modifier healing."; available_spells.insert_last(s); }
-            { client_spell s; s.id = "healing_word"; s.name = "Healing Word"; s.level = 1; s.description = "Level 1. Bonus action. 2d4 + modifier healing. 60 feet."; available_spells.insert_last(s); }
-            { client_spell s; s.id = "guiding_bolt"; s.name = "Guiding Bolt"; s.level = 1; s.description = "Level 1. 4d6 radiant. Next attack has advantage."; available_spells.insert_last(s); }
-            { client_spell s; s.id = "bless"; s.name = "Bless"; s.level = 1; s.description = "Level 1. 3 targets add 1d4 to attacks and saves. Concentration."; available_spells.insert_last(s); }
-        }
-        if (lc == "bard" or lc == "druid" or lc == "ranger") {
-            { client_spell s; s.id = "cure_wounds"; s.name = "Cure Wounds"; s.level = 1; s.description = "Level 1. Touch. 2d8 + modifier healing."; available_spells.insert_last(s); }
-            { client_spell s; s.id = "healing_word"; s.name = "Healing Word"; s.level = 1; s.description = "Level 1. Bonus action. 2d4 + modifier healing. 60 feet."; available_spells.insert_last(s); }
-            { client_spell s; s.id = "thunderwave"; s.name = "Thunderwave"; s.level = 1; s.description = "Level 1. 2d8 thunder. CON save. Push 10 feet."; available_spells.insert_last(s); }
-        }
-        if (lc == "paladin") {
-            { client_spell s; s.id = "cure_wounds"; s.name = "Cure Wounds"; s.level = 1; s.description = "Level 1. Touch. 2d8 + modifier healing."; available_spells.insert_last(s); }
-            { client_spell s; s.id = "bless"; s.name = "Bless"; s.level = 1; s.description = "Level 1. 3 targets add 1d4 to attacks and saves. Concentration."; available_spells.insert_last(s); }
+void build_spell_list_for_character(string class_name, string subclass_name, int char_level) {
+    ensure_client_spell_catalog();
+    available_spells.resize(0);
+
+    string list_class = get_spell_list_class_for_character(class_name, subclass_name);
+    int max_spell_level = get_max_spell_level_for_character(class_name, subclass_name, char_level);
+
+    for (uint i = 0; i < SPELL_CATALOG.length(); i++) {
+        client_spell@ spell = SPELL_CATALOG[i];
+        if (!client_spell_has_class(spell, list_class)) continue;
+        if (spell.level > 0 and spell.level > max_spell_level) continue;
+        available_spells.insert_last(spell);
+    }
+}
+
+void build_spell_list_for_selected_spells(string[]@ cantrip_ids, string[]@ spell_ids) {
+    ensure_client_spell_catalog();
+    available_spells.resize(0);
+
+    if (@cantrip_ids != null) {
+        for (uint i = 0; i < cantrip_ids.length(); i++) {
+            client_spell@ spell = find_client_spell(cantrip_ids[i]);
+            if (@spell != null) available_spells.insert_last(spell);
         }
     }
-    // Level 2
-    if (char_level >= 3) {
-        if (lc == "cleric") {
-            { client_spell s; s.id = "spiritual_weapon"; s.name = "Spiritual Weapon"; s.level = 2; s.description = "Level 2. Bonus action. 1d8+mod force per turn. Concentration."; available_spells.insert_last(s); }
-            { client_spell s; s.id = "hold_person"; s.name = "Hold Person"; s.level = 2; s.description = "Level 2. WIS save or paralyzed. Concentration."; available_spells.insert_last(s); }
-        }
-        if (lc == "wizard" or lc == "sorcerer") {
-            { client_spell s; s.id = "scorching_ray"; s.name = "Scorching Ray"; s.level = 2; s.description = "Level 2. 3 rays, 2d6 fire each. Spell attack."; available_spells.insert_last(s); }
-            { client_spell s; s.id = "misty_step"; s.name = "Misty Step"; s.level = 2; s.description = "Level 2. Bonus action. Teleport 30 feet."; available_spells.insert_last(s); }
-            { client_spell s; s.id = "hold_person"; s.name = "Hold Person"; s.level = 2; s.description = "Level 2. WIS save or paralyzed. Concentration."; available_spells.insert_last(s); }
-        }
-    }
-    // Level 3
-    if (char_level >= 5) {
-        if (lc == "wizard" or lc == "sorcerer") {
-            { client_spell s; s.id = "fireball"; s.name = "Fireball"; s.level = 3; s.description = "Level 3. 8d6 fire in 20ft radius. DEX save."; available_spells.insert_last(s); }
-            { client_spell s; s.id = "counterspell"; s.name = "Counterspell"; s.level = 3; s.description = "Level 3. Reaction. Negate a spell being cast. CON save."; available_spells.insert_last(s); }
-            { client_spell s; s.id = "haste"; s.name = "Haste"; s.level = 3; s.description = "Level 3. Double speed, +2 AC, extra action. Concentration."; available_spells.insert_last(s); }
-        }
-        if (lc == "cleric") {
-            { client_spell s; s.id = "spirit_guardians"; s.name = "Spirit Guardians"; s.level = 3; s.description = "Level 3. 3d8 radiant in 15ft radius around you. Concentration."; available_spells.insert_last(s); }
-            { client_spell s; s.id = "revivify"; s.name = "Revivify"; s.level = 3; s.description = "Level 3. Revive a creature that died within 1 minute with 1 HP."; available_spells.insert_last(s); }
+    if (@spell_ids != null) {
+        for (uint i = 0; i < spell_ids.length(); i++) {
+            client_spell@ spell = find_client_spell(spell_ids[i]);
+            if (@spell != null) available_spells.insert_last(spell);
         }
     }
 }
 
-// Display the spell selection menu and return the chosen spell ID
+string spell_display_name(string id) {
+    client_spell@ spell = find_client_spell(id);
+    if (@spell == null) return id;
+    return spell.name;
+}
+
+string spell_metadata_summary(client_spell@ spell) {
+    if (@spell == null) return "";
+    string desc_lc = spell.description.lower();
+    string cast_time = "Action";
+    if (desc_lc.find("bonus action") >= 0) cast_time = "Bonus action";
+    else if (desc_lc.find("reaction") >= 0) cast_time = "Reaction";
+    string summary = (spell.level == 0 ? "Cantrip" : "Level " + spell.level) + ". " + spell.school + ". " + cast_time + ".";
+    if (desc_lc.find("concentration") >= 0) summary += " Concentration.";
+    return summary;
+}
+
 string show_spell_selection_menu() {
     if (available_spells.length() == 0) {
-        speak("No spells available for your class.", true);
+        speak("No spells are currently available.", true);
         return "";
     }
 
     menu@ m = setup_sub_menu("Choose a spell to cast.");
     for (uint i = 0; i < available_spells.length(); i++) {
-        m.add_item(available_spells[i].name + ". " + available_spells[i].description);
+        m.add_item(available_spells[i].name + ". " + spell_metadata_summary(available_spells[i]) + " " + available_spells[i].description);
     }
     int res = m.run();
     if (res < 0 or res >= int(available_spells.length())) {

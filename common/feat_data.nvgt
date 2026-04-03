@@ -1,0 +1,195 @@
+const string FEAT_CATEGORY_ORIGIN = "origin";
+const string FEAT_CATEGORY_GENERAL = "general";
+const string FEAT_CATEGORY_FIGHTING_STYLE = "fighting_style";
+const string FEAT_CATEGORY_EPIC = "epic";
+
+class feat_choice_def {
+	string id;
+	string name;
+	string category;
+	string description;
+	bool repeatable = false;
+	int min_level = 1;
+	string prerequisite_class = "";
+	bool requires_fighting_style_feature = false;
+	bool requires_spellcasting = false;
+	int prerequisite_ability = -1;
+	int prerequisite_score = 0;
+}
+
+class background_choice_def {
+	string id;
+	string name;
+	string description;
+	string ability_csv;
+	string feat_id;
+	string[] skills;
+	string tool_name;
+}
+
+class skill_choice_def {
+	string name;
+	string description;
+}
+
+feat_choice_def@[] FEAT_CHOICES;
+background_choice_def@[] BACKGROUND_CHOICES;
+skill_choice_def@[] SKILL_CHOICES;
+
+void add_feat_choice(string id, string name, string category, string description, bool repeatable = false, int min_level = 1, string prerequisite_class = "", bool requires_fighting_style_feature = false, bool requires_spellcasting = false, int prerequisite_ability = -1, int prerequisite_score = 0) {
+	feat_choice_def f;
+	f.id = id;
+	f.name = name;
+	f.category = category;
+	f.description = description;
+	f.repeatable = repeatable;
+	f.min_level = min_level;
+	f.prerequisite_class = prerequisite_class;
+	f.requires_fighting_style_feature = requires_fighting_style_feature;
+	f.requires_spellcasting = requires_spellcasting;
+	f.prerequisite_ability = prerequisite_ability;
+	f.prerequisite_score = prerequisite_score;
+	FEAT_CHOICES.insert_last(f);
+}
+
+void add_background_choice(string id, string name, string description, string ability_csv, string feat_id, string[]@ skills, string tool_name) {
+	background_choice_def b;
+	b.id = id;
+	b.name = name;
+	b.description = description;
+	b.ability_csv = ability_csv;
+	b.feat_id = feat_id;
+	if (@skills != null) b.skills = skills;
+	b.tool_name = tool_name;
+	BACKGROUND_CHOICES.insert_last(b);
+}
+
+void add_skill_choice(string name, string description) {
+	skill_choice_def s;
+	s.name = name;
+	s.description = description;
+	SKILL_CHOICES.insert_last(s);
+}
+
+void init_feat_data() {
+	if (FEAT_CHOICES.length() > 0) return;
+
+	add_skill_choice("Acrobatics", "Balance, tumble, and wriggle free.");
+	add_skill_choice("Animal Handling", "Calm, direct, and understand animals.");
+	add_skill_choice("Arcana", "Recall magical lore and theory.");
+	add_skill_choice("Athletics", "Climb, jump, wrestle, and overpower.");
+	add_skill_choice("Deception", "Lie convincingly and maintain a disguise.");
+	add_skill_choice("History", "Recall historical events and lore.");
+	add_skill_choice("Insight", "Read motives and emotional tells.");
+	add_skill_choice("Intimidation", "Coerce with menace or force of presence.");
+	add_skill_choice("Investigation", "Search for clues and make deductions.");
+	add_skill_choice("Medicine", "Stabilize and diagnose injuries or illness.");
+	add_skill_choice("Nature", "Recall terrain, beasts, and natural lore.");
+	add_skill_choice("Perception", "Notice ambushes, creatures, and details.");
+	add_skill_choice("Performance", "Entertain with music, dance, or drama.");
+	add_skill_choice("Persuasion", "Influence with tact and confidence.");
+	add_skill_choice("Religion", "Recall divine lore and rites.");
+	add_skill_choice("Sleight of Hand", "Pick pockets and manipulate objects subtly.");
+	add_skill_choice("Stealth", "Move quietly and stay hidden.");
+	add_skill_choice("Survival", "Track creatures and endure the wilds.");
+
+	add_feat_choice("alert", "Alert", FEAT_CATEGORY_ORIGIN, "Add your Proficiency Bonus to initiative rolls.", false, 1);
+	add_feat_choice("magic_initiate_cleric", "Magic Initiate (Cleric)", FEAT_CATEGORY_ORIGIN, "Learn two Cleric cantrips and one level 1 Cleric spell. You can cast the spell once for free each battle.", false, 1);
+	add_feat_choice("magic_initiate_druid", "Magic Initiate (Druid)", FEAT_CATEGORY_ORIGIN, "Learn two Druid cantrips and one level 1 Druid spell. You can cast the spell once for free each battle.", false, 1);
+	add_feat_choice("magic_initiate_wizard", "Magic Initiate (Wizard)", FEAT_CATEGORY_ORIGIN, "Learn two Wizard cantrips and one level 1 Wizard spell. You can cast the spell once for free each battle.", false, 1);
+	add_feat_choice("savage_attacker", "Savage Attacker", FEAT_CATEGORY_ORIGIN, "Once on each of your turns, reroll your weapon damage dice and use either result.", false, 1);
+	add_feat_choice("skilled", "Skilled", FEAT_CATEGORY_ORIGIN, "Gain proficiency in any combination of three skills or tools of your choice.", true, 1);
+	add_feat_choice("tough", "Tough", FEAT_CATEGORY_ORIGIN, "Your Hit Point maximum increases by 2 per character level.", false, 1);
+	add_feat_choice("tavern_brawler", "Tavern Brawler", FEAT_CATEGORY_ORIGIN, "Improve unarmed fighting and push foes when you land an unarmed strike.", false, 1);
+	add_feat_choice("healer", "Healer", FEAT_CATEGORY_ORIGIN, "Your healing rolls reroll 1s.", false, 1);
+
+	add_feat_choice("ability_score_improvement", "Ability Score Improvement", FEAT_CATEGORY_GENERAL, "Increase one ability score by 2, or increase two ability scores by 1.", true, 4);
+	add_feat_choice("grappler", "Grappler", FEAT_CATEGORY_GENERAL, "Increase Strength or Dexterity by 1 and gain advantage against creatures grappled by you.", false, 4, "", false, false, -1, 0);
+
+	add_feat_choice("archery", "Archery", FEAT_CATEGORY_FIGHTING_STYLE, "You gain a +2 bonus to attack rolls you make with ranged weapons.", false, 1, "", true);
+	add_feat_choice("defense", "Defense", FEAT_CATEGORY_FIGHTING_STYLE, "You gain a +1 bonus to Armor Class.", false, 1, "", true);
+	add_feat_choice("great_weapon_fighting", "Great Weapon Fighting", FEAT_CATEGORY_FIGHTING_STYLE, "Treat weapon damage die rolls of 1 or 2 as 3 when wielding a suitable melee weapon.", false, 1, "", true);
+	add_feat_choice("two_weapon_fighting", "Two-Weapon Fighting", FEAT_CATEGORY_FIGHTING_STYLE, "Add your ability modifier to the damage of your light-weapon extra attacks.", false, 1, "", true);
+
+	add_feat_choice("boon_of_combat_prowess", "Boon of Combat Prowess", FEAT_CATEGORY_EPIC, "Increase one ability score by 1. Once on each of your turns, a missed attack can hit instead.", false, 19);
+	add_feat_choice("boon_of_irresistible_offense", "Boon of Irresistible Offense", FEAT_CATEGORY_EPIC, "Increase Strength or Dexterity by 1. Your natural 20 weapon hits deal extra damage.", false, 19);
+	add_feat_choice("boon_of_spell_recall", "Boon of Spell Recall", FEAT_CATEGORY_EPIC, "Increase Intelligence, Wisdom, or Charisma by 1. Lower-level spell slots can sometimes be preserved.", false, 19, "", false, true);
+	add_feat_choice("boon_of_truesight", "Boon of Truesight", FEAT_CATEGORY_EPIC, "Increase one ability score by 1 and gain truesight out to 60 feet.", false, 19);
+
+	string[] acolyte_skills = {"Insight", "Religion"};
+	string[] criminal_skills = {"Sleight of Hand", "Stealth"};
+	string[] sage_skills = {"Arcana", "History"};
+	string[] soldier_skills = {"Athletics", "Intimidation"};
+	add_background_choice("acolyte", "Acolyte", "Acolyte. Study, devotion, and temple service. Grants Magic Initiate (Cleric).", "int,wis,cha", "magic_initiate_cleric", acolyte_skills, "Calligrapher's Supplies");
+	add_background_choice("criminal", "Criminal", "Criminal. Quick hands, stealth, and underworld survival. Grants Alert.", "dex,con,int", "alert", criminal_skills, "Thieves' Tools");
+	add_background_choice("sage", "Sage", "Sage. Research, lore, and arcane study. Grants Magic Initiate (Wizard).", "con,int,wis", "magic_initiate_wizard", sage_skills, "Calligrapher's Supplies");
+	add_background_choice("soldier", "Soldier", "Soldier. Discipline, drills, and battle experience. Grants Savage Attacker.", "str,dex,con", "savage_attacker", soldier_skills, "Gaming Set");
+}
+
+feat_choice_def@ get_feat_choice(string id) {
+	init_feat_data();
+	for (uint i = 0; i < FEAT_CHOICES.length(); i++) {
+		if (FEAT_CHOICES[i].id == id) return FEAT_CHOICES[i];
+	}
+	return null;
+}
+
+background_choice_def@ get_background_choice(string id) {
+	init_feat_data();
+	for (uint i = 0; i < BACKGROUND_CHOICES.length(); i++) {
+		if (BACKGROUND_CHOICES[i].id == id) return BACKGROUND_CHOICES[i];
+	}
+	return null;
+}
+
+bool feat_is_repeatable(string id) {
+	feat_choice_def@ feat = get_feat_choice(id);
+	return @feat != null and feat.repeatable;
+}
+
+bool feat_is_origin(string id) {
+	feat_choice_def@ feat = get_feat_choice(id);
+	return @feat != null and feat.category == FEAT_CATEGORY_ORIGIN;
+}
+
+bool feat_is_fighting_style(string id) {
+	feat_choice_def@ feat = get_feat_choice(id);
+	return @feat != null and feat.category == FEAT_CATEGORY_FIGHTING_STYLE;
+}
+
+bool feat_is_epic_boon(string id) {
+	feat_choice_def@ feat = get_feat_choice(id);
+	return @feat != null and feat.category == FEAT_CATEGORY_EPIC;
+}
+
+bool feat_is_magic_initiate(string id) {
+	return id == "magic_initiate_cleric" or id == "magic_initiate_druid" or id == "magic_initiate_wizard";
+}
+
+string feat_magic_initiate_list_class(string id) {
+	if (id == "magic_initiate_cleric") return "cleric";
+	if (id == "magic_initiate_druid") return "druid";
+	if (id == "magic_initiate_wizard") return "wizard";
+	return "";
+}
+
+int ability_id_from_key(string key) {
+	key = key.lower();
+	if (key == "str" or key == "strength") return ABILITY_STR;
+	if (key == "dex" or key == "dexterity") return ABILITY_DEX;
+	if (key == "con" or key == "constitution") return ABILITY_CON;
+	if (key == "int" or key == "intelligence") return ABILITY_INT;
+	if (key == "wis" or key == "wisdom") return ABILITY_WIS;
+	if (key == "cha" or key == "charisma") return ABILITY_CHA;
+	return -1;
+}
+
+string ability_key_from_id(int ability_id) {
+	if (ability_id == ABILITY_STR) return "str";
+	if (ability_id == ABILITY_DEX) return "dex";
+	if (ability_id == ABILITY_CON) return "con";
+	if (ability_id == ABILITY_INT) return "int";
+	if (ability_id == ABILITY_WIS) return "wis";
+	if (ability_id == ABILITY_CHA) return "cha";
+	return "";
+}

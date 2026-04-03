@@ -1,4 +1,5 @@
 #include "../common/message_types.nvgt"
+#include "../common/feat_data.nvgt"
 network net;
 uint client_peer_id;
 uint player_id; // Assigned by the server after successful login.
@@ -144,8 +145,9 @@ void handle_message(json_object@ msg)
 {
 	if (@msg == null or !msg.exists("type")) return;
 	string msg_type = msg["type"];
-	if (msg_type == message_types::announce and msg.exists("text") and msg.exists("interrupt")) {
-		speak(string(msg["text"]), bool(msg["interrupt"]));
+	if (msg_type == message_types::announce and msg.exists("text")) {
+		bool interrupt = msg.exists("interrupt") ? bool(msg["interrupt"]) : false;
+		speak(string(msg["text"]), interrupt);
 	}
 	else if (msg_type == message_types::pop_text and msg.exists("text") and msg.exists("timeout")) {
 		pop_text(string(msg["text"]), uint(msg["timeout"]));
@@ -197,6 +199,7 @@ void handle_message(json_object@ msg)
 	else if (msg_type == message_types::game_start_battle) {
 		start_game_pending = true;
 		pending_view = "battle";
+		if (msg.exists("combatant_id")) my_combatant_id = uint(int(msg["combatant_id"]));
 		speak("Battle starting!", true);
 	}
 	else if (msg_type == message_types::game_state) {
@@ -204,17 +207,24 @@ void handle_message(json_object@ msg)
 	}
 	else if (msg_type == message_types::turn_start) {
 		string name = msg.exists("name") ? string(msg["name"]) : "";
-		bool is_me = msg.exists("is_you") ? bool(msg["is_you"]) : false;
+		uint turn_id = msg.exists("combatant_id") ? uint(int(msg["combatant_id"])) : 0;
 		current_turn_index = msg.exists("turn_index") ? int(msg["turn_index"]) : -1;
 		current_round = msg.exists("round") ? int(msg["round"]) : 0;
+		bool is_me = (turn_id == my_combatant_id and my_combatant_id > 0);
 		is_my_turn = is_me;
 		speak_turn_start(name, is_me);
 	}
 	else if (msg_type == message_types::roll_request) {
 		string reason = msg.exists("reason") ? string(msg["reason"]) : "Roll";
 		int dice = msg.exists("dice") ? int(msg["dice"]) : 20;
+		int count = msg.exists("count") ? int(msg["count"]) : 1;
 		int modifier = msg.exists("modifier") ? int(msg["modifier"]) : 0;
-		prompt_roll(reason, dice, modifier);
+		roll_type = msg.exists("roll_type") ? int(msg["roll_type"]) : -1;
+		prompt_roll(reason, dice, modifier, count);
+	}
+	else if (msg_type == message_types::bardic_prompt) {
+		string text = msg.exists("text") ? string(msg["text"]) : "Use Bardic Inspiration? Press Enter to use it or Escape to save it.";
+		prompt_bardic_choice(text);
 	}
 	else if (msg_type == message_types::roll_result) {
 		// Server broadcasts roll results to ALL players - spoken via TTS
@@ -267,8 +277,32 @@ void handle_message(json_object@ msg)
 			receive_scan_results(msg["results"]);
 		}
 	}
+	else if (msg_type == message_types::target_info) {
+		string target_name = msg.exists("name") ? string(msg["name"]) : "Unknown target";
+		int hp = msg.exists("hp") ? int(msg["hp"]) : 0;
+		int max_hp = msg.exists("max_hp") ? int(msg["max_hp"]) : 0;
+		int ac = msg.exists("ac") ? int(msg["ac"]) : 0;
+		int distance = msg.exists("distance") ? int(msg["distance"]) : 0;
+		string text = target_name + ". " + hp + " of " + max_hp + " hit points. Armor class " + ac + ". Distance " + distance + " feet.";
+		text += " Your weapon range is " + my_weapon_range + " feet.";
+		if (distance <= my_weapon_range) text += " Target is within weapon range.";
+		else text += " Target is outside your weapon range.";
+		if (msg.exists("conditions")) {
+			json_array@ conds = msg["conditions"];
+			if (@conds != null and conds.length() > 0) {
+				text += " Conditions: ";
+				for (uint ci = 0; ci < conds.length(); ci++) {
+					if (ci > 0) text += ", ";
+					text += string(conds[ci]);
+				}
+				text += ".";
+			}
+		}
+		speak(text, false);
+	}
 	else if (msg_type == message_types::game_end_battle) {
 		string result = msg.exists("result") ? string(msg["result"]) : "";
+		if (result == "" and msg.exists("winner")) result = string(msg["winner"]);
 		battle_active = false;
 		on_battle_end(result);
 	}
@@ -283,6 +317,62 @@ void handle_message(json_object@ msg)
 	else if (msg_type == message_types::monster_action) {
 		string text = msg.exists("text") ? string(msg["text"]) : "";
 		if (text != "") speak(text, false);
+	}
+	else if (msg_type == message_types::character_data) {
+		init_feat_data();
+		// Restore saved character from server on login.
+		if (msg.exists("name")) created_char_name = string(msg["name"]);
+		if (msg.exists("race")) created_char_race = string(msg["race"]);
+		if (msg.exists("class")) created_char_class = string(msg["class"]);
+		if (msg.exists("subclass")) created_char_subclass = string(msg["subclass"]);
+		if (msg.exists("background")) created_char_background = string(msg["background"]);
+		if (msg.exists("level")) created_char_level = int(msg["level"]);
+		if (msg.exists("str")) created_ability_scores[0] = int(msg["str"]);
+		if (msg.exists("dex")) created_ability_scores[1] = int(msg["dex"]);
+		if (msg.exists("con")) created_ability_scores[2] = int(msg["con"]);
+		if (msg.exists("int")) created_ability_scores[3] = int(msg["int"]);
+		if (msg.exists("wis")) created_ability_scores[4] = int(msg["wis"]);
+		if (msg.exists("cha")) created_ability_scores[5] = int(msg["cha"]);
+		if (msg.exists("weapon")) created_weapon = string(msg["weapon"]);
+		if (msg.exists("feats")) parse_csv_into_string_array(string(msg["feats"]), created_char_feats);
+		if (msg.exists("skills")) parse_csv_into_string_array(string(msg["skills"]), created_char_skill_proficiencies);
+		if (msg.exists("tools")) parse_csv_into_string_array(string(msg["tools"]), created_char_tool_proficiencies);
+		if (msg.exists("free_cast_spells")) parse_csv_into_string_array(string(msg["free_cast_spells"]), created_free_cast_spells);
+		created_spellcasting_override_spells.resize(0);
+		created_spellcasting_override_abilities.resize(0);
+		if (msg.exists("spell_ability_overrides")) {
+			string specs = string(msg["spell_ability_overrides"]);
+			if (specs != "") {
+				string[]@ parts = specs.split(",");
+				for (uint si = 0; si < parts.length(); si++) {
+					if (parts[si] == "") continue;
+					int split_at = parts[si].find(":");
+					if (split_at <= 0) continue;
+					string spell_id = parts[si].substr(0, split_at);
+					string ability_key = parts[si].substr(split_at + 1);
+					int ability_id = ability_id_from_key(ability_key);
+					if (spell_id != "" and ability_id >= 0) {
+						created_spellcasting_override_spells.insert_last(spell_id);
+						created_spellcasting_override_abilities.insert_last(ability_id);
+					}
+				}
+			}
+		}
+		if (msg.exists("cantrips")) {
+			string cantrip_str = string(msg["cantrips"]);
+			parse_csv_into_string_array(cantrip_str, created_cantrips);
+		}
+		if (msg.exists("spells")) {
+			string spell_str = string(msg["spells"]);
+			parse_csv_into_string_array(spell_str, created_spells);
+		}
+		string subclass_text = created_char_subclass != "" ? " " + created_char_subclass : "";
+		string background_text = "";
+		if (created_char_background != "") {
+			background_choice_def@ bg = get_background_choice(created_char_background);
+			if (@bg != null) background_text = ", " + bg.name + " background";
+		}
+		speak("Character loaded: " + created_char_name + ", " + created_char_race + " " + created_char_class + subclass_text + background_text + ", level " + created_char_level + ".", false);
 	}
 	else if (msg_type == message_types::leave_room) {
 		if (msg.exists("close")) {

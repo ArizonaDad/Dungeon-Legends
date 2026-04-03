@@ -89,25 +89,22 @@ void main_menu()
 			character_creation_menu();
 		}
 		else if (view_char >= 0 and res == view_char) {
-			string summary = created_char_name + ". " + created_char_race + " " + created_char_class + ", level " + created_char_level + ". ";
+			string subclass_text = created_char_subclass != "" ? " " + created_char_subclass : "";
+			string background_text = "";
+			if (created_char_background != "") {
+				background_choice_def@ bg = get_background_choice(created_char_background);
+				if (@bg != null) background_text = " Background: " + bg.name + ".";
+			}
+			string summary = created_char_name + ". " + created_char_race + " " + created_char_class + subclass_text + ", level " + created_char_level + "." + background_text + " ";
 			summary += "Strength " + created_ability_scores[0] + ". Dexterity " + created_ability_scores[1] + ". Constitution " + created_ability_scores[2] + ". ";
 			summary += "Intelligence " + created_ability_scores[3] + ". Wisdom " + created_ability_scores[4] + ". Charisma " + created_ability_scores[5] + ". ";
 			summary += "Weapon: " + created_weapon + ".";
+			if (created_char_feats.length() > 0) summary += " Feats: " + join_feat_names(created_char_feats) + ".";
 			if (created_cantrips.length() > 0) {
-				summary += " Cantrips: ";
-				for (uint ci = 0; ci < created_cantrips.length(); ci++) {
-					if (ci > 0) summary += ", ";
-					summary += created_cantrips[ci];
-				}
-				summary += ".";
+				summary += " Cantrips: " + join_spell_names(created_cantrips) + ".";
 			}
 			if (created_spells.length() > 0) {
-				summary += " Spells: ";
-				for (uint ci = 0; ci < created_spells.length(); ci++) {
-					if (ci > 0) summary += ", ";
-					summary += created_spells[ci];
-				}
-				summary += ".";
+				summary += " Spells: " + join_spell_names(created_spells) + ".";
 			}
 			speak(summary, true);
 		}
@@ -340,17 +337,18 @@ void host_menu()
 		menu@ m = setup_menu("You created a lobby. Select an option when you are ready.");
 		m.intro_interrupt = false;
 		m.automatic_intro = do_intro;
-		int total_items = 3 + room_player_names.length();
+		int total_items = 4 + room_player_names.length();
 		int start = m.add_item("Start game 1 of " + total_items);
 		int add_bot = m.add_item("Add AI player 2 of " + total_items);
-		int close_room = m.add_item("Close room and return to Main Menu 3 of " + total_items);
+		int add_enemy_bot = m.add_item("Add enemy A.I. opponent. Best for PvP; in co-op modes it joins your party. 3 of " + total_items);
+		int close_room = m.add_item("Close room and return to Main Menu 4 of " + total_items);
 		int[] player_items;
 		for (uint i = 0; i < room_player_names.length(); i++) {
 			string pname = room_player_names[i];
 			string label = pname;
 			if (pname == room_host_name) label += " (Host)";
 			if (is_room_bot(pname)) label += " (AI)";
-			label += " " + (i + 4) + " of " + total_items;
+			label += " " + (i + 5) + " of " + total_items;
 			player_items.insert_last(m.add_item("Player: " + label));
 		}
 		int res = m.run();
@@ -371,6 +369,13 @@ void host_menu()
 		else if (res == add_bot and add_bot >= 0) {
 			send({{"type", message_types::add_bot}});
 			speak("Adding AI player...", false);
+			wait(200);
+			network_loop();
+			do_intro = false;
+		}
+		else if (res == add_enemy_bot and add_enemy_bot >= 0) {
+			send({{"type", message_types::add_bot}});
+			speak("Adding AI opponent...", false);
 			wait(200);
 			network_loop();
 			do_intro = false;
