@@ -42,6 +42,11 @@ class pending_roll {
 	// Extra Attack tracking
 	int attacks_remaining = 0;
 	bool resume_turn_start = false;
+	int rolls_completed = 0;
+	int accumulated_natural = 0;
+	int first_natural = 0;
+	int savage_attacker_first_total = 0;
+	bool savage_attacker_reroll = false;
 }
 
 class pending_bardic_prompt {
@@ -426,6 +431,50 @@ class battle_manager {
 		return total;
 	}
 
+	bool has_effective_advantage(pending_roll@ pr) {
+		return @pr != null and pr.has_advantage and !pr.has_disadvantage;
+	}
+
+	bool has_effective_disadvantage(pending_roll@ pr) {
+		return @pr != null and pr.has_disadvantage and !pr.has_advantage;
+	}
+
+	bool can_use_savage_attacker(combatant@ attacker, pending_roll@ pr) {
+		return @attacker != null and @pr != null and !pr.is_spell_effect and pr.damage_dice_count > 0 and attacker.has_feat("savage_attacker") and !attacker.savage_attacker_used;
+	}
+
+	string build_roll_request_reason(pending_roll@ pr) {
+		if (@pr == null) return "Roll";
+		string reason = pr.reason;
+		if (pr.roll_type == ROLL_ATTACK and (has_effective_advantage(pr) or has_effective_disadvantage(pr))) {
+			string mode = has_effective_advantage(pr) ? "advantage" : "disadvantage";
+			reason += ". Roll " + (pr.rolls_completed + 1) + " of 2 for " + mode;
+		}
+		else if (pr.roll_type == ROLL_DAMAGE) {
+			if (pr.damage_dice_count > 1) reason += ". Damage die " + (pr.rolls_completed + 1) + " of " + pr.damage_dice_count;
+			if (pr.savage_attacker_reroll) reason += ". Savage Attacker reroll";
+		}
+		return reason;
+	}
+
+	int build_roll_request_modifier(pending_roll@ pr) {
+		if (@pr == null) return 0;
+		if (pr.roll_type == ROLL_DAMAGE) return 0;
+		return pr.modifier;
+	}
+
+	void send_roll_request(user@ u, pending_roll@ pr) {
+		if (@u == null or @pr == null) return;
+		u.send({
+			{"type", message_types::roll_request},
+			{"roll_type", pr.roll_type},
+			{"dice", pr.dice_sides},
+			{"count", 1},
+			{"modifier", build_roll_request_modifier(pr)},
+			{"reason", build_roll_request_reason(pr)}
+		});
+	}
+
 	bool spell_uses_attack_roll(spell_def@ spell) {
 		return @spell != null and spell.damage_count > 0 and spell.save_type < 0 and spell.id != "magic_missile";
 	}
@@ -501,14 +550,7 @@ class battle_manager {
 		pr.spell_id = spell.id;
 		pr.spell_name = spell.name;
 		@current_roll = pr;
-		u.send({
-			{"type", message_types::roll_request},
-			{"roll_type", ROLL_ATTACK},
-			{"dice", 20},
-			{"count", 1},
-			{"modifier", attack_bonus},
-			{"reason", spell.name + " attack against " + target.name}
-		});
+		send_roll_request(u, pr);
 	}
 
 	void queue_spell_damage_roll(user@ u, combatant@ caster, combatant@ center_target, spell_def@ spell, int damage_count, int damage_sides, int damage_modifier, bool requires_save = false, int save_type = -1, int save_dc = 0) {
@@ -536,14 +578,7 @@ class battle_manager {
 		pr.spell_is_aoe = spell.is_aoe;
 		pr.spell_aoe_radius = spell.aoe_radius;
 		@current_roll = pr;
-		u.send({
-			{"type", message_types::roll_request},
-			{"roll_type", ROLL_DAMAGE},
-			{"dice", damage_sides},
-			{"count", damage_count},
-			{"modifier", damage_modifier},
-			{"reason", spell.name + " damage"}
-		});
+		send_roll_request(u, pr);
 	}
 
 	bool start_followup_spell_attack(combatant@ caster, pending_roll@ pr, combatant@ preferred_target) {
@@ -1108,13 +1143,7 @@ class battle_manager {
 
 			user@ reactor_user = find_user_for_combatant(reactor);
 			if (@reactor_user != null and !reactor_user.is_bot and reactor.is_player) {
-				reactor_user.send({
-					{"type", message_types::roll_request},
-					{"roll_type", ROLL_ATTACK},
-					{"dice", 20},
-					{"modifier", pr.modifier},
-					{"reason", pr.reason}
-				});
+				send_roll_request(reactor_user, pr);
 			} else {
 				int roll1 = random(1, 20);
 				int roll2 = random(1, 20);
@@ -1356,13 +1385,7 @@ class battle_manager {
 
 		if (@u != null and !u.is_bot and c.is_player) {
 			// Human player: send roll request.
-			u.send({
-				{"type", message_types::roll_request},
-				{"roll_type", ROLL_INITIATIVE},
-				{"dice", 20},
-				{"modifier", mod},
-				{"reason", "initiative"}
-			});
+			send_roll_request(u, pr);
 		} else {
 			// Bot/monster: auto-roll.
 			int natural = random(1, 20);
@@ -1497,17 +1520,11 @@ class battle_manager {
 			pr.roll_type = ROLL_CONCENTRATION;
 			pr.dice_sides = 20;
 			pr.modifier = con_mod;
-			pr.reason = "Constitution save to maintain concentration (DC " + dc + ")";
+			pr.reason = "Constitution save to maintain concentration on " + target.concentration_spell + " (DC " + dc + ")";
 			pr.dc = dc;
 			@current_roll = pr;
 
-			u.send({
-				{"type", message_types::roll_request},
-				{"roll_type", ROLL_CONCENTRATION},
-				{"dice", 20},
-				{"modifier", con_mod},
-				{"reason", "Constitution save to maintain concentration on " + target.concentration_spell + " (DC " + dc + ")"}
-			});
+			send_roll_request(u, pr);
 		} else {
 			// Auto-roll for monsters/bots.
 			int natural = random(1, 20);
@@ -1748,13 +1765,7 @@ class battle_manager {
 							broadcast_to_battle({{"type", message_types::reaction_opportunity}, {"attacker_id", enemy.id}, {"target_id", mover.id}});
 							process_roll_result(natural);
 						} else {
-							opp_user.send({
-								{"type", message_types::roll_request},
-								{"roll_type", ROLL_ATTACK},
-								{"dice", 20},
-								{"modifier", atk_bonus},
-								{"reason", "opportunity attack against " + mover.name}
-							});
+							send_roll_request(opp_user, pr);
 							broadcast_to_battle({{"type", message_types::reaction_opportunity}, {"attacker_id", enemy.id}, {"target_id", mover.id}});
 							// Only one opportunity attack per move step; return to let roll resolve.
 							return;
@@ -1874,13 +1885,7 @@ class battle_manager {
 
 		user@ u = find_user_for_combatant(attacker);
 		if (@u != null and !u.is_bot and attacker.is_player) {
-			u.send({
-				{"type", message_types::roll_request},
-				{"roll_type", ROLL_ATTACK},
-				{"dice", 20},
-				{"modifier", pr.modifier},
-				{"reason", pr.reason}
-			});
+			send_roll_request(u, pr);
 		} else {
 			int roll1 = random(1, 20);
 			int roll2 = random(1, 20);
@@ -2037,14 +2042,7 @@ class battle_manager {
 
 				user@ u = find_user_for_combatant(c);
 				if (@u != null and !u.is_bot and c.is_player) {
-					u.send({
-						{"type", message_types::roll_request},
-						{"roll_type", ROLL_DAMAGE},
-						{"dice", dmg_sides},
-						{"count", dmg_pr.damage_dice_count},
-						{"modifier", dmg_mod},
-						{"reason", dmg_pr.reason}
-					});
+					send_roll_request(u, dmg_pr);
 				} else {
 					@current_roll = dmg_pr;
 					process_roll_result(roll_attack_damage_natural(pr.is_spell_effect ? null : c, dmg_pr));
@@ -2307,6 +2305,91 @@ class battle_manager {
 		finalize_roll_result(pr, natural_roll, bless_bonus, 0);
 	}
 
+	void handle_roll_result(user@ u) {
+		if (@current_roll == null or @combat == null or @u == null) return;
+		if (current_roll.player_username != u.username) return;
+
+		pending_roll@ pr = current_roll;
+		combatant@ roller = combat.get_combatant(pr.combatant_id);
+
+		if (pr.roll_type == ROLL_DAMAGE) {
+			bool stepwise_damage = pr.damage_dice_count > 1 or pr.savage_attacker_reroll or can_use_savage_attacker(pr.is_spell_effect ? null : roller, pr);
+			if (stepwise_damage) {
+				int die_roll = roll_single_attack_damage_die(pr.is_spell_effect ? null : roller, pr);
+				pr.rolls_completed++;
+				pr.accumulated_natural += die_roll;
+
+				string roller_name = @roller != null ? roller.name : pr.player_username;
+				string roll_text = roller_name + " rolls " + pr.reason + ". ";
+				if (pr.damage_dice_count > 1) roll_text += "Die " + pr.rolls_completed + " of " + pr.damage_dice_count + ": " + die_roll + ".";
+				else roll_text += die_roll + ".";
+				if (pr.savage_attacker_reroll) roll_text += " Savage Attacker reroll.";
+				broadcast_announce(roll_text, false);
+
+				if (pr.rolls_completed < pr.damage_dice_count) {
+					send_roll_request(u, pr);
+					return;
+				}
+
+				int natural = pr.accumulated_natural;
+				pr.rolls_completed = 0;
+				pr.accumulated_natural = 0;
+
+				if (!pr.savage_attacker_reroll and can_use_savage_attacker(pr.is_spell_effect ? null : roller, pr)) {
+					pr.savage_attacker_first_total = natural;
+					pr.savage_attacker_reroll = true;
+					send_private_announce(u, "Savage Attacker lets you reroll the weapon damage and keep the higher total.", true);
+					send_roll_request(u, pr);
+					return;
+				}
+
+				if (pr.savage_attacker_reroll and @roller != null) {
+					roller.savage_attacker_used = true;
+					int chosen = natural > pr.savage_attacker_first_total ? natural : pr.savage_attacker_first_total;
+					int replaced = natural > pr.savage_attacker_first_total ? pr.savage_attacker_first_total : natural;
+					broadcast_announce(roller.name + " uses Savage Attacker and keeps " + chosen + " weapon damage instead of " + replaced + ".", false);
+					natural = chosen;
+					pr.savage_attacker_reroll = false;
+					pr.savage_attacker_first_total = 0;
+				}
+
+				process_roll_result(natural);
+				return;
+			}
+		}
+
+		if (pr.roll_type == ROLL_ATTACK and (has_effective_advantage(pr) or has_effective_disadvantage(pr))) {
+			int die_roll = random(1, pr.dice_sides);
+			string roller_name = @roller != null ? roller.name : pr.player_username;
+			string mode = has_effective_advantage(pr) ? "advantage" : "disadvantage";
+			if (pr.rolls_completed == 0) {
+				pr.first_natural = die_roll;
+				pr.rolls_completed = 1;
+				broadcast_announce(roller_name + " rolls " + pr.reason + ". First d20 for " + mode + ": " + die_roll + ".", false);
+				send_roll_request(u, pr);
+				return;
+			}
+
+			int natural = pr.first_natural;
+			if (has_effective_advantage(pr) and die_roll > natural) natural = die_roll;
+			else if (has_effective_disadvantage(pr) and die_roll < natural) natural = die_roll;
+
+			broadcast_announce(roller_name + " rolls " + pr.reason + ". Second d20 for " + mode + ": " + die_roll + ". Using " + natural + ".", false);
+			pr.rolls_completed = 0;
+			pr.first_natural = 0;
+			process_roll_result(natural);
+			return;
+		}
+
+		int natural = 0;
+		if (pr.roll_type == ROLL_DAMAGE) {
+			natural = roll_attack_damage_natural(pr.is_spell_effect ? null : roller, pr);
+		} else {
+			natural = random(1, pr.dice_sides);
+		}
+		process_roll_result(natural);
+	}
+
 	void handle_bardic_response(user@ u, json_object@ msg) {
 		if (@current_bardic_prompt == null or @u == null) return;
 		if (current_bardic_prompt.player_username != u.username) return;
@@ -2405,13 +2488,7 @@ class battle_manager {
 		@current_roll = pr;
 
 		// Request the roll.
-		u.send({
-			{"type", message_types::roll_request},
-			{"roll_type", ROLL_ATTACK},
-			{"dice", 20},
-			{"modifier", atk_bonus},
-			{"reason", c.main_hand + " attack against " + target.name}
-		});
+		send_roll_request(u, pr);
 	}
 
 	void handle_move(user@ u, json_object@ msg) {
@@ -3122,80 +3199,6 @@ class battle_manager {
 				players[pi].room.started = false;
 				break;
 			}
-		}
-	}
-
-	// ---- Message Router ----
-
-	void handle_message(user@ u, json_object@ msg) {
-		if (@u == null or @msg == null or !msg.exists("type")) return;
-		string msg_type = msg["type"];
-
-		if (msg_type == message_types::start_game) {
-			string mode = msg.exists("mode") ? string(msg["mode"]) : "pvp";
-			string scenario = msg.exists("scenario") ? string(msg["scenario"]) : "";
-			start_game(u, mode, scenario);
-		}
-		else if (msg_type == message_types::roll_result) {
-			if (@current_roll == null) return;
-			// Verify the roller is the expected player.
-			if (current_roll.player_username != u.username) return;
-			// Server rolls the dice; client just confirms they pressed Roll.
-			int natural = 0;
-			if (current_roll.roll_type == ROLL_DAMAGE) {
-				combatant@ roller = @combat != null ? combat.get_combatant(current_roll.combatant_id) : null;
-				natural = roll_attack_damage_natural(current_roll.is_spell_effect ? null : roller, current_roll);
-			} else {
-				natural = random(1, current_roll.dice_sides);
-			}
-			if (current_roll.roll_type == ROLL_ATTACK and (current_roll.has_advantage or current_roll.has_disadvantage)) {
-				int second_roll = random(1, current_roll.dice_sides);
-				if (current_roll.has_advantage and !current_roll.has_disadvantage and second_roll > natural) natural = second_roll;
-				else if (current_roll.has_disadvantage and !current_roll.has_advantage and second_roll < natural) natural = second_roll;
-			}
-			process_roll_result(natural);
-		}
-		else if (msg_type == message_types::action_attack) {
-			handle_attack(u, msg);
-		}
-		else if (msg_type == message_types::action_move) {
-			handle_move(u, msg);
-		}
-		else if (msg_type == message_types::action_dodge) {
-			handle_dodge(u);
-		}
-		else if (msg_type == message_types::action_dash) {
-			handle_dash(u);
-		}
-		else if (msg_type == message_types::action_disengage) {
-			handle_disengage(u);
-		}
-		else if (msg_type == message_types::action_help) {
-			handle_help(u, msg);
-		}
-		else if (msg_type == message_types::action_hide) {
-			handle_hide(u);
-		}
-		else if (msg_type == message_types::action_ready) {
-			handle_ready(u, msg);
-		}
-		else if (msg_type == message_types::action_shove) {
-			handle_shove(u, msg);
-		}
-		else if (msg_type == message_types::action_grapple) {
-			handle_grapple(u, msg);
-		}
-		else if (msg_type == message_types::action_cast) {
-			handle_cast(u, msg);
-		}
-		else if (msg_type == message_types::turn_end) {
-			handle_turn_end(u);
-		}
-		else if (msg_type == message_types::scan_direction) {
-			handle_scan(u, msg);
-		}
-		else if (msg_type == message_types::set_target) {
-			handle_set_target(u, msg);
 		}
 	}
 }

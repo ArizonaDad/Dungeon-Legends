@@ -903,20 +903,8 @@ void handle_user_message(user@ u, json_object@ msg)
 		if (@u.room != null and @u.room.bm != null and @u.room.bm.current_roll != null) {
 			// Player pressed Roll — server rolls the dice
 			if (u.room.bm.current_roll.player_username != u.username) return;
-			int natural = 0;
-			if (u.room.bm.current_roll.roll_type == ROLL_DAMAGE) {
-				combatant@ roller = @u.room.bm.combat != null ? u.room.bm.combat.get_combatant(u.room.bm.current_roll.combatant_id) : null;
-				natural = u.room.bm.roll_attack_damage_natural(u.room.bm.current_roll.is_spell_effect ? null : roller, u.room.bm.current_roll);
-			}
-			else {
-				natural = random(1, u.room.bm.current_roll.dice_sides);
-			}
-			if (u.room.bm.current_roll.roll_type == ROLL_ATTACK and (u.room.bm.current_roll.has_advantage or u.room.bm.current_roll.has_disadvantage)) {
-				int second_roll = random(1, u.room.bm.current_roll.dice_sides);
-				if (u.room.bm.current_roll.has_advantage and !u.room.bm.current_roll.has_disadvantage and second_roll > natural) natural = second_roll;
-				else if (u.room.bm.current_roll.has_disadvantage and !u.room.bm.current_roll.has_advantage and second_roll < natural) natural = second_roll;
-			}
-			u.room.bm.process_roll_result(natural);
+			u.room.bm.handle_roll_result(u);
+			return;
 		}
 	}
 	else if (msg_type == message_types::turn_end) {
