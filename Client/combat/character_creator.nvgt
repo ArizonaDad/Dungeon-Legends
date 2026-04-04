@@ -97,8 +97,16 @@ bool creation_should_go_back() {
 }
 
 int creation_menu_run(menu@ m) {
-    int pick = creation_menu_run(m);
-    if (pick < 0) creation_back_requested = true;
+    if (@m == null) {
+        creation_back_requested = true;
+        return -1;
+    }
+    int back_item = m.add_item("Go back.");
+    int pick = m.run();
+    if (pick < 0 or pick == back_item) {
+        creation_back_requested = true;
+        return -1;
+    }
     return pick;
 }
 
@@ -1172,6 +1180,12 @@ void character_creation_menu() {
         {"int", created_ability_scores[3]},
         {"wis", created_ability_scores[4]},
         {"cha", created_ability_scores[5]},
+        {"base_str", created_pre_progression_ability_scores[0]},
+        {"base_dex", created_pre_progression_ability_scores[1]},
+        {"base_con", created_pre_progression_ability_scores[2]},
+        {"base_int", created_pre_progression_ability_scores[3]},
+        {"base_wis", created_pre_progression_ability_scores[4]},
+        {"base_cha", created_pre_progression_ability_scores[5]},
         {"weapon", created_weapon},
         {"feats", join_csv_list(created_char_feats)},
         {"skills", join_csv_list(created_char_skill_proficiencies)},

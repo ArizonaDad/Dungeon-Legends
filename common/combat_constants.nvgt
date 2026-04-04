@@ -129,3 +129,15 @@ int tile_distance(int x1, int y1, int x2, int y2) {
 int feet_distance(int x1, int y1, int x2, int y2) {
 	return tile_distance(x1, y1, x2, y2) * FEET_PER_TILE;
 }
+
+string relative_direction_text(int from_x, int from_y, int to_x, int to_y) {
+	int dx = to_x - from_x;
+	int dy = to_y - from_y;
+	if (dx == 0 and dy == 0) return "here";
+	if (dx == 0) return dy > 0 ? "north" : "south";
+	if (dy == 0) return dx > 0 ? "east" : "west";
+	if (dx > 0 and dy > 0) return "northeast";
+	if (dx > 0 and dy < 0) return "southeast";
+	if (dx < 0 and dy > 0) return "northwest";
+	return "southwest";
+}

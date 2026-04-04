@@ -597,5 +597,9 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
     c.lay_on_hands_pool = cs.lay_on_hands_pool;
     c.bardic_inspiration_uses = cs.bardic_inspiration_uses;
     c.bardic_inspiration_grant_die = cs.bardic_inspiration_die;
+    c.rage_uses_remaining = cs.rage_count;
+    c.rage_damage_bonus = cs.rage_damage;
+    c.action_surge_uses_remaining = cs.action_surge_uses;
+    c.second_wind_available = cs.class_name == "Fighter";
     return c;
 }

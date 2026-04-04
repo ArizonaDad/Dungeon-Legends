@@ -350,6 +350,12 @@ class user
 				if (char_data.exists("int")) char_msg["int"] = char_data["int"];
 				if (char_data.exists("wis")) char_msg["wis"] = char_data["wis"];
 				if (char_data.exists("cha")) char_msg["cha"] = char_data["cha"];
+				if (char_data.exists("base_str")) char_msg["base_str"] = char_data["base_str"];
+				if (char_data.exists("base_dex")) char_msg["base_dex"] = char_data["base_dex"];
+				if (char_data.exists("base_con")) char_msg["base_con"] = char_data["base_con"];
+				if (char_data.exists("base_int")) char_msg["base_int"] = char_data["base_int"];
+				if (char_data.exists("base_wis")) char_msg["base_wis"] = char_data["base_wis"];
+				if (char_data.exists("base_cha")) char_msg["base_cha"] = char_data["base_cha"];
 				if (char_data.exists("weapon")) char_msg["weapon"] = char_data["weapon"];
 				if (char_data.exists("feats")) char_msg["feats"] = char_data["feats"];
 				if (char_data.exists("skills")) char_msg["skills"] = char_data["skills"];
@@ -883,6 +889,12 @@ void handle_user_message(user@ u, json_object@ msg)
 			if (msg.exists("int")) char_data["int"] = msg["int"];
 			if (msg.exists("wis")) char_data["wis"] = msg["wis"];
 			if (msg.exists("cha")) char_data["cha"] = msg["cha"];
+			if (msg.exists("base_str")) char_data["base_str"] = msg["base_str"];
+			if (msg.exists("base_dex")) char_data["base_dex"] = msg["base_dex"];
+			if (msg.exists("base_con")) char_data["base_con"] = msg["base_con"];
+			if (msg.exists("base_int")) char_data["base_int"] = msg["base_int"];
+			if (msg.exists("base_wis")) char_data["base_wis"] = msg["base_wis"];
+			if (msg.exists("base_cha")) char_data["base_cha"] = msg["base_cha"];
 			if (msg.exists("weapon")) char_data["weapon"] = msg["weapon"];
 			if (msg.exists("feats")) char_data["feats"] = msg["feats"];
 			if (msg.exists("skills")) char_data["skills"] = msg["skills"];
@@ -945,29 +957,41 @@ void handle_user_message(user@ u, json_object@ msg)
 		uint target_id = msg.exists("target_id") ? uint(int(msg["target_id"])) : (msg.exists("target") ? uint(int(msg["target"])) : 0);
 
 		if (feature == "rage") {
+			if (c.class_name != "Barbarian") { u.send({{"type", message_types::announce}, {"text", "Only barbarians can Rage."}, {"interrupt", true}}); return; }
+			if (c.raging) { u.send({{"type", message_types::announce}, {"text", "You are already raging."}, {"interrupt", true}}); return; }
+			if (c.rage_uses_remaining <= 0) { u.send({{"type", message_types::announce}, {"text", "You have no Rages remaining this battle."}, {"interrupt", true}}); return; }
 			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
 			c.has_bonus_action = false;
 			c.used_bonus_action = true;
-			// Add rage damage bonus (stored in a simple flag)
-			c.add_condition(COND_DODGING); // reuse as "raging" marker temporarily
-			u.room.bm.broadcast_announce(c.name + " enters a RAGE! Advantage on STR, bonus damage, resistance to physical.", true);
+			c.rage_uses_remaining--;
+			c.raging = true;
+			c.rage_turns_remaining = 10;
+			u.room.bm.broadcast_announce(c.name + " enters a Rage! Bonus damage and resistance to bludgeoning, piercing, and slashing. " + c.rage_uses_remaining + " use" + (c.rage_uses_remaining == 1 ? "" : "s") + " remain.", true);
 		}
 		else if (feature == "action_surge") {
+			if (c.class_name != "Fighter") { u.send({{"type", message_types::announce}, {"text", "Only fighters can use Action Surge."}, {"interrupt", true}}); return; }
+			if (c.action_surge_uses_remaining <= 0) { u.send({{"type", message_types::announce}, {"text", "You have no Action Surge uses remaining this battle."}, {"interrupt", true}}); return; }
 			// Action Surge is a free action (not bonus action). Restore action.
+			c.action_surge_uses_remaining--;
 			c.has_action = true;
 			c.used_action = false;
 			c.attacks_remaining_this_turn = 0; // Reset so new Attack action gets full extra attacks
-			u.room.bm.broadcast_announce(c.name + " uses Action Surge! Extra action this turn.", true);
+			u.room.bm.broadcast_announce(c.name + " uses Action Surge! Extra action this turn. " + c.action_surge_uses_remaining + " use" + (c.action_surge_uses_remaining == 1 ? "" : "s") + " remain.", true);
 		}
 		else if (feature == "second_wind") {
+			if (c.class_name != "Fighter") { u.send({{"type", message_types::announce}, {"text", "Only fighters can use Second Wind."}, {"interrupt", true}}); return; }
+			if (!c.second_wind_available) { u.send({{"type", message_types::announce}, {"text", "You have already used Second Wind this battle."}, {"interrupt", true}}); return; }
 			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
 			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.second_wind_available = false;
 			int heal = random(1, 10) + c.level;
 			u.room.bm.combat.apply_healing(c, heal);
 			u.room.bm.broadcast_roll(c.name, "Second Wind healing", heal, c.level, heal, "");
 			u.room.bm.broadcast_announce(c.name + " uses Second Wind! Healed " + heal + " HP. Now at " + c.current_hp + ".", false);
 		}
 		else if (feature == "divine_smite") {
+			if (c.class_name != "Paladin") { u.send({{"type", message_types::announce}, {"text", "Only paladins can prepare Divine Smite."}, {"interrupt", true}}); return; }
 			// Find lowest available spell slot (1-5 for smite)
 			int slot_used = -1;
 			for (int sl = 1; sl <= 5; sl++) {
@@ -984,6 +1008,7 @@ void handle_user_message(user@ u, json_object@ msg)
 			}
 		}
 		else if (feature == "lay_on_hands") {
+			if (c.class_name != "Paladin") { u.send({{"type", message_types::announce}, {"text", "Only paladins can use Lay on Hands."}, {"interrupt", true}}); return; }
 			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
 			combatant@ target = target_id != 0 ? u.room.bm.combat.get_combatant(target_id) : c;
 			if (@target == null or target.is_dead) { u.send({{"type", message_types::announce}, {"text", "Choose a valid creature for Lay on Hands."}, {"interrupt", true}}); return; }
@@ -1058,6 +1083,7 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.room.bm.broadcast_announce(text, true);
 		}
 		else if (feature == "cunning_action") {
+			if (c.class_name != "Rogue" or c.level < 2) { u.send({{"type", message_types::announce}, {"text", "Your character cannot use Cunning Action."}, {"interrupt", true}}); return; }
 			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
 			c.has_bonus_action = false;
 			c.used_bonus_action = true;
@@ -1070,9 +1096,15 @@ void handle_user_message(user@ u, json_object@ msg)
 				u.room.bm.broadcast_announce(c.name + " uses Cunning Action: Disengage!", false);
 			} else if (action == "hide") {
 				u.room.bm.request_hide_check(u, c);
+			} else {
+				c.has_bonus_action = true;
+				c.used_bonus_action = false;
+				u.send({{"type", message_types::announce}, {"text", "That is not a valid Cunning Action choice."}, {"interrupt", true}});
+				return;
 			}
 		}
 		else if (feature == "flurry_of_blows") {
+			if (c.class_name != "Monk" or c.level < 2) { u.send({{"type", message_types::announce}, {"text", "Your character cannot use Flurry of Blows."}, {"interrupt", true}}); return; }
 			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
 			if (c.focus_points <= 0) { u.send({{"type", message_types::announce}, {"text", "You need 1 Focus Point for Flurry of Blows."}, {"interrupt", true}}); return; }
 			combatant@ target = u.room.bm.combat.get_combatant(target_id);
@@ -1091,6 +1123,7 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.room.bm.broadcast_announce(c.name + " spends 1 Focus Point and unleashes Flurry of Blows!", true);
 		}
 		else if (feature == "bardic_inspiration") {
+			if (c.class_name != "Bard") { u.send({{"type", message_types::announce}, {"text", "Only bards can grant Bardic Inspiration."}, {"interrupt", true}}); return; }
 			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
 			combatant@ target = u.room.bm.combat.get_combatant(target_id);
 			if (u.room.bm.combat.mode == "pvp") { u.send({{"type", message_types::announce}, {"text", "Bardic Inspiration requires an ally in this simulator."}, {"interrupt", true}}); return; }
@@ -1168,6 +1201,10 @@ void handle_user_message(user@ u, json_object@ msg)
 				string cost_text = moon ? "bonus action" : "action";
 				u.room.bm.broadcast_announce(base_name + " uses Wild Shape as a " + cost_text + " and becomes a " + form.name + "!", true);
 			}
+		}
+		else {
+			u.send({{"type", message_types::announce}, {"text", "That bonus action is not available to your character."}, {"interrupt", true}});
+			return;
 		}
 		u.room.bm.broadcast_state();
 	}

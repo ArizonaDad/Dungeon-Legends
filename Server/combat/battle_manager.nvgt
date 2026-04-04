@@ -752,7 +752,9 @@ class battle_manager {
 	int get_damage_modifier_for_attack(combatant@ attacker, bool use_secondary = false) {
 		if (@attacker == null) return 0;
 		if (!attacker.is_player or attacker.wild_shape_active) return use_secondary ? attacker.monster_attack2_mod : attacker.monster_attack_damage_mod;
-		return get_weapon_damage_ability_mod(attacker);
+		int mod = get_weapon_damage_ability_mod(attacker);
+		if (attacker.raging and !attacker.main_hand_is_ranged) mod += attacker.rage_damage_bonus;
+		return mod;
 	}
 
 	int get_attack_damage_count(combatant@ attacker, bool use_secondary = false) {
@@ -1429,7 +1431,13 @@ class battle_manager {
 		for (uint i = 0; i < combat.initiative_order.length(); i++) {
 			init_arr.add(combat.initiative_order[i]);
 		}
-		broadcast_to_battle({{"type", message_types::initiative_order}, {"order", init_arr}});
+		broadcast_to_battle({
+			{"type", message_types::initiative_order},
+			{"order", init_arr},
+			{"initiative_order", init_arr},
+			{"round", combat.round_number},
+			{"turn_index", combat.current_turn_index}
+		});
 
 		// Start first turn.
 		combat.current_turn_index = -1;
@@ -1447,6 +1455,20 @@ class battle_manager {
 		if (@prev != null) {
 			prev.is_dodging = false;
 			prev.remove_condition(COND_DODGING);
+			if (prev.raging) {
+				if (prev.is_dead or prev.current_hp <= 0) {
+					prev.raging = false;
+					prev.rage_turns_remaining = 0;
+				}
+				else {
+					prev.rage_turns_remaining--;
+					if (prev.rage_turns_remaining <= 0) {
+						prev.raging = false;
+						prev.rage_turns_remaining = 0;
+						broadcast_announce(prev.name + "'s Rage ends.", false);
+					}
+				}
+			}
 		}
 
 		combat.advance_turn();
@@ -3160,6 +3182,7 @@ class battle_manager {
 
 		// Find player's combatant for distance calculation.
 		info["distance"] = feet_distance(viewer.x, viewer.y, target.x, target.y);
+		info["direction"] = relative_direction_text(viewer.x, viewer.y, target.x, target.y);
 
 		json_array cond_arr;
 		for (uint i = 0; i < target.conditions.length(); i++) {

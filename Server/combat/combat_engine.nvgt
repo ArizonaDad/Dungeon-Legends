@@ -75,6 +75,12 @@ class combatant {
 	int bardic_inspiration_grant_die = 0;
 	int bardic_inspiration_die = 0;
 	uint bardic_inspiration_source_id = 0;
+	int rage_uses_remaining = 0;
+	int rage_damage_bonus = 0;
+	bool raging = false;
+	int rage_turns_remaining = 0;
+	int action_surge_uses_remaining = 0;
+	bool second_wind_available = false;
 	uint help_target_id = 0;
 	int hide_dc = 0;
 	bool hasted = false;
@@ -432,7 +438,9 @@ class battle {
 		if (@target == null or target.is_dead) return;
 		if (amount <= 0) return;
 
-		// TODO: implement resistance/vulnerability per creature
+		if (target.raging and (damage_type == DMG_BLUDGEONING or damage_type == DMG_PIERCING or damage_type == DMG_SLASHING)) {
+			amount = (amount + 1) / 2;
+		}
 
 		// Temp HP absorbs first
 		if (target.temp_hp > 0) {
@@ -645,6 +653,8 @@ class battle {
 			cobj["max_hp"] = c.max_hp;
 			cobj["ac"] = c.armor_class;
 			cobj["level"] = c.level;
+			cobj["class_name"] = c.class_name;
+			cobj["subclass"] = c.subclass;
 			cobj["is_dead"] = c.is_dead;
 			cobj["is_stable"] = c.is_stable;
 			cobj["initiative"] = c.initiative_roll;
@@ -675,10 +685,19 @@ class battle {
 				state["my_bardic_inspiration_uses"] = c.bardic_inspiration_uses;
 				state["my_bardic_inspiration_grant_die"] = c.bardic_inspiration_grant_die;
 				state["my_bardic_inspiration_die"] = c.bardic_inspiration_die;
+				state["my_rage_uses_remaining"] = c.rage_uses_remaining;
+				state["my_rage_damage_bonus"] = c.rage_damage_bonus;
+				state["my_is_raging"] = c.raging;
+				state["my_action_surge_uses_remaining"] = c.action_surge_uses_remaining;
+				state["my_second_wind_available"] = c.second_wind_available;
 				state["my_is_hidden"] = c.is_hidden;
 				state["my_weapon_range"] = c.main_hand_range;
 				state["my_movement_remaining"] = c.movement_remaining;
 				state["my_speed"] = c.speed;
+				state["my_has_action"] = c.has_action;
+				state["my_has_bonus_action"] = c.has_bonus_action;
+				state["my_has_reaction"] = c.has_reaction;
+				state["my_attacks_remaining"] = c.attacks_remaining_this_turn;
 				break;
 			}
 		}

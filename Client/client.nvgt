@@ -49,6 +49,10 @@ void main()
 	if (!login()) return;
 	wait(100);
 	network_loop();
+	if (created_char_class == "") {
+		speak("You do not have a saved character yet. Character creation will open now for your first Adventure character.", true);
+		character_creation_menu();
+	}
 	main_menu();
 	config.close();
 }
@@ -66,24 +70,30 @@ bool launch_pending_game_if_needed()
 	return true;
 }
 string current_screen_name = "main_menu"; // Tracks current screen for F1 help.
+void create_lobby_for_mode(string game_type) {
+	string name, password;
+	if (!create_room_form(name, password)) return;
+	send({{"type", message_types::new_room}, {"name", name}, {"password", password}, {"game_type", game_type}});
+	host_menu();
+}
+
 void main_menu()
 {
 	while (true) {
 		menu@ m = setup_menu("");
 		@m = main_screen;
-		int total = 7;
-		int create_char = m.add_item("Create Character. 1 of " + total);
+		int create_char = m.add_item("Create or update character.");
 		int view_char = -1;
 		if (created_char_class != "") {
-			total = 8;
-			view_char = m.add_item("View My Character. 2 of " + total);
+			view_char = m.add_item("View current character.");
 		}
-		int create_room = m.add_item("Create a lobby! " + (total == 8 ? "3" : "2") + " of " + total);
-		int join = m.add_item("Join a game! " + (total == 8 ? "4" : "3") + " of " + total);
-		int social = m.add_item("Friends. " + (total == 8 ? "5" : "4") + " of " + total);
-		int CHECK_ONLINE = m.add_item("Check who is online. " + (total == 8 ? "6" : "5") + " of " + total);
-		int About = m.add_item("About us. " + (total == 8 ? "7" : "6") + " of " + total);
-		int quit = m.add_item("Quit. " + (total == 8 ? "8" : "7") + " of " + total);
+		int create_adventure = m.add_item("Adventure. Create an Adventure lobby.");
+		int create_sandbox = m.add_item("Sandbox. Create a Sandbox lobby.");
+		int join = m.add_item("Join a lobby.");
+		int social = m.add_item("Friends.");
+		int CHECK_ONLINE = m.add_item("Check who is online.");
+		int About = m.add_item("About us.");
+		int quit = m.add_item("Quit.");
 		int res = m.run();
 		if (res == create_char) {
 			character_creation_menu();
@@ -108,13 +118,13 @@ void main_menu()
 			}
 			speak(summary, true);
 		}
-		else if (res == create_room) {
-			string name, password;
-			if (create_room_form(name, password)) {
-				send({{"type", message_types::new_room}, {"name", name}, {"password", password}, {"game_type", "default"}});
-				host_menu();
-				m.play(m.select_sound);
-			}
+		else if (res == create_adventure) {
+			create_lobby_for_mode("adventure");
+			m.play(m.select_sound);
+		}
+		else if (res == create_sandbox) {
+			create_lobby_for_mode("sandbox");
+			m.play(m.select_sound);
 		}
 		else if (res == join) {
 			send({{"type", message_types::list_rooms}});
@@ -187,7 +197,7 @@ bool main_screen_loop()
 	if (key_pressed(KEY_F4)) {
 		social_panel();
 	}
-	return focus == f_main_keyboard_area;
+	return main_screen.form.get_current_focus() == f_main_keyboard_area;
 }
 void send_chat_message()
 {

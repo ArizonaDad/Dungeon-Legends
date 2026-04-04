@@ -15,6 +15,8 @@ class combat_entity {
 	int max_hp;
 	int ac;
 	int level;
+	string class_name;
+	string subclass;
 	bool is_dead;
 	bool is_stable;
 	int initiative;
@@ -30,6 +32,8 @@ class combat_entity {
 		max_hp = 0;
 		ac = 0;
 		level = 1;
+		class_name = "";
+		subclass = "";
 		is_dead = false;
 		is_stable = false;
 		initiative = 0;
@@ -83,10 +87,19 @@ int my_lay_on_hands_pool = 0;
 int my_bardic_inspiration_uses = 0;
 int my_bardic_inspiration_grant_die = 0;
 int my_bardic_inspiration_die = 0;
+int my_rage_uses_remaining = 0;
+int my_rage_damage_bonus = 0;
+bool my_is_raging = false;
+int my_action_surge_uses_remaining = 0;
+bool my_second_wind_available = false;
 bool my_is_hidden = false;
 int my_weapon_range = 5;
 int my_movement_remaining = 0;
 int my_speed = 30;
+bool my_has_action = false;
+bool my_has_bonus_action = false;
+bool my_has_reaction = false;
+int my_attacks_remaining = 0;
 
 // ============================================================
 // ROLL BUTTON - The core interaction for blind D&D
@@ -131,6 +144,34 @@ int parse_nonnegative_int(string text) {
 		value = value * 10 + digit;
 	}
 	return value;
+}
+
+combat_entity@ get_my_entity() {
+	return get_entity(my_combatant_id);
+}
+
+string current_class_name() {
+	combat_entity@ me = get_my_entity();
+	if (@me != null and me.class_name != "") return me.class_name;
+	return created_char_class;
+}
+
+string current_subclass_name() {
+	combat_entity@ me = get_my_entity();
+	if (@me != null and me.subclass != "") return me.subclass;
+	return created_char_subclass;
+}
+
+int current_character_level() {
+	combat_entity@ me = get_my_entity();
+	if (@me != null and me.level > 0) return me.level;
+	return created_char_level;
+}
+
+string describe_target_position(combat_entity@ source, combat_entity@ target) {
+	if (@source == null or @target == null) return "";
+	int dist = feet_distance(source.x, source.y, target.x, target.y);
+	return dist + " feet to the " + relative_direction_text(source.x, source.y, target.x, target.y);
 }
 
 void prompt_bardic_choice(string text) {
@@ -185,9 +226,19 @@ void show_action_menu() {
 		return;
 	}
 
-	menu@ m = setup_sub_menu("Your turn. Choose an action or bonus action.");
-	int attack_opt = m.add_item("Attack. Strike a target with your weapon.");
-	int cast_opt = m.add_item("Cast a spell.");
+	menu@ m = setup_sub_menu("Your turn. Choose an action.");
+	combat_entity@ me = get_my_entity();
+	string lc = current_class_name().lower();
+	int level = current_character_level();
+	string subclass = current_subclass_name();
+	bool currently_wild_shaped = @me != null and me.wild_shape_form != "";
+	string attack_label = "Attack. Strike a target with your weapon. Range " + my_weapon_range + " feet.";
+	if (current_target_id > 0) {
+		combat_entity@ action_target = get_entity(current_target_id);
+		if (@me != null and @action_target != null) attack_label += " Current target " + action_target.name + ", " + describe_target_position(me, action_target) + ".";
+	}
+	int attack_opt = m.add_item(attack_label);
+	int cast_opt = m.add_item("Cast a spell. Spell entries tell you casting time and concentration.");
 	int dodge_opt = m.add_item("Dodge. Attacks against you have disadvantage.");
 	int dash_opt = m.add_item("Dash. Double your movement this turn.");
 	int disengage_opt = m.add_item("Disengage. Move without provoking opportunity attacks.");
@@ -197,37 +248,19 @@ void show_action_menu() {
 	int shove_opt = m.add_item("Shove. Push or knock prone a creature.");
 	int grapple_opt = m.add_item("Grapple. Grab and restrain a creature.");
 	// Class-specific actions
-	int rage_opt = -1;
-	int sneak_opt = -1;
 	int surge_opt = -1;
-	int second_wind_opt = -1;
 	int smite_opt = -1;
-	int lay_hands_opt = -1;
-	int cunning_opt = -1;
-	int flurry_opt = -1;
 	int wild_shape_opt = -1;
-	int bardic_opt = -1;
 
-	string lc = created_char_class.lower();
-	combat_entity@ me = get_entity(my_combatant_id);
-	bool currently_wild_shaped = @me != null and me.wild_shape_form != "";
-	if (lc == "barbarian") rage_opt = m.add_item("Rage. Bonus action. Advantage on STR checks, bonus damage, resistance to physical.");
 	if (lc == "fighter") {
-		surge_opt = m.add_item("Action Surge. Take an additional action this turn.");
-		second_wind_opt = m.add_item("Second Wind. Bonus action. Heal 1d10 plus fighter level.");
+		if (my_action_surge_uses_remaining > 0) surge_opt = m.add_item("Action Surge. Gain another action this turn. Uses left: " + my_action_surge_uses_remaining + ".");
 	}
-	if (lc == "rogue") cunning_opt = m.add_item("Cunning Action. Bonus action. Dash, Disengage, or Hide.");
 	if (lc == "paladin") {
 		smite_opt = m.add_item("Divine Smite. Spend spell slot for extra 2d8 radiant on next hit.");
-		lay_hands_opt = m.add_item("Lay on Hands. Bonus action. Touch heal or remove conditions. Pool: " + my_lay_on_hands_pool + ".");
 	}
-	if (lc == "monk") flurry_opt = m.add_item("Flurry of Blows. 1 Focus Point. Two unarmed strikes as a bonus action. Focus Points: " + my_focus_points + ".");
-	if (lc == "druid" and created_char_level >= 2) {
-		if (currently_wild_shaped) wild_shape_opt = m.add_item("Wild Shape. Revert or choose a new beast form.");
-		else if (created_char_subclass == "Circle of the Moon") wild_shape_opt = m.add_item("Wild Shape. Bonus action. Transform into a beast.");
-		else wild_shape_opt = m.add_item("Wild Shape. Action. Transform into a beast.");
+	if (lc == "druid" and level >= 2) {
+		if (!currently_wild_shaped and subclass != "Circle of the Moon") wild_shape_opt = m.add_item("Wild Shape. Action. Transform into a beast.");
 	}
-	if (lc == "bard") bardic_opt = m.add_item("Bardic Inspiration. Bonus action. Give an ally within 60 feet a " + die_label(my_bardic_inspiration_grant_die) + ". Uses left: " + my_bardic_inspiration_uses + ".");
 
 	int end_opt = m.add_item("End turn.");
 	int status_opt = m.add_item("Check status. Hear your current stats.");
@@ -296,19 +329,77 @@ void show_action_menu() {
 		speak_my_status();
 	}
 	// Class feature handlers
-	if (rage_opt >= 0 and res == rage_opt) {
-		send({{"type", message_types::bonus_action}, {"feature", "rage"}});
-		speak("Rage activated! Bonus damage and resistance to physical damage.", true);
-	}
-	else if (surge_opt >= 0 and res == surge_opt) {
+	if (surge_opt >= 0 and res == surge_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "action_surge"}});
 		speak("Action Surge! You gain an additional action.", true);
 	}
-	else if (second_wind_opt >= 0 and res == second_wind_opt) {
-		send({{"type", message_types::bonus_action}, {"feature", "second_wind"}});
-	}
 	else if (wild_shape_opt >= 0 and res == wild_shape_opt) {
 		show_wild_shape_menu(currently_wild_shaped);
+	}
+	else if (smite_opt >= 0 and res == smite_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "divine_smite"}});
+		speak("Divine Smite prepared. Your next melee hit deals extra 2d8 radiant.", true);
+	}
+}
+
+void show_bonus_action_menu() {
+	if (!is_my_turn) {
+		speak("It's not your turn.", true);
+		return;
+	}
+	if (!my_has_bonus_action) {
+		speak("No bonus action remaining.", true);
+		return;
+	}
+
+	combat_entity@ me = get_my_entity();
+	string lc = current_class_name().lower();
+	int level = current_character_level();
+	string subclass = current_subclass_name();
+	bool currently_wild_shaped = @me != null and me.wild_shape_form != "";
+
+	menu@ m = setup_sub_menu("Choose a bonus action.");
+	int spell_opt = m.add_item("Cast a spell. Useful for bonus action spells such as Healing Word or Misty Step.");
+	int rage_opt = -1;
+	int second_wind_opt = -1;
+	int cunning_opt = -1;
+	int lay_hands_opt = -1;
+	int flurry_opt = -1;
+	int bardic_opt = -1;
+	int wild_shape_opt = -1;
+
+	if (lc == "barbarian" and !my_is_raging and my_rage_uses_remaining > 0) rage_opt = m.add_item("Rage. Bonus action. Uses left: " + my_rage_uses_remaining + ". Damage bonus: " + my_rage_damage_bonus + ".");
+	if (lc == "fighter" and my_second_wind_available) second_wind_opt = m.add_item("Second Wind. Bonus action. Heal 1d10 plus fighter level.");
+	if (lc == "rogue" and level >= 2) cunning_opt = m.add_item("Cunning Action. Bonus action. Dash, Disengage, or Hide.");
+	if (lc == "paladin" and my_lay_on_hands_pool > 0) lay_hands_opt = m.add_item("Lay on Hands. Bonus action. Pool: " + my_lay_on_hands_pool + ".");
+	if (lc == "monk" and level >= 2) flurry_opt = m.add_item("Flurry of Blows. 1 Focus Point. Focus Points: " + my_focus_points + ".");
+	if (lc == "bard" and my_bardic_inspiration_uses > 0) bardic_opt = m.add_item("Bardic Inspiration. Bonus action. Uses left: " + my_bardic_inspiration_uses + ".");
+	if (lc == "druid" and level >= 2 and (currently_wild_shaped or subclass == "Circle of the Moon")) {
+		if (currently_wild_shaped) wild_shape_opt = m.add_item("Wild Shape. Revert or choose a new beast form.");
+		else wild_shape_opt = m.add_item("Wild Shape. Bonus action. Transform into a beast.");
+	}
+
+	int options = 1;
+	if (rage_opt >= 0) options++;
+	if (second_wind_opt >= 0) options++;
+	if (cunning_opt >= 0) options++;
+	if (lay_hands_opt >= 0) options++;
+	if (flurry_opt >= 0) options++;
+	if (bardic_opt >= 0) options++;
+	if (wild_shape_opt >= 0) options++;
+	if (options == 1) {
+		speak("No class bonus actions are available right now. You can still use a bonus action spell if you know one.", true);
+	}
+
+	int res = m.run();
+	if (res == spell_opt) {
+		show_spell_menu();
+	}
+	else if (rage_opt >= 0 and res == rage_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "rage"}});
+	}
+	else if (second_wind_opt >= 0 and res == second_wind_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "second_wind"}});
 	}
 	else if (cunning_opt >= 0 and res == cunning_opt) {
 		menu@ cm = setup_sub_menu("Cunning Action. Choose:");
@@ -321,10 +412,6 @@ void show_action_menu() {
 		else if (cp == 2) action = "hide";
 		send({{"type", message_types::bonus_action}, {"feature", "cunning_action"}, {"action", action}});
 	}
-	else if (smite_opt >= 0 and res == smite_opt) {
-		send({{"type", message_types::bonus_action}, {"feature", "divine_smite"}});
-		speak("Divine Smite prepared. Your next melee hit deals extra 2d8 radiant.", true);
-	}
 	else if (lay_hands_opt >= 0 and res == lay_hands_opt) {
 		use_lay_on_hands();
 	}
@@ -333,6 +420,9 @@ void show_action_menu() {
 	}
 	else if (bardic_opt >= 0 and res == bardic_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "bardic_inspiration"}, {"target_id", current_target_id}});
+	}
+	else if (wild_shape_opt >= 0 and res == wild_shape_opt) {
+		show_wild_shape_menu(currently_wild_shaped);
 	}
 }
 
@@ -365,7 +455,7 @@ void use_lay_on_hands() {
 	if (target.has_condition(COND_POISONED) and yes_no("Spend 5 points to remove Poisoned from " + target.name + "?", setup_sub_menu())) {
 		cleanse_list.insert_last("poisoned");
 	}
-	if (created_char_level >= 14) {
+	if (current_character_level() >= 14) {
 		if (target.has_condition(COND_BLINDED) and yes_no("Spend 5 points to remove Blinded from " + target.name + "?", setup_sub_menu())) cleanse_list.insert_last("blinded");
 		if (target.has_condition(COND_CHARMED) and yes_no("Spend 5 points to remove Charmed from " + target.name + "?", setup_sub_menu())) cleanse_list.insert_last("charmed");
 		if (target.has_condition(COND_DEAFENED) and yes_no("Spend 5 points to remove Deafened from " + target.name + "?", setup_sub_menu())) cleanse_list.insert_last("deafened");
@@ -413,22 +503,24 @@ void show_wild_shape_menu(bool currently_wild_shaped) {
 	form_ids.insert_last("giant_wolf_spider");
 	form_labels.insert_last("Giant Wolf Spider");
 
-	if (created_char_level >= 4) {
+	int level = current_character_level();
+	string subclass = current_subclass_name();
+	if (level >= 4) {
 		item_ids.insert_last(m.add_item("Crocodile. CR 1/2. Tough swimmer with a crushing bite."));
 		form_ids.insert_last("crocodile");
 		form_labels.insert_last("Crocodile");
 	}
-	if (created_char_subclass == "Circle of the Moon" or created_char_level >= 8) {
+	if (subclass == "Circle of the Moon" or level >= 8) {
 		item_ids.insert_last(m.add_item("Dire Wolf. CR 1. Large predator with a brutal bite."));
 		form_ids.insert_last("dire_wolf");
 		form_labels.insert_last("Dire Wolf");
 	}
-	if (created_char_level >= 8) {
+	if (level >= 8) {
 		item_ids.insert_last(m.add_item("Giant Bat. CR 1/4. Flying scout with fast movement."));
 		form_ids.insert_last("giant_bat");
 		form_labels.insert_last("Giant Bat");
 	}
-	if (created_char_subclass == "Circle of the Moon" and created_char_level >= 6) {
+	if (subclass == "Circle of the Moon" and level >= 6) {
 		item_ids.insert_last(m.add_item("Giant Constrictor Snake. CR 2. Huge serpent with long reach."));
 		form_ids.insert_last("giant_constrictor_snake");
 		form_labels.insert_last("Giant Constrictor Snake");
@@ -499,6 +591,17 @@ void speak_my_status() {
 	if (my_lay_on_hands_pool > 0) text += "Lay on Hands pool: " + my_lay_on_hands_pool + ". ";
 	if (my_bardic_inspiration_uses > 0) text += "Bardic Inspiration uses: " + my_bardic_inspiration_uses + ", die " + die_label(my_bardic_inspiration_grant_die) + ". ";
 	if (my_bardic_inspiration_die > 0) text += "You currently have Bardic Inspiration " + die_label(my_bardic_inspiration_die) + ". ";
+	if (my_is_raging) text += "Rage is active. ";
+	else if (my_rage_uses_remaining > 0) text += "Rages remaining: " + my_rage_uses_remaining + ". ";
+	if (my_action_surge_uses_remaining > 0) text += "Action Surge uses remaining: " + my_action_surge_uses_remaining + ". ";
+	if (my_second_wind_available) text += "Second Wind available. ";
+	if (my_has_action) text += "Action available. ";
+	else if (my_attacks_remaining > 0) text += my_attacks_remaining + " extra attack" + (my_attacks_remaining == 1 ? "" : "s") + " remaining. ";
+	else text += "Action spent. ";
+	if (my_has_bonus_action) text += "Bonus action available. ";
+	else text += "Bonus action spent. ";
+	if (my_has_reaction) text += "Reaction available. ";
+	else text += "Reaction spent. ";
 	text += "Weapon range " + my_weapon_range + " feet. ";
 	text += "Speed " + my_speed + " feet. ";
 	text += "Movement remaining " + my_movement_remaining + " feet. ";
@@ -518,8 +621,7 @@ void speak_my_status() {
 	if (current_target_id > 0) {
 		combat_entity@ target = get_entity(current_target_id);
 		if (@target != null) {
-			int dist = feet_distance(me.x, me.y, target.x, target.y);
-			text += "Targeting " + current_target_name + " at " + dist + " feet. ";
+			text += "Targeting " + current_target_name + ", " + describe_target_position(me, target) + ". ";
 		} else {
 			text += "Targeting " + current_target_name + ". ";
 		}
@@ -645,7 +747,8 @@ void announce_scan_target(int index) {
 
 	string text = "";
 	if (e.is_player) text = "Ally: ";
-	text += e.name + ", " + dist + " feet, " + e.health_status();
+	string direction = @me != null ? relative_direction_text(me.x, me.y, e.x, e.y) : "unknown direction";
+	text += e.name + ", " + dist + " feet to the " + direction + ", " + e.health_status();
 	// Show conditions
 	for (uint c = 0; c < e.conditions.length(); c++) {
 		int cond = e.conditions[c];
@@ -666,7 +769,9 @@ void lock_target() {
 	current_target_id = e.id;
 	current_target_name = e.name;
 	send({{"type", message_types::set_target}, {"target_id", current_target_id}});
-	speak("Targeting " + e.name + ".", true);
+	combat_entity@ me = get_my_entity();
+	if (@me != null) speak("Targeting " + e.name + ", " + describe_target_position(me, e) + ".", true);
+	else speak("Targeting " + e.name + ".", true);
 }
 
 // ============================================================
@@ -749,10 +854,19 @@ void parse_game_state(json_object@ msg) {
 	my_bardic_inspiration_uses = msg.exists("my_bardic_inspiration_uses") ? int(msg["my_bardic_inspiration_uses"]) : 0;
 	my_bardic_inspiration_grant_die = msg.exists("my_bardic_inspiration_grant_die") ? int(msg["my_bardic_inspiration_grant_die"]) : 0;
 	my_bardic_inspiration_die = msg.exists("my_bardic_inspiration_die") ? int(msg["my_bardic_inspiration_die"]) : 0;
+	my_rage_uses_remaining = msg.exists("my_rage_uses_remaining") ? int(msg["my_rage_uses_remaining"]) : 0;
+	my_rage_damage_bonus = msg.exists("my_rage_damage_bonus") ? int(msg["my_rage_damage_bonus"]) : 0;
+	my_is_raging = msg.exists("my_is_raging") ? bool(msg["my_is_raging"]) : false;
+	my_action_surge_uses_remaining = msg.exists("my_action_surge_uses_remaining") ? int(msg["my_action_surge_uses_remaining"]) : 0;
+	my_second_wind_available = msg.exists("my_second_wind_available") ? bool(msg["my_second_wind_available"]) : false;
 	my_is_hidden = msg.exists("my_is_hidden") ? bool(msg["my_is_hidden"]) : false;
 	my_weapon_range = msg.exists("my_weapon_range") ? int(msg["my_weapon_range"]) : 5;
 	my_movement_remaining = msg.exists("my_movement_remaining") ? int(msg["my_movement_remaining"]) : 0;
 	my_speed = msg.exists("my_speed") ? int(msg["my_speed"]) : 30;
+	my_has_action = msg.exists("my_has_action") ? bool(msg["my_has_action"]) : false;
+	my_has_bonus_action = msg.exists("my_has_bonus_action") ? bool(msg["my_has_bonus_action"]) : false;
+	my_has_reaction = msg.exists("my_has_reaction") ? bool(msg["my_has_reaction"]) : false;
+	my_attacks_remaining = msg.exists("my_attacks_remaining") ? int(msg["my_attacks_remaining"]) : 0;
 
 	// Parse combatants
 	if (msg.exists("combatants")) {
@@ -770,6 +884,8 @@ void parse_game_state(json_object@ msg) {
 			e.max_hp = int(cobj["max_hp"]);
 			e.ac = int(cobj["ac"]);
 			e.level = cobj.exists("level") ? int(cobj["level"]) : 1;
+			e.class_name = cobj.exists("class_name") ? string(cobj["class_name"]) : "";
+			e.subclass = cobj.exists("subclass") ? string(cobj["subclass"]) : "";
 			e.is_dead = bool(cobj["is_dead"]);
 			e.is_stable = cobj.exists("is_stable") ? bool(cobj["is_stable"]) : false;
 			e.initiative = cobj.exists("initiative") ? int(cobj["initiative"]) : 0;
@@ -785,11 +901,15 @@ void parse_game_state(json_object@ msg) {
 	}
 
 	// Parse initiative order
-	if (msg.exists("initiative_order")) {
-		json_array@ iarr = msg["initiative_order"];
+	if (msg.exists("initiative_order") or msg.exists("order")) {
+		json_array@ iarr = null;
+		if (msg.exists("initiative_order")) @iarr = msg["initiative_order"];
+		else @iarr = msg["order"];
 		initiative_order.resize(0);
-		for (uint i = 0; i < iarr.length(); i++) {
-			initiative_order.insert_last(int(iarr[i]));
+		if (@iarr != null) {
+			for (uint i = 0; i < iarr.length(); i++) {
+				initiative_order.insert_last(int(iarr[i]));
+			}
 		}
 	}
 }
@@ -800,7 +920,8 @@ void show_combat_help() {
 	m.add_item("I J K L. Scan for creatures. I north, K south, J west, L east.");
 	m.add_item("Left and right bracket keys. Cycle through scan targets.");
 	m.add_item("Enter. Lock onto scanned target.");
-	m.add_item("F or B. Open your action menu on your turn. Attack, cast spells, and use bonus actions.");
+	m.add_item("F. Open your action menu on your turn.");
+	m.add_item("B. Open your bonus action menu on your turn.");
 	m.add_item("R. Roll one die when prompted. If an action needs multiple dice, you will be prompted once per die.");
 	m.add_item("H. Hear your current status. Health, AC, conditions, position.");
 	m.add_item("O. Hear initiative order. Who goes when.");
@@ -837,10 +958,19 @@ void reset_combat_state() {
 	my_bardic_inspiration_uses = 0;
 	my_bardic_inspiration_grant_die = 0;
 	my_bardic_inspiration_die = 0;
+	my_rage_uses_remaining = 0;
+	my_rage_damage_bonus = 0;
+	my_is_raging = false;
+	my_action_surge_uses_remaining = 0;
+	my_second_wind_available = false;
 	my_is_hidden = false;
 	my_weapon_range = 5;
 	my_movement_remaining = 0;
 	my_speed = 30;
+	my_has_action = false;
+	my_has_bonus_action = false;
+	my_has_reaction = false;
+	my_attacks_remaining = 0;
 }
 
 // ============================================================
@@ -895,7 +1025,7 @@ void combat_game_loop() {
 
 			// Action menu
 			else if (key_pressed(KEY_F)) show_action_menu();
-			else if (key_pressed(KEY_B)) show_action_menu();
+			else if (key_pressed(KEY_B)) show_bonus_action_menu();
 		}
 
 		// Info keys (available any time during combat)

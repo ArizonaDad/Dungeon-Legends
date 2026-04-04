@@ -145,7 +145,11 @@ void handle_message(json_object@ msg)
 {
 	if (@msg == null or !msg.exists("type")) return;
 	string msg_type = msg["type"];
-	if (msg_type == message_types::announce and msg.exists("text")) {
+	if (msg_type == message_types::error) {
+		string text = msg.exists("text") ? string(msg["text"]) : "An unknown error occurred.";
+		speak(text, true);
+	}
+	else if (msg_type == message_types::announce and msg.exists("text")) {
 		bool interrupt = msg.exists("interrupt") ? bool(msg["interrupt"]) : false;
 		speak(string(msg["text"]), interrupt);
 	}
@@ -212,6 +216,11 @@ void handle_message(json_object@ msg)
 		current_round = msg.exists("round") ? int(msg["round"]) : 0;
 		bool is_me = (turn_id == my_combatant_id and my_combatant_id > 0);
 		is_my_turn = is_me;
+		if (is_me) {
+			my_has_action = msg.exists("has_action") ? bool(msg["has_action"]) : true;
+			my_has_bonus_action = msg.exists("has_bonus_action") ? bool(msg["has_bonus_action"]) : true;
+			my_movement_remaining = msg.exists("movement") ? int(msg["movement"]) : my_movement_remaining;
+		}
 		speak_turn_start(name, is_me);
 	}
 	else if (msg_type == message_types::roll_request) {
@@ -283,7 +292,9 @@ void handle_message(json_object@ msg)
 		int max_hp = msg.exists("max_hp") ? int(msg["max_hp"]) : 0;
 		int ac = msg.exists("ac") ? int(msg["ac"]) : 0;
 		int distance = msg.exists("distance") ? int(msg["distance"]) : 0;
+		string direction = msg.exists("direction") ? string(msg["direction"]) : "";
 		string text = target_name + ". " + hp + " of " + max_hp + " hit points. Armor class " + ac + ". Distance " + distance + " feet.";
+		if (direction != "") text += " Direction " + direction + ".";
 		text += " Your weapon range is " + my_weapon_range + " feet.";
 		if (distance <= my_weapon_range) text += " Target is within weapon range.";
 		else text += " Target is outside your weapon range.";
@@ -333,6 +344,13 @@ void handle_message(json_object@ msg)
 		if (msg.exists("int")) created_ability_scores[3] = int(msg["int"]);
 		if (msg.exists("wis")) created_ability_scores[4] = int(msg["wis"]);
 		if (msg.exists("cha")) created_ability_scores[5] = int(msg["cha"]);
+		created_pre_progression_ability_scores = created_ability_scores;
+		if (msg.exists("base_str")) created_pre_progression_ability_scores[0] = int(msg["base_str"]);
+		if (msg.exists("base_dex")) created_pre_progression_ability_scores[1] = int(msg["base_dex"]);
+		if (msg.exists("base_con")) created_pre_progression_ability_scores[2] = int(msg["base_con"]);
+		if (msg.exists("base_int")) created_pre_progression_ability_scores[3] = int(msg["base_int"]);
+		if (msg.exists("base_wis")) created_pre_progression_ability_scores[4] = int(msg["base_wis"]);
+		if (msg.exists("base_cha")) created_pre_progression_ability_scores[5] = int(msg["base_cha"]);
 		if (msg.exists("weapon")) created_weapon = string(msg["weapon"]);
 		if (msg.exists("feats")) parse_csv_into_string_array(string(msg["feats"]), created_char_feats);
 		if (msg.exists("skills")) parse_csv_into_string_array(string(msg["skills"]), created_char_skill_proficiencies);
