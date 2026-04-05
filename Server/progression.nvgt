@@ -119,6 +119,9 @@ void ensure_account_progression(account@ acct) {
 	if (!progress.exists("gold")) progress["gold"] = 0;
 	ensure_json_array_field(data, "adventure_consumables");
 
+	// Guild membership
+	if (!progress.exists("guild_name")) progress["guild_name"] = "";
+
 	// Weekly challenge tracking
 	if (!progress.exists("challenge_week")) progress["challenge_week"] = 0;
 	ensure_json_object_field(progress, "challenge_progress");

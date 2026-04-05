@@ -1381,10 +1381,12 @@ class battle_manager {
 			if (saved) damage = damage / 2;
 			if (damage < 1) damage = 1;
 
+			bool aoe_target_was_full = (t.current_hp == t.max_hp);
+			bool aoe_caster_was_hidden = caster.is_hidden;
 			combat.apply_damage(t, damage, pr.damage_type, caster);
 			broadcast_to_battle({{"type", message_types::damage_dealt}, {"attacker", caster.name}, {"target", t.name}, {"amount", damage}, {"damage_type", DAMAGE_TYPE_NAMES[pr.damage_type]}, {"is_crit", false}, {"is_spell", true}});
 			if (t.is_dead) {
-				broadcast_to_battle({{"type", message_types::creature_died}, {"name", t.name}, {"is_player", t.is_player}, {"killed_by", caster.name}});
+				broadcast_to_battle({{"type", message_types::creature_died}, {"name", t.name}, {"is_player", t.is_player}, {"killed_by", caster.name}, {"was_full_hp", aoe_target_was_full}, {"was_overkill", damage >= t.max_hp * 2}, {"was_stealth", aoe_caster_was_hidden}});
 			}
 			check_concentration(t, damage);
 		}
@@ -2163,7 +2165,8 @@ class battle_manager {
 			players[pi].send({
 				{"type", message_types::game_start_battle},
 				{"combatant_id", cid},
-				{"mode", combat.mode}
+				{"mode", combat.mode},
+				{"scenario", scenario_id}
 			});
 		}
 
@@ -2751,13 +2754,14 @@ class battle_manager {
 						}
 
 						broadcast_roll(enemy.name, "opportunity attack damage", dmg_natural, dmg_mod, total_damage, total_damage + " " + dmg_type_name + " to " + mover.name + ".");
+						bool opp_target_was_full = (mover.current_hp == mover.max_hp);
 						combat.apply_damage(mover, total_damage, enemy.main_hand_damage_type, enemy);
 						maybe_apply_on_kill_features(enemy, mover);
 						check_concentration(mover, total_damage);
 
 						if (mover.is_dead) {
 							broadcast_announce(mover.name + " has been slain!", true);
-							broadcast_to_battle({{"type", message_types::creature_died}, {"name", mover.name}, {"id", mover.id}, {"killed_by", enemy.name}});
+							broadcast_to_battle({{"type", message_types::creature_died}, {"name", mover.name}, {"id", mover.id}, {"killed_by", enemy.name}, {"was_full_hp", opp_target_was_full}, {"was_overkill", total_damage >= mover.max_hp * 2}, {"was_stealth", false}});
 						} else if (mover.current_hp == 0 and mover.has_condition(COND_UNCONSCIOUS)) {
 							broadcast_announce(mover.name + " falls unconscious!", true);
 						} else {
@@ -3415,6 +3419,8 @@ class battle_manager {
 			}
 			string dmg_type_str = (pr.damage_type >= 0 and pr.damage_type < int(DAMAGE_TYPE_NAMES.length())) ? DAMAGE_TYPE_NAMES[pr.damage_type] : "physical";
 			broadcast_to_battle({{"type", message_types::damage_dealt}, {"attacker", c.name}, {"target", target.name}, {"amount", total_damage}, {"damage_type", dmg_type_str}, {"is_crit", pr.is_crit}, {"weapon", pr.attack_name}, {"is_weapon_attack", pr.is_weapon_attack}});
+			bool target_was_full_hp = (target.current_hp == target.max_hp);
+			bool attacker_was_hidden = c.is_hidden;
 			combat.apply_damage(target, total_damage, pr.damage_type, c);
 
 			// Check boss phase transitions after damage
@@ -3427,7 +3433,7 @@ class battle_manager {
 
 			if (target.is_dead) {
 				broadcast_announce(target.name + " has been slain!", true);
-				broadcast_to_battle({{"type", message_types::creature_died}, {"name", target.name}, {"id", target.id}, {"killed_by", c.name}});
+				broadcast_to_battle({{"type", message_types::creature_died}, {"name", target.name}, {"id", target.id}, {"killed_by", c.name}, {"was_full_hp", target_was_full_hp}, {"was_overkill", total_damage >= target.max_hp * 2}, {"was_stealth", attacker_was_hidden}});
 			} else if (target.current_hp == 0 and target.has_condition(COND_UNCONSCIOUS)) {
 				broadcast_announce(target.name + " falls unconscious!", true);
 			} else {
@@ -3900,19 +3906,19 @@ class battle_manager {
 		if (@c == null or !c.is_player or c.player_username != u.username) return;
 		// Allow attack if: has action (fresh), OR has remaining attacks from Extra Attack.
 		if (!c.has_action and c.attacks_remaining_this_turn <= 0) {
-			u.send({{"type", message_types::error}, {"text", "No action remaining."}});
+			u.send({{"type", message_types::error}, {"text", "You've already used your action this turn. Press F and choose End Turn, or press B for a bonus action."}});
 			return;
 		}
 
 		uint target_id = 0;
 		if (msg.exists("target_id")) target_id = uint(msg["target_id"]);
 		combatant@ target = combat.get_combatant(target_id);
-		if (@target == null or target.is_dead) { u.send({{"type", message_types::error}, {"text", "Invalid target."}}); return; }
+		if (@target == null or target.is_dead) { u.send({{"type", message_types::error}, {"text", "Invalid target. Use I J K L to scan and Enter to lock a target."}});  return; }
 
 		// Range check.
 		int dist = feet_distance(c.x, c.y, target.x, target.y);
 		if (dist > c.main_hand_range) {
-			u.send({{"type", message_types::error}, {"text", "Target is out of range. Distance: " + dist + " feet, range: " + c.main_hand_range + " feet."}});
+			u.send({{"type", message_types::error}, {"text", "Target is out of range. Distance: " + dist + " feet, range: " + c.main_hand_range + " feet. Move closer with W A S D or choose a ranged option."}});
 			return;
 		}
 
@@ -4015,7 +4021,7 @@ class battle_manager {
 		if (@combat == null or @u == null) return;
 		combatant@ c = combat.current_combatant();
 		if (@c == null or !c.is_player or c.player_username != u.username) return;
-		if (!c.has_action) { u.send({{"type", message_types::error}, {"text", "No action remaining."}}); return; }
+		if (!c.has_action) { u.send({{"type", message_types::error}, {"text", "You've already used your action this turn. Press F and choose End Turn, or press B for a bonus action."}}); return; }
 
 		c.has_action = false;
 		c.used_action = true;
@@ -4029,7 +4035,7 @@ class battle_manager {
 		if (@combat == null or @u == null) return;
 		combatant@ c = combat.current_combatant();
 		if (@c == null or !c.is_player or c.player_username != u.username) return;
-		if (!c.has_action) { u.send({{"type", message_types::error}, {"text", "No action remaining."}}); return; }
+		if (!c.has_action) { u.send({{"type", message_types::error}, {"text", "You've already used your action this turn. Press F and choose End Turn, or press B for a bonus action."}}); return; }
 
 		c.has_action = false;
 		c.used_action = true;
@@ -4042,7 +4048,7 @@ class battle_manager {
 		if (@combat == null or @u == null) return;
 		combatant@ c = combat.current_combatant();
 		if (@c == null or !c.is_player or c.player_username != u.username) return;
-		if (!c.has_action) { u.send({{"type", message_types::error}, {"text", "No action remaining."}}); return; }
+		if (!c.has_action) { u.send({{"type", message_types::error}, {"text", "You've already used your action this turn. Press F and choose End Turn, or press B for a bonus action."}}); return; }
 
 		c.has_action = false;
 		c.used_action = true;
@@ -4055,7 +4061,7 @@ class battle_manager {
 		if (@combat == null or @u == null) return;
 		combatant@ c = combat.current_combatant();
 		if (@c == null or !c.is_player or c.player_username != u.username) return;
-		if (!c.has_action) { u.send({{"type", message_types::error}, {"text", "No action remaining."}}); return; }
+		if (!c.has_action) { u.send({{"type", message_types::error}, {"text", "You've already used your action this turn. Press F and choose End Turn, or press B for a bonus action."}}); return; }
 		if (!msg.exists("target_id")) { u.send({{"type", message_types::error}, {"text", "Choose an enemy to distract."}}); return; }
 		if (combat.mode == "pvp") { u.send({{"type", message_types::error}, {"text", "Help is not available in free-for-all PvP."}}); return; }
 
@@ -4094,7 +4100,7 @@ class battle_manager {
 		if (@combat == null or @u == null) return;
 		combatant@ c = combat.current_combatant();
 		if (@c == null or !c.is_player or c.player_username != u.username) return;
-		if (!c.has_action) { u.send({{"type", message_types::error}, {"text", "No action remaining."}}); return; }
+		if (!c.has_action) { u.send({{"type", message_types::error}, {"text", "You've already used your action this turn. Press F and choose End Turn, or press B for a bonus action."}}); return; }
 
 		c.has_action = false;
 		c.used_action = true;
@@ -4106,7 +4112,7 @@ class battle_manager {
 		if (@combat == null or @u == null) return;
 		combatant@ c = combat.current_combatant();
 		if (@c == null or !c.is_player or c.player_username != u.username) return;
-		if (!c.has_action) { u.send({{"type", message_types::error}, {"text", "No action remaining."}}); return; }
+		if (!c.has_action) { u.send({{"type", message_types::error}, {"text", "You've already used your action this turn. Press F and choose End Turn, or press B for a bonus action."}}); return; }
 		if (!c.has_reaction) { u.send({{"type", message_types::error}, {"text", "You need your reaction available to ready an attack."}}); return; }
 		if (!msg.exists("target_id")) { u.send({{"type", message_types::error}, {"text", "Choose a target to ready an attack against."}}); return; }
 
@@ -4135,7 +4141,7 @@ class battle_manager {
 		if (@combat == null or @u == null) return;
 		combatant@ c = combat.current_combatant();
 		if (@c == null or !c.is_player or c.player_username != u.username) return;
-		if (!c.has_action) { u.send({{"type", message_types::error}, {"text", "No action remaining."}}); return; }
+		if (!c.has_action) { u.send({{"type", message_types::error}, {"text", "You've already used your action this turn. Press F and choose End Turn, or press B for a bonus action."}}); return; }
 
 		uint target_id = 0;
 		if (msg.exists("target_id")) target_id = uint(msg["target_id"]);
@@ -4189,7 +4195,7 @@ class battle_manager {
 		if (@combat == null or @u == null) return;
 		combatant@ c = combat.current_combatant();
 		if (@c == null or !c.is_player or c.player_username != u.username) return;
-		if (!c.has_action) { u.send({{"type", message_types::error}, {"text", "No action remaining."}}); return; }
+		if (!c.has_action) { u.send({{"type", message_types::error}, {"text", "You've already used your action this turn. Press F and choose End Turn, or press B for a bonus action."}}); return; }
 
 		uint target_id = 0;
 		if (msg.exists("target_id")) target_id = uint(msg["target_id"]);
@@ -4256,7 +4262,7 @@ class battle_manager {
 		if (cdef.action_type == CONS_ACTION_BONUS) {
 			if (!c.has_bonus_action) { u.send({{"type", message_types::error}, {"text", "No bonus action remaining."}}); return; }
 		} else {
-			if (!c.has_action) { u.send({{"type", message_types::error}, {"text", "No action remaining."}}); return; }
+			if (!c.has_action) { u.send({{"type", message_types::error}, {"text", "You've already used your action this turn. Press F and choose End Turn, or press B for a bonus action."}}); return; }
 		}
 
 		// Check no_healing modifier
@@ -4352,11 +4358,12 @@ class battle_manager {
 			if (active_modifier == "glass_cannon") throw_damage *= 2;
 
 			broadcast_announce(c.name + " throws " + cdef.name + " at " + target.name + " for " + throw_damage + " damage!", true);
+			bool throw_target_was_full = (target.current_hp == target.max_hp);
 			combat.apply_damage(target, throw_damage, cdef.damage_type, c);
 
 			if (target.is_dead) {
 				broadcast_announce(target.name + " has been slain!", true);
-				broadcast_to_battle({{"type", message_types::creature_died}, {"name", target.name}, {"id", target.id}, {"killed_by", c.name}});
+				broadcast_to_battle({{"type", message_types::creature_died}, {"name", target.name}, {"id", target.id}, {"killed_by", c.name}, {"was_full_hp", throw_target_was_full}, {"was_overkill", throw_damage >= target.max_hp * 2}, {"was_stealth", false}});
 			} else if (target.current_hp == 0 and target.has_condition(COND_UNCONSCIOUS)) {
 				broadcast_announce(target.name + " falls unconscious!", true);
 			} else {
@@ -4500,11 +4507,11 @@ class battle_manager {
 
 		// Check casting time: 0=action, 1=bonus action, 2=reaction
 		if (spell.casting_time == 0 and !c.has_action) {
-			u.send({{"type", message_types::announce}, {"text", "No action remaining."}, {"interrupt", true}});
+			u.send({{"type", message_types::announce}, {"text", "You've already used your action this turn. Press F and choose End Turn, or press B for a bonus action."}, {"interrupt", true}});
 			return;
 		}
 		if (spell.casting_time == 1 and !c.has_bonus_action) {
-			u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}});
+			u.send({{"type", message_types::announce}, {"text", "No bonus action remaining. Press F for standard actions or End Turn."}, {"interrupt", true}});
 			return;
 		}
 		if (spell.casting_time == 2 and !c.has_reaction) {

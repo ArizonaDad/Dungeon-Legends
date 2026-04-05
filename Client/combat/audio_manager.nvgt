@@ -215,7 +215,7 @@ void set_current_turn_player(string name) {
 	}
 }
 
-void on_kill(string killer, string victim) {
+void on_kill(string killer, string victim, bool was_from_full_hp = false, bool was_overkill = false, bool was_stealth = false) {
 	if (killer == "") return;
 
 	// Track total kills this battle
@@ -236,6 +236,11 @@ void on_kill(string killer, string victim) {
 		audio_play_global("First_Blood.mp3", VOL_ANNOUNCE);
 		return;
 	}
+
+	// Special kill types
+	if (was_stealth) { audio_play_global("Stealth_Kill.mp3", VOL_ANNOUNCE); return; }
+	if (was_from_full_hp) { audio_play_global("insta_kill_from_full_health.mp3", VOL_ANNOUNCE); return; }
+	if (was_overkill) { audio_play_global("Over_Kill(200%_hit_of_max_health_or_more).mp3", VOL_ANNOUNCE); return; }
 
 	// Multi-kills (per turn)
 	if (turn_kills == 2) { audio_play_global("Double_Kill.mp3", VOL_ANNOUNCE); return; }
@@ -321,10 +326,10 @@ void audio_on_condition(string target, string condition, bool removed) {
 	}
 }
 
-void audio_on_death(string name, string killed_by) {
+void audio_on_death(string name, string killed_by, bool was_from_full_hp = false, bool was_overkill = false, bool was_stealth = false) {
 	combat_entity@ e = combat_audio_find_entity_by_name(name);
 	if (@e != null) audio_play_at("Body_Fall.wav", e);
-	if (killed_by != "") on_kill(killed_by, name);
+	if (killed_by != "") on_kill(killed_by, name, was_from_full_hp, was_overkill, was_stealth);
 }
 
 void audio_on_battle_start() {
@@ -370,17 +375,60 @@ void audio_on_move_blocked() {
 	audio_play_global("you_cant_move_sound.mp3", VOL_COMBAT);
 }
 
+// ---- Low Health Heartbeat ----
+
+bool heartbeat_active = false;
+uint64 next_heartbeat = 0;
+
+void update_heartbeat() {
+	combat_entity@ me = get_entity(my_combatant_id);
+	if (@me == null or me.is_dead or me.max_hp <= 0) { heartbeat_active = false; return; }
+	float pct = float(me.hp) / float(me.max_hp);
+	if (pct > 0.25 or pct <= 0.0) { heartbeat_active = false; return; }
+	heartbeat_active = true;
+	if (ticks() >= next_heartbeat) {
+		// Faster heartbeat as HP gets lower
+		int interval = int(1500.0 * pct / 0.25);
+		if (interval < 400) interval = 400;
+		// Play synth heartbeat (two quick thumps)
+		sound@ beat = combat_audio_make_sweep(60.0, 40.0, 80, -8.0, 0.0, 0.0, 0.1, 0.3, 1.0);
+		if (@beat != null) { beat.spatialization_enabled = false; beat.play(); combat_audio_track(beat); }
+		next_heartbeat = ticks() + interval;
+	}
+}
+
+// ---- TTS Speed Control ----
+
+float tts_rate = 0.0;
+
+void tts_speed_up() {
+	tts_rate += 1.0;
+	if (tts_rate > 10.0) tts_rate = 10.0;
+	v.rate = int(tts_rate);
+	speak("Speed " + int(tts_rate) + ".", true);
+}
+
+void tts_speed_down() {
+	tts_rate -= 1.0;
+	if (tts_rate < -10.0) tts_rate = -10.0;
+	v.rate = int(tts_rate);
+	speak("Speed " + int(tts_rate) + ".", true);
+}
+
 // ---- Master Update / Reset ----
 
 void audio_manager_update() {
 	music_update();
 	combat_entity@ me = get_entity(my_combatant_id);
 	if (@me != null) check_low_hp(me);
+	update_heartbeat();
 }
 
 void audio_manager_reset() {
 	music_stop();
 	reset_kill_streaks();
 	low_hp_warned = false;
+	heartbeat_active = false;
+	next_heartbeat = 0;
 	footstep_alt = 0;
 }

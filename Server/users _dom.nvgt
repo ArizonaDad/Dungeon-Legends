@@ -135,6 +135,96 @@ json_array@ json_array_remove_string(json_array@ arr, string value)
 	return result;
 }
 
+// ---- GUILD SYSTEM ----
+
+class guild {
+	string name;
+	string leader;
+	string[] members;
+
+	guild(string guild_name, string leader_name) {
+		name = guild_name;
+		leader = leader_name;
+		members.insert_last(leader_name);
+	}
+
+	bool is_member(string username) {
+		for (uint i = 0; i < members.length(); i++) {
+			if (members[i] == username) return true;
+		}
+		return false;
+	}
+
+	bool add_member(string username) {
+		if (members.length() >= 20) return false;
+		if (is_member(username)) return false;
+		members.insert_last(username);
+		return true;
+	}
+
+	bool remove_member(string username) {
+		for (uint i = 0; i < members.length(); i++) {
+			if (members[i] == username) {
+				members.remove_at(i);
+				return true;
+			}
+		}
+		return false;
+	}
+}
+
+guild@[] guilds;
+
+guild@ find_guild(string name) {
+	for (uint i = 0; i < guilds.length(); i++) {
+		if (guilds[i].name.lower() == name.lower()) return guilds[i];
+	}
+	return null;
+}
+
+guild@ find_guild_for_user(string username) {
+	for (uint i = 0; i < guilds.length(); i++) {
+		if (guilds[i].is_member(username)) return guilds[i];
+	}
+	return null;
+}
+
+// Rebuild in-memory guild objects from all persisted account data.
+// Called once after load_accounts() on server startup.
+void rebuild_guilds_from_accounts() {
+	guilds.resize(0);
+	for (uint i = 0; i < accounts.length(); i++) {
+		account@ acct = accounts[i];
+		if (@acct == null or @acct.data == null) continue;
+		ensure_account_progression(acct);
+		json_object@ progress = ensure_json_object_field(acct.data, ACCOUNT_KEY_ADVENTURE_PROGRESS);
+		if (@progress == null) continue;
+		string gname = progress.exists("guild_name") ? string(progress["guild_name"]) : "";
+		if (gname == "") continue;
+		guild@ g = find_guild(gname);
+		if (@g == null) {
+			// First member seen for this guild becomes leader initially.
+			// The actual leader is stored per-account; we correct below.
+			@g = guild(gname, acct.username);
+			guilds.insert_last(g);
+		} else {
+			g.add_member(acct.username);
+		}
+	}
+	// Second pass: correct leaders from persisted guild_leader field.
+	for (uint i = 0; i < accounts.length(); i++) {
+		account@ acct = accounts[i];
+		if (@acct == null or @acct.data == null) continue;
+		json_object@ progress = ensure_json_object_field(acct.data, ACCOUNT_KEY_ADVENTURE_PROGRESS);
+		if (@progress == null) continue;
+		if (progress.exists("guild_leader") and string(progress["guild_leader"]) != "") {
+			guild@ g = find_guild(string(progress["guild_name"]));
+			if (@g != null) g.leader = string(progress["guild_leader"]);
+		}
+	}
+	println("[GUILDS] Rebuilt " + guilds.length() + " guild(s) from account data.");
+}
+
 monster_def@ get_wild_shape_form_for_combatant(combatant@ c, string form_id)
 {
 	if (@c == null or c.class_name != "Druid" or c.level < 2) return null;
@@ -516,6 +606,29 @@ class user
 			string daily_name = get_dungeon_display_name(daily_id);
 			bool daily_claimable = can_claim_daily(this.account);
 			this.send({{"type", message_types::daily_dungeon_info}, {"dungeon_id", daily_id}, {"dungeon_name", daily_name}, {"difficulty", daily_diff}, {"can_claim", daily_claimable}});
+			// Send guild info on login if player is in a guild.
+			json_object@ gp = get_adventure_progress(this.account);
+			string login_guild_name = (@gp != null and gp.exists("guild_name")) ? string(gp["guild_name"]) : "";
+			if (login_guild_name != "") {
+				guild@ login_guild = find_guild(login_guild_name);
+				if (@login_guild != null) {
+					json_object guild_login_info;
+					guild_login_info["type"] = message_types::guild_info;
+					guild_login_info["name"] = login_guild.name;
+					guild_login_info["leader"] = login_guild.leader;
+					json_array login_members;
+					int login_glory = 0;
+					for (uint gi = 0; gi < login_guild.members.length(); gi++) {
+						login_members.add(login_guild.members[gi]);
+						user@ gu = users.get_user_by_name(login_guild.members[gi]);
+						if (@gu != null and @gu.account != null) login_glory += get_glory(gu.account);
+					}
+					guild_login_info["members"] = login_members;
+					guild_login_info["member_count"] = int(login_guild.members.length());
+					guild_login_info["total_glory"] = login_glory;
+					this.send(guild_login_info);
+				}
+			}
 			this.account.commit();
 		}
 	}
@@ -2653,5 +2766,258 @@ void handle_user_message(user@ u, json_object@ msg)
 			return;
 		}
 		u.room.bm.handle_use_consumable(u, msg);
+	}
+
+	// ---- GUILD SYSTEM HANDLERS ----
+
+	else if (msg_type == message_types::create_guild and msg.exists("name")) {
+		string guild_name = string(msg["name"]).trim_whitespace();
+		// Validate name length.
+		if (guild_name.length() < 3 or guild_name.length() > 30) {
+			u.speak("Guild name must be between 3 and 30 characters.");
+			return;
+		}
+		// Validate characters (letters, numbers, spaces only).
+		string allowed = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ";
+		for (uint i = 0; i < guild_name.length(); i++) {
+			if (allowed.find(guild_name[i]) < 0) {
+				u.speak("Guild name can only contain letters, numbers, and spaces.");
+				return;
+			}
+		}
+		// Check if player is already in a guild.
+		if (@find_guild_for_user(u.username) != null) {
+			u.speak("You are already in a guild. Leave your current guild first.");
+			return;
+		}
+		// Check if guild name is taken.
+		if (@find_guild(guild_name) != null) {
+			u.speak("A guild with that name already exists.");
+			return;
+		}
+		// Create the guild.
+		guild@ g = guild(guild_name, u.username);
+		guilds.insert_last(g);
+		// Persist to account.
+		ensure_account_progression(u.account);
+		json_object@ progress = get_adventure_progress(u.account);
+		if (@progress != null) {
+			progress["guild_name"] = guild_name;
+			progress["guild_leader"] = u.username;
+		}
+		u.account.commit();
+		println("[GUILDS] " + u.username + " created guild '" + guild_name + "'");
+		// Send guild info back to confirm.
+		json_object info;
+		info["type"] = message_types::guild_info;
+		info["name"] = g.name;
+		info["leader"] = g.leader;
+		json_array member_arr;
+		for (uint i = 0; i < g.members.length(); i++) member_arr.add(g.members[i]);
+		info["members"] = member_arr;
+		info["member_count"] = int(g.members.length());
+		info["total_glory"] = get_glory(u.account);
+		u.send(info);
+		u.speak("Guild '" + guild_name + "' created! You are the guild leader.");
+	}
+
+	else if (msg_type == message_types::join_guild and msg.exists("name")) {
+		string guild_name = string(msg["name"]);
+		// Check if player is already in a guild.
+		if (@find_guild_for_user(u.username) != null) {
+			u.speak("You are already in a guild.");
+			return;
+		}
+		guild@ g = find_guild(guild_name);
+		if (@g == null) {
+			u.speak("No guild found with that name.");
+			return;
+		}
+		if (g.members.length() >= 20) {
+			u.speak("That guild is full.");
+			return;
+		}
+		if (!g.add_member(u.username)) {
+			u.speak("Could not join the guild.");
+			return;
+		}
+		// Persist to account.
+		ensure_account_progression(u.account);
+		json_object@ progress = get_adventure_progress(u.account);
+		if (@progress != null) {
+			progress["guild_name"] = g.name;
+			progress["guild_leader"] = g.leader;
+		}
+		u.account.commit();
+		println("[GUILDS] " + u.username + " joined guild '" + g.name + "'");
+		u.speak("You joined the guild '" + g.name + "'!");
+		// Notify online guild members.
+		for (uint i = 0; i < g.members.length(); i++) {
+			if (g.members[i] == u.username) continue;
+			user@ member = users.get_user_by_name(g.members[i]);
+			if (@member != null) {
+				member.send({{"type", message_types::announce}, {"text", u.username + " has joined the guild!"}, {"interrupt", false}});
+			}
+		}
+	}
+
+	else if (msg_type == message_types::leave_guild) {
+		guild@ g = find_guild_for_user(u.username);
+		if (@g == null) {
+			u.speak("You are not in a guild.");
+			return;
+		}
+		string old_guild_name = g.name;
+		bool was_leader = (g.leader == u.username);
+		g.remove_member(u.username);
+		// Clear from account.
+		ensure_account_progression(u.account);
+		json_object@ progress = get_adventure_progress(u.account);
+		if (@progress != null) {
+			progress["guild_name"] = "";
+			progress["guild_leader"] = "";
+		}
+		u.account.commit();
+		if (g.members.length() == 0) {
+			// Disband guild.
+			int idx = guilds.find_by_ref(g);
+			if (idx >= 0) guilds.remove_at(idx);
+			println("[GUILDS] Guild '" + old_guild_name + "' disbanded (last member left).");
+		} else if (was_leader) {
+			// Transfer leadership to first remaining member.
+			g.leader = g.members[0];
+			// Update the new leader's account.
+			account@ new_leader_acct = get_account(g.leader);
+			if (@new_leader_acct != null) {
+				ensure_account_progression(new_leader_acct);
+				json_object@ lp = get_adventure_progress(new_leader_acct);
+				if (@lp != null) lp["guild_leader"] = g.leader;
+				new_leader_acct.commit();
+			}
+			// Notify online guild members.
+			for (uint i = 0; i < g.members.length(); i++) {
+				user@ member = users.get_user_by_name(g.members[i]);
+				if (@member != null) {
+					member.send({{"type", message_types::announce}, {"text", u.username + " has left the guild. " + g.leader + " is the new leader."}, {"interrupt", false}});
+				}
+			}
+			println("[GUILDS] " + u.username + " left guild '" + old_guild_name + "'. New leader: " + g.leader);
+		} else {
+			// Notify online guild members.
+			for (uint i = 0; i < g.members.length(); i++) {
+				user@ member = users.get_user_by_name(g.members[i]);
+				if (@member != null) {
+					member.send({{"type", message_types::announce}, {"text", u.username + " has left the guild."}, {"interrupt", false}});
+				}
+			}
+			println("[GUILDS] " + u.username + " left guild '" + old_guild_name + "'.");
+		}
+		u.send({{"type", message_types::leave_guild}});
+		u.speak("You left the guild '" + old_guild_name + "'.");
+	}
+
+	else if (msg_type == message_types::guild_chat and msg.exists("message")) {
+		guild@ g = find_guild_for_user(u.username);
+		if (@g == null) {
+			u.speak("You are not in a guild.");
+			return;
+		}
+		string chat_text = string(msg["message"]);
+		// Broadcast to all online guild members.
+		json_object@ chat_msg = {{"type", message_types::guild_chat}, {"from", u.username}, {"message", chat_text}};
+		for (uint i = 0; i < g.members.length(); i++) {
+			user@ member = users.get_user_by_name(g.members[i]);
+			if (@member != null) member.send(chat_msg);
+		}
+	}
+
+	else if (msg_type == message_types::guild_info) {
+		guild@ g = find_guild_for_user(u.username);
+		if (@g == null) {
+			u.send({{"type", message_types::guild_info}});
+			return;
+		}
+		json_object info;
+		info["type"] = message_types::guild_info;
+		info["name"] = g.name;
+		info["leader"] = g.leader;
+		json_array member_arr;
+		int total_glory = 0;
+		for (uint i = 0; i < g.members.length(); i++) {
+			member_arr.add(g.members[i]);
+			account@ macct = get_account(g.members[i]);
+			if (@macct != null) total_glory += get_glory(macct);
+		}
+		info["members"] = member_arr;
+		info["member_count"] = int(g.members.length());
+		info["total_glory"] = total_glory;
+		u.send(info);
+	}
+
+	else if (msg_type == message_types::guild_invite and msg.exists("target")) {
+		string target_name = string(msg["target"]);
+		guild@ g = find_guild_for_user(u.username);
+		if (@g == null) {
+			u.speak("You are not in a guild.");
+			return;
+		}
+		user@ target = users.get_user_by_name(target_name);
+		if (@target == null) {
+			u.speak(target_name + " is not online.");
+			return;
+		}
+		if (@find_guild_for_user(target_name) != null) {
+			u.speak(target_name + " is already in a guild.");
+			return;
+		}
+		// Send invite to target.
+		target.send({{"type", message_types::guild_invite_received}, {"from", u.username}, {"guild_name", g.name}});
+		u.speak("Guild invite sent to " + target_name + ".");
+		println("[GUILDS] " + u.username + " invited " + target_name + " to guild '" + g.name + "'");
+	}
+
+	else if (msg_type == message_types::guild_invite_response and msg.exists("accepted") and msg.exists("guild_name")) {
+		bool accepted = bool(msg["accepted"]);
+		string guild_name = string(msg["guild_name"]);
+		if (!accepted) {
+			u.speak("Guild invite declined.");
+			return;
+		}
+		// Check if player is already in a guild.
+		if (@find_guild_for_user(u.username) != null) {
+			u.speak("You are already in a guild.");
+			return;
+		}
+		guild@ g = find_guild(guild_name);
+		if (@g == null) {
+			u.speak("That guild no longer exists.");
+			return;
+		}
+		if (g.members.length() >= 20) {
+			u.speak("That guild is full.");
+			return;
+		}
+		if (!g.add_member(u.username)) {
+			u.speak("Could not join the guild.");
+			return;
+		}
+		// Persist to account.
+		ensure_account_progression(u.account);
+		json_object@ progress = get_adventure_progress(u.account);
+		if (@progress != null) {
+			progress["guild_name"] = g.name;
+			progress["guild_leader"] = g.leader;
+		}
+		u.account.commit();
+		println("[GUILDS] " + u.username + " accepted guild invite to '" + g.name + "'");
+		u.speak("You joined the guild '" + g.name + "'!");
+		// Notify online guild members.
+		for (uint i = 0; i < g.members.length(); i++) {
+			if (g.members[i] == u.username) continue;
+			user@ member = users.get_user_by_name(g.members[i]);
+			if (@member != null) {
+				member.send({{"type", message_types::announce}, {"text", u.username + " has joined the guild!"}, {"interrupt", false}});
+			}
+		}
 	}
 }

@@ -57,6 +57,7 @@ class server
 			println("[SERVER] ERROR: Failed to load accounts from database.");
 			return false;
 		}
+		rebuild_guilds_from_accounts();
 		println("[SERVER] Accounts loaded. Binding to port 10500...");
 		return net.setup_server(2000, 32, 900);
 		//return net.setup_local_server(10500, 255, 4095);

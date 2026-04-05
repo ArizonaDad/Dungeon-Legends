@@ -36,6 +36,10 @@ bool trade_their_confirmed = false;
 // ---- Weekly challenges cache ----
 json_object@ cached_challenge_data = null;
 
+// ---- Guild state ----
+string my_guild_name = "";
+json_object@ cached_guild_info = null;
+
 string room_game_type_label(string game_type) {
 	game_type = normalize_character_profile(game_type);
 	return game_type == "adventure" ? "Adventure" : "Sandbox";
@@ -399,10 +403,15 @@ void main_menu()
 			show_trade_screen();
 			continue;
 		}
-		menu@ m = setup_menu("");
+		string intro = "Main Menu.";
+		if (cached_level > 0) intro += " Level " + cached_level + ".";
+		int menu_gold = @cached_stats != null and cached_stats.exists("gold") ? int(cached_stats["gold"]) : 0;
+		int menu_glory = @cached_stats != null and cached_stats.exists("glory") ? int(cached_stats["glory"]) : 0;
+		if (menu_gold > 0 or menu_glory > 0) intro += " Gold: " + menu_gold + ". Glory: " + menu_glory + ".";
+		menu@ m = setup_menu(intro);
 		@m = main_screen;
 		// Calculate total items dynamically
-		int total = 13; // base: create char, adventure, sandbox, join, weekly, glory shop, daily dungeon, leaderboards, shop, friends, online, about, quit
+		int total = 14; // base: create char, adventure, sandbox, join, weekly, glory shop, daily dungeon, leaderboards, shop, guild, friends, online, about, quit
 		bool has_char = has_any_character_profile();
 		if (has_char) total++; // view char
 		total++; // inventory
@@ -427,6 +436,8 @@ void main_menu()
 		int daily_btn = m.add_item("Daily Dungeon. Today's featured dungeon with bonus rewards. " + n + " of " + total); n++;
 		int leaderboard_btn = m.add_item("Leaderboards. See the top players. " + n + " of " + total); n++;
 		int shop_btn = m.add_item("Shop. Buy consumable items for combat. " + n + " of " + total); n++;
+		string guild_label = my_guild_name != "" ? "Guild. " + my_guild_name + "." : "Guild. Create or join a guild.";
+		int guild_btn = m.add_item(guild_label + " " + n + " of " + total); n++;
 		int social = m.add_item("Friends. " + n + " of " + total); n++;
 		int CHECK_ONLINE = m.add_item("Check who is online. " + n + " of " + total); n++;
 		int About = m.add_item("About us. " + n + " of " + total); n++;
@@ -529,6 +540,9 @@ void main_menu()
 		else if (res == shop_btn) {
 			show_shop();
 		}
+		else if (res == guild_btn) {
+			show_guild_menu();
+		}
 		else if (res == social) {
 			social_panel();
 		}
@@ -626,8 +640,10 @@ void menu_callback(menu@ m, string user = "")
 	network_loop();
 	main_screen_loop();
 	music_update();
-	if (key_pressed(KEY_PAGEUP)) volume_up();
-	if (key_pressed(KEY_PAGEDOWN)) volume_down();
+	if ((keyboard_modifiers & KEYMOD_CTRL) != 0 and key_pressed(KEY_PAGEUP)) tts_speed_up();
+	else if ((keyboard_modifiers & KEYMOD_CTRL) != 0 and key_pressed(KEY_PAGEDOWN)) tts_speed_down();
+	else if (key_pressed(KEY_PAGEUP)) volume_up();
+	else if (key_pressed(KEY_PAGEDOWN)) volume_down();
 	if (key_pressed(KEY_F3) and has_pending_invite) { handle_game_invite(); }
 	if (key_pressed(KEY_F5) and trade_pending) { handle_trade_request(); }
 }
@@ -635,8 +651,10 @@ void sub_menu_callback(menu@ m, string user = "")
 {
 	network_loop();
 	music_update();
-	if (key_pressed(KEY_PAGEUP)) volume_up();
-	if (key_pressed(KEY_PAGEDOWN)) volume_down();
+	if ((keyboard_modifiers & KEYMOD_CTRL) != 0 and key_pressed(KEY_PAGEUP)) tts_speed_up();
+	else if ((keyboard_modifiers & KEYMOD_CTRL) != 0 and key_pressed(KEY_PAGEDOWN)) tts_speed_down();
+	else if (key_pressed(KEY_PAGEUP)) volume_up();
+	else if (key_pressed(KEY_PAGEDOWN)) volume_down();
 	if (key_pressed(KEY_BACK)) { simulate_key_down(KEY_ESCAPE); }
 	if (key_pressed(KEY_F3) and has_pending_invite) { handle_game_invite(); }
 	if (key_pressed(KEY_F5) and trade_pending) { handle_trade_request(); }
@@ -838,8 +856,12 @@ void host_menu()
 				int diff_pick = diff_menu.run();
 				string[] difficulties = {"normal", "hard", "nightmare"};
 				string difficulty = difficulties[diff_pick >= 0 ? diff_pick : 0];
+				last_scenario = scenario_id;
+				last_difficulty = difficulty;
 				send({{"type", message_types::start_game}, {"mode", game_mode}, {"scenario", scenario_id}, {"difficulty", difficulty}});
 			} else {
+				last_scenario = "";
+				last_difficulty = "";
 				send({{"type", message_types::start_game}, {"mode", game_mode}});
 			}
 			do_intro = false;
@@ -1351,6 +1373,100 @@ void send_report_form(string target_name)
 	send({{"type", message_types::report_player}, {"target", target_name}, {"reason", reason}});
 	speak("Report submitted for " + target_name + ".", false);
 }
+void show_guild_menu() {
+	if (my_guild_name == "") {
+		// Not in a guild.
+		menu@ m = setup_sub_menu("You are not in a guild.");
+		m.add_item("Create a guild.");
+		m.add_item("Back.");
+		int pick = m.run();
+		if (pick == 0) {
+			bool canceled = false;
+			string name = input_box_form("Create Guild", "Enter a name for your guild:", "", canceled);
+			if (!canceled and !name.empty()) {
+				send({{"type", message_types::create_guild}, {"name", name}});
+				wait(500);
+				network_loop();
+			}
+		}
+	} else {
+		// In a guild - request fresh info.
+		send({{"type", message_types::guild_info}});
+		wait(500);
+		network_loop();
+
+		string info = "Guild: " + my_guild_name + ".";
+		if (@cached_guild_info != null) {
+			info += " Leader: " + (cached_guild_info.exists("leader") ? string(cached_guild_info["leader"]) : "Unknown") + ".";
+			info += " Members: " + (cached_guild_info.exists("member_count") ? string(cached_guild_info["member_count"]) : "0") + ".";
+			info += " Total Glory: " + (cached_guild_info.exists("total_glory") ? string(cached_guild_info["total_glory"]) : "0") + ".";
+		}
+
+		menu@ m = setup_sub_menu(info);
+		m.add_item("Guild Chat. Send a message to your guild.");
+		m.add_item("View Members.");
+		m.add_item("Invite a friend to guild.");
+		m.add_item("Leave Guild.");
+		m.add_item("Back.");
+		int pick = m.run();
+		if (pick == 0) {
+			bool canceled = false;
+			string msg = input_box_form("Guild Chat", "Type your message:", "", canceled);
+			if (!canceled and !msg.empty()) {
+				send({{"type", message_types::guild_chat}, {"message", msg}});
+			}
+		} else if (pick == 1) {
+			// Show member list from cached_guild_info.
+			if (@cached_guild_info != null and cached_guild_info.exists("members")) {
+				json_array@ members = cached_guild_info["members"];
+				menu@ ml = setup_sub_menu("Guild Members.");
+				for (uint i = 0; i < members.length(); i++) {
+					string member_label = string(members[i]);
+					if (cached_guild_info.exists("leader") and string(cached_guild_info["leader"]) == member_label) {
+						member_label += " (Leader)";
+					}
+					ml.add_item(member_label + ". " + (i + 1) + " of " + members.length());
+				}
+				ml.run();
+			} else {
+				speak("No member data available.", true);
+			}
+		} else if (pick == 2) {
+			// Invite from friend list.
+			send({{"type", message_types::friend_list}});
+			wait(300);
+			network_loop();
+			if (@cached_friends != null and cached_friends.length() > 0) {
+				menu@ fl = setup_sub_menu("Invite a friend to " + my_guild_name + ".");
+				for (uint i = 0; i < cached_friends.length(); i++) {
+					json_object@ f = cached_friends[i];
+					string fname = string(f["username"]);
+					string status_text = bool(f["online"]) ? "Online" : "Offline";
+					fl.add_item(fname + ". " + status_text + ". " + (i + 1) + " of " + cached_friends.length());
+				}
+				int fp = fl.run();
+				if (fp >= 0 and fp < int(cached_friends.length())) {
+					json_object@ selected_friend = cached_friends[fp];
+					send({{"type", message_types::guild_invite}, {"target", string(selected_friend["username"])}});
+					speak("Invite sent!", true);
+				}
+			} else {
+				speak("No friends to invite.", true);
+			}
+		} else if (pick == 3) {
+			menu@ confirm = setup_sub_menu("Are you sure you want to leave " + my_guild_name + "?");
+			confirm.add_item("Yes, leave the guild.");
+			confirm.add_item("No, stay.");
+			if (confirm.run() == 0) {
+				send({{"type", message_types::leave_guild}});
+				my_guild_name = "";
+				@cached_guild_info = null;
+				speak("You left the guild.", true);
+			}
+		}
+	}
+}
+
 void social_panel()
 {
 	while (true) {

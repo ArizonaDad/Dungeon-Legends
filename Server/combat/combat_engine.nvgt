@@ -820,6 +820,11 @@ class battle {
 				state["my_portent_2_used"] = c.portent_2_used;
 				state["my_fey_presence_used"] = c.fey_presence_used;
 				state["my_dread_ambusher_used"] = c.dread_ambusher_used;
+				// Potion buff rounds remaining
+				state["my_potion_damage_rounds"] = c.potion_damage_rounds;
+				state["my_potion_ac_rounds"] = c.potion_ac_rounds;
+				state["my_potion_speed_rounds"] = c.potion_speed_rounds;
+				state["my_potion_spell_dc_rounds"] = c.potion_spell_dc_rounds;
 				break;
 			}
 		}

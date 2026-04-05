@@ -159,4 +159,14 @@ namespace message_types
 	const string shop_buy = "shop_buy";                       // Client requests to buy a consumable.
 	const string use_consumable = "use_consumable";           // Client uses a consumable in combat.
 	const string modifier_info = "modifier_info";             // Server sends active dungeon modifier info.
+
+	// Guild system
+	const string create_guild = "create_guild";               // Client requests to create a new guild.
+	const string join_guild = "join_guild";                    // Client requests to join an existing guild.
+	const string leave_guild = "leave_guild";                  // Client requests to leave their guild.
+	const string guild_chat = "guild_chat";                    // Client sends a message to guild members.
+	const string guild_info = "guild_info";                    // Client requests or server sends guild info.
+	const string guild_invite = "guild_invite";                // Client invites a friend to their guild.
+	const string guild_invite_received = "guild_invite_received"; // Server notifies client of incoming guild invite.
+	const string guild_invite_response = "guild_invite_response"; // Client accepts/declines a guild invite.
 }

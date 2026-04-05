@@ -1,7 +1,7 @@
 # Dungeon Legends - D&D 5e Battle Simulator
 
 ## Project Overview
-Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (NonVisual Gaming Toolkit, AngelScript-like). Players create characters (33 species, 13 classes, 16 backgrounds, 38 weapons, 86 spells) and fight in turn-based combat with full TTS and HRTF spatial audio. Supports PvP Arena, Wave Survival, Boss Rush, and Endless Survival modes. Features 40+ achievements, glory shop, daily dungeons, leaderboards, loot system, trading, prestige, and multi-phase boss fights.
+Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (NonVisual Gaming Toolkit, AngelScript-like). Players create characters (33 species, 13 classes, 16 backgrounds, 38 weapons, 86 spells) and fight in turn-based combat with full TTS and HRTF spatial audio. Supports PvP Arena, Wave Survival, Boss Rush, and Endless Survival modes. Features 40+ achievements, glory shop, daily dungeons, leaderboards, loot system, trading, prestige, guilds, and multi-phase boss fights.
 
 ## Architecture
 - **Client-server** model using ENet networking with JSON message passing
@@ -30,14 +30,16 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 | `Client/combat/combat_ui.nvgt` | Combat game loop, action/bonus action menus, scanning, targeting, roll prompts, tab focus, level-up screen |
 | `Client/combat/character_creator.nvgt` | Character creation with back-navigation (race->class->level->abilities->weapon->spells) |
 | `Client/combat/spell_menu.nvgt` | Spell list building, selection menu, class spell availability check |
-| `common/message_types.nvgt` | 70+ network message type constants |
+| `common/message_types.nvgt` | 80+ network message type constants |
 | `common/combat_constants.nvgt` | D&D constants (conditions, damage types, abilities, sizes, roll types) |
 
 ## Main Menu
+- Menu header displays player level, gold, and glory points
 - **Adventure**: Create an adventure lobby with persistent progression (XP, achievements, level-ups)
 - **Sandbox**: Create a sandbox lobby for free-build characters (level 1-20, no persistence)
 - Adventure characters can be used in sandbox mode as fallback
 - **Shop**: Buy consumable items (potions, throwables, scrolls) with gold for use in combat
+- **Guild**: Create or join a guild (max 20 members), guild chat, invite friends, view members and total glory
 - First-time login prompts character creation automatically
 - Daily login bonuses: streak-based XP (50-200 XP, resets after day 7)
 
@@ -115,10 +117,11 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 - **Weapon sounds**: Mapped by weapon type (sword, dagger, axe, hammer, bow) with flesh impact at target
 - **Spell sounds**: Mapped by damage type (fire, lightning, cold/water, shadow/necrotic, wind/thunder, arcane/radiant)
 - **Footsteps**: Heavy armor (Fighter/Paladin/Cleric) vs grass steps, alternating variants, spatially positioned
-- **Kill streaks**: First Blood, Double Kill (2 in one turn), Triple Kill (3 in one turn), kill_streak1-9 (4+ total)
+- **Kill streaks**: First Blood, Stealth Kill, Insta Kill (from full HP), Overkill (200%+ max HP), Double Kill (2 in one turn), Triple Kill (3 in one turn), kill_streak1-9 (4+ total)
 - **Healing sounds**: Small heals (random from 3 variants), large heals (15+ HP)
 - **Buff/debuff sounds**: Different sounds for positive vs negative conditions
-- **Announcements**: Low health warning (25% HP), level-up stinger, wave/boss stingers, victory/defeat
+- **Announcements**: Low health warning (25% HP), low health heartbeat (synth thumps below 25% HP with increasing tempo), level-up stinger, wave/boss stingers, victory/defeat
+- **TTS Speed Control**: Ctrl+PageUp/Down adjusts speech rate (-10 to +10), available in menus and combat
 - **121 sound files**: Weapon impacts, spell effects, music tracks, footsteps, kill announcements, UI sounds
 
 ### Monster AI
@@ -154,6 +157,7 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 - Glory points awarded: 10 normal, 25 boss; dungeon completions tracked
 - Level-up flow: players choose new spells, cantrips, and subclass (at level 3) interactively
 - Room `started` flag reset so new games can be launched
+- Quick restart option for wave/boss/endless modes: "Play again" re-sends start_game with same scenario/difficulty
 - Client shows 5-second countdown then returns to lobby
 
 ### Loot & Equipment System
@@ -216,14 +220,17 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 - **Caps Lock/Shift+Caps Lock**: Cycle targets from scan results
 - **[/]**: Alternative target cycling
 - **Enter**: Lock target
-- **H**: Status readout
+- **H**: Enhanced status readout (HP, AC, equipped items, active buffs with rounds remaining, consumables, kill count, modifier)
 - **O**: Initiative order (reads top to bottom)
 - **T**: Whose turn it is
 - **Tab**: Switch focus forward (Game -> Chat -> Chat History)
 - **Shift+Tab**: Switch focus backward (Game -> Chat History -> Chat)
 - **Page Up**: Volume up (+3dB)
 - **Page Down**: Volume down (-3dB)
+- **Ctrl+Page Up**: TTS speed up
+- **Ctrl+Page Down**: TTS speed down
 - **F1**: Combat help
+- **F2**: Quick keybind reference (spoken summary of all controls)
 - **Escape x 2**: Forfeit
 
 ## Sound System
@@ -276,6 +283,18 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 ## Leaderboards
 - Categories: Glory Points, Endless Best Wave, Monster Kills, Prestige Rank, Dungeons Cleared
 - Top 10 shown per category with player's own rank
+
+## Guild System
+- Players can create or join a guild (max 20 members per guild)
+- Guild names: 3-30 characters, letters/numbers/spaces only, case-insensitive uniqueness
+- Guild roles: Leader (creator or transferred) and Members
+- Guild chat: broadcasts to all online guild members via `guild_chat` message
+- Guild invites: invite friends to your guild; target receives `guild_invite_received` prompt
+- Leave guild: if leader leaves, leadership transfers to first remaining member; if last member leaves, guild disbands
+- Guild info: shows name, leader, member list, member count, and total glory (sum of all members' glory)
+- Persistence: guild_name stored in each member's `adventure_progress`; guild objects rebuilt from accounts on server startup via `rebuild_guilds_from_accounts()`
+- Message types: `create_guild`, `join_guild`, `leave_guild`, `guild_chat`, `guild_info`, `guild_invite`, `guild_invite_received`, `guild_invite_response`
+- Client guild menu accessible from main menu; shows create prompt if not in a guild, or guild management panel if in one
 
 ## Boss Phases
 - Bosses with XP >= 5000 have multi-phase transitions

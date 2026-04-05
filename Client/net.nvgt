@@ -209,6 +209,8 @@ void handle_message(json_object@ msg)
 		pending_view = "battle";
 		if (msg.exists("combatant_id")) my_combatant_id = uint(int(msg["combatant_id"]));
 		if (msg.exists("mode")) battle_mode = string(msg["mode"]);
+		if (msg.exists("scenario")) last_scenario = string(msg["scenario"]);
+		if (msg.exists("difficulty")) last_difficulty = string(msg["difficulty"]);
 		speak("Battle starting!", true);
 	}
 	else if (msg_type == message_types::game_state) {
@@ -295,7 +297,10 @@ void handle_message(json_object@ msg)
 		string name = msg.exists("name") ? string(msg["name"]) : "";
 		bool is_player = msg.exists("is_player") ? bool(msg["is_player"]) : false;
 		string killed_by = msg.exists("killed_by") ? string(msg["killed_by"]) : "";
-		on_creature_died(name, is_player, killed_by);
+		bool was_full_hp = msg.exists("was_full_hp") ? bool(msg["was_full_hp"]) : false;
+		bool was_overkill = msg.exists("was_overkill") ? bool(msg["was_overkill"]) : false;
+		bool was_stealth = msg.exists("was_stealth") ? bool(msg["was_stealth"]) : false;
+		on_creature_died(name, is_player, killed_by, was_full_hp, was_overkill, was_stealth);
 	}
 	else if (msg_type == message_types::death_save) {
 		string name = msg.exists("name") ? string(msg["name"]) : "";
@@ -563,6 +568,45 @@ void handle_message(json_object@ msg)
 		if (active_modifier_name != "" and active_modifier_name != "No Modifier") {
 			speak("Dungeon Modifier: " + active_modifier_name + ". " + active_modifier_desc, true);
 		}
+	}
+	// === GUILD SYSTEM ===
+	else if (msg_type == message_types::guild_info) {
+		@cached_guild_info = msg;
+		if (msg.exists("name") and string(msg["name"]) != "") {
+			my_guild_name = string(msg["name"]);
+		} else {
+			my_guild_name = "";
+			@cached_guild_info = null;
+		}
+	}
+	else if (msg_type == message_types::guild_chat) {
+		string from = msg.exists("from") ? string(msg["from"]) : "Unknown";
+		string guild_msg = msg.exists("message") ? string(msg["message"]) : "";
+		string display = "[Guild] " + from + ": " + guild_msg;
+		speak(display, false);
+		if (@main_screen != null) {
+			main_screen.form.add_list_item(f_main_history, display + "  ( " + calendar().format(DATE_TIME_FORMAT_RFC822) + ")", guild_msg);
+		}
+	}
+	else if (msg_type == message_types::guild_invite_received) {
+		string from = msg.exists("from") ? string(msg["from"]) : "Unknown";
+		string guild_name = msg.exists("guild_name") ? string(msg["guild_name"]) : "Unknown";
+		// Prompt user to accept or decline.
+		menu@ invite_menu = setup_sub_menu(from + " has invited you to join the guild: " + guild_name + ".");
+		invite_menu.add_item("Accept the invite.");
+		invite_menu.add_item("Decline.");
+		int invite_pick = invite_menu.run();
+		if (invite_pick == 0) {
+			send({{"type", message_types::guild_invite_response}, {"accepted", true}, {"guild_name", guild_name}});
+			speak("Joining guild " + guild_name + "!", false);
+		} else {
+			send({{"type", message_types::guild_invite_response}, {"accepted", false}, {"guild_name", guild_name}});
+			speak("Guild invite declined.", false);
+		}
+	}
+	else if (msg_type == message_types::leave_guild) {
+		my_guild_name = "";
+		@cached_guild_info = null;
 	}
 	// Unknown messages are silently ignored.
 }
