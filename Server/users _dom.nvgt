@@ -875,8 +875,18 @@ void handle_user_message(user@ u, json_object@ msg)
 	}
 
 	else if (msg_type == message_types::start_game) {
-		if (@u.room == null) return;
-		if (u.room.players.length() == 0) return;
+		if (@u.room == null) {
+			u.send({{"type", message_types::error}, {"text", "You are not in a room."}});
+			return;
+		}
+		if (u.room.players.length() == 0) {
+			u.send({{"type", message_types::error}, {"text", "No players in the room."}});
+			return;
+		}
+		if (u.room.started) {
+			u.send({{"type", message_types::error}, {"text", "A game is already in progress."}});
+			return;
+		}
 		// Only host can start (first player in room)
 		if (u.room.players[0].username != u.username) {
 			u.send({{"type", message_types::announce}, {"text", "Only the host can start the game."}, {"interrupt", true}});
@@ -1331,6 +1341,12 @@ void handle_user_message(user@ u, json_object@ msg)
 	}
 	else if (msg_type == message_types::bardic_response) {
 		if (@u.room != null and @u.room.bm != null) u.room.bm.handle_bardic_response(u, msg);
+	}
+	else if (msg_type == message_types::lucky_response) {
+		if (@u.room != null and @u.room.bm != null) u.room.bm.handle_lucky_response(u, msg);
+	}
+	else if (msg_type == message_types::heroic_response) {
+		if (@u.room != null and @u.room.bm != null) u.room.bm.handle_heroic_response(u, msg);
 	}
 	else if (msg_type == message_types::action_cast) {
 		if (@u.room != null and @u.room.bm != null) {

@@ -90,6 +90,12 @@ string roll_target_player = "";
 bool waiting_for_bardic_prompt = false;
 string bardic_prompt_text = "";
 uint64 next_bardic_prompt_reminder = 0;
+bool waiting_for_lucky_prompt = false;
+string lucky_prompt_text = "";
+uint64 next_lucky_prompt_reminder = 0;
+bool waiting_for_heroic_prompt = false;
+string heroic_prompt_text = "";
+uint64 next_heroic_prompt_reminder = 0;
 
 // Targeting
 uint current_target_id = 0;
@@ -210,6 +216,20 @@ void prompt_bardic_choice(string text) {
 	speak(text, true);
 }
 
+void prompt_lucky_choice(string text) {
+	waiting_for_lucky_prompt = true;
+	lucky_prompt_text = text;
+	next_lucky_prompt_reminder = ticks() + 3500;
+	speak(text, true);
+}
+
+void prompt_heroic_choice(string text) {
+	waiting_for_heroic_prompt = true;
+	heroic_prompt_text = text;
+	next_heroic_prompt_reminder = ticks() + 3500;
+	speak(text, true);
+}
+
 bool check_roll_input() {
 	if (!waiting_for_roll) return false;
 	if (key_pressed(KEY_R) or key_pressed(KEY_RETURN)) {
@@ -241,6 +261,44 @@ bool check_bardic_prompt_input() {
 		next_bardic_prompt_reminder = 0;
 		send({{"type", message_types::bardic_response}, {"use", false}});
 		speak("Saving Bardic Inspiration.", true);
+		return true;
+	}
+	return false;
+}
+
+bool check_lucky_prompt_input() {
+	if (!waiting_for_lucky_prompt) return false;
+	if (key_pressed(KEY_L)) {
+		waiting_for_lucky_prompt = false;
+		next_lucky_prompt_reminder = 0;
+		send({{"type", message_types::lucky_response}, {"use", true}});
+		speak("Using Luck Point.", true);
+		return true;
+	}
+	if (key_pressed(KEY_ESCAPE)) {
+		waiting_for_lucky_prompt = false;
+		next_lucky_prompt_reminder = 0;
+		send({{"type", message_types::lucky_response}, {"use", false}});
+		speak("Saving Luck Points.", true);
+		return true;
+	}
+	return false;
+}
+
+bool check_heroic_prompt_input() {
+	if (!waiting_for_heroic_prompt) return false;
+	if (key_pressed(KEY_H)) {
+		waiting_for_heroic_prompt = false;
+		next_heroic_prompt_reminder = 0;
+		send({{"type", message_types::heroic_response}, {"use", true}});
+		speak("Using Heroic Inspiration.", true);
+		return true;
+	}
+	if (key_pressed(KEY_ESCAPE)) {
+		waiting_for_heroic_prompt = false;
+		next_heroic_prompt_reminder = 0;
+		send({{"type", message_types::heroic_response}, {"use", false}});
+		speak("Saving Heroic Inspiration.", true);
 		return true;
 	}
 	return false;
@@ -1047,6 +1105,8 @@ void show_combat_help() {
 	m.add_item("O. Hear initiative order. Who goes when.");
 	m.add_item("T. Hear whose turn it is and who acts next.");
 	m.add_item("Tab. Switch focus between Game, Chat, and History. Shift plus Tab switches backward.");
+	m.add_item("Page Up. Increase volume.");
+	m.add_item("Page Down. Decrease volume.");
 	m.add_item("Escape. Forfeit the battle. Press twice to confirm. In Chat or History mode, returns to Game.");
 	m.add_item("Turn structure. Move up to your speed, then take an action. You can move before or after your action.");
 	m.add_item("Actions. Attack, Cast a Spell, Dodge, Dash, Disengage, Help, Hide, Ready attack, Shove, Grapple.");
@@ -1070,8 +1130,12 @@ void reset_combat_state() {
 	my_combatant_id = 0;
 	waiting_for_roll = false;
 	waiting_for_bardic_prompt = false;
+	waiting_for_lucky_prompt = false;
+	waiting_for_heroic_prompt = false;
 	next_roll_prompt_reminder = 0;
 	next_bardic_prompt_reminder = 0;
+	next_lucky_prompt_reminder = 0;
+	next_heroic_prompt_reminder = 0;
 	roll_type = -1;
 	current_target_id = 0;
 	current_target_name = "";
@@ -1197,6 +1261,22 @@ void combat_game_loop() {
 			check_bardic_prompt_input();
 			continue;
 		}
+		if (waiting_for_lucky_prompt) {
+			if (next_lucky_prompt_reminder > 0 and ticks() >= next_lucky_prompt_reminder) {
+				speak("Still waiting. " + lucky_prompt_text, true);
+				next_lucky_prompt_reminder = ticks() + 3500;
+			}
+			check_lucky_prompt_input();
+			continue;
+		}
+		if (waiting_for_heroic_prompt) {
+			if (next_heroic_prompt_reminder > 0 and ticks() >= next_heroic_prompt_reminder) {
+				speak("Still waiting. " + heroic_prompt_text, true);
+				next_heroic_prompt_reminder = ticks() + 3500;
+			}
+			check_heroic_prompt_input();
+			continue;
+		}
 		if (@main_screen != null and !main_screen_loop()) continue;
 
 		if (key_pressed(KEY_TAB)) {
@@ -1241,8 +1321,12 @@ void combat_game_loop() {
 			else if (key_pressed(KEY_B)) show_bonus_action_menu();
 		}
 
+		// Volume controls (available any time)
+		if (key_pressed(KEY_PAGEUP)) volume_up();
+		else if (key_pressed(KEY_PAGEDOWN)) volume_down();
+
 		// Info keys (available any time during combat)
-		if (key_pressed(KEY_F1)) show_combat_help();
+		else if (key_pressed(KEY_F1)) show_combat_help();
 		else if (key_pressed(KEY_H)) speak_my_status();
 		else if (key_pressed(KEY_O)) speak_initiative_order();
 		else if (key_pressed(KEY_T)) speak_current_turn_status();

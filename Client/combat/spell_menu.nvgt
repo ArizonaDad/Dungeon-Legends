@@ -240,7 +240,10 @@ string show_spell_selection_menu() {
 
     menu@ m = setup_sub_menu("Choose a spell to cast.");
     for (uint i = 0; i < available_spells.length(); i++) {
-        m.add_item(available_spells[i].name + ". " + spell_metadata_summary(available_spells[i]) + " " + available_spells[i].description);
+        string level_text = available_spells[i].level == 0 ? "Cantrip" : "Level " + available_spells[i].level;
+        bool is_conc = available_spells[i].description.lower().find("concentration") >= 0;
+        string conc_text = is_conc ? ". Concentration" : "";
+        m.add_item(available_spells[i].name + ". " + level_text + conc_text + ". " + available_spells[i].description);
     }
     int res = m.run();
     if (res < 0 or res >= int(available_spells.length())) {

@@ -63,6 +63,22 @@ class pending_bardic_prompt {
 	int die_size = 0;
 }
 
+class pending_lucky_prompt {
+	string player_username;
+	pending_roll@ roll;
+	int natural_roll = 0;
+	int bless_bonus = 0;
+	int bardic_bonus = 0;
+}
+
+class pending_heroic_prompt {
+	string player_username;
+	pending_roll@ roll;
+	int natural_roll = 0;
+	int bless_bonus = 0;
+	int bardic_bonus = 0;
+}
+
 class achievement_notice {
 	string id;
 	string name;
@@ -77,6 +93,8 @@ class battle_manager {
 	user@[] players;          // All players in this battle (mirrors room.players at start)
 	pending_roll@ current_roll;
 	pending_bardic_prompt@ current_bardic_prompt;
+	pending_lucky_prompt@ current_lucky_prompt;
+	pending_heroic_prompt@ current_heroic_prompt;
 	bool initiative_phase = false;
 	uint initiative_index = 0;  // Which combatant we are rolling initiative for
 	string scenario_id = "";
@@ -95,6 +113,8 @@ class battle_manager {
 		@combat = null;
 		@current_roll = null;
 		@current_bardic_prompt = null;
+		@current_lucky_prompt = null;
+		@current_heroic_prompt = null;
 		reset_progression_tracking();
 	}
 
@@ -643,6 +663,14 @@ class battle_manager {
 
 	bool has_pending_bardic_prompt() {
 		return @current_bardic_prompt != null;
+	}
+
+	bool has_pending_lucky_prompt() {
+		return @current_lucky_prompt != null;
+	}
+
+	bool has_pending_heroic_prompt() {
+		return @current_heroic_prompt != null;
 	}
 
 	int get_weapon_attack_ability_mod(combatant@ c) {
@@ -1581,7 +1609,10 @@ class battle_manager {
 	// ---- Game Start ----
 
 	void start_game(user@ host, string mode = "pvp", string scenario = "") {
-		if (@host == null or @host.room == null) return;
+		if (@host == null or @host.room == null) {
+			if (@host != null) host.send({{"type", message_types::error}, {"text", "Failed to start game: invalid room."}});
+			return;
+		}
 		reset_progression_tracking();
 		lobby_game_type = normalize_game_type(host.room.game_type);
 		progression_enabled = is_adventure_game_type(lobby_game_type);
@@ -1676,6 +1707,9 @@ class battle_manager {
 				combat.wave_number = 1;
 				spawn_wave(combat, ws.waves[0], combat.map_width);
 				broadcast_announce("Wave 1! " + ws.name + ".", false);
+			} else {
+				broadcast_announce("Unknown scenario. Defaulting to PvP arena.", false);
+				combat.mode = "pvp";
 			}
 		} else if (mode == "boss") {
 			monster_def@ boss_def = choose_boss_monster();
@@ -1691,6 +1725,7 @@ class battle_manager {
 			}
 		}
 		broadcast_announce("Battle begins! Rolling initiative.", true);
+		broadcast_state();
 
 		// Send game_start_battle to each player individually with their combatant_id.
 		for (uint pi = 0; pi < players.length(); pi++) {
@@ -2459,6 +2494,12 @@ class battle_manager {
 		int total = natural_roll + pr.modifier + bless_bonus + bardic_bonus;
 		int reported_modifier = pr.modifier + bless_bonus + bardic_bonus;
 
+		// Heroic Inspiration: grant on natural 20 for any d20 roll (players only)
+		if (natural_roll == 20 and c.is_player and !c.has_heroic_inspiration and pr.roll_type != ROLL_DAMAGE) {
+			c.has_heroic_inspiration = true;
+			broadcast_announce(c.name + " earns Heroic Inspiration!", false);
+		}
+
 		if (pr.roll_type == ROLL_INITIATIVE) {
 			c.initiative_roll = total;
 			broadcast_roll(pr.player_username, "initiative", natural_roll, reported_modifier, total, "");
@@ -2822,6 +2863,7 @@ class battle_manager {
 			}
 		}
 		if (maybe_prompt_bardic_inspiration(pr, c, natural_roll, bless_bonus)) return;
+		if (try_reroll_prompts(pr, c, natural_roll, bless_bonus, 0)) return;
 		finalize_roll_result(pr, natural_roll, bless_bonus, 0);
 	}
 
@@ -2930,7 +2972,197 @@ class battle_manager {
 			broadcast_announce(c.name + " uses Bardic Inspiration (" + die_label(die_size) + ") and adds " + bardic_bonus + " to the roll.", false);
 		}
 
-		finalize_roll_result(pr, prompt.natural_roll, prompt.bless_bonus, bardic_bonus);
+		if (!try_reroll_prompts(pr, c, prompt.natural_roll, prompt.bless_bonus, bardic_bonus)) {
+			finalize_roll_result(pr, prompt.natural_roll, prompt.bless_bonus, bardic_bonus);
+		}
+	}
+
+	// ---- Lucky / Heroic Inspiration Reroll Prompts ----
+
+	// Check if a d20 roll would fail given the current total.
+	// Returns true if the roll is a failure that could benefit from a reroll.
+	bool roll_would_fail(pending_roll@ pr, combatant@ c, int natural_roll, int total) {
+		if (@pr == null or @c == null) return false;
+		if (natural_roll == 20) return false; // nat 20 always succeeds
+		if (pr.roll_type == ROLL_ATTACK) {
+			if (natural_roll == 1) return true; // nat 1 always misses
+			combatant@ target = combat.get_combatant(pr.target_id);
+			if (@target == null) return false;
+			return total < target.armor_class;
+		}
+		else if (pr.roll_type == ROLL_CONCENTRATION) {
+			return total < pr.dc;
+		}
+		else if (pr.roll_type == ROLL_DEATH_SAVE) {
+			if (natural_roll == 1) return true;
+			return total < DEATH_SAVE_DC;
+		}
+		else if (pr.roll_type == ROLL_ABILITY_CHECK and pr.resolution_tag == "hide") {
+			return total < pr.dc;
+		}
+		return false;
+	}
+
+	// Try Lucky then Heroic prompts. Returns true if a prompt was sent (caller should wait).
+	bool try_reroll_prompts(pending_roll@ pr, combatant@ c, int natural_roll, int bless_bonus, int bardic_bonus) {
+		if (@pr == null or @c == null) return false;
+		int total = natural_roll + pr.modifier + bless_bonus + bardic_bonus;
+		if (!roll_would_fail(pr, c, natural_roll, total)) return false;
+		if (maybe_prompt_lucky(pr, c, natural_roll, bless_bonus, bardic_bonus)) return true;
+		if (maybe_prompt_heroic(pr, c, natural_roll, bless_bonus, bardic_bonus)) return true;
+		return false;
+	}
+
+	bool maybe_prompt_lucky(pending_roll@ pr, combatant@ c, int natural_roll, int bless_bonus, int bardic_bonus) {
+		if (@pr == null or @c == null) return false;
+		if (!c.has_lucky_feat or c.luck_points <= 0) return false;
+		if (!c.is_player) return false;
+
+		int total = natural_roll + pr.modifier + bless_bonus + bardic_bonus;
+		string prompt_text = "";
+		if (pr.roll_type == ROLL_ATTACK) {
+			combatant@ target = combat.get_combatant(pr.target_id);
+			prompt_text = "You missed" + (@target != null ? " " + target.name : "") + "!";
+		}
+		else if (pr.roll_type == ROLL_CONCENTRATION) {
+			prompt_text = "You failed your concentration save!";
+		}
+		else if (pr.roll_type == ROLL_DEATH_SAVE) {
+			prompt_text = "You failed your death save!";
+		}
+		else if (pr.roll_type == ROLL_ABILITY_CHECK) {
+			prompt_text = "Your check failed!";
+		}
+		else {
+			return false;
+		}
+
+		user@ roller_user = find_user_for_combatant(c);
+		if (@roller_user == null or roller_user.is_bot) {
+			// Bot auto-uses Lucky
+			c.luck_points--;
+			int roll1 = random(1, 20);
+			int roll2 = random(1, 20);
+			int new_natural = roll1 > roll2 ? roll1 : roll2;
+			broadcast_announce(c.name + " spends a Luck Point to reroll! (" + c.luck_points + " remaining). Rolled " + roll1 + " and " + roll2 + ", using " + new_natural + ".", false);
+			finalize_roll_result(pr, new_natural, bless_bonus, bardic_bonus);
+			return true;
+		}
+
+		pending_lucky_prompt prompt;
+		prompt.player_username = c.player_username;
+		@prompt.roll = pr;
+		prompt.natural_roll = natural_roll;
+		prompt.bless_bonus = bless_bonus;
+		prompt.bardic_bonus = bardic_bonus;
+		@current_lucky_prompt = prompt;
+
+		roller_user.send({
+			{"type", message_types::lucky_prompt},
+			{"text", prompt_text + " Use a Luck Point to reroll? " + c.luck_points + " points remaining. Press L to use or Escape to save."},
+			{"points", c.luck_points}
+		});
+		return true;
+	}
+
+	bool maybe_prompt_heroic(pending_roll@ pr, combatant@ c, int natural_roll, int bless_bonus, int bardic_bonus) {
+		if (@pr == null or @c == null) return false;
+		if (!c.has_heroic_inspiration) return false;
+		if (!c.is_player) return false;
+
+		int total = natural_roll + pr.modifier + bless_bonus + bardic_bonus;
+		string prompt_text = "";
+		if (pr.roll_type == ROLL_ATTACK) {
+			combatant@ target = combat.get_combatant(pr.target_id);
+			prompt_text = "You missed" + (@target != null ? " " + target.name : "") + "!";
+		}
+		else if (pr.roll_type == ROLL_CONCENTRATION) {
+			prompt_text = "You failed your concentration save!";
+		}
+		else if (pr.roll_type == ROLL_DEATH_SAVE) {
+			prompt_text = "You failed your death save!";
+		}
+		else if (pr.roll_type == ROLL_ABILITY_CHECK) {
+			prompt_text = "Your check failed!";
+		}
+		else {
+			return false;
+		}
+
+		user@ roller_user = find_user_for_combatant(c);
+		if (@roller_user == null or roller_user.is_bot) {
+			// Bot auto-uses Heroic Inspiration
+			c.has_heroic_inspiration = false;
+			int new_natural = random(1, 20);
+			broadcast_announce(c.name + " uses Heroic Inspiration to reroll! New roll: " + new_natural + ".", false);
+			finalize_roll_result(pr, new_natural, bless_bonus, bardic_bonus);
+			return true;
+		}
+
+		pending_heroic_prompt prompt;
+		prompt.player_username = c.player_username;
+		@prompt.roll = pr;
+		prompt.natural_roll = natural_roll;
+		prompt.bless_bonus = bless_bonus;
+		prompt.bardic_bonus = bardic_bonus;
+		@current_heroic_prompt = prompt;
+
+		roller_user.send({
+			{"type", message_types::heroic_prompt},
+			{"text", prompt_text + " Use Heroic Inspiration to reroll? Press H to use or Escape to save."}
+		});
+		return true;
+	}
+
+	void handle_lucky_response(user@ u, json_object@ msg) {
+		if (@current_lucky_prompt == null or @u == null) return;
+		if (current_lucky_prompt.player_username != u.username) return;
+
+		pending_lucky_prompt@ prompt = current_lucky_prompt;
+		@current_lucky_prompt = null;
+
+		pending_roll@ pr = prompt.roll;
+		combatant@ c = @pr != null ? combat.get_combatant(pr.combatant_id) : null;
+		if (@pr == null or @c == null) return;
+
+		bool use_point = msg.exists("use") ? bool(msg["use"]) : false;
+		if (use_point and c.luck_points > 0) {
+			c.luck_points--;
+			int roll1 = random(1, 20);
+			int roll2 = random(1, 20);
+			int new_natural = roll1 > roll2 ? roll1 : roll2;
+			broadcast_announce(c.name + " spends a Luck Point to reroll with advantage! (" + c.luck_points + " remaining). Rolled " + roll1 + " and " + roll2 + ", using " + new_natural + ".", false);
+			if (!try_reroll_prompts(pr, c, new_natural, prompt.bless_bonus, prompt.bardic_bonus)) {
+				finalize_roll_result(pr, new_natural, prompt.bless_bonus, prompt.bardic_bonus);
+			}
+		} else {
+			// Declined Lucky - try Heroic next
+			if (!maybe_prompt_heroic(pr, c, prompt.natural_roll, prompt.bless_bonus, prompt.bardic_bonus)) {
+				finalize_roll_result(pr, prompt.natural_roll, prompt.bless_bonus, prompt.bardic_bonus);
+			}
+		}
+	}
+
+	void handle_heroic_response(user@ u, json_object@ msg) {
+		if (@current_heroic_prompt == null or @u == null) return;
+		if (current_heroic_prompt.player_username != u.username) return;
+
+		pending_heroic_prompt@ prompt = current_heroic_prompt;
+		@current_heroic_prompt = null;
+
+		pending_roll@ pr = prompt.roll;
+		combatant@ c = @pr != null ? combat.get_combatant(pr.combatant_id) : null;
+		if (@pr == null or @c == null) return;
+
+		bool use_it = msg.exists("use") ? bool(msg["use"]) : false;
+		if (use_it and c.has_heroic_inspiration) {
+			c.has_heroic_inspiration = false;
+			int new_natural = random(1, 20);
+			broadcast_announce(c.name + " uses Heroic Inspiration to reroll! New roll: " + new_natural + ".", false);
+			finalize_roll_result(pr, new_natural, prompt.bless_bonus, prompt.bardic_bonus);
+		} else {
+			finalize_roll_result(pr, prompt.natural_roll, prompt.bless_bonus, prompt.bardic_bonus);
+		}
 	}
 
 	// ---- Action Handlers ----

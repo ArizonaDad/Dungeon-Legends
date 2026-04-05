@@ -667,14 +667,43 @@ void choose_origin_feat_step(string prompt) {
     gain_feat(feat_ids[pick], true);
 }
 
+string ability_name_from_key(string key) {
+    int id = ability_id_from_key(key);
+    if (id >= 0 and id < int(ABILITY_NAMES.length())) return ABILITY_NAMES[id];
+    return key;
+}
+
+string get_feat_brief(string feat_id) {
+    if (feat_id == "magic_initiate_cleric") return "Magic Initiate (Cleric) - learn cleric cantrips and a 1st level spell";
+    if (feat_id == "magic_initiate_wizard") return "Magic Initiate (Wizard) - learn wizard cantrips and a 1st level spell";
+    if (feat_id == "magic_initiate_druid") return "Magic Initiate (Druid) - learn druid cantrips and a 1st level spell";
+    if (feat_id == "alert") return "Alert - bonus to initiative, can't be surprised";
+    if (feat_id == "savage_attacker") return "Savage Attacker - reroll damage dice once per turn";
+    if (feat_id == "skilled") return "Skilled - gain 3 additional skill proficiencies";
+    if (feat_id == "tough") return "Tough - gain extra hit points equal to twice your level";
+    if (feat_id == "tavern_brawler") return "Tavern Brawler - enhanced unarmed strikes, push enemies";
+    if (feat_id == "healer") return "Healer - enhanced healing with healer's kit";
+    if (feat_id == "lucky") return "Lucky - luck points to reroll attacks, saves, or checks";
+    if (feat_id == "crafter") return "Crafter - craft items and get discounts";
+    if (feat_id == "musician") return "Musician - grant Bardic Inspiration to allies after resting";
+    return feat_id;
+}
+
 void choose_background_step() {
     init_feat_data();
-    menu@ background_menu = setup_sub_menu("Choose your background. Backgrounds now provide your ability score increases and your starting feat.");
+    menu@ background_menu = setup_sub_menu("Choose your background. This determines your ability score bonuses and starting feat.");
     string[] background_ids;
     for (uint i = 0; i < BACKGROUND_CHOICES.length(); i++) {
         background_choice_def@ bg = BACKGROUND_CHOICES[i];
         if (@bg == null) continue;
-        background_menu.add_item(bg.description);
+        string[] ability_keys = bg.ability_csv.split(",");
+        string ability_display = "";
+        for (uint k = 0; k < ability_keys.length(); k++) {
+            if (k > 0) ability_display += ", ";
+            ability_display += ability_name_from_key(ability_keys[k]);
+        }
+        string label = bg.name + ". Ability bonuses: " + ability_display + ". Feat: " + get_feat_brief(bg.feat_id) + ".";
+        background_menu.add_item(label);
         background_ids.insert_last(bg.id);
     }
     int pick = creation_menu_run(background_menu);
@@ -1161,7 +1190,7 @@ int run_weapon_step() {
 }
 
 bool choose_race_step() {
-    menu@ race_menu = setup_sub_menu("Choose your species. In this rules pass, ability score increases come from your background, not your species.");
+    menu@ race_menu = setup_sub_menu("Choose your species. Each species provides unique ability bonuses and traits.");
 
     string[] races = {
         "Aasimar", "Dragonborn", "Dwarf", "Elf", "Gnome",
@@ -1216,7 +1245,7 @@ bool choose_race_step() {
 }
 
 bool choose_class_step() {
-    menu@ class_menu = setup_sub_menu("Choose your class.");
+    menu@ class_menu = setup_sub_menu("Choose your class. Your class determines your combat role, abilities, and how you fight.");
     string[] classes = {"Barbarian","Bard","Cleric","Druid","Fighter","Monk","Paladin","Ranger","Rogue","Sorcerer","Warlock","Wizard","Artificer"};
     string[] class_desc = {
         "Barbarian. D 12 hit die. Rages in battle for extra damage and resistance.",
@@ -1260,40 +1289,78 @@ bool assign_ability_scores_step() {
     int[] previous_scores = created_ability_scores;
     int[] standard = {15, 14, 13, 12, 10, 8};
     bool[] used = {false, false, false, false, false, false};
+    int[] used_indices = {-1, -1, -1, -1, -1, -1};
     speak("Assign ability scores using the standard array: 15, 14, 13, 12, 10, 8.", true);
-    for (int a = 0; a < 6; a++) {
+
+    string lc = created_char_class.lower();
+    if (lc == "fighter" or lc == "barbarian" or lc == "paladin") {
+        speak("Tip: Strength and Constitution are most important for your class.", false);
+    } else if (lc == "rogue" or lc == "ranger" or lc == "monk") {
+        speak("Tip: Dexterity is most important for your class.", false);
+    } else if (lc == "wizard" or lc == "artificer") {
+        speak("Tip: Intelligence is most important for your class.", false);
+    } else if (lc == "cleric" or lc == "druid") {
+        speak("Tip: Wisdom is most important for your class.", false);
+    } else if (lc == "sorcerer" or lc == "warlock" or lc == "bard") {
+        speak("Tip: Charisma is most important for your class.", false);
+    }
+
+    int a = 0;
+    while (a < 6) {
         string ability_name = ABILITY_NAMES[a];
+        string progress = "";
+        for (int p = 0; p < a; p++) {
+            if (progress != "") progress += ", ";
+            progress += ABILITY_NAMES[p] + " " + created_ability_scores[p];
+        }
         string available = "";
         menu@ score_menu = setup_sub_menu("Assign a score to " + ability_name + ".");
         int[] remaining_scores;
+        int[] remaining_indices;
         for (uint s = 0; s < 6; s++) {
             if (used[s]) continue;
             if (available != "") available += ", ";
             available += standard[s];
             score_menu.add_item("" + standard[s]);
             remaining_scores.insert_last(standard[s]);
+            remaining_indices.insert_last(s);
         }
-        score_menu.intro_text = "Assign a score to " + ability_name + ". Available: " + available + ".";
-        int pick = creation_menu_run(score_menu);
-        if (pick < 0 or pick >= int(remaining_scores.length())) {
+        string prompt_text = "Assign a score to " + ability_name + ".";
+        if (progress != "") prompt_text += " So far: " + progress + ".";
+        prompt_text += " Available: " + available + ".";
+        if (a > 0) prompt_text += " Press backspace to redo the previous score.";
+        score_menu.intro_text = prompt_text;
+        int back_item = score_menu.add_item("Go back.");
+        int pick = score_menu.run();
+        if (pick < 0 or pick == back_item) {
+            if (a > 0) {
+                a--;
+                int prev_index = used_indices[a];
+                if (prev_index >= 0 and prev_index < 6) used[prev_index] = false;
+                used_indices[a] = -1;
+                created_ability_scores[a] = 10;
+                speak("Going back to " + ABILITY_NAMES[a] + ".", false);
+                continue;
+            }
+            created_ability_scores = previous_scores;
+            return false;
+        }
+        if (pick >= int(remaining_scores.length())) {
             created_ability_scores = previous_scores;
             return false;
         }
         created_ability_scores[a] = remaining_scores[pick];
-        for (uint s = 0; s < 6; s++) {
-            if (!used[s] and standard[s] == remaining_scores[pick]) {
-                used[s] = true;
-                break;
-            }
-        }
+        used[remaining_indices[pick]] = true;
+        used_indices[a] = remaining_indices[pick];
         speak(ability_name + " set to " + created_ability_scores[a] + ".", false);
+        a++;
     }
     created_pre_progression_ability_scores = created_ability_scores;
     return true;
 }
 
 bool choose_weapon_step() {
-    menu@ weapon_cat_menu = setup_sub_menu("Choose a weapon category.");
+    menu@ weapon_cat_menu = setup_sub_menu("Choose your weapon. This is what you'll use to attack in combat.");
     weapon_cat_menu.add_item("Simple Melee Weapons.");
     weapon_cat_menu.add_item("Simple Ranged Weapons.");
     weapon_cat_menu.add_item("Martial Melee Weapons.");

@@ -102,6 +102,9 @@ void init_feat_data() {
 	add_feat_choice("tough", "Tough", FEAT_CATEGORY_ORIGIN, "Your Hit Point maximum increases by 2 per character level.", false, 1);
 	add_feat_choice("tavern_brawler", "Tavern Brawler", FEAT_CATEGORY_ORIGIN, "Improve unarmed fighting and push foes when you land an unarmed strike.", false, 1);
 	add_feat_choice("healer", "Healer", FEAT_CATEGORY_ORIGIN, "Your healing rolls reroll 1s.", false, 1);
+	add_feat_choice("lucky", "Lucky", FEAT_CATEGORY_ORIGIN, "You gain Luck Points equal to your Proficiency Bonus. Spend one to reroll a failed d20 roll.", false, 1);
+	add_feat_choice("crafter", "Crafter", FEAT_CATEGORY_ORIGIN, "You gain proficiency with three Artisan's Tools and can craft items at a discount.", false, 1);
+	add_feat_choice("musician", "Musician", FEAT_CATEGORY_ORIGIN, "You can play a musical instrument to grant Bardic Inspiration to allies after a rest.", false, 1);
 
 	add_feat_choice("ability_score_improvement", "Ability Score Improvement", FEAT_CATEGORY_GENERAL, "Increase one ability score by 2, or increase two ability scores by 1.", true, 4);
 	add_feat_choice("grappler", "Grappler", FEAT_CATEGORY_GENERAL, "Increase Strength or Dexterity by 1 and gain advantage against creatures grappled by you.", false, 4, "", false, false, -1, 0);
@@ -120,10 +123,34 @@ void init_feat_data() {
 	string[] criminal_skills = {"Sleight of Hand", "Stealth"};
 	string[] sage_skills = {"Arcana", "History"};
 	string[] soldier_skills = {"Athletics", "Intimidation"};
+	string[] artisan_skills = {"Investigation", "Persuasion"};
+	string[] charlatan_skills = {"Deception", "Sleight of Hand"};
+	string[] entertainer_skills = {"Acrobatics", "Performance"};
+	string[] farmer_skills = {"Animal Handling", "Nature"};
+	string[] guard_skills = {"Athletics", "Perception"};
+	string[] guide_skills = {"Stealth", "Survival"};
+	string[] hermit_skills = {"Medicine", "Religion"};
+	string[] merchant_skills = {"Animal Handling", "Persuasion"};
+	string[] noble_skills = {"History", "Persuasion"};
+	string[] sailor_skills = {"Acrobatics", "Perception"};
+	string[] scribe_skills = {"Investigation", "Perception"};
+	string[] wayfarer_skills = {"Insight", "Stealth"};
 	add_background_choice("acolyte", "Acolyte", "Acolyte. Study, devotion, and temple service. Grants Magic Initiate (Cleric).", "int,wis,cha", "magic_initiate_cleric", acolyte_skills, "Calligrapher's Supplies");
 	add_background_choice("criminal", "Criminal", "Criminal. Quick hands, stealth, and underworld survival. Grants Alert.", "dex,con,int", "alert", criminal_skills, "Thieves' Tools");
 	add_background_choice("sage", "Sage", "Sage. Research, lore, and arcane study. Grants Magic Initiate (Wizard).", "con,int,wis", "magic_initiate_wizard", sage_skills, "Calligrapher's Supplies");
 	add_background_choice("soldier", "Soldier", "Soldier. Discipline, drills, and battle experience. Grants Savage Attacker.", "str,dex,con", "savage_attacker", soldier_skills, "Gaming Set");
+	add_background_choice("artisan", "Artisan", "Artisan. Crafting expertise and keen eye for detail.", "str,dex,int", "crafter", artisan_skills, "Artisan's Tools");
+	add_background_choice("charlatan", "Charlatan", "Charlatan. Deception, disguise, and quick wits.", "dex,con,cha", "skilled", charlatan_skills, "Forgery Kit");
+	add_background_choice("entertainer", "Entertainer", "Entertainer. Performance, acrobatics, and crowd control.", "str,dex,cha", "musician", entertainer_skills, "Musical Instrument");
+	add_background_choice("farmer", "Farmer", "Farmer. Hard work, endurance, and connection to the land.", "str,con,wis", "tough", farmer_skills, "Carpenter's Tools");
+	add_background_choice("guard", "Guard", "Guard. Vigilance, discipline, and combat readiness.", "str,int,wis", "alert", guard_skills, "Gaming Set");
+	add_background_choice("guide", "Guide", "Guide. Navigation, survival, and nature magic.", "dex,con,wis", "magic_initiate_druid", guide_skills, "Navigator's Tools");
+	add_background_choice("hermit", "Hermit", "Hermit. Solitude, meditation, and healing knowledge.", "con,wis,cha", "healer", hermit_skills, "Herbalism Kit");
+	add_background_choice("merchant", "Merchant", "Merchant. Trade, negotiation, and fortunate dealings.", "con,int,cha", "lucky", merchant_skills, "Scales");
+	add_background_choice("noble", "Noble", "Noble. Authority, education, and social influence.", "str,int,cha", "skilled", noble_skills, "Gaming Set");
+	add_background_choice("sailor", "Sailor", "Sailor. Sea legs, brawling, and navigation.", "str,dex,wis", "tavern_brawler", sailor_skills, "Navigator's Tools");
+	add_background_choice("scribe", "Scribe", "Scribe. Research, investigation, and meticulous observation.", "dex,int,wis", "skilled", scribe_skills, "Calligrapher's Supplies");
+	add_background_choice("wayfarer", "Wayfarer", "Wayfarer. Wandering, intuition, and lucky breaks.", "dex,wis,cha", "lucky", wayfarer_skills, "Thieves' Tools");
 }
 
 feat_choice_def@ get_feat_choice(string id) {

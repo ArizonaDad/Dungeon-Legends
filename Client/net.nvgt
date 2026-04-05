@@ -241,6 +241,14 @@ void handle_message(json_object@ msg)
 		string text = msg.exists("text") ? string(msg["text"]) : "Use Bardic Inspiration? Press Enter to use it or Escape to save it.";
 		prompt_bardic_choice(text);
 	}
+	else if (msg_type == message_types::lucky_prompt) {
+		string text = msg.exists("text") ? string(msg["text"]) : "Use a Luck Point to reroll? Press L to use or Escape to save.";
+		prompt_lucky_choice(text);
+	}
+	else if (msg_type == message_types::heroic_prompt) {
+		string text = msg.exists("text") ? string(msg["text"]) : "Use Heroic Inspiration to reroll? Press H to use or Escape to save.";
+		prompt_heroic_choice(text);
+	}
 	else if (msg_type == message_types::roll_result) {
 		// Server broadcasts roll results to ALL players - spoken via TTS
 		int natural_roll = msg.exists("natural") ? int(msg["natural"]) : 0;

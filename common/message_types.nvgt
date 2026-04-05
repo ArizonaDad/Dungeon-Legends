@@ -52,6 +52,10 @@ namespace message_types
 	const string roll_result = "roll_result";                 // Client pressed Roll, server sends result.
 	const string bardic_prompt = "bardic_prompt";             // Server offers Bardic Inspiration after a failed roll.
 	const string bardic_response = "bardic_response";         // Client chooses whether to spend Bardic Inspiration.
+	const string lucky_prompt = "lucky_prompt";               // Server offers Lucky reroll after a failed d20 roll.
+	const string lucky_response = "lucky_response";           // Client chooses whether to spend a Luck Point.
+	const string heroic_prompt = "heroic_prompt";             // Server offers Heroic Inspiration reroll after a failed d20 roll.
+	const string heroic_response = "heroic_response";         // Client chooses whether to spend Heroic Inspiration.
 
 	// Actions
 	const string action_move = "action_move";                 // Client moves their character.

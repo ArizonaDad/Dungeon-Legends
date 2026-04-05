@@ -9,6 +9,23 @@ const float VOL_COMBAT = -6.0f;
 const float VOL_ANNOUNCE = 0.0f;
 const float VOL_FOOTSTEP = -10.0f;
 
+// Master volume control
+float master_volume_offset = 0.0f;
+
+void volume_up() {
+	master_volume_offset += 3.0f;
+	if (master_volume_offset > 12.0f) master_volume_offset = 12.0f;
+	if (@current_music != null) current_music.volume = VOL_MUSIC + master_volume_offset;
+	speak("Volume up. " + int(master_volume_offset) + " decibels.", true);
+}
+
+void volume_down() {
+	master_volume_offset -= 3.0f;
+	if (master_volume_offset < -30.0f) master_volume_offset = -30.0f;
+	if (@current_music != null) current_music.volume = VOL_MUSIC + master_volume_offset;
+	speak("Volume down. " + int(master_volume_offset) + " decibels.", true);
+}
+
 // Music track arrays
 string[] MENU_MUSIC = {"main_menu_music.wav", "main_menu_music1.wav", "main_menu_music3.wav", "main_menu_music5.wav", "main_menu_music6.wav", "main_music4.wav"};
 string[] BATTLE_MUSIC = {"battle_music1.wav", "battle_music2.wav", "battle_music3.wav", "battle_music4.wav", "battle_music5.wav", "battle_music6.wav", "battle_music7.wav"};
@@ -56,7 +73,7 @@ string pick_random(string[]@ files) {
 sound@ audio_load(string filename, float vol = VOL_COMBAT) {
 	sound@ s = sound();
 	if (!s.load(SND + filename)) { s.close(); return null; }
-	s.volume = vol;
+	s.volume = vol + master_volume_offset;
 	return s;
 }
 
@@ -113,7 +130,7 @@ void music_play_next() {
 	music_last_idx = idx;
 	@current_music = sound();
 	current_music.load(SND + tracks[idx]);
-	current_music.volume = VOL_MUSIC;
+	current_music.volume = VOL_MUSIC + master_volume_offset;
 	current_music.spatialization_enabled = false;
 	current_music.play();
 }

@@ -1,7 +1,7 @@
 # Souls MMO - D&D 5e Battle Simulator
 
 ## Project Overview
-Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (NonVisual Gaming Toolkit, AngelScript-like). Players create characters (33 species, 13 classes, 38 weapons, 53 spells) and fight in turn-based combat with full TTS and HRTF spatial audio. Supports PvP Arena, Wave Survival, and Boss Rush modes.
+Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (NonVisual Gaming Toolkit, AngelScript-like). Players create characters (33 species, 13 classes, 16 backgrounds, 38 weapons, 53 spells) and fight in turn-based combat with full TTS and HRTF spatial audio. Supports PvP Arena, Wave Survival, and Boss Rush modes.
 
 ## Architecture
 - **Client-server** model using ENet networking with JSON message passing
@@ -28,7 +28,7 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 | `Client/combat/combat_ui.nvgt` | Combat game loop, action/bonus action menus, scanning, targeting, roll prompts, tab focus, level-up screen |
 | `Client/combat/character_creator.nvgt` | Character creation with back-navigation (race->class->level->abilities->weapon->spells) |
 | `Client/combat/spell_menu.nvgt` | Spell list building, selection menu, class spell availability check |
-| `common/message_types.nvgt` | 65+ network message type constants |
+| `common/message_types.nvgt` | 70+ network message type constants |
 | `common/combat_constants.nvgt` | D&D constants (conditions, damage types, abilities, sizes, roll types) |
 
 ## Main Menu
@@ -67,6 +67,12 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 - Cantrip scaling at levels 5/11/17
 - Concentration management (drop old when casting new)
 - Spell slot consumption (lowest available >= spell level)
+- Spell menu shows level (Cantrip/Level N) and Concentration tag for each spell
+
+### Reroll Mechanics
+- **Lucky feat**: Characters with the Lucky feat gain Luck Points equal to proficiency bonus per battle. After a failed d20 roll, prompted to spend a Luck Point to reroll with advantage (Press L / Escape). Chains after Bardic Inspiration prompt.
+- **Heroic Inspiration**: Earned on any natural 20 d20 roll (players only). After a failed d20 roll, prompted to use Heroic Inspiration for a reroll (Press H / Escape). Chains after Lucky prompt. Consumed on use.
+- **Prompt chain order**: Bardic Inspiration (additive) -> Lucky (reroll with advantage) -> Heroic Inspiration (reroll)
 
 ### Action Menu (F key)
 - Standard actions only: Attack, Cast, Dodge, Dash, Disengage, Help, Hide, Ready, Shove, Grapple, End Turn, Status
@@ -129,7 +135,9 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 - Client shows 5-second countdown then returns to lobby
 
 ### Character Creation
-- Step-by-step wizard: Name -> Species -> Class -> Level -> Subclass -> Abilities -> Weapon -> Spells -> Summary
+- Step-by-step wizard: Name -> Species -> Class -> Level -> Background -> Subclass -> Abilities -> Weapon -> Spells -> Summary
+- 16 backgrounds: Acolyte, Artisan, Charlatan, Criminal, Entertainer, Farmer, Guard, Guide, Hermit, Merchant, Noble, Sage, Sailor, Scribe, Soldier, Wayfarer
+- Each background grants: 3 ability score bonuses, an Origin feat, 2 skill proficiencies, and a tool proficiency
 - **Backspace/Escape goes back** to the previous step at any point
 - At the first step, Escape cancels the wizard
 - Adventure mode forces level from server progression

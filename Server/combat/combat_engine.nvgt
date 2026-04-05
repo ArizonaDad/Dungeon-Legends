@@ -173,6 +173,14 @@ class combatant {
 	bool tavern_brawler_push_used = false;
 	bool hunter_colossus_used = false;
 
+	// Lucky feat
+	int luck_points = 0;
+	int luck_points_max = 0;
+	bool has_lucky_feat = false;
+
+	// Heroic Inspiration
+	bool has_heroic_inspiration = false;
+
 	// Helpers
 	int get_ability_mod(int ability_id) {
 		return ability_modifier(ability_scores[ability_id]);
@@ -708,6 +716,9 @@ class battle {
 				state["my_has_reaction"] = c.has_reaction;
 				state["my_attacks_remaining"] = c.attacks_remaining_this_turn;
 				state["my_spiritual_weapon_active"] = c.spiritual_weapon_active;
+				state["my_luck_points"] = c.luck_points;
+				state["my_luck_points_max"] = c.luck_points_max;
+				state["my_has_heroic_inspiration"] = c.has_heroic_inspiration;
 				break;
 			}
 		}

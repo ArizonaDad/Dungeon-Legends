@@ -275,11 +275,17 @@ void menu_callback(menu@ m, string user = "")
 {
 	network_loop();
 	main_screen_loop();
+	music_update();
+	if (key_pressed(KEY_PAGEUP)) volume_up();
+	if (key_pressed(KEY_PAGEDOWN)) volume_down();
 	if (key_pressed(KEY_F3) and has_pending_invite) { handle_game_invite(); }
 }
 void sub_menu_callback(menu@ m, string user = "")
 {
 	network_loop();
+	music_update();
+	if (key_pressed(KEY_PAGEUP)) volume_up();
+	if (key_pressed(KEY_PAGEDOWN)) volume_down();
 	if (key_pressed(KEY_BACK)) { simulate_key_down(KEY_ESCAPE); }
 	if (key_pressed(KEY_F3) and has_pending_invite) { handle_game_invite(); }
 }

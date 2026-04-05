@@ -601,5 +601,18 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
     c.rage_damage_bonus = cs.rage_damage;
     c.action_surge_uses_remaining = cs.action_surge_uses;
     c.second_wind_available = cs.class_name == "Fighter";
+
+    // Lucky feat: grant luck points equal to proficiency bonus
+    if (character_sheet_has_feat(cs, "lucky")) {
+        c.has_lucky_feat = true;
+        c.luck_points_max = proficiency_bonus(cs.level);
+        c.luck_points = c.luck_points_max;
+    }
+
+    // Heroic Inspiration (e.g. Human species trait)
+    if (cs.has_heroic_inspiration) {
+        c.has_heroic_inspiration = true;
+    }
+
     return c;
 }
