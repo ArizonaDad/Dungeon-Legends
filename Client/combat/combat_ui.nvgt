@@ -124,6 +124,7 @@ int my_attacks_remaining = 0;
 bool my_spiritual_weapon_active = false;
 
 #include "combat_audio.nvgt"
+#include "audio_manager.nvgt"
 
 // ============================================================
 // ROLL BUTTON - The core interaction for blind D&D
@@ -709,6 +710,7 @@ void speak_initiative_order() {
 
 void speak_turn_start(string name, bool is_me) {
 	combat_audio_play_turn_start(name, is_me);
+	set_current_turn_player(name);
 	if (is_me) {
 		combat_history_add("Your turn! Round " + current_round + ".");
 		speak("Your turn! Round " + current_round + ". Press F for actions, B for bonus actions, W A S D to move, I J K L to scan.", true);
@@ -860,12 +862,13 @@ void combat_history_add(string msg) {
 	combat_history.insert_last(msg);
 }
 
-void on_damage_dealt(string attacker, string target, int amount, string damage_type, bool is_crit) {
+void on_damage_dealt(string attacker, string target, int amount, string damage_type, bool is_crit, string weapon_name = "", bool is_weapon_attack = false, bool is_spell = false) {
 	string text = attacker + " hits " + target + " for " + amount + " " + damage_type + " damage";
 	if (is_crit) text += "! Critical hit!";
 	else text += ".";
 	combat_history_add(text);
 	combat_audio_play_damage(attacker, target, is_crit, amount);
+	audio_on_damage(attacker, target, amount, damage_type, is_crit, weapon_name, is_weapon_attack, is_spell);
 	speak(text, true);
 }
 
@@ -873,6 +876,7 @@ void on_healing_done(string source, string target, int amount) {
 	string text = source + " heals " + target + " for " + amount + " hit points.";
 	combat_history_add(text);
 	combat_audio_play_heal(target, amount);
+	audio_on_heal(target, amount);
 	speak(text, true);
 }
 
@@ -880,6 +884,7 @@ void on_condition_applied(string target, string condition) {
 	string text = target + " is now " + condition + ".";
 	combat_history_add(text);
 	combat_audio_play_condition(target, false);
+	audio_on_condition(target, condition, false);
 	speak(text, false);
 }
 
@@ -887,13 +892,15 @@ void on_condition_removed(string target, string condition) {
 	string text = target + " is no longer " + condition + ".";
 	combat_history_add(text);
 	combat_audio_play_condition(target, true);
+	audio_on_condition(target, condition, true);
 	speak(text, false);
 }
 
-void on_creature_died(string name, bool is_player) {
+void on_creature_died(string name, bool is_player, string killed_by = "") {
 	string text = is_player ? name + " has fallen!" : name + " is defeated!";
 	combat_history_add(text);
 	combat_audio_play_death(name);
+	audio_on_death(name, killed_by);
 	speak(text, true);
 }
 
@@ -913,12 +920,14 @@ void on_miss(string attacker, string target) {
 void on_battle_start(string mode_text) {
 	combat_history_add("Battle begins! " + mode_text);
 	combat_audio_play_battle_start();
+	audio_on_battle_start();
 	combat_audio_refresh_ambience();
 	speak("Battle begins! " + mode_text, true);
 }
 
 void on_battle_end(string result) {
 	combat_audio_play_battle_end(result);
+	audio_on_battle_end(result);
 	if (result == "victory") speak("Victory! You have won the battle!", true);
 	else if (result == "defeat") speak("Defeat! Your party has fallen.", true);
 	else speak("Battle over! " + result, true);
@@ -928,6 +937,7 @@ void on_battle_end(string result) {
 void on_wave_start(int wave_num) {
 	wave_number = wave_num;
 	combat_audio_play_wave_start();
+	audio_on_wave_start();
 	speak("Wave " + wave_num + "!", true);
 }
 
@@ -1049,6 +1059,7 @@ void show_combat_help() {
 
 void reset_combat_state() {
 	combat_audio_reset();
+	audio_manager_reset();
 	combat_entities.resize(0);
 	initiative_order.resize(0);
 	scan_results.resize(0);
@@ -1165,6 +1176,7 @@ void combat_game_loop() {
 		network_loop();
 		if (@main_screen != null) main_screen.form.monitor();
 		combat_audio_update();
+		audio_manager_update();
 
 		if (waiting_for_roll) {
 			if (next_roll_prompt_reminder > 0 and ticks() >= next_roll_prompt_reminder) {
@@ -1271,6 +1283,7 @@ void combat_game_loop() {
 }
 
 void show_level_up_screen() {
+	audio_on_level_up();
 	pending_level_up = false;
 	speak("Level Up! You are now level " + level_up_new_level + "!", true);
 	wait(1500);

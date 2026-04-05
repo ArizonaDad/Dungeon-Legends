@@ -83,6 +83,19 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 - **Druid** (level 2+): Wild Shape
 - **Any class**: Spiritual Weapon (if active)
 
+### Audio System
+- **Dual-layer audio**: Synthesized spatial cues (combat_audio.nvgt) + pre-recorded sound files (audio_manager.nvgt)
+- **HRTF 3D spatial audio**: All combat sounds positioned at entity locations in 3D space
+- **Music manager**: Auto-advances to next random track when one ends. Categories: menu, wait room, battle
+- **Weapon sounds**: Mapped by weapon type (sword, dagger, axe, hammer, bow) with flesh impact at target
+- **Spell sounds**: Mapped by damage type (fire, lightning, cold/water, shadow/necrotic, wind/thunder, arcane/radiant)
+- **Footsteps**: Heavy armor (Fighter/Paladin/Cleric) vs grass steps, alternating variants, spatially positioned
+- **Kill streaks**: First Blood, Double Kill (2 in one turn), Triple Kill (3 in one turn), kill_streak1-9 (4+ total)
+- **Healing sounds**: Small heals (random from 3 variants), large heals (15+ HP)
+- **Buff/debuff sounds**: Different sounds for positive vs negative conditions
+- **Announcements**: Low health warning (25% HP), level-up stinger, wave/boss stingers, victory/defeat
+- **121 sound files**: Weapon impacts, spell effects, music tracks, footsteps, kill announcements, UI sounds
+
 ### Monster AI
 - Move toward nearest conscious player
 - Attack when in weapon range

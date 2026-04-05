@@ -1,0 +1,369 @@
+// File-based audio manager - layers recorded sounds on top of synthesized combat audio.
+// Handles music, weapon/spell sounds, footsteps, kill streaks, and announcements.
+
+const string SND = "sounds/";
+
+// Volume constants (dB)
+const float VOL_MUSIC = -12.0f;
+const float VOL_COMBAT = -6.0f;
+const float VOL_ANNOUNCE = 0.0f;
+const float VOL_FOOTSTEP = -10.0f;
+
+// Music track arrays
+string[] MENU_MUSIC = {"main_menu_music.wav", "main_menu_music1.wav", "main_menu_music3.wav", "main_menu_music5.wav", "main_menu_music6.wav", "main_music4.wav"};
+string[] BATTLE_MUSIC = {"battle_music1.wav", "battle_music2.wav", "battle_music3.wav", "battle_music4.wav", "battle_music5.wav", "battle_music6.wav", "battle_music7.wav"};
+string[] WAIT_MUSIC = {"wait_room_music.wav", "wait_room_music2.wav"};
+string[] INITIATIVE_MUSIC = {"Initiative!_music.wav", "Initiative_music(dont_skip).wav", "Initiative_music(dont_skip2).wav"};
+
+// Spell sounds by damage type
+string[] SND_FIRE = {"Fire_Spell_01.wav", "Fire_Spell_02.wav", "Fire_Spell_03.wav", "Fire_Spell_04.wav"};
+string[] SND_LIGHTNING = {"Lightning_Spell_01.wav", "Lightning_Spell_02.wav", "Lightning_Spell_03.wav", "Lightning_Spell_04.wav"};
+string[] SND_ARCANE = {"Arcane_Spell_01.wav", "Arcane_Spell_02.wav", "Arcane_Spell_03.wav", "Arcane_Spell_04.wav"};
+string[] SND_SHADOW = {"Shadow_Spell_01.wav", "Shadow_Spell_02.wav", "Shadow_Spell_03.wav", "Shadow_Spell_04.wav"};
+string[] SND_WATER = {"Water_Spell_01.wav", "Water_Spell_02.wav", "Water_Spell_03.wav", "Water_Spell_04.wav"};
+string[] SND_WIND = {"Wind_Spell_01.wav", "Wind_Spell_02.wav", "Wind_Spell_03.wav", "Wind_Spell_04.wav"};
+
+// Healing
+string[] SND_HEAL_SMALL = {"Cast_Heal_01.wav", "Heal_.wav", "heal2.wav"};
+
+// Buffs / Debuffs
+string[] SND_BUFFS = {"Buff.wav", "buff2.wav", "buff3.wav", "buff4.wav"};
+
+// Crits
+string[] SND_CRITS = {"crit.mp3", "crit2.mp3", "crit3.mp3"};
+
+// Footsteps
+string[] SND_GRASS = {"StepGrass1.mp3", "StepGrass2.mp3"};
+string[] SND_ARMOR = {"Step_heavy_Armour1.mp3", "Step_heavy_Armour2.mp3", "Step_heavy_Armour3.mp3", "Step_heavy_Armour4.mp3", "Step_heavy_Armour5.mp3", "Step_heavy_Armour6.mp3"};
+
+// Kill streaks
+string[] SND_KILLS = {"kill.mp3", "kill2.mp3"};
+string[] SND_STREAKS = {"kill_streak1.mp3", "kill_streak2.mp3", "kill_streak3.mp3", "kill_streak4.mp3", "kill_streak5.mp3", "kill_streak6.mp3", "kill_streak7.mp3", "kill_streak8.mp3", "kill_streak9.mp3"};
+
+// Game start
+string[] SND_GAME_START = {"game_start1.mp3", "game_start2.mp3", "game_start3.mp3", "game_start4.mp3"};
+
+// Victory / Defeat
+string[] SND_WIN = {"Win.mp3", "win2.mp3"};
+
+// ---- Helpers ----
+
+string pick_random(string[]@ files) {
+	if (files.length() == 0) return "";
+	return files[random(0, files.length() - 1)];
+}
+
+sound@ audio_load(string filename, float vol = VOL_COMBAT) {
+	sound@ s = sound();
+	if (!s.load(SND + filename)) { s.close(); return null; }
+	s.volume = vol;
+	return s;
+}
+
+void audio_play_at(string filename, combat_entity@ e, float vol = VOL_COMBAT) {
+	sound@ s = audio_load(filename, vol);
+	if (@s == null) return;
+	if (@e != null) {
+		combat_audio_configure_spatial(s);
+		s.set_position_3d(combat_audio_world_position(e.x, e.y, 0));
+		s.play();
+	} else {
+		s.spatialization_enabled = false;
+		s.play();
+	}
+	combat_audio_track(s);
+}
+
+void audio_play_global(string filename, float vol = VOL_ANNOUNCE) {
+	sound@ s = audio_load(filename, vol);
+	if (@s == null) return;
+	s.spatialization_enabled = false;
+	s.play();
+	combat_audio_track(s);
+}
+
+void audio_play_random_at(string[]@ files, combat_entity@ e, float vol = VOL_COMBAT) {
+	if (files.length() == 0) return;
+	audio_play_at(pick_random(files), e, vol);
+}
+
+void audio_play_random_global(string[]@ files, float vol = VOL_ANNOUNCE) {
+	if (files.length() == 0) return;
+	audio_play_global(pick_random(files), vol);
+}
+
+// ---- Music Manager ----
+
+sound@ current_music = null;
+string music_category = "";
+int music_last_idx = -1;
+
+string[]@ get_music_tracks(string cat) {
+	if (cat == "menu") return MENU_MUSIC;
+	if (cat == "battle") return BATTLE_MUSIC;
+	if (cat == "wait") return WAIT_MUSIC;
+	return null;
+}
+
+void music_play_next() {
+	string[]@ tracks = get_music_tracks(music_category);
+	if (@tracks == null or tracks.length() == 0) return;
+	int idx = random(0, tracks.length() - 1);
+	if (tracks.length() > 1) { while (idx == music_last_idx) idx = random(0, tracks.length() - 1); }
+	music_last_idx = idx;
+	@current_music = sound();
+	current_music.load(SND + tracks[idx]);
+	current_music.volume = VOL_MUSIC;
+	current_music.spatialization_enabled = false;
+	current_music.play();
+}
+
+void music_start(string cat) {
+	music_stop();
+	music_category = cat;
+	music_last_idx = -1;
+	music_play_next();
+}
+
+void music_stop() {
+	if (@current_music != null) {
+		current_music.stop();
+		current_music.close();
+		@current_music = null;
+	}
+	music_category = "";
+}
+
+void music_update() {
+	if (@current_music == null or music_category == "") return;
+	if (!current_music.playing) music_play_next();
+}
+
+// ---- Weapon Sound Mapping ----
+
+string get_weapon_sound(string weapon) {
+	string lc = weapon.lower();
+	if (lc.find("longsword") >= 0 or lc.find("shortsword") >= 0 or lc.find("rapier") >= 0 or lc.find("greatsword") >= 0 or lc.find("scimitar") >= 0) return "Sword1.mp3";
+	if (lc.find("dagger") >= 0) return random(0,1) == 0 ? "Dagger1.mp3" : "Dagger2.mp3";
+	if (lc.find("axe") >= 0) return "Axe_swing.mp3";
+	if (lc.find("hammer") >= 0 or lc.find("maul") >= 0 or lc.find("mace") >= 0 or lc.find("flail") >= 0) return "Hammer1.mp3";
+	if (lc.find("bow") >= 0 or lc.find("crossbow") >= 0) return "BowWhistleShot1.mp3";
+	if (lc.find("dart") >= 0 or lc.find("sling") >= 0 or lc.find("javelin") >= 0) return "BowWhistleShot1.mp3";
+	return random(0,1) == 0 ? "Impact1.mp3" : "Impact2.mp3";
+}
+
+string get_hit_sound() {
+	int r = random(1, 3);
+	if (r == 1) return "CutFlesh1.mp3";
+	if (r == 2) return "CutFlesh2.mp3";
+	return "CutFlesh3.mp3";
+}
+
+bool is_ranged_weapon(string weapon) {
+	string lc = weapon.lower();
+	return lc.find("bow") >= 0 or lc.find("crossbow") >= 0 or lc.find("sling") >= 0 or lc.find("dart") >= 0 or lc.find("javelin") >= 0;
+}
+
+// ---- Spell School Sound Mapping ----
+
+string[]@ get_spell_sounds(string damage_type) {
+	string lc = damage_type.lower();
+	if (lc == "fire") return SND_FIRE;
+	if (lc == "lightning") return SND_LIGHTNING;
+	if (lc == "cold" or lc == "acid" or lc == "poison") return SND_WATER;
+	if (lc == "thunder") return SND_WIND;
+	if (lc == "necrotic" or lc == "psychic") return SND_SHADOW;
+	if (lc == "radiant" or lc == "force") return SND_ARCANE;
+	return SND_ARCANE;
+}
+
+// ---- Kill Streak System ----
+
+dictionary kill_totals;
+dictionary kill_turn_counts;
+bool first_blood_done = false;
+string current_turn_player = "";
+
+void reset_kill_streaks() {
+	kill_totals.delete_all();
+	kill_turn_counts.delete_all();
+	first_blood_done = false;
+	current_turn_player = "";
+}
+
+void set_current_turn_player(string name) {
+	if (name != current_turn_player) {
+		kill_turn_counts.delete_all();
+		current_turn_player = name;
+	}
+}
+
+void on_kill(string killer, string victim) {
+	if (killer == "") return;
+
+	// Track total kills this battle
+	int total = 0;
+	if (kill_totals.exists(killer)) total = int(kill_totals[killer]);
+	total++;
+	kill_totals[killer] = total;
+
+	// Track kills this turn
+	int turn_kills = 0;
+	if (kill_turn_counts.exists(killer)) turn_kills = int(kill_turn_counts[killer]);
+	turn_kills++;
+	kill_turn_counts[killer] = turn_kills;
+
+	// First blood
+	if (!first_blood_done) {
+		first_blood_done = true;
+		audio_play_global("First_Blood.mp3", VOL_ANNOUNCE);
+		return;
+	}
+
+	// Multi-kills (per turn)
+	if (turn_kills == 2) { audio_play_global("Double_Kill.mp3", VOL_ANNOUNCE); return; }
+	if (turn_kills >= 3) { audio_play_global("Triple_Kill.mp3", VOL_ANNOUNCE); return; }
+
+	// Killing spree (cumulative, 4+)
+	if (total >= 4 and total - 4 < int(SND_STREAKS.length())) {
+		audio_play_global(SND_STREAKS[total - 4], VOL_ANNOUNCE);
+		return;
+	}
+
+	// Basic kill sound
+	audio_play_random_global(SND_KILLS, VOL_COMBAT);
+}
+
+// ---- Footstep System ----
+
+int footstep_alt = 0;
+
+bool is_heavy_armor(string class_name) {
+	string lc = class_name.lower();
+	return lc == "fighter" or lc == "paladin" or lc == "cleric";
+}
+
+void play_footstep(combat_entity@ e, string class_name = "") {
+	if (@e == null) return;
+	string[]@ steps = is_heavy_armor(class_name) ? SND_ARMOR : SND_GRASS;
+	int idx = footstep_alt % steps.length();
+	footstep_alt++;
+	audio_play_at(steps[idx], e, VOL_FOOTSTEP);
+}
+
+// ---- Low Health Warning ----
+
+bool low_hp_warned = false;
+
+void check_low_hp(combat_entity@ me) {
+	if (@me == null or me.is_dead or me.max_hp <= 0) return;
+	float pct = float(me.hp) / float(me.max_hp);
+	if (pct <= 0.25f and pct > 0.0f and !low_hp_warned) {
+		low_hp_warned = true;
+		audio_play_global("low_health_announce.mp3", VOL_ANNOUNCE);
+	}
+	if (pct > 0.25f) low_hp_warned = false;
+}
+
+// ---- Combat Event Sound Hooks ----
+
+void audio_on_damage(string attacker, string target, int amount, string damage_type, bool is_crit, string weapon, bool is_weapon_attack, bool is_spell) {
+	combat_entity@ atk = combat_audio_find_entity_by_name(attacker);
+	combat_entity@ tgt = combat_audio_find_entity_by_name(target);
+
+	if (is_weapon_attack) {
+		string w = weapon != "" ? weapon : created_weapon;
+		if (@atk != null) audio_play_at(get_weapon_sound(w), atk);
+		if (@tgt != null) audio_play_at(get_hit_sound(), tgt);
+		if (is_ranged_weapon(w) and @tgt != null) audio_play_at("ArrowImpact1.mp3", tgt);
+	} else {
+		string[]@ spell_snd = get_spell_sounds(damage_type);
+		if (@spell_snd != null and @tgt != null) audio_play_random_at(spell_snd, tgt);
+	}
+
+	if (is_crit) audio_play_random_global(SND_CRITS, VOL_ANNOUNCE);
+}
+
+void audio_on_heal(string target, int amount) {
+	combat_entity@ tgt = combat_audio_find_entity_by_name(target);
+	if (amount >= 15) {
+		if (@tgt != null) audio_play_at("Large_Heal_.wav", tgt);
+	} else {
+		if (@tgt != null) audio_play_random_at(SND_HEAL_SMALL, tgt);
+	}
+}
+
+void audio_on_condition(string target, string condition, bool removed) {
+	combat_entity@ tgt = combat_audio_find_entity_by_name(target);
+	if (@tgt == null) return;
+	string lc = condition.lower();
+	bool is_buff = (lc == "blessed" or lc == "hasted" or lc == "raging" or lc == "inspired" or lc == "dodging");
+	if (!removed) {
+		if (is_buff) audio_play_random_at(SND_BUFFS, tgt);
+		else audio_play_at("apply_debuff.wav", tgt);
+	}
+}
+
+void audio_on_death(string name, string killed_by) {
+	combat_entity@ e = combat_audio_find_entity_by_name(name);
+	if (@e != null) audio_play_at("Body_Fall.wav", e);
+	if (killed_by != "") on_kill(killed_by, name);
+}
+
+void audio_on_battle_start() {
+	audio_play_random_global(SND_GAME_START, VOL_ANNOUNCE);
+	music_start("battle");
+}
+
+void audio_on_battle_end(string result) {
+	music_stop();
+	if (result == "victory") audio_play_random_global(SND_WIN, VOL_ANNOUNCE);
+	else if (result == "defeat") audio_play_global("lose.mp3", VOL_ANNOUNCE);
+}
+
+void audio_on_wave_start() {
+	audio_play_global("wave_game_mode_start.mp3", VOL_ANNOUNCE);
+}
+
+void audio_on_wave_complete() {
+	audio_play_global("wave_completed_stinger.mp3", VOL_ANNOUNCE);
+}
+
+void audio_on_boss_start() {
+	audio_play_global("boss_pstart.mp3", VOL_ANNOUNCE);
+}
+
+void audio_on_boss_defeated() {
+	audio_play_global("boss_defeated_stinger.mp3", VOL_ANNOUNCE);
+}
+
+void audio_on_initiative() {
+	audio_play_random_global(INITIATIVE_MUSIC, VOL_MUSIC);
+}
+
+void audio_on_level_up() {
+	audio_play_global("level_up_Stinger_1.mp3", VOL_ANNOUNCE);
+}
+
+void audio_on_friend_invite() {
+	audio_play_global("friend_invite.mp3", VOL_ANNOUNCE);
+}
+
+void audio_on_move_blocked() {
+	audio_play_global("you_cant_move_sound.mp3", VOL_COMBAT);
+}
+
+// ---- Master Update / Reset ----
+
+void audio_manager_update() {
+	music_update();
+	combat_entity@ me = get_entity(my_combatant_id);
+	if (@me != null) check_low_hp(me);
+}
+
+void audio_manager_reset() {
+	music_stop();
+	reset_kill_streaks();
+	low_hp_warned = false;
+	footstep_alt = 0;
+}

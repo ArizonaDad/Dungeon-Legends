@@ -237,6 +237,7 @@ void combat_audio_play_movement(combat_entity@ old_e, combat_entity@ new_e) {
 	if (@s == null) return;
 	if (dx != 0 or dy != 0) s.set_direction(vector(float(dx), float(dy), 0.0f));
 	combat_audio_play_at_world(s, float(new_e.x), float(new_e.y), 0.0f);
+	play_footstep(new_e, "");
 }
 
 void combat_audio_play_damage(string attacker_name, string target_name, bool is_crit, int amount) {

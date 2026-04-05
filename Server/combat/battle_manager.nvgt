@@ -1018,9 +1018,9 @@ class battle_manager {
 			if (damage < 1) damage = 1;
 
 			combat.apply_damage(t, damage, pr.damage_type, caster);
-			broadcast_to_battle({{"type", message_types::damage_dealt}, {"attacker", caster.name}, {"target", t.name}, {"amount", damage}, {"damage_type", DAMAGE_TYPE_NAMES[pr.damage_type]}, {"is_crit", false}});
+			broadcast_to_battle({{"type", message_types::damage_dealt}, {"attacker", caster.name}, {"target", t.name}, {"amount", damage}, {"damage_type", DAMAGE_TYPE_NAMES[pr.damage_type]}, {"is_crit", false}, {"is_spell", true}});
 			if (t.is_dead) {
-				broadcast_to_battle({{"type", message_types::creature_died}, {"name", t.name}, {"is_player", t.is_player}});
+				broadcast_to_battle({{"type", message_types::creature_died}, {"name", t.name}, {"is_player", t.is_player}, {"killed_by", caster.name}});
 			}
 			check_concentration(t, damage);
 		}
@@ -2112,7 +2112,7 @@ class battle_manager {
 
 						if (mover.is_dead) {
 							broadcast_announce(mover.name + " has been slain!", true);
-							broadcast_to_battle({{"type", message_types::creature_died}, {"name", mover.name}, {"id", mover.id}});
+							broadcast_to_battle({{"type", message_types::creature_died}, {"name", mover.name}, {"id", mover.id}, {"killed_by", enemy.name}});
 						} else if (mover.current_hp == 0 and mover.has_condition(COND_UNCONSCIOUS)) {
 							broadcast_announce(mover.name + " falls unconscious!", true);
 						} else {
@@ -2648,6 +2648,8 @@ class battle_manager {
 			if (extra_damage > 0 and pr.extra_damage_type >= 0 and pr.extra_damage_type < int(DAMAGE_TYPE_NAMES.length())) {
 				broadcast_announce(c.name + " adds " + extra_damage + " " + DAMAGE_TYPE_NAMES[pr.extra_damage_type] + " damage.", false);
 			}
+			string dmg_type_str = (pr.damage_type >= 0 and pr.damage_type < int(DAMAGE_TYPE_NAMES.length())) ? DAMAGE_TYPE_NAMES[pr.damage_type] : "physical";
+			broadcast_to_battle({{"type", message_types::damage_dealt}, {"attacker", c.name}, {"target", target.name}, {"amount", total_damage}, {"damage_type", dmg_type_str}, {"is_crit", pr.is_crit}, {"weapon", pr.attack_name}, {"is_weapon_attack", pr.is_weapon_attack}});
 			combat.apply_damage(target, total_damage, pr.damage_type, c);
 			maybe_apply_on_kill_features(c, target);
 			if (target.wild_shape_just_ended) {
@@ -2657,7 +2659,7 @@ class battle_manager {
 
 			if (target.is_dead) {
 				broadcast_announce(target.name + " has been slain!", true);
-				broadcast_to_battle({{"type", message_types::creature_died}, {"name", target.name}, {"id", target.id}});
+				broadcast_to_battle({{"type", message_types::creature_died}, {"name", target.name}, {"id", target.id}, {"killed_by", c.name}});
 			} else if (target.current_hp == 0 and target.has_condition(COND_UNCONSCIOUS)) {
 				broadcast_announce(target.name + " falls unconscious!", true);
 			} else {

@@ -251,6 +251,7 @@ void handle_message(json_object@ msg)
 	else if (msg_type == message_types::initiative_order) {
 		parse_game_state(msg);
 		speak_initiative_order();
+		audio_on_initiative();
 	}
 	else if (msg_type == message_types::damage_dealt) {
 		string attacker = msg.exists("attacker") ? string(msg["attacker"]) : "";
@@ -258,7 +259,10 @@ void handle_message(json_object@ msg)
 		int amount = msg.exists("amount") ? int(msg["amount"]) : 0;
 		string dmg_type = msg.exists("damage_type") ? string(msg["damage_type"]) : "";
 		bool is_crit = msg.exists("is_crit") ? bool(msg["is_crit"]) : false;
-		on_damage_dealt(attacker, target, amount, dmg_type, is_crit);
+		string weapon_name = msg.exists("weapon") ? string(msg["weapon"]) : "";
+		bool is_weapon = msg.exists("is_weapon_attack") ? bool(msg["is_weapon_attack"]) : false;
+		bool is_spell_dmg = msg.exists("is_spell") ? bool(msg["is_spell"]) : false;
+		on_damage_dealt(attacker, target, amount, dmg_type, is_crit, weapon_name, is_weapon, is_spell_dmg);
 	}
 	else if (msg_type == message_types::healing_done) {
 		string source = msg.exists("source") ? string(msg["source"]) : "";
@@ -279,7 +283,8 @@ void handle_message(json_object@ msg)
 	else if (msg_type == message_types::creature_died) {
 		string name = msg.exists("name") ? string(msg["name"]) : "";
 		bool is_player = msg.exists("is_player") ? bool(msg["is_player"]) : false;
-		on_creature_died(name, is_player);
+		string killed_by = msg.exists("killed_by") ? string(msg["killed_by"]) : "";
+		on_creature_died(name, is_player, killed_by);
 	}
 	else if (msg_type == message_types::death_save) {
 		string name = msg.exists("name") ? string(msg["name"]) : "";
@@ -338,6 +343,9 @@ void handle_message(json_object@ msg)
 		int wave = msg.exists("wave") ? int(msg["wave"]) : 0;
 		on_wave_start(wave);
 	}
+	else if (msg_type == message_types::wave_complete) {
+		audio_on_wave_complete();
+	}
 	else if (msg_type == message_types::spell_effect) {
 		string text = msg.exists("text") ? string(msg["text"]) : "";
 		if (text != "") speak(text, false);
@@ -352,6 +360,7 @@ void handle_message(json_object@ msg)
 		if (msg.exists("xp_needed")) cached_xp_needed = int(msg["xp_needed"]);
 		if (msg.exists("stats")) @cached_stats = msg["stats"];
 		update_profile_level("adventure", cached_level);
+		if (msg.exists("levels_gained") and int(msg["levels_gained"]) > 0) audio_on_level_up();
 		string summary = msg.exists("summary") ? string(msg["summary"]) : "";
 		if (summary != "") speak(summary, false);
 	}
@@ -428,6 +437,7 @@ void handle_message(json_object@ msg)
 		pending_invite_room_name = room_name;
 		pending_invite_room_id = room_id;
 		has_pending_invite = true;
+		audio_on_friend_invite();
 		speak(from + " has invited you to join their game: " + room_name + ". Press F3 to accept or decline.", false);
 	}
 	else if (msg_type == message_types::daily_bonus) {
