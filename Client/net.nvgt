@@ -426,7 +426,7 @@ void handle_message(json_object@ msg)
 		room_host_name = "";
 		speak("The room has been closed.", false);
 	}
-	// Fix 11: Server requests password for a locked room.
+	// Server requests password for a locked room.
 	else if (msg_type == message_types::password_required) {
 		int room_idx = msg.exists("room") ? int(msg["room"]) : -1;
 		bool canceled = false;

@@ -1,4 +1,4 @@
-# Souls MMO - D&D 5e Battle Simulator
+# Dungeon Legends - D&D 5e Battle Simulator
 
 ## Project Overview
 Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (NonVisual Gaming Toolkit, AngelScript-like). Players create characters (33 species, 13 classes, 16 backgrounds, 38 weapons, 53 spells) and fight in turn-based combat with full TTS and HRTF spatial audio. Supports PvP Arena, Wave Survival, and Boss Rush modes.

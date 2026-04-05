@@ -35,19 +35,19 @@ bool is_room_bot(string name) {
 	}
 	return false;
 }
-instance single_game("TabletopTavern");
+instance single_game("DungeonLegends");
 void main()
 {
 	chdir(spec::path(SCRIPT_CURRENT_FILE).make_parent());
 	if (SCRIPT_COMPILED and single_game.is_already_running) {
-		alert("Tabletop Tavern is already running", "Sorry, only one instance of the game can be run at a time.");
+		alert("Dungeon Legends", "Sorry, only one instance of the game can be run at a time.");
 		exit();
 	}
-	show_window("Souls MMO.");
+	show_window("Dungeon Legends");
 	install_keyhook();
 	set_sound_global_hrtf(true);
 	config.set_encryption("Libertos918!!!");
-	config.setup("Libertos Gaming", "Master Dungeon", false);
+	config.setup("Libertos Gaming", "Dungeon Legends", false);
 	if (!connect()) {
 		pop_text("Unable to connect to server.");
 		return;
@@ -62,7 +62,7 @@ void main()
 	main_menu();
 	config.close();
 }
-// Placeholder: called when the server signals a game start.
+// Called when the server signals a game start.
 bool launch_pending_game_if_needed()
 {
 	if (!start_game_pending) return false;
@@ -94,7 +94,7 @@ void main_menu()
 {
 	music_start("menu");
 	if (is_new_account) {
-		speak("Welcome to Souls MMO! Let's create your first character.", true);
+		speak("Welcome to Dungeon Legends! Let's create your first character.", true);
 		character_creation_menu("adventure", 1);
 		is_new_account = false;
 	}
@@ -188,8 +188,8 @@ void main_menu()
 		}
 		else if (res == About) {
 			m.play(m.select_sound);
-			info_box_form("About", "Information",
-				"Multiplayer Game Framework.\r\nBuilt with NVGT.\r\n"
+			info_box_form("About", "Dungeon Legends",
+				"Dungeon Legends. A multiplayer accessible D&D 5e combat arena.\r\nCreate your character from 33 species, 13 classes, and 16 backgrounds.\r\nBattle in PvP Arena, Wave Survival, or Boss Rush modes.\r\nFully accessible with text to speech and 3D spatial audio.\r\nVersion 1.0.\r\n"
 			);
 		}
 		else {
@@ -320,7 +320,7 @@ menu@ setup_menu(string intro, bool use_main_screen = true)
 	return m;
 }
 menu@ setup_sub_menu(string intro = "") { return setup_menu(intro, false); }
-bool room_closed_flag = false; // Fix 17: Flag set when room is closed by host.
+bool room_closed_flag = false;
 bool client_disconnected = false; // True when connection to server is lost.
 bool rejoin_game_pending = false; // True when server sends rejoin_game after reconnect.
 void on_list_rooms(json_array@ rooms_list)
@@ -329,11 +329,11 @@ void on_list_rooms(json_array@ rooms_list)
 		pop_text("No games available.");
 		return;
 	}
-	// Fix 16: Use sub_menu to avoid overwriting main_screen and causing freeze.
+	// Use sub_menu to avoid overwriting main_screen.
 	menu@ rm = setup_sub_menu("Rooms. Viewing " + rooms_list.length() + " games. Press escape to return to the main menu.");
 	for (uint i = 0; i < rooms_list.length(); i++) {
 		json_object@ room_obj = rooms_list[i];
-		// Fix 11: Show locked status for password-protected rooms.
+		// Show locked status for password-protected rooms.
 		string lock_label = "";
 		if (room_obj.exists("locked") and bool(room_obj["locked"])) lock_label = " (Locked)";
 		string game_type = room_obj.exists("game_type") ? normalize_character_profile(string(room_obj["game_type"])) : "sandbox";
@@ -549,7 +549,7 @@ void show_player_context_menu(string target_name, bool show_kick)
 {
 	if (target_name == username) {
 		speak("That's you!", false);
-		// Fix 15: Return immediately so caller can refocus the menu.
+		// Return immediately so caller can refocus the menu.
 		return;
 	}
 

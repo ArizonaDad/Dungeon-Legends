@@ -1,5 +1,5 @@
 @echo off
-echo Compiling Tabletop Tavern...
+echo Compiling Dungeon Legends...
 echo.
 
 echo Current directory: %cd%
