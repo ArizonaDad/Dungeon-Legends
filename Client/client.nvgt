@@ -1,4 +1,4 @@
-#pragma asset "sounds"
+#pragma asset "sounds.dat"
 #include "menu.nvgt"
 #include "instance.nvgt"
 #include "forms.nvgt"
@@ -46,6 +46,10 @@ void main()
 	show_window("Dungeon Legends");
 	install_keyhook();
 	set_sound_global_hrtf(true);
+	pack_file@ sound_pack = pack_file();
+	if (sound_pack.open("sounds.dat", "DL_aud10_k3y_2026!")) {
+		set_sound_default_pack(sound_pack);
+	}
 	config.set_encryption("Libertos918!!!");
 	config.setup("Libertos Gaming", "Dungeon Legends", false);
 	if (!connect()) {

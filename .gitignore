@@ -1,5 +1,6 @@
 *.zip
 *.db
+*.dat
 __pycache__/
 *.pyc
 Client/sounds/

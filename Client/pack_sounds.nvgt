@@ -1,0 +1,36 @@
+// Build tool: Packs all sound files into an encrypted sounds.dat
+// Run BEFORE compiling: nvgt.exe pack_sounds.nvgt
+// Then compile client normally - it loads from sounds.dat at runtime.
+
+const string PACK_KEY = "DL_aud10_k3y_2026!";
+
+void main() {
+	pack_file p;
+	if (!p.create("sounds.dat", PACK_KEY)) {
+		println("ERROR: Failed to create sounds.dat");
+		exit(1);
+	}
+
+	string[]@ files = find_files("sounds/*.*");
+	if (@files == null or files.length() == 0) {
+		println("ERROR: No sound files found in sounds/ directory");
+		exit(1);
+	}
+
+	int count = 0;
+	for (uint i = 0; i < files.length(); i++) {
+		string name = files[i];
+		if (name == "." or name == "..") continue;
+		string disc_path = "sounds/" + name;
+		string pack_path = "sounds/" + name;
+		if (p.add_file(disc_path, pack_path)) {
+			count++;
+			println("Packed: " + name);
+		} else {
+			println("FAILED: " + name);
+		}
+	}
+
+	p.close();
+	println("Done! Packed " + count + " files into sounds.dat");
+}
