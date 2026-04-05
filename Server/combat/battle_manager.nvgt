@@ -109,6 +109,7 @@ class battle_manager {
 	dictionary run_healing;
 	dictionary run_crits;
 	dictionary run_max_damage;
+	dictionary run_damage;
 	dictionary defeated_monsters;
 
 	uint64 monster_turn_start_time = 0;
@@ -247,6 +248,7 @@ class battle_manager {
 		run_healing.delete_all();
 		run_crits.delete_all();
 		run_max_damage.delete_all();
+		run_damage.delete_all();
 		defeated_monsters.delete_all();
 	}
 
@@ -292,6 +294,17 @@ class battle_manager {
 	void set_run_max_damage(string username, int amount) {
 		if (username == "") return;
 		run_max_damage.set(username, amount);
+	}
+
+	int get_run_damage_total(string username) {
+		int value = 0;
+		if (run_damage.exists(username)) run_damage.get(username, value);
+		return value;
+	}
+
+	void add_run_damage(string username, int amount) {
+		if (username == "" or amount <= 0) return;
+		run_damage.set(username, get_run_damage_total(username) + amount);
 	}
 
 	int get_monster_progression_xp(combatant@ target) {
@@ -407,12 +420,46 @@ class battle_manager {
 			if (victory) add_json_int(progress, "victories", 1);
 			if (victory and combat.mode == "boss") add_json_int(progress, "boss_kills", 1);
 
+			// Track total damage dealt from this run
+			add_json_int(progress, "total_damage_dealt", get_run_damage_total(player.username));
+
 			// Track crit count and max single damage from this run
 			int crit_count = get_run_crit_count(player.username);
 			add_json_int(progress, "crit_count", crit_count);
 			int this_run_max = get_run_max_damage(player.username);
 			int current_max = get_json_int(progress, "max_single_damage");
 			if (this_run_max > current_max) progress["max_single_damage"] = this_run_max;
+
+			// Track deaths: check if this player's combatant is dead at battle end
+			for (uint ci = 0; ci < combat.combatants.length(); ci++) {
+				if (combat.combatants[ci].is_player and combat.combatants[ci].player_username == player.username) {
+					if (combat.combatants[ci].is_dead) {
+						add_json_int(progress, "total_deaths", 1);
+					}
+					break;
+				}
+			}
+
+			// Track PvP wins and losses
+			if (combat.mode == "pvp") {
+				bool is_winner = false;
+				for (uint ci = 0; ci < combat.combatants.length(); ci++) {
+					if (combat.combatants[ci].is_player and combat.combatants[ci].player_username == player.username and combat.combatants[ci].is_alive()) {
+						is_winner = true;
+						break;
+					}
+				}
+				if (is_winner) {
+					add_json_int(progress, "pvp_wins", 1);
+				} else {
+					add_json_int(progress, "pvp_losses", 1);
+				}
+			}
+
+			// Track longest kill streak
+			if (kill_count > get_json_int(progress, "longest_kill_streak")) {
+				progress["longest_kill_streak"] = kill_count;
+			}
 
 			// Track class wins
 			if (victory) {
@@ -1383,6 +1430,9 @@ class battle_manager {
 
 			bool aoe_target_was_full = (t.current_hp == t.max_hp);
 			bool aoe_caster_was_hidden = caster.is_hidden;
+			if (caster.is_player and caster.player_username != "" and progression_enabled) {
+				add_run_damage(caster.player_username, damage);
+			}
 			combat.apply_damage(t, damage, pr.damage_type, caster);
 			broadcast_to_battle({{"type", message_types::damage_dealt}, {"attacker", caster.name}, {"target", t.name}, {"amount", damage}, {"damage_type", DAMAGE_TYPE_NAMES[pr.damage_type]}, {"is_crit", false}, {"is_spell", true}});
 			if (t.is_dead) {
@@ -3406,10 +3456,11 @@ class battle_manager {
 			if (active_modifier == "glass_cannon") total_damage *= 2;
 			if (active_modifier == "volatile" and pr.is_crit) total_damage = int(float(total_damage) * 1.5);
 
-			// Track crit and max damage stats for achievements
+			// Track crit, max damage, and total damage stats
 			if (c.is_player and c.player_username != "" and progression_enabled) {
 				if (pr.is_crit) add_run_crits(c.player_username, 1);
 				if (total_damage > get_run_max_damage(c.player_username)) set_run_max_damage(c.player_username, total_damage);
+				add_run_damage(c.player_username, total_damage);
 			}
 
 			string damage_reason = pr.attack_name != "" ? pr.attack_name + " damage" : "damage";

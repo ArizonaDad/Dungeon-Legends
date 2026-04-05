@@ -3020,4 +3020,33 @@ void handle_user_message(user@ u, json_object@ msg)
 			}
 		}
 	}
+
+	// ---- Player Stats ----
+	else if (msg_type == message_types::player_stats) {
+		if (@u.account != null) {
+			ensure_account_progression(u.account);
+			json_object@ stats_msg = build_player_stats_message(u.account);
+			if (@stats_msg != null) u.send(stats_msg);
+		}
+	}
+
+	else if (msg_type == message_types::inspect_player and msg.exists("target")) {
+		string target_name = string(msg["target"]);
+		if (target_name == "") {
+			u.speak("No player specified.");
+			return;
+		}
+		account@ target_acct = get_account(target_name);
+		if (@target_acct == null) {
+			u.speak("Player not found.");
+			return;
+		}
+		ensure_account_progression(target_acct);
+		json_object@ inspect_msg = build_player_inspect_message(target_acct, target_name);
+		if (@inspect_msg != null) {
+			u.send(inspect_msg);
+		} else {
+			u.speak("Could not retrieve stats for that player.");
+		}
+	}
 }

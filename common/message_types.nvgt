@@ -169,4 +169,9 @@ namespace message_types
 	const string guild_invite = "guild_invite";                // Client invites a friend to their guild.
 	const string guild_invite_received = "guild_invite_received"; // Server notifies client of incoming guild invite.
 	const string guild_invite_response = "guild_invite_response"; // Client accepts/declines a guild invite.
+
+	// Player stats
+	const string player_stats = "player_stats";               // Client requests or server sends full player stats.
+	const string inspect_player = "inspect_player";           // Client requests to view another player's public stats.
+	const string player_inspect_data = "player_inspect_data"; // Server sends inspected player's public stats.
 }

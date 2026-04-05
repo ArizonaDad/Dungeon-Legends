@@ -40,6 +40,10 @@ json_object@ cached_challenge_data = null;
 string my_guild_name = "";
 json_object@ cached_guild_info = null;
 
+// ---- Player stats / inspect cache ----
+json_object@ cached_player_stats = null;
+json_object@ cached_inspect_data = null;
+
 string room_game_type_label(string game_type) {
 	game_type = normalize_character_profile(game_type);
 	return game_type == "adventure" ? "Adventure" : "Sandbox";
@@ -411,7 +415,7 @@ void main_menu()
 		menu@ m = setup_menu(intro);
 		@m = main_screen;
 		// Calculate total items dynamically
-		int total = 14; // base: create char, adventure, sandbox, join, weekly, glory shop, daily dungeon, leaderboards, shop, guild, friends, online, about, quit
+		int total = 15; // base: create char, adventure, sandbox, join, weekly, glory shop, daily dungeon, leaderboards, shop, guild, friends, online, about, quit, my stats
 		bool has_char = has_any_character_profile();
 		if (has_char) total++; // view char
 		total++; // inventory
@@ -424,6 +428,7 @@ void main_menu()
 			view_char = m.add_item("View My Character. " + n + " of " + total); n++;
 		}
 		int inventory_btn = m.add_item("Inventory. " + n + " of " + total); n++;
+		int stats_btn = m.add_item("My Stats. " + n + " of " + total); n++;
 		int prestige_btn = -1;
 		if (show_prestige) {
 			prestige_btn = m.add_item("Prestige. Reset to level 1 for permanent bonuses. " + n + " of " + total); n++;
@@ -499,6 +504,9 @@ void main_menu()
 		}
 		else if (res == inventory_btn) {
 			show_inventory();
+		}
+		else if (res == stats_btn) {
+			show_player_stats();
 		}
 		else if (prestige_btn >= 0 and res == prestige_btn) {
 			menu@ prestige_menu = setup_sub_menu("Prestige will reset your level to 1 but you keep your inventory, achievements, and dungeon completions. You gain plus 1 to all ability scores permanently and a unique title. This cannot be undone. Are you sure?");
@@ -939,6 +947,146 @@ void wait_menu()
 		}
 	}
 }
+// ---- Player Stats helpers ----
+int get_stat_int(json_object@ obj, string key) {
+	if (@obj == null or !obj.exists(key)) return 0;
+	return int(obj[key]);
+}
+
+string get_stat_str(json_object@ obj, string key) {
+	if (@obj == null or !obj.exists(key)) return "";
+	return string(obj[key]);
+}
+
+void show_player_stats() {
+	send({{"type", message_types::player_stats}});
+	@cached_player_stats = null;
+	wait(500);
+	network_loop();
+	if (@cached_player_stats == null) {
+		speak("Unable to load stats.", true);
+		return;
+	}
+	json_object@ s = cached_player_stats;
+
+	menu@ m = setup_sub_menu("Player Stats.");
+	m.add_item("Combat Stats.");
+	m.add_item("Progression.");
+	m.add_item("Dungeon Stats.");
+	m.add_item("Achievements.");
+	m.add_item("Equipment.");
+	m.add_item("Social.");
+	m.add_item("Class History.");
+	int pick = m.run();
+
+	if (pick == 0) {
+		// Combat Stats
+		string text = "Combat Stats. ";
+		text += "Monsters killed: " + get_stat_int(s, "monster_kills") + ". ";
+		text += "Total damage dealt: " + get_stat_int(s, "total_damage_dealt") + ". ";
+		text += "Total healing done: " + get_stat_int(s, "healing_done") + ". ";
+		text += "Highest single hit: " + get_stat_int(s, "max_single_damage") + ". ";
+		text += "Critical hits: " + get_stat_int(s, "crit_count") + ". ";
+		text += "Deaths: " + get_stat_int(s, "total_deaths") + ". ";
+		text += "Battles completed: " + get_stat_int(s, "matches_completed") + ". ";
+		text += "Victories: " + get_stat_int(s, "victories") + ". ";
+		text += "Win rate: " + get_stat_int(s, "win_rate") + " percent. ";
+		text += "PvP record: " + get_stat_int(s, "pvp_wins") + " wins, " + get_stat_int(s, "pvp_losses") + " losses. ";
+		text += "Longest kill streak: " + get_stat_int(s, "longest_kill_streak") + ".";
+		speak(text, true);
+	}
+	else if (pick == 1) {
+		// Progression
+		string text = "Progression. ";
+		text += "Level " + get_stat_int(s, "level") + ". ";
+		text += get_stat_int(s, "xp") + " of " + get_stat_int(s, "xp_needed") + " XP to next level. ";
+		text += "Total XP earned: " + get_stat_int(s, "total_xp") + ". ";
+		int prestige = get_stat_int(s, "prestige_rank");
+		if (prestige > 0) text += "Prestige rank " + prestige + ": " + get_stat_str(s, "prestige_title") + ". ";
+		text += "Gold: " + get_stat_int(s, "gold") + ". ";
+		text += "Glory: " + get_stat_int(s, "glory") + ".";
+		speak(text, true);
+	}
+	else if (pick == 2) {
+		// Dungeon Stats
+		string text = "Dungeon Stats. ";
+		text += "Total dungeons cleared: " + get_stat_int(s, "total_dungeons_cleared") + ". ";
+		text += "Waves cleared: " + get_stat_int(s, "waves_cleared") + ". ";
+		text += "Boss kills: " + get_stat_int(s, "boss_kills") + ". ";
+		text += "Endless best wave: " + get_stat_int(s, "endless_best_wave") + ".";
+		speak(text, true);
+	}
+	else if (pick == 3) {
+		// Achievements
+		int count = get_stat_int(s, "achievement_count");
+		string text = "Achievements. " + count + " unlocked.";
+		if (s.exists("achievements")) {
+			json_array@ achs = s["achievements"];
+			if (@achs != null and achs.length() > 0) {
+				text += " Earned: ";
+				for (uint i = 0; i < achs.length(); i++) {
+					if (i > 0) text += ", ";
+					text += string(achs[i]);
+				}
+				text += ".";
+			}
+		}
+		speak(text, true);
+	}
+	else if (pick == 4) {
+		// Equipment
+		string text = "Equipment. ";
+		text += "Items found lifetime: " + get_stat_int(s, "items_found") + ". ";
+		text += "Trades completed: " + get_stat_int(s, "trades_completed") + ".";
+		if (s.exists("equipped")) {
+			json_object@ eq = s["equipped"];
+			if (@eq != null) {
+				string[] slots = {"weapon", "armor", "ring", "amulet"};
+				string[] slot_names = {"Weapon", "Armor", "Ring", "Amulet"};
+				for (uint i = 0; i < slots.length(); i++) {
+					if (eq.exists(slots[i]) and string(eq[slots[i]]) != "") {
+						init_item_catalog();
+						item_def@ item = find_item(string(eq[slots[i]]));
+						if (@item != null) text += " " + slot_names[i] + ": " + item.name + ". " + item_stat_summary(item) + ".";
+						else text += " " + slot_names[i] + ": " + string(eq[slots[i]]) + ".";
+					} else {
+						text += " " + slot_names[i] + ": Empty.";
+					}
+				}
+			}
+		}
+		speak(text, true);
+	}
+	else if (pick == 5) {
+		// Social
+		string text = "Social Stats. ";
+		text += "Friends: " + get_stat_int(s, "friends_count") + ". ";
+		string guild = get_stat_str(s, "guild_name");
+		text += guild != "" ? "Guild: " + guild + ". " : "No guild. ";
+		text += "Trades completed: " + get_stat_int(s, "trades_completed") + ".";
+		speak(text, true);
+	}
+	else if (pick == 6) {
+		// Class History
+		string text = "Class History. ";
+		if (s.exists("class_wins")) {
+			json_object@ cw = s["class_wins"];
+			string[] classes = {"barbarian","bard","cleric","druid","fighter","monk","paladin","ranger","rogue","sorcerer","warlock","wizard","artificer"};
+			string[] display = {"Barbarian","Bard","Cleric","Druid","Fighter","Monk","Paladin","Ranger","Rogue","Sorcerer","Warlock","Wizard","Artificer"};
+			int most_wins = 0;
+			string fav_class = "";
+			for (uint i = 0; i < classes.length(); i++) {
+				int wins = 0;
+				if (@cw != null and cw.exists(classes[i])) wins = int(cw[classes[i]]);
+				if (wins > 0) text += display[i] + ": " + wins + " wins. ";
+				if (wins > most_wins) { most_wins = wins; fav_class = display[i]; }
+			}
+			if (fav_class != "") text += "Favorite class: " + fav_class + ".";
+		}
+		speak(text, true);
+	}
+}
+
 void show_player_context_menu(string target_name, bool show_kick)
 {
 	if (target_name == username) {
@@ -972,11 +1120,12 @@ void show_player_context_menu(string target_name, bool show_kick)
 
 	// Trade option only for online, non-bot players
 	bool can_trade = !is_room_bot(target_name);
-	int total = (show_kick ? 1 : 0) + 3 + (can_trade ? 1 : 0);
+	int total = (show_kick ? 1 : 0) + 4 + (can_trade ? 1 : 0);
 	int item_num = 1;
 	menu@ pm = setup_sub_menu("Options for " + target_name);
 	int kick_opt = -1;
 	if (show_kick) { kick_opt = pm.add_item("Kick " + target_name + " " + item_num + " of " + total); item_num++; }
+	int inspect_opt = pm.add_item("View Stats " + item_num + " of " + total); item_num++;
 	int trade_opt = -1;
 	if (can_trade) { trade_opt = pm.add_item("Trade with " + target_name + " " + item_num + " of " + total); item_num++; }
 	int msg_opt = pm.add_item("Send private message to " + target_name + " " + item_num + " of " + total); item_num++;
@@ -993,6 +1142,26 @@ void show_player_context_menu(string target_name, bool show_kick)
 			speak("Canceled.", false);
 		} else {
 			send({{"type", message_types::kick_player}, {"target", target_name}});
+		}
+	}
+	else if (res == inspect_opt) {
+		send({{"type", message_types::inspect_player}, {"target", target_name}});
+		@cached_inspect_data = null;
+		wait(500);
+		network_loop();
+		if (@cached_inspect_data != null) {
+			string text = target_name + "'s stats. ";
+			text += "Level " + get_stat_int(cached_inspect_data, "level") + ". ";
+			int prestige = get_stat_int(cached_inspect_data, "prestige_rank");
+			if (prestige > 0) text += get_stat_str(cached_inspect_data, "prestige_title") + ". ";
+			text += get_stat_str(cached_inspect_data, "char_race") + " " + get_stat_str(cached_inspect_data, "char_class") + ". ";
+			text += "Kills: " + get_stat_int(cached_inspect_data, "monster_kills") + ". ";
+			text += "Victories: " + get_stat_int(cached_inspect_data, "victories") + ". ";
+			text += "Glory: " + get_stat_int(cached_inspect_data, "glory") + ". ";
+			text += "Endless best: " + get_stat_int(cached_inspect_data, "endless_best_wave") + ".";
+			speak(text, true);
+		} else {
+			speak("Could not load stats for " + target_name + ".", true);
 		}
 	}
 	else if (trade_opt >= 0 and res == trade_opt) {

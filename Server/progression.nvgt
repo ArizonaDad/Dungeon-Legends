@@ -103,6 +103,12 @@ void ensure_account_progression(account@ acct) {
 	if (!progress.exists("revived_and_won")) progress["revived_and_won"] = 0;
 	if (!progress.exists("friends_count")) progress["friends_count"] = 0;
 	if (!progress.exists("battles_with_friends")) progress["battles_with_friends"] = 0;
+	if (!progress.exists("total_damage_dealt")) progress["total_damage_dealt"] = 0;
+	if (!progress.exists("total_deaths")) progress["total_deaths"] = 0;
+	if (!progress.exists("pvp_wins")) progress["pvp_wins"] = 0;
+	if (!progress.exists("pvp_losses")) progress["pvp_losses"] = 0;
+	if (!progress.exists("longest_kill_streak")) progress["longest_kill_streak"] = 0;
+	if (!progress.exists("days_played")) progress["days_played"] = 0;
 	ensure_json_array_field(progress, "achievements");
 	ensure_json_object_field(progress, "dungeons_completed");
 	ensure_json_object_field(progress, "class_wins");
@@ -314,6 +320,133 @@ json_object@ build_progression_update_message(account@ acct, int gained = 0, int
 	msg["prestige_title"] = get_prestige_title(get_prestige_rank_from_progress(progress));
 	msg["glory"] = get_glory_from_progress(progress);
 	msg["gold"] = get_json_int(progress, "gold", 0);
+	return msg;
+}
+
+// ---- PLAYER STATS ----
+
+json_object@ build_player_stats_message(account@ acct) {
+	if (@acct == null) return null;
+	json_object@ progress = get_adventure_progress(acct);
+	if (@progress == null) return null;
+	json_object@ msg = json_object();
+	msg["type"] = message_types::player_stats;
+
+	// Combat stats
+	msg["monster_kills"] = get_json_int(progress, "monster_kills");
+	msg["total_damage_dealt"] = get_json_int(progress, "total_damage_dealt");
+	msg["healing_done"] = get_json_int(progress, "healing_done");
+	msg["max_single_damage"] = get_json_int(progress, "max_single_damage");
+	msg["crit_count"] = get_json_int(progress, "crit_count");
+	msg["total_deaths"] = get_json_int(progress, "total_deaths");
+	msg["matches_completed"] = get_json_int(progress, "matches_completed");
+	msg["victories"] = get_json_int(progress, "victories");
+	int matches = get_json_int(progress, "matches_completed");
+	int victories = get_json_int(progress, "victories");
+	msg["win_rate"] = matches > 0 ? (victories * 100 / matches) : 0;
+	msg["pvp_wins"] = get_json_int(progress, "pvp_wins");
+	msg["pvp_losses"] = get_json_int(progress, "pvp_losses");
+	msg["longest_kill_streak"] = get_json_int(progress, "longest_kill_streak");
+
+	// Progression stats
+	msg["level"] = get_json_int(progress, "level", 1);
+	msg["xp"] = get_json_int(progress, "xp");
+	msg["xp_needed"] = adventure_xp_needed_for_next_level(get_json_int(progress, "level", 1));
+	msg["total_xp"] = get_json_int(progress, "total_xp");
+	msg["prestige_rank"] = get_json_int(progress, "prestige_rank");
+	msg["prestige_title"] = get_prestige_title(get_json_int(progress, "prestige_rank"));
+	msg["gold"] = get_json_int(progress, "gold");
+	msg["glory"] = get_json_int(progress, "glory");
+
+	// Dungeon stats
+	msg["total_dungeons_cleared"] = get_json_int(progress, "total_dungeons_cleared");
+	msg["endless_best_wave"] = get_json_int(progress, "endless_best_wave");
+	msg["waves_cleared"] = get_json_int(progress, "waves_cleared");
+	msg["boss_kills"] = get_json_int(progress, "boss_kills");
+	if (progress.exists("dungeons_completed")) msg["dungeons_completed"] = progress["dungeons_completed"];
+
+	// Achievement stats
+	msg["achievement_count"] = get_achievement_count(progress);
+	if (progress.exists("achievements")) msg["achievements"] = progress["achievements"];
+
+	// Items
+	msg["items_found"] = get_json_int(progress, "items_found");
+	msg["trades_completed"] = get_json_int(progress, "trades_completed");
+
+	// Social
+	msg["friends_count"] = get_json_int(progress, "friends_count");
+	msg["guild_name"] = progress.exists("guild_name") ? string(progress["guild_name"]) : "";
+
+	// Class wins
+	if (progress.exists("class_wins")) msg["class_wins"] = progress["class_wins"];
+
+	// Character info
+	json_object@ character = get_character_profile(acct, GAME_TYPE_ADVENTURE);
+	if (@character != null) {
+		msg["char_name"] = character.exists("name") ? string(character["name"]) : "";
+		msg["char_race"] = character.exists("race") ? string(character["race"]) : "";
+		msg["char_class"] = character.exists("class") ? string(character["class"]) : "";
+		msg["char_subclass"] = character.exists("subclass") ? string(character["subclass"]) : "";
+		if (character.exists("equipped")) msg["equipped"] = character["equipped"];
+	}
+
+	return msg;
+}
+
+json_object@ build_player_inspect_message(account@ acct, string target_name) {
+	if (@acct == null) return null;
+	json_object@ progress = get_adventure_progress(acct);
+	if (@progress == null) return null;
+	json_object@ msg = json_object();
+	msg["type"] = message_types::player_inspect_data;
+	msg["target"] = target_name;
+
+	// Combat stats (public)
+	msg["monster_kills"] = get_json_int(progress, "monster_kills");
+	msg["total_damage_dealt"] = get_json_int(progress, "total_damage_dealt");
+	msg["healing_done"] = get_json_int(progress, "healing_done");
+	msg["max_single_damage"] = get_json_int(progress, "max_single_damage");
+	msg["crit_count"] = get_json_int(progress, "crit_count");
+	msg["total_deaths"] = get_json_int(progress, "total_deaths");
+	msg["matches_completed"] = get_json_int(progress, "matches_completed");
+	msg["victories"] = get_json_int(progress, "victories");
+	int matches = get_json_int(progress, "matches_completed");
+	int victories = get_json_int(progress, "victories");
+	msg["win_rate"] = matches > 0 ? (victories * 100 / matches) : 0;
+	msg["pvp_wins"] = get_json_int(progress, "pvp_wins");
+	msg["pvp_losses"] = get_json_int(progress, "pvp_losses");
+	msg["longest_kill_streak"] = get_json_int(progress, "longest_kill_streak");
+
+	// Progression stats (public)
+	msg["level"] = get_json_int(progress, "level", 1);
+	msg["prestige_rank"] = get_json_int(progress, "prestige_rank");
+	msg["prestige_title"] = get_prestige_title(get_json_int(progress, "prestige_rank"));
+	msg["glory"] = get_json_int(progress, "glory");
+
+	// Dungeon stats (public)
+	msg["total_dungeons_cleared"] = get_json_int(progress, "total_dungeons_cleared");
+	msg["endless_best_wave"] = get_json_int(progress, "endless_best_wave");
+	msg["waves_cleared"] = get_json_int(progress, "waves_cleared");
+	msg["boss_kills"] = get_json_int(progress, "boss_kills");
+
+	// Achievement stats (public)
+	msg["achievement_count"] = get_achievement_count(progress);
+
+	// Social (public)
+	msg["guild_name"] = progress.exists("guild_name") ? string(progress["guild_name"]) : "";
+
+	// Class wins (public)
+	if (progress.exists("class_wins")) msg["class_wins"] = progress["class_wins"];
+
+	// Character info (public)
+	json_object@ character = get_character_profile(acct, GAME_TYPE_ADVENTURE);
+	if (@character != null) {
+		msg["char_name"] = character.exists("name") ? string(character["name"]) : "";
+		msg["char_race"] = character.exists("race") ? string(character["race"]) : "";
+		msg["char_class"] = character.exists("class") ? string(character["class"]) : "";
+		msg["char_subclass"] = character.exists("subclass") ? string(character["subclass"]) : "";
+	}
+
 	return msg;
 }
 

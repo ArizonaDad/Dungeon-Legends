@@ -608,6 +608,13 @@ void handle_message(json_object@ msg)
 		my_guild_name = "";
 		@cached_guild_info = null;
 	}
+	// === PLAYER STATS / INSPECT ===
+	else if (msg_type == message_types::player_stats) {
+		@cached_player_stats = msg;
+	}
+	else if (msg_type == message_types::player_inspect_data) {
+		@cached_inspect_data = msg;
+	}
 	// Unknown messages are silently ignored.
 }
 // send  Send a JSON message to the server.

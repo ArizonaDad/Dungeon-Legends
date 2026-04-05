@@ -301,6 +301,18 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 - Phase 2 (50% HP): +3 AC, +2 damage, +10 speed, summons 2 minions
 - Phase 3 (25% HP): Additional +2 damage, heals 10% max HP, enrage announcement
 
+## Player Stats Menu
+- Accessible from main menu: "My Stats" with 7 sub-categories
+- **Combat Stats**: Kills, damage dealt, healing, max hit, crits, deaths, win rate, PvP record, kill streak
+- **Progression**: Level, XP, prestige, gold, glory
+- **Dungeon Stats**: Completions per dungeon/difficulty, endless best wave, boss kills
+- **Achievements**: Total unlocked, full list with names
+- **Equipment**: Equipped items with stats, inventory count, items found lifetime
+- **Social**: Friends, guild, trades completed
+- **Class History**: Per-class win counts, favorite class
+- **Player Inspect**: View another player's public stats from context menu (right-click in lobby/friends)
+- Server tracks: total_damage_dealt, total_deaths, pvp_wins/losses, longest_kill_streak per account
+
 ## Development
 - Compile: `C:\Users\16239\Documents\games\nvgt\nvgt.exe -c Server/Server.nvgt` and `C:\Users\16239\Documents\games\nvgt\nvgt.exe -c Client/client.nvgt`
 - Git repo: https://github.com/ArizonaDad/souls-mmo
