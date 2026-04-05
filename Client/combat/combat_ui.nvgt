@@ -1044,9 +1044,15 @@ void on_battle_start(string mode_text) {
 void on_battle_end(string result) {
 	combat_audio_play_battle_end(result);
 	audio_on_battle_end(result);
-	if (result == "victory") speak("Victory! You have won the battle!", true);
-	else if (result == "defeat") speak("Defeat! Your party has fallen.", true);
-	else speak("Battle over! " + result, true);
+	if (battle_mode == "endless") {
+		speak("You survived " + wave_number + " waves!", true);
+	} else if (result == "victory") {
+		speak("Victory! You have won the battle!", true);
+	} else if (result == "defeat") {
+		speak("Defeat! Your party has fallen.", true);
+	} else {
+		speak("Battle over! " + result, true);
+	}
 	tutorial_check("battle_end");
 	battle_active = false;
 }
@@ -1055,7 +1061,11 @@ void on_wave_start(int wave_num) {
 	wave_number = wave_num;
 	combat_audio_play_wave_start();
 	audio_on_wave_start();
-	speak("Wave " + wave_num + "!", true);
+	if (battle_mode == "endless") {
+		speak("Endless wave " + wave_num + "!", true);
+	} else {
+		speak("Wave " + wave_num + "!", true);
+	}
 }
 
 // ============================================================

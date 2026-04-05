@@ -1,5 +1,123 @@
 //          private messaging, friend system, reporting, kick.
 
+// ---- TRADE SESSION ----
+
+class trade_session {
+	user@ player_a;
+	user@ player_b;
+	string[] offer_a;
+	string[] offer_b;
+	bool confirmed_a = false;
+	bool confirmed_b = false;
+}
+
+trade_session@[] active_trades;
+
+trade_session@ find_trade_for_user(user@ u) {
+	if (@u == null) return null;
+	for (uint i = 0; i < active_trades.length(); i++) {
+		if (@active_trades[i].player_a is u or @active_trades[i].player_b is u)
+			return active_trades[i];
+	}
+	return null;
+}
+
+void cancel_trade(trade_session@ t, string reason) {
+	if (@t == null) return;
+	if (@t.player_a != null) t.player_a.send({{"type", message_types::trade_cancel}, {"reason", reason}});
+	if (@t.player_b != null) t.player_b.send({{"type", message_types::trade_cancel}, {"reason", reason}});
+	int idx = active_trades.find_by_ref(t);
+	if (idx >= 0) active_trades.remove_at(idx);
+}
+
+void complete_trade(trade_session@ t) {
+	if (@t == null or @t.player_a == null or @t.player_b == null) return;
+	if (@t.player_a.account == null or @t.player_b.account == null) return;
+
+	init_item_catalog();
+	json_array@ inv_a = ensure_json_array_field(t.player_a.account.data, "adventure_inventory");
+	json_array@ inv_b = ensure_json_array_field(t.player_b.account.data, "adventure_inventory");
+	if (@inv_a == null or @inv_b == null) {
+		cancel_trade(t, "Inventory error.");
+		return;
+	}
+
+	// Remove offered items from each player's inventory
+	for (uint i = 0; i < t.offer_a.length(); i++) {
+		inventory_remove_item(inv_a, t.offer_a[i]);
+	}
+	for (uint i = 0; i < t.offer_b.length(); i++) {
+		inventory_remove_item(inv_b, t.offer_b[i]);
+	}
+
+	// Add received items to each player's inventory
+	json_array received_a;  // Items player A receives (from B's offer)
+	for (uint i = 0; i < t.offer_b.length(); i++) {
+		inventory_add_item(inv_a, t.offer_b[i]);
+		item_def@ item = find_item(t.offer_b[i]);
+		json_object entry;
+		entry["id"] = t.offer_b[i];
+		entry["name"] = @item != null ? item.name : t.offer_b[i];
+		received_a.add(entry);
+	}
+	json_array received_b;  // Items player B receives (from A's offer)
+	for (uint i = 0; i < t.offer_a.length(); i++) {
+		inventory_add_item(inv_b, t.offer_a[i]);
+		item_def@ item = find_item(t.offer_a[i]);
+		json_object entry;
+		entry["id"] = t.offer_a[i];
+		entry["name"] = @item != null ? item.name : t.offer_a[i];
+		received_b.add(entry);
+	}
+
+	t.player_a.account.commit();
+	t.player_b.account.commit();
+
+	t.player_a.send({{"type", message_types::trade_complete}, {"items", received_a}});
+	t.player_b.send({{"type", message_types::trade_complete}, {"items", received_b}});
+
+	int idx = active_trades.find_by_ref(t);
+	if (idx >= 0) active_trades.remove_at(idx);
+	println("[TRADE] Trade completed between " + t.player_a.username + " and " + t.player_b.username);
+}
+
+// Helper: build a trade_update message for one side of the trade.
+json_object@ build_trade_update(trade_session@ t, bool for_player_a) {
+	if (@t == null) return null;
+	init_item_catalog();
+	json_object msg;
+	msg["type"] = message_types::trade_update;
+	msg["partner"] = for_player_a ? t.player_b.username : t.player_a.username;
+
+	// My offer
+	string[]@ my_offer = for_player_a ? t.offer_a : t.offer_b;
+	json_array my_arr;
+	for (uint i = 0; i < my_offer.length(); i++) {
+		item_def@ item = find_item(my_offer[i]);
+		json_object entry;
+		entry["id"] = my_offer[i];
+		entry["name"] = @item != null ? item.name : my_offer[i];
+		my_arr.add(entry);
+	}
+	msg["my_offer"] = my_arr;
+
+	// Their offer
+	string[]@ their_offer = for_player_a ? t.offer_b : t.offer_a;
+	json_array their_arr;
+	for (uint i = 0; i < their_offer.length(); i++) {
+		item_def@ item = find_item(their_offer[i]);
+		json_object entry;
+		entry["id"] = their_offer[i];
+		entry["name"] = @item != null ? item.name : their_offer[i];
+		their_arr.add(entry);
+	}
+	msg["their_offer"] = their_arr;
+
+	msg["my_confirmed"] = for_player_a ? t.confirmed_a : t.confirmed_b;
+	msg["their_confirmed"] = for_player_a ? t.confirmed_b : t.confirmed_a;
+	return msg;
+}
+
 // Helper: Remove the first occurrence of a string value from a json_array.
 // Returns a new json_array with the element removed.
 json_array@ json_array_remove_string(json_array@ arr, string value)
@@ -188,6 +306,10 @@ class user_manager
 			u.account.data["last_seen"] = calendar().format(DATE_TIME_FORMAT_RFC822);
 			u.account.data["last_seen_timestamp"] = ticks();
 		}
+
+		// Clean up active trades.
+		trade_session@ t = find_trade_for_user(u);
+		if (@t != null) cancel_trade(t, u.username + " disconnected.");
 
 		// Clean up room membership.
 		if (@u.room != null) {
@@ -1576,6 +1698,131 @@ void handle_user_message(user@ u, json_object@ msg)
 		send_character_profile_to_user(u, GAME_TYPE_ADVENTURE);
 	}
 
+	// ---- UPGRADE ITEM ----
+	else if (msg_type == message_types::upgrade_item and msg.exists("item_ids")) {
+		if (@u.account == null) return;
+		init_item_catalog();
+		ensure_account_progression(u.account);
+
+		json_array@ ids = msg["item_ids"];
+		if (@ids == null or ids.length() != 3) {
+			u.send({{"type", message_types::error}, {"text", "You must select exactly 3 items to upgrade."}});
+			return;
+		}
+
+		json_array@ inv = ensure_json_array_field(u.account.data, "adventure_inventory");
+		if (@inv == null) {
+			u.send({{"type", message_types::error}, {"text", "No inventory found."}});
+			return;
+		}
+
+		// Validate all 3 items exist in inventory and have same rarity
+		string[] item_ids;
+		string[] item_names;
+		int common_rarity = -1;
+		for (uint ii = 0; ii < ids.length(); ii++) {
+			string item_id = string(ids[ii]);
+			if (!inventory_has_item(inv, item_id)) {
+				u.send({{"type", message_types::error}, {"text", "You do not have item: " + item_id + "."}});
+				return;
+			}
+			item_def@ item = find_item(item_id);
+			if (@item == null) {
+				u.send({{"type", message_types::error}, {"text", "Unknown item: " + item_id + "."}});
+				return;
+			}
+			if (common_rarity == -1) {
+				common_rarity = item.rarity;
+			} else if (item.rarity != common_rarity) {
+				u.send({{"type", message_types::error}, {"text", "All 3 items must be the same rarity."}});
+				return;
+			}
+			item_ids.insert_last(item_id);
+			item_names.insert_last(item.name);
+		}
+
+		// Check rarity is upgradeable (not legendary)
+		if (common_rarity >= RARITY_LEGENDARY) {
+			u.send({{"type", message_types::error}, {"text", "Legendary items cannot be upgraded further."}});
+			return;
+		}
+
+		// Check glory cost
+		int cost = get_upgrade_glory_cost(common_rarity);
+		int current_glory = get_glory(u.account);
+		if (current_glory < cost) {
+			u.send({{"type", message_types::error}, {"text", "Not enough Glory. Need " + cost + " but you have " + current_glory + "."}});
+			return;
+		}
+
+		// Remove 3 items from inventory
+		for (uint ii = 0; ii < item_ids.length(); ii++) {
+			inventory_remove_item(inv, item_ids[ii]);
+		}
+
+		// Deduct glory
+		json_object@ progress = get_adventure_progress(u.account);
+		if (@progress != null) {
+			int new_glory = get_json_int(progress, "glory", 0) - cost;
+			if (new_glory < 0) new_glory = 0;
+			progress["glory"] = new_glory;
+		}
+
+		// Generate random item of next rarity
+		int target_rarity = common_rarity + 1;
+		item_def@ result_item = generate_upgrade_result(target_rarity);
+		string result_name = "Unknown";
+		if (@result_item != null) {
+			inventory_add_item(inv, result_item.id);
+			result_name = result_item.name;
+		}
+
+		u.account.commit();
+
+		// Send updated inventory
+		// Re-build inventory list
+		json_array items_arr;
+		for (uint ii = 0; ii < inv.length(); ii++) {
+			json_object@ entry = inv[ii];
+			if (@entry == null or !entry.exists("id")) continue;
+			string iid = string(entry["id"]);
+			item_def@ idef = find_item(iid);
+			if (@idef == null) continue;
+			json_object item_obj;
+			item_obj["id"] = idef.id;
+			item_obj["name"] = idef.name;
+			item_obj["rarity"] = idef.rarity;
+			item_obj["slot"] = idef.slot;
+			item_obj["description"] = idef.description;
+			item_obj["stats"] = item_stat_summary(idef);
+			items_arr.add(item_obj);
+		}
+		json_object equipped_info;
+		json_object@ character = get_character_profile(u.account, GAME_TYPE_ADVENTURE);
+		if (@character != null and character.exists("equipped")) {
+			json_object@ eq = character["equipped"];
+			if (eq.exists("weapon")) equipped_info["weapon"] = eq["weapon"];
+			if (eq.exists("armor")) equipped_info["armor"] = eq["armor"];
+			if (eq.exists("ring")) equipped_info["ring"] = eq["ring"];
+			if (eq.exists("amulet")) equipped_info["amulet"] = eq["amulet"];
+		}
+		u.send({
+			{"type", message_types::inventory_list},
+			{"items", items_arr},
+			{"equipped", equipped_info}
+		});
+
+		// Send glory update
+		u.send({
+			{"type", message_types::glory_update},
+			{"glory", get_glory(u.account)}
+		});
+
+		// Announce the result
+		string rarity_name = RARITY_NAMES[target_rarity];
+		u.send({{"type", message_types::announce}, {"text", "Upgrade successful! Combined " + item_names[0] + ", " + item_names[1] + ", and " + item_names[2] + " into " + result_name + " (" + rarity_name + "). Cost: " + cost + " Glory."}, {"interrupt", true}});
+	}
+
 	// ---- PRESTIGE ACTION ----
 	else if (msg_type == message_types::prestige_action) {
 		if (@u.account == null) return;
@@ -1618,5 +1865,127 @@ void handle_user_message(user@ u, json_object@ msg)
 			{"glory", get_glory(u.account)},
 			{"gained", glory_reward}
 		});
+	}
+
+	// ---- TRADING SYSTEM ----
+
+	else if (msg_type == message_types::trade_request and msg.exists("target")) {
+		string target_name = msg["target"];
+		if (target_name == u.username) {
+			u.send({{"type", message_types::error}, {"text", "You cannot trade with yourself."}});
+			return;
+		}
+		// Check if already in a trade
+		if (@find_trade_for_user(u) != null) {
+			u.send({{"type", message_types::error}, {"text", "You are already in a trade."}});
+			return;
+		}
+		user@ target = users.get_user_by_name(target_name);
+		if (@target == null) {
+			u.send({{"type", message_types::error}, {"text", target_name + " is not online."}});
+			return;
+		}
+		if (target.is_bot) {
+			u.send({{"type", message_types::error}, {"text", "You cannot trade with an AI player."}});
+			return;
+		}
+		if (@find_trade_for_user(target) != null) {
+			u.send({{"type", message_types::error}, {"text", target_name + " is already in a trade."}});
+			return;
+		}
+		// Send trade request to the target
+		target.send({{"type", message_types::trade_request}, {"from", u.username}});
+		u.send({{"type", message_types::announce}, {"text", "Trade request sent to " + target_name + "."}, {"interrupt", false}});
+		println("[TRADE] " + u.username + " sent trade request to " + target_name);
+	}
+
+	else if (msg_type == message_types::trade_accept and msg.exists("from")) {
+		string from_name = msg["from"];
+		user@ requester = users.get_user_by_name(from_name);
+		if (@requester == null) {
+			u.send({{"type", message_types::error}, {"text", from_name + " is no longer online."}});
+			return;
+		}
+		if (@find_trade_for_user(u) != null or @find_trade_for_user(requester) != null) {
+			u.send({{"type", message_types::error}, {"text", "Trade session conflict. Please try again."}});
+			return;
+		}
+		// Create the trade session
+		trade_session t;
+		@t.player_a = requester;
+		@t.player_b = u;
+		active_trades.insert_last(t);
+		// Send initial trade_update to both
+		requester.send(build_trade_update(t, true));
+		u.send(build_trade_update(t, false));
+		println("[TRADE] Trade session started between " + requester.username + " and " + u.username);
+	}
+
+	else if (msg_type == message_types::trade_offer and msg.exists("items")) {
+		trade_session@ t = find_trade_for_user(u);
+		if (@t == null) {
+			u.send({{"type", message_types::error}, {"text", "You are not in an active trade."}});
+			return;
+		}
+		// Reset confirmations when offer changes
+		t.confirmed_a = false;
+		t.confirmed_b = false;
+
+		bool is_a = (@t.player_a is u);
+		json_array@ items = msg["items"];
+		string[] new_offer;
+		if (@items != null and @u.account != null) {
+			init_item_catalog();
+			json_array@ inv = ensure_json_array_field(u.account.data, "adventure_inventory");
+			for (uint i = 0; i < items.length(); i++) {
+				string item_id = string(items[i]);
+				// Validate item exists in player's inventory
+				if (inventory_has_item(inv, item_id)) {
+					new_offer.insert_last(item_id);
+				}
+			}
+		}
+
+		if (is_a) t.offer_a = new_offer;
+		else t.offer_b = new_offer;
+
+		// Send updated trade state to both
+		t.player_a.send(build_trade_update(t, true));
+		t.player_b.send(build_trade_update(t, false));
+	}
+
+	else if (msg_type == message_types::trade_confirm) {
+		trade_session@ t = find_trade_for_user(u);
+		if (@t == null) {
+			u.send({{"type", message_types::error}, {"text", "You are not in an active trade."}});
+			return;
+		}
+		bool is_a = (@t.player_a is u);
+		if (is_a) t.confirmed_a = true;
+		else t.confirmed_b = true;
+
+		// Send updated state to both
+		t.player_a.send(build_trade_update(t, true));
+		t.player_b.send(build_trade_update(t, false));
+
+		// If both confirmed, execute the trade
+		if (t.confirmed_a and t.confirmed_b) {
+			complete_trade(t);
+		}
+	}
+
+	else if (msg_type == message_types::trade_cancel) {
+		trade_session@ t = find_trade_for_user(u);
+		if (@t == null) return;
+		cancel_trade(t, u.username + " cancelled the trade.");
+	}
+
+	// ---- WEEKLY CHALLENGES ----
+
+	else if (msg_type == message_types::weekly_challenges) {
+		if (@u.account == null) return;
+		ensure_account_progression(u.account);
+		json_object@ challenge_msg = build_weekly_challenges_message(u.account);
+		if (@challenge_msg != null) u.send(challenge_msg);
 	}
 }

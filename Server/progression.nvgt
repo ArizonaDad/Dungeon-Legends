@@ -93,9 +93,14 @@ void ensure_account_progression(account@ acct) {
 	if (!progress.exists("prestige_rank")) progress["prestige_rank"] = 0;
 	if (!progress.exists("prestige_title")) progress["prestige_title"] = "";
 	if (!progress.exists("glory")) progress["glory"] = 0;
+	if (!progress.exists("endless_best_wave")) progress["endless_best_wave"] = 0;
 	ensure_json_array_field(progress, "achievements");
 	ensure_json_object_field(progress, "dungeons_completed");
 	ensure_json_array_field(data, "adventure_inventory");
+
+	// Weekly challenge tracking
+	if (!progress.exists("challenge_week")) progress["challenge_week"] = 0;
+	ensure_json_object_field(progress, "challenge_progress");
 
 	if (data.exists(ACCOUNT_KEY_ADVENTURE_CHARACTER)) {
 		json_object@ character = data[ACCOUNT_KEY_ADVENTURE_CHARACTER];
@@ -243,6 +248,7 @@ json_object@ build_progression_stats_message(json_object@ progress) {
 	stats["prestige_rank"] = get_prestige_rank_from_progress(progress);
 	stats["prestige_title"] = get_prestige_title(get_prestige_rank_from_progress(progress));
 	stats["glory"] = get_glory_from_progress(progress);
+	stats["endless_best_wave"] = get_json_int(progress, "endless_best_wave", 0);
 	return stats;
 }
 
@@ -345,6 +351,17 @@ void add_glory(account@ acct, int amount) {
 	add_json_int(progress, "glory", amount);
 }
 
+void update_endless_best_wave(account@ acct, int wave) {
+	if (@acct == null or wave <= 0) return;
+	json_object@ progress = get_adventure_progress(acct);
+	if (@progress == null) return;
+	int current_best = get_json_int(progress, "endless_best_wave", 0);
+	if (wave > current_best) {
+		progress["endless_best_wave"] = wave;
+		acct.commit();
+	}
+}
+
 void add_dungeon_completion(account@ acct, string dungeon_id) {
 	if (@acct == null or dungeon_id == "") return;
 	json_object@ progress = get_adventure_progress(acct);
@@ -352,4 +369,170 @@ void add_dungeon_completion(account@ acct, string dungeon_id) {
 	json_object@ completions = ensure_json_object_field(progress, "dungeons_completed");
 	if (@completions == null) return;
 	add_json_int(completions, dungeon_id, 1);
+}
+
+// ---- WEEKLY CHALLENGE SYSTEM ----
+
+class challenge_def {
+	string id;
+	string description;
+	string type;  // "kills", "matches", "healing", "endless", "pvp"
+	int target_value;
+	int glory_reward;
+}
+
+int get_current_week_number() {
+	// Days since epoch / 7. ticks() is in ms.
+	return int(ticks() / (uint64(1000) * 60 * 60 * 24 * 7));
+}
+
+challenge_def@[] generate_weekly_challenges(int week_number) {
+	challenge_def@[] challenges;
+
+	// Use week_number as seed for deterministic generation
+	int seed = week_number * 7919;  // prime multiplier for variety
+
+	// Challenge 1: Kill-based
+	challenge_def c1;
+	c1.id = "weekly_kills_" + week_number;
+	int[] kill_targets = {15, 20, 25, 30};
+	c1.target_value = kill_targets[seed % 4];
+	c1.description = "Defeat " + c1.target_value + " monsters in Adventure mode";
+	c1.type = "kills";
+	c1.glory_reward = c1.target_value;
+	challenges.insert_last(c1);
+
+	// Challenge 2: Match/dungeon-based
+	challenge_def c2;
+	c2.id = "weekly_matches_" + week_number;
+	int[] match_targets = {3, 5, 7};
+	c2.target_value = match_targets[(seed / 4) % 3];
+	c2.description = "Complete " + c2.target_value + " Adventure matches";
+	c2.type = "matches";
+	c2.glory_reward = c2.target_value * 5;
+	challenges.insert_last(c2);
+
+	// Challenge 3: Varied (healing, endless, pvp)
+	challenge_def c3;
+	c3.id = "weekly_special_" + week_number;
+	int special_type = (seed / 12) % 3;
+	if (special_type == 0) {
+		c3.type = "healing";
+		c3.target_value = 200;
+		c3.description = "Heal 200 total HP in Adventure";
+		c3.glory_reward = 30;
+	} else if (special_type == 1) {
+		c3.type = "endless";
+		c3.target_value = 5 + ((seed / 36) % 6);
+		c3.description = "Reach wave " + c3.target_value + " in Endless Survival";
+		c3.glory_reward = c3.target_value * 5;
+	} else {
+		c3.type = "pvp";
+		c3.target_value = 1;
+		c3.description = "Win a PvP match";
+		c3.glory_reward = 20;
+	}
+	challenges.insert_last(c3);
+
+	return challenges;
+}
+
+// Reset challenge progress if the stored week doesn't match the current week.
+void ensure_current_week_challenges(json_object@ progress) {
+	if (@progress == null) return;
+	int current_week = get_current_week_number();
+	int stored_week = get_json_int(progress, "challenge_week", 0);
+	if (stored_week != current_week) {
+		// New week: reset progress
+		progress["challenge_week"] = current_week;
+		json_object fresh;
+		progress["challenge_progress"] = fresh;
+	}
+}
+
+// Update progress toward a specific challenge type.
+// amount is additive for kills/matches/healing, max-based for endless.
+void update_challenge_progress(account@ acct, string type, int amount) {
+	if (@acct == null or amount <= 0) return;
+	json_object@ progress = get_adventure_progress(acct);
+	if (@progress == null) return;
+	ensure_current_week_challenges(progress);
+	json_object@ cp = ensure_json_object_field(progress, "challenge_progress");
+	if (@cp == null) return;
+
+	if (type == "endless") {
+		// Endless uses max value (highest wave reached this run)
+		int current = get_json_int(cp, type, 0);
+		if (amount > current) cp[type] = amount;
+	} else {
+		add_json_int(cp, type, amount);
+	}
+}
+
+// Check all challenges and award glory for any newly completed ones.
+// Returns an array of completed challenge descriptions for notification.
+string[] check_challenge_completion(account@ acct) {
+	string[] completed;
+	if (@acct == null) return completed;
+	json_object@ progress = get_adventure_progress(acct);
+	if (@progress == null) return completed;
+	ensure_current_week_challenges(progress);
+
+	int week = get_json_int(progress, "challenge_week", 0);
+	challenge_def@[] challenges = generate_weekly_challenges(week);
+	json_object@ cp = ensure_json_object_field(progress, "challenge_progress");
+	if (@cp == null) return completed;
+
+	for (uint i = 0; i < challenges.length(); i++) {
+		challenge_def@ c = challenges[i];
+		string done_key = c.id + "_done";
+		// Already awarded?
+		if (get_json_int(cp, done_key, 0) == 1) continue;
+		int current = get_json_int(cp, c.type, 0);
+		if (current >= c.target_value) {
+			// Mark as done and award glory
+			cp[done_key] = 1;
+			add_glory(acct, c.glory_reward);
+			completed.insert_last(c.description + "|" + c.glory_reward);
+		}
+	}
+	return completed;
+}
+
+// Build the weekly challenges response message for a user.
+json_object@ build_weekly_challenges_message(account@ acct) {
+	if (@acct == null) return null;
+	json_object@ progress = get_adventure_progress(acct);
+	if (@progress == null) return null;
+	ensure_current_week_challenges(progress);
+
+	int week = get_json_int(progress, "challenge_week", 0);
+	challenge_def@[] challenges = generate_weekly_challenges(week);
+	json_object@ cp = ensure_json_object_field(progress, "challenge_progress");
+
+	json_object msg;
+	msg["type"] = message_types::weekly_challenges;
+	json_array challenge_arr;
+	int total_done = 0;
+	for (uint i = 0; i < challenges.length(); i++) {
+		challenge_def@ c = challenges[i];
+		json_object entry;
+		entry["id"] = c.id;
+		entry["description"] = c.description;
+		entry["type"] = c.type;
+		entry["target"] = c.target_value;
+		entry["glory"] = c.glory_reward;
+		int current = @cp != null ? get_json_int(cp, c.type, 0) : 0;
+		if (current > c.target_value) current = c.target_value;
+		entry["progress"] = current;
+		string done_key = c.id + "_done";
+		bool done = @cp != null and get_json_int(cp, done_key, 0) == 1;
+		entry["completed"] = done;
+		if (done) total_done++;
+		challenge_arr.add(entry);
+	}
+	msg["challenges"] = challenge_arr;
+	msg["completed_count"] = total_done;
+	msg["total_count"] = int(challenges.length());
+	return msg;
 }

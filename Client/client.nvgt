@@ -24,6 +24,18 @@ json_array@ cached_friends = json_array();     // Most recent friends list from 
 json_array@ cached_pending = json_array();     // Most recent pending friend requests.
 bool has_pending_notification = false; // True when we got a friend request notification.
 
+// ---- Trade state ----
+bool trade_pending = false;           // True when a trade request is waiting to be accepted.
+string trade_partner = "";            // Username of the trade partner (pending or active).
+bool trade_active = false;            // True when in an active trade session.
+json_array@ trade_my_offer = null;    // Items we are offering.
+json_array@ trade_their_offer = null; // Items they are offering.
+bool trade_my_confirmed = false;
+bool trade_their_confirmed = false;
+
+// ---- Weekly challenges cache ----
+json_object@ cached_challenge_data = null;
+
 string room_game_type_label(string game_type) {
 	game_type = normalize_character_profile(game_type);
 	return game_type == "adventure" ? "Adventure" : "Sandbox";
@@ -94,6 +106,103 @@ void create_lobby_for_mode(string game_type) {
 	host_menu();
 }
 
+void show_upgrade_menu() {
+	init_item_catalog();
+	// Request fresh inventory
+	send({{"type", message_types::inventory_list}});
+	timer inv_wait;
+	while (inv_wait.elapsed < 1500) {
+		wait(10);
+		network_loop();
+		if (@cached_inventory != null) break;
+	}
+	if (@cached_inventory == null or cached_inventory.length() == 0) {
+		speak("Your inventory is empty. Nothing to upgrade.", true);
+		return;
+	}
+
+	// Count items by rarity
+	int[] rarity_counts = {0, 0, 0, 0, 0};
+	for (uint i = 0; i < cached_inventory.length(); i++) {
+		json_object@ entry = cached_inventory[i];
+		if (@entry == null or !entry.exists("id")) continue;
+		item_def@ item = find_item(string(entry["id"]));
+		if (@item != null and item.rarity >= 0 and item.rarity < 5) {
+			rarity_counts[item.rarity]++;
+		}
+	}
+
+	menu@ upgrade_menu = setup_sub_menu("Upgrade Items. Combine 3 items of the same rarity into 1 item of the next rarity.");
+	int[] rarity_options;
+	for (int r = 0; r < 4; r++) {
+		if (rarity_counts[r] >= 3) {
+			int cost = get_upgrade_glory_cost(r);
+			string next_rarity = RARITY_NAMES[r + 1];
+			upgrade_menu.add_item("Upgrade 3 " + RARITY_NAMES[r] + " items to 1 " + next_rarity + " item. Cost: " + cost + " Glory. You have " + rarity_counts[r] + " " + RARITY_NAMES[r] + " items.");
+			rarity_options.insert_last(r);
+		}
+	}
+
+	if (rarity_options.length() == 0) {
+		speak("You need at least 3 items of the same rarity to upgrade. No upgrades available.", true);
+		return;
+	}
+
+	int pick = upgrade_menu.run();
+	if (pick < 0) return;
+	if (pick >= int(rarity_options.length())) return;
+
+	int selected_rarity = rarity_options[pick];
+
+	// Auto-pick first 3 items of that rarity
+	string[] picked_ids;
+	string[] picked_names;
+	for (uint i = 0; i < cached_inventory.length(); i++) {
+		if (int(picked_ids.length()) >= 3) break;
+		json_object@ entry = cached_inventory[i];
+		if (@entry == null or !entry.exists("id")) continue;
+		string item_id = string(entry["id"]);
+		item_def@ item = find_item(item_id);
+		if (@item != null and item.rarity == selected_rarity) {
+			picked_ids.insert_last(item_id);
+			picked_names.insert_last(item.name);
+		}
+	}
+
+	if (int(picked_ids.length()) < 3) {
+		speak("Not enough items of that rarity.", true);
+		return;
+	}
+
+	int cost = get_upgrade_glory_cost(selected_rarity);
+	string confirm_text = "Combine " + picked_names[0] + ", " + picked_names[1] + ", and " + picked_names[2] + " for " + cost + " Glory?";
+	menu@ confirm_menu = setup_sub_menu(confirm_text);
+	confirm_menu.add_item("Yes, upgrade them.");
+	confirm_menu.add_item("No, cancel.");
+	int confirm = confirm_menu.run();
+	if (confirm != 0) {
+		speak("Canceled.", false);
+		return;
+	}
+
+	// Send upgrade request
+	json_object upgrade_msg;
+	upgrade_msg["type"] = message_types::upgrade_item;
+	json_array ids_arr;
+	for (uint i = 0; i < picked_ids.length(); i++) {
+		ids_arr.add(picked_ids[i]);
+	}
+	upgrade_msg["item_ids"] = ids_arr;
+	send(upgrade_msg);
+	speak("Upgrading items...", false);
+	// Wait for server response
+	timer resp_wait;
+	while (resp_wait.elapsed < 2000) {
+		wait(10);
+		network_loop();
+	}
+}
+
 void show_inventory() {
 	init_item_catalog();
 	// Request inventory from server
@@ -111,6 +220,7 @@ void show_inventory() {
 	}
 	while (true) {
 		menu@ inv_menu = setup_sub_menu("Inventory. " + cached_inventory.length() + " of " + MAX_INVENTORY + " slots used.");
+		int upgrade_opt = inv_menu.add_item("Upgrade Items. Combine 3 items of the same rarity into a higher rarity item.");
 		for (uint i = 0; i < cached_inventory.length(); i++) {
 			json_object@ entry = cached_inventory[i];
 			if (@entry == null or !entry.exists("id")) continue;
@@ -138,8 +248,21 @@ void show_inventory() {
 		}
 		int pick = inv_menu.run();
 		if (pick < 0) return;
-		if (pick >= int(cached_inventory.length())) continue;
-		json_object@ selected_entry = cached_inventory[pick];
+		if (pick == upgrade_opt) {
+			show_upgrade_menu();
+			// Refresh inventory after upgrade
+			send({{"type", message_types::inventory_list}});
+			timer upg_wait;
+			while (upg_wait.elapsed < 1500) {
+				wait(10);
+				network_loop();
+				if (@cached_inventory != null) break;
+			}
+			continue;
+		}
+		int item_index = pick - 1; // Offset by 1 because of the Upgrade Items option at the top
+		if (item_index < 0 or item_index >= int(cached_inventory.length())) continue;
+		json_object@ selected_entry = cached_inventory[item_index];
 		if (@selected_entry == null or !selected_entry.exists("id")) continue;
 		string sel_item_id = string(selected_entry["id"]);
 		item_def@ sel_item = find_item(sel_item_id);
@@ -235,10 +358,15 @@ void main_menu()
 		}
 	}
 	while (true) {
+		// Check if a trade was accepted and we need to open trade screen
+		if (trade_active and !trade_pending) {
+			show_trade_screen();
+			continue;
+		}
 		menu@ m = setup_menu("");
 		@m = main_screen;
 		// Calculate total items dynamically
-		int total = 8; // base: create char, adventure, sandbox, join, friends, online, about, quit
+		int total = 9; // base: create char, adventure, sandbox, join, weekly, friends, online, about, quit
 		bool has_char = has_any_character_profile();
 		if (has_char) total++; // view char
 		total++; // inventory
@@ -258,6 +386,7 @@ void main_menu()
 		int create_adventure = m.add_item("Adventure. Create or join an adventure lobby. " + n + " of " + total); n++;
 		int create_sandbox = m.add_item("Sandbox. Create or join a sandbox lobby. " + n + " of " + total); n++;
 		int join = m.add_item("Join a game! " + n + " of " + total); n++;
+		int challenges_btn = m.add_item("Weekly Challenges. " + n + " of " + total); n++;
 		int social = m.add_item("Friends. " + n + " of " + total); n++;
 		int CHECK_ONLINE = m.add_item("Check who is online. " + n + " of " + total); n++;
 		int About = m.add_item("About us. " + n + " of " + total); n++;
@@ -344,6 +473,9 @@ void main_menu()
 		else if (res == join) {
 			send({{"type", message_types::list_rooms}});
 			m.play(m.select_sound);
+		}
+		else if (res == challenges_btn) {
+			show_weekly_challenges();
 		}
 		else if (res == social) {
 			social_panel();
@@ -445,6 +577,7 @@ void menu_callback(menu@ m, string user = "")
 	if (key_pressed(KEY_PAGEUP)) volume_up();
 	if (key_pressed(KEY_PAGEDOWN)) volume_down();
 	if (key_pressed(KEY_F3) and has_pending_invite) { handle_game_invite(); }
+	if (key_pressed(KEY_F5) and trade_pending) { handle_trade_request(); }
 }
 void sub_menu_callback(menu@ m, string user = "")
 {
@@ -454,6 +587,7 @@ void sub_menu_callback(menu@ m, string user = "")
 	if (key_pressed(KEY_PAGEDOWN)) volume_down();
 	if (key_pressed(KEY_BACK)) { simulate_key_down(KEY_ESCAPE); }
 	if (key_pressed(KEY_F3) and has_pending_invite) { handle_game_invite(); }
+	if (key_pressed(KEY_F5) and trade_pending) { handle_trade_request(); }
 }
 menu@ setup_menu(string intro, bool use_main_screen = true)
 {
@@ -612,17 +746,22 @@ void host_menu()
 				mode_menu.add_item("PvP Arena. Players fight each other with Sandbox characters.");
 				mode_menu.add_item("Wave Survival. Fight waves of monsters together with Sandbox characters.");
 				mode_menu.add_item("Boss Rush. Challenge powerful bosses with your Sandbox party.");
+				mode_menu.add_item("Endless Survival. Fight endless waves of escalating monsters.");
 				int mode_pick = mode_menu.run();
 				if (mode_pick < 0) continue;
 				game_mode = "pvp";
 				if (mode_pick == 1) game_mode = "wave";
 				else if (mode_pick == 2) game_mode = "boss";
+				else if (mode_pick == 3) game_mode = "endless";
 			} else {
 				mode_menu.add_item("Adventure Run. Fight a wave scenario together and earn XP.");
 				mode_menu.add_item("Boss Hunt. Challenge a boss together and earn XP.");
+				mode_menu.add_item("Endless Survival. Fight endless waves and earn XP. How far can you go?");
 				int mode_pick = mode_menu.run();
 				if (mode_pick < 0) continue;
-				game_mode = mode_pick == 0 ? "wave" : "boss";
+				if (mode_pick == 0) game_mode = "wave";
+				else if (mode_pick == 1) game_mode = "boss";
+				else game_mode = "endless";
 			}
 			if (game_mode == "wave") {
 				menu@ scenario_menu = setup_sub_menu("Choose a scenario.");
@@ -757,11 +896,15 @@ void show_player_context_menu(string target_name, bool show_kick)
 		return;
 	}
 
-	int total = show_kick ? 4 : 3;
+	// Trade option only for online, non-bot players
+	bool can_trade = !is_room_bot(target_name);
+	int total = (show_kick ? 1 : 0) + 3 + (can_trade ? 1 : 0);
 	int item_num = 1;
 	menu@ pm = setup_sub_menu("Options for " + target_name);
 	int kick_opt = -1;
 	if (show_kick) { kick_opt = pm.add_item("Kick " + target_name + " " + item_num + " of " + total); item_num++; }
+	int trade_opt = -1;
+	if (can_trade) { trade_opt = pm.add_item("Trade with " + target_name + " " + item_num + " of " + total); item_num++; }
 	int msg_opt = pm.add_item("Send private message to " + target_name + " " + item_num + " of " + total); item_num++;
 	int friend_opt = pm.add_item("Add " + target_name + " as friend " + item_num + " of " + total); item_num++;
 	int report_opt = pm.add_item("Report " + target_name + " " + item_num + " of " + total);
@@ -778,6 +921,10 @@ void show_player_context_menu(string target_name, bool show_kick)
 			send({{"type", message_types::kick_player}, {"target", target_name}});
 		}
 	}
+	else if (trade_opt >= 0 and res == trade_opt) {
+		send({{"type", message_types::trade_request}, {"target", target_name}});
+		speak("Trade request sent to " + target_name + ".", false);
+	}
 	else if (res == msg_opt) {
 		send_private_message_form(target_name);
 	}
@@ -788,6 +935,244 @@ void show_player_context_menu(string target_name, bool show_kick)
 		send_report_form(target_name);
 	}
 }
+
+void handle_trade_request() {
+	if (!trade_pending) return;
+	trade_pending = false;
+	if (yes_no(trade_partner + " wants to trade with you. Accept?", setup_sub_menu())) {
+		send({{"type", message_types::trade_accept}, {"from", trade_partner}});
+		speak("Trade accepted. Opening trade screen...", false);
+		trade_active = true;
+		@trade_my_offer = json_array();
+		@trade_their_offer = json_array();
+		trade_my_confirmed = false;
+		trade_their_confirmed = false;
+		// Wait briefly for server trade_update before showing screen
+		timer tw;
+		while (tw.elapsed < 1000) {
+			wait(10);
+			network_loop();
+		}
+		show_trade_screen();
+	} else {
+		send({{"type", message_types::trade_cancel}});
+		trade_partner = "";
+		speak("Trade declined.", false);
+	}
+}
+
+void show_trade_screen() {
+	if (!trade_active) return;
+	init_item_catalog();
+	while (trade_active) {
+		network_loop();
+		// Build the trade menu
+		int my_count = @trade_my_offer != null ? int(trade_my_offer.length()) : 0;
+		int their_count = @trade_their_offer != null ? int(trade_their_offer.length()) : 0;
+		string status = "";
+		if (trade_my_confirmed and trade_their_confirmed) status = "Both confirmed!";
+		else if (trade_my_confirmed) status = "You confirmed. Waiting for " + trade_partner + ".";
+		else if (trade_their_confirmed) status = trade_partner + " confirmed. Your turn.";
+
+		string intro = "Trading with " + trade_partner + ".";
+		if (status != "") intro += " " + status;
+		menu@ tm = setup_sub_menu(intro);
+
+		// Your offer section
+		string my_label = "Your offer: ";
+		if (my_count == 0) my_label += "Nothing.";
+		else {
+			for (int i = 0; i < my_count; i++) {
+				json_object@ entry = trade_my_offer[i];
+				string name = entry.exists("name") ? string(entry["name"]) : string(entry["id"]);
+				if (i > 0) my_label += ", ";
+				my_label += name;
+			}
+			my_label += ".";
+		}
+		int my_offer_item = tm.add_item(my_label);
+
+		// Their offer section
+		string their_label = trade_partner + "'s offer: ";
+		if (their_count == 0) their_label += "Nothing.";
+		else {
+			for (int i = 0; i < their_count; i++) {
+				json_object@ entry = trade_their_offer[i];
+				string name = entry.exists("name") ? string(entry["name"]) : string(entry["id"]);
+				if (i > 0) their_label += ", ";
+				their_label += name;
+			}
+			their_label += ".";
+		}
+		int their_offer_item = tm.add_item(their_label);
+
+		int add_item_btn = tm.add_item("Add item to offer.");
+		int remove_item_btn = -1;
+		if (my_count > 0) remove_item_btn = tm.add_item("Remove item from offer.");
+		int confirm_btn = -1;
+		if (!trade_my_confirmed) confirm_btn = tm.add_item("Confirm trade.");
+		int cancel_btn = tm.add_item("Cancel trade.");
+
+		int pick = tm.run();
+		if (pick < 0 or pick == cancel_btn) {
+			send({{"type", message_types::trade_cancel}});
+			trade_active = false;
+			trade_partner = "";
+			@trade_my_offer = null;
+			@trade_their_offer = null;
+			speak("Trade cancelled.", false);
+			return;
+		}
+		if (pick == add_item_btn) {
+			// Show inventory picker (non-equipped items only)
+			send({{"type", message_types::inventory_list}});
+			timer inv_wait;
+			while (inv_wait.elapsed < 1500) {
+				wait(10);
+				network_loop();
+				if (@cached_inventory != null) break;
+			}
+			if (@cached_inventory == null or cached_inventory.length() == 0) {
+				speak("Your inventory is empty.", true);
+				continue;
+			}
+			menu@ inv_pick = setup_sub_menu("Choose an item to offer.");
+			int[] valid_indices;
+			for (uint i = 0; i < cached_inventory.length(); i++) {
+				json_object@ entry = cached_inventory[i];
+				if (@entry == null or !entry.exists("id")) continue;
+				string item_id = string(entry["id"]);
+				// Skip already offered items
+				bool already_offered = false;
+				if (@trade_my_offer != null) {
+					for (uint j = 0; j < trade_my_offer.length(); j++) {
+						json_object@ oe = trade_my_offer[j];
+						if (@oe != null and string(oe["id"]) == item_id) { already_offered = true; break; }
+					}
+				}
+				if (already_offered) continue;
+				// Skip equipped items
+				bool equipped = false;
+				if (@cached_equipped != null) {
+					for (uint s = 0; s < SLOT_NAMES.length(); s++) {
+						string slot_key = SLOT_NAMES[s].lower();
+						if (cached_equipped.exists(slot_key) and string(cached_equipped[slot_key]) == item_id) {
+							equipped = true;
+							break;
+						}
+					}
+				}
+				if (equipped) continue;
+				item_def@ item = find_item(item_id);
+				string label = @item != null ? item.name + ". " + RARITY_NAMES[item.rarity] + " " + SLOT_NAMES[item.slot] + "." : item_id;
+				inv_pick.add_item(label);
+				valid_indices.insert_last(int(i));
+			}
+			if (valid_indices.length() == 0) {
+				speak("No tradable items in your inventory.", true);
+				continue;
+			}
+			int inv_res = inv_pick.run();
+			if (inv_res >= 0 and inv_res < int(valid_indices.length())) {
+				json_object@ selected = cached_inventory[valid_indices[inv_res]];
+				string sel_id = string(selected["id"]);
+				// Build updated offer list
+				json_array offer_ids;
+				if (@trade_my_offer != null) {
+					for (uint j = 0; j < trade_my_offer.length(); j++) {
+						json_object@ oj = trade_my_offer[j];
+						if (@oj != null and oj.exists("id")) offer_ids.add(string(oj["id"]));
+					}
+				}
+				offer_ids.add(sel_id);
+				send({{"type", message_types::trade_offer}, {"items", offer_ids}});
+				item_def@ item = find_item(sel_id);
+				speak("Added " + (@item != null ? item.name : sel_id) + " to your offer.", false);
+				// Wait for server update
+				wait(300);
+				network_loop();
+			}
+		}
+		else if (remove_item_btn >= 0 and pick == remove_item_btn) {
+			if (@trade_my_offer == null or trade_my_offer.length() == 0) {
+				speak("No items to remove.", true);
+				continue;
+			}
+			menu@ rm = setup_sub_menu("Choose an item to remove from your offer.");
+			for (uint i = 0; i < trade_my_offer.length(); i++) {
+				json_object@ entry = trade_my_offer[i];
+				string name = entry.exists("name") ? string(entry["name"]) : string(entry["id"]);
+				rm.add_item(name);
+			}
+			int rm_res = rm.run();
+			if (rm_res >= 0 and rm_res < int(trade_my_offer.length())) {
+				// Rebuild offer without the removed item
+				json_array offer_ids;
+				for (uint j = 0; j < trade_my_offer.length(); j++) {
+					if (int(j) != rm_res) {
+						json_object@ rj = trade_my_offer[j];
+						if (@rj != null and rj.exists("id")) offer_ids.add(string(rj["id"]));
+					}
+				}
+				send({{"type", message_types::trade_offer}, {"items", offer_ids}});
+				speak("Item removed from offer.", false);
+				wait(300);
+				network_loop();
+			}
+		}
+		else if (confirm_btn >= 0 and pick == confirm_btn) {
+			send({{"type", message_types::trade_confirm}});
+			trade_my_confirmed = true;
+			speak("Trade confirmed. Waiting for " + trade_partner + " to confirm.", false);
+			wait(300);
+			network_loop();
+		}
+	}
+}
+
+void show_weekly_challenges() {
+	send({{"type", message_types::weekly_challenges}});
+	// Wait for response
+	json_object@ challenge_response = null;
+	timer cw;
+	while (cw.elapsed < 2000) {
+		wait(10);
+		network_loop();
+		if (@cached_challenge_data != null) {
+			@challenge_response = cached_challenge_data;
+			break;
+		}
+	}
+	if (@challenge_response == null or !challenge_response.exists("challenges")) {
+		speak("Unable to load weekly challenges.", true);
+		return;
+	}
+	json_array@ challenges = challenge_response["challenges"];
+	int completed_count = challenge_response.exists("completed_count") ? int(challenge_response["completed_count"]) : 0;
+	int total_count = challenge_response.exists("total_count") ? int(challenge_response["total_count"]) : 0;
+
+	menu@ cm = setup_sub_menu("Weekly Challenges. " + completed_count + " of " + total_count + " completed.");
+	for (uint i = 0; i < challenges.length(); i++) {
+		json_object@ c = challenges[i];
+		string desc = c.exists("description") ? string(c["description"]) : "Unknown challenge";
+		int target = c.exists("target") ? int(c["target"]) : 0;
+		int progress = c.exists("progress") ? int(c["progress"]) : 0;
+		int glory = c.exists("glory") ? int(c["glory"]) : 0;
+		bool done = c.exists("completed") ? bool(c["completed"]) : false;
+		string label = (i + 1) + ". " + desc + ". ";
+		if (done) {
+			label += "Completed!";
+		} else {
+			label += progress + " of " + target + ".";
+		}
+		label += " " + glory + " Glory. " + (i + 1) + " of " + total_count + ".";
+		cm.add_item(label);
+	}
+	cm.run();
+	// Reset cached data so next request gets fresh data
+	@cached_challenge_data = null;
+}
+
 void send_private_message_form(string target_name)
 {
 	wait(50);

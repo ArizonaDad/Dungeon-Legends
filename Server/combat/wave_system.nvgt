@@ -348,6 +348,52 @@ void init_wave_scenarios() {
     }
 }
 
+// Generate a wave for Endless Survival mode based on wave number.
+// Picks monsters from the appropriate CR tier and scales count with wave.
+wave_encounter@ generate_endless_wave(int wave_number) {
+    wave_encounter wave;
+    wave.wave_number = wave_number;
+
+    string[] tier1 = {"rat", "kobold", "goblin"};        // CR 0-1/4
+    string[] tier2 = {"skeleton", "wolf", "ogre"};        // CR 1/4-2
+    string[] tier3 = {"owlbear", "basilisk", "troll"};    // CR 3-5
+    string[] tier4 = {"wight", "fire_elemental", "frost_giant"};  // CR 5-8
+    string[] tier5 = {"aboleth", "remorhaz", "archmage"}; // CR 8-12
+    string[] tier6 = {"pit_fiend", "lich", "adult_black_dragon"}; // CR 13+
+
+    string[] pool;
+    int count = 3;
+
+    if (wave_number <= 3) {
+        pool = tier1;
+        count = 2 + wave_number;
+    } else if (wave_number <= 6) {
+        pool = tier2;
+        count = 3 + (wave_number - 3);
+    } else if (wave_number <= 9) {
+        pool = tier3;
+        count = 3 + (wave_number - 6);
+    } else if (wave_number <= 12) {
+        pool = tier4;
+        count = 3 + (wave_number - 9);
+    } else if (wave_number <= 15) {
+        pool = tier5;
+        count = 3 + (wave_number - 12);
+    } else {
+        pool = tier6;
+        count = 2 + (wave_number - 15);
+        if (count > 6) count = 6;
+    }
+
+    for (int i = 0; i < count; i++) {
+        string monster_id = pool[random(0, pool.length() - 1)];
+        wave.monster_ids.insert_last(monster_id);
+        wave.monster_counts.insert_last(1);
+    }
+
+    return wave;
+}
+
 wave_scenario@ get_scenario(string id) {
     for (uint i = 0; i < WAVE_SCENARIOS.length(); i++) {
         if (WAVE_SCENARIOS[i].id == id) return WAVE_SCENARIOS[i];

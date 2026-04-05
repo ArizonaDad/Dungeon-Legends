@@ -208,6 +208,7 @@ void handle_message(json_object@ msg)
 		start_game_pending = true;
 		pending_view = "battle";
 		if (msg.exists("combatant_id")) my_combatant_id = uint(int(msg["combatant_id"]));
+		if (msg.exists("mode")) battle_mode = string(msg["mode"]);
 		speak("Battle starting!", true);
 	}
 	else if (msg_type == message_types::game_state) {
@@ -345,10 +346,16 @@ void handle_message(json_object@ msg)
 	else if (msg_type == message_types::game_end_battle) {
 		string result = msg.exists("result") ? string(msg["result"]) : "";
 		if (result == "" and msg.exists("winner")) result = string(msg["winner"]);
+		if (msg.exists("mode")) battle_mode = string(msg["mode"]);
+		if (msg.exists("final_wave")) wave_number = int(msg["final_wave"]);
 		battle_active = false;
 		on_battle_end(result);
 	}
 	else if (msg_type == message_types::wave_start) {
+		int wave = msg.exists("wave") ? int(msg["wave"]) : 0;
+		on_wave_start(wave);
+	}
+	else if (msg_type == message_types::endless_wave_start) {
 		int wave = msg.exists("wave") ? int(msg["wave"]) : 0;
 		on_wave_start(wave);
 	}
@@ -467,6 +474,64 @@ void handle_message(json_object@ msg)
 	else if (msg_type == message_types::glory_update) {
 		int glory = msg.exists("glory") ? int(msg["glory"]) : 0;
 		speak("You now have " + glory + " Glory Points.", false);
+	}
+	// === TRADING SYSTEM ===
+	else if (msg_type == message_types::trade_request and msg.exists("from")) {
+		string from = string(msg["from"]);
+		trade_pending = true;
+		trade_partner = from;
+		speak(from + " wants to trade with you. Press F5 to accept or decline.", false);
+	}
+	else if (msg_type == message_types::trade_update) {
+		// Update trade state from server
+		if (msg.exists("partner")) trade_partner = string(msg["partner"]);
+		if (msg.exists("my_offer")) @trade_my_offer = msg["my_offer"];
+		if (msg.exists("their_offer")) @trade_their_offer = msg["their_offer"];
+		trade_my_confirmed = msg.exists("my_confirmed") ? bool(msg["my_confirmed"]) : false;
+		trade_their_confirmed = msg.exists("their_confirmed") ? bool(msg["their_confirmed"]) : false;
+		trade_active = true;
+	}
+	else if (msg_type == message_types::trade_complete) {
+		trade_active = false;
+		trade_pending = false;
+		string items_text = "";
+		if (msg.exists("items")) {
+			json_array@ items = msg["items"];
+			if (@items != null) {
+				for (uint i = 0; i < items.length(); i++) {
+					json_object@ entry = items[i];
+					if (i > 0) items_text += ", ";
+					items_text += entry.exists("name") ? string(entry["name"]) : string(entry["id"]);
+				}
+			}
+		}
+		if (items_text != "") speak("Trade complete! You received: " + items_text + ".", true);
+		else speak("Trade complete!", true);
+		trade_partner = "";
+		@trade_my_offer = null;
+		@trade_their_offer = null;
+		trade_my_confirmed = false;
+		trade_their_confirmed = false;
+	}
+	else if (msg_type == message_types::trade_cancel) {
+		string reason = msg.exists("reason") ? string(msg["reason"]) : "Trade cancelled.";
+		speak(reason, false);
+		trade_active = false;
+		trade_pending = false;
+		trade_partner = "";
+		@trade_my_offer = null;
+		@trade_their_offer = null;
+		trade_my_confirmed = false;
+		trade_their_confirmed = false;
+	}
+	// === WEEKLY CHALLENGES ===
+	else if (msg_type == message_types::weekly_challenges) {
+		@cached_challenge_data = msg;
+	}
+	else if (msg_type == message_types::challenge_complete) {
+		string description = msg.exists("description") ? string(msg["description"]) : "Challenge completed";
+		int glory = msg.exists("glory") ? int(msg["glory"]) : 0;
+		speak("Challenge complete! " + description + ". Plus " + glory + " Glory!", true);
 	}
 	// Unknown messages are silently ignored.
 }

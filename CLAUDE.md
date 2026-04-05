@@ -1,7 +1,7 @@
 # Dungeon Legends - D&D 5e Battle Simulator
 
 ## Project Overview
-Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (NonVisual Gaming Toolkit, AngelScript-like). Players create characters (33 species, 13 classes, 16 backgrounds, 38 weapons, 68 spells) and fight in turn-based combat with full TTS and HRTF spatial audio. Supports PvP Arena, Wave Survival, and Boss Rush modes.
+Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (NonVisual Gaming Toolkit, AngelScript-like). Players create characters (33 species, 13 classes, 16 backgrounds, 38 weapons, 68 spells) and fight in turn-based combat with full TTS and HRTF spatial audio. Supports PvP Arena, Wave Survival, Boss Rush, and Endless Survival modes.
 
 ## Architecture
 - **Client-server** model using ENet networking with JSON message passing
@@ -115,6 +115,7 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 - **PvP**: Last player standing wins
 - **Wave Survival**: Clear waves of monsters (Rat Cellar, Goblin Ambush, Bandit Camp, Crypt of Undead, Dragon's Challenge, Haunted Catacombs, Fire Caverns, Shadow Realm, Abyssal Fortress)
 - **Boss Rush**: Defeat boss monsters
+- **Endless Survival**: Fight infinite escalating waves until the party falls. Waves 1-3: CR 0-1 (rats/kobolds/goblins), 4-6: CR 1-3 (skeletons/wolves/ogres), 7-9: CR 3-5 (owlbear/basilisk/troll), 10-12: CR 5-8 (wight/fire_elemental/frost_giant), 13-15: CR 8-12 (aboleth/remorhaz/archmage), 16+: CR 13+ bosses (pit_fiend/lich/dragon) with HP scaling. Players heal 25% between waves and earn wave_number*15 XP per wave. Best wave tracked per player. Glory earned = 5 + waves_cleared * 3.
 
 ### Targeting & Scanning
 - IJKL to scan directions, Caps Lock or brackets to cycle results
@@ -144,6 +145,7 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 - Max inventory: 20 items per player (stored in account `adventure_inventory` array)
 - Equipment bonuses applied to combatant at battle start from character `equipped` JSON object
 - Message types: `loot_drop`, `inventory_list`, `equip_item`, `discard_item`
+- **Item Upgrading**: Combine 3 items of the same rarity into 1 random item of the next rarity. Glory cost: Common=10, Uncommon=25, Rare=50, Epic=100. Cannot upgrade Legendary. Message type: `upgrade_item` with `item_ids` array of 3 IDs.
 
 ### Prestige System
 - Available at level 20 with max 5 ranks: Veteran, Champion, Legend, Mythic, Ascendant

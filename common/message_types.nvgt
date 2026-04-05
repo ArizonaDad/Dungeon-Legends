@@ -122,4 +122,23 @@ namespace message_types
 
 	// Prestige system
 	const string prestige_action = "prestige_action";         // Client requests prestige reset.
+
+	// Endless survival mode
+	const string endless_wave_start = "endless_wave_start";   // Server announces next endless wave.
+
+	// Item upgrading
+	const string upgrade_item = "upgrade_item";               // Client requests to upgrade 3 items into 1.
+
+	// Trading system
+	const string trade_request = "trade_request";             // Client sends trade request to another player.
+	const string trade_accept = "trade_accept";               // Target accepts a trade request.
+	const string trade_offer = "trade_offer";                 // Client updates their offered items in a trade.
+	const string trade_confirm = "trade_confirm";             // Client confirms the trade.
+	const string trade_cancel = "trade_cancel";               // Client cancels the trade.
+	const string trade_update = "trade_update";               // Server sends trade state update to both players.
+	const string trade_complete = "trade_complete";           // Server announces trade completed successfully.
+
+	// Weekly challenges
+	const string weekly_challenges = "weekly_challenges";     // Client requests or server sends weekly challenge data.
+	const string challenge_complete = "challenge_complete";   // Server announces a challenge was completed.
 }

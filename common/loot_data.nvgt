@@ -227,3 +227,23 @@ bool inventory_remove_item(json_array@ inventory, string item_id) {
 	}
 	return false;
 }
+
+// ---- ITEM UPGRADING ----
+
+int get_upgrade_glory_cost(int rarity) {
+	if (rarity == RARITY_COMMON) return 10;
+	if (rarity == RARITY_UNCOMMON) return 25;
+	if (rarity == RARITY_RARE) return 50;
+	if (rarity == RARITY_EPIC) return 100;
+	return 0;
+}
+
+item_def@ generate_upgrade_result(int target_rarity) {
+	init_item_catalog();
+	item_def@[] pool;
+	for (uint i = 0; i < ITEM_CATALOG.length(); i++) {
+		if (ITEM_CATALOG[i].rarity == target_rarity) pool.insert_last(ITEM_CATALOG[i]);
+	}
+	if (pool.length() == 0) return null;
+	return pool[random(0, pool.length() - 1)];
+}
