@@ -1,0 +1,229 @@
+// Loot & Equipment System
+// Item definitions, rarity tiers, loot tables, and equipment slot management.
+
+const int RARITY_COMMON = 0;
+const int RARITY_UNCOMMON = 1;
+const int RARITY_RARE = 2;
+const int RARITY_EPIC = 3;
+const int RARITY_LEGENDARY = 4;
+
+string[] RARITY_NAMES = {"Common", "Uncommon", "Rare", "Epic", "Legendary"};
+
+const int SLOT_WEAPON = 0;
+const int SLOT_ARMOR = 1;
+const int SLOT_RING = 2;
+const int SLOT_AMULET = 3;
+
+string[] SLOT_NAMES = {"Weapon", "Armor", "Ring", "Amulet"};
+
+const int MAX_INVENTORY = 20;
+
+class item_def {
+	string id;
+	string name;
+	int slot;
+	int rarity;
+	string description;
+	int ac_bonus = 0;
+	int damage_bonus = 0;
+	int hp_bonus = 0;
+	int spell_dc_bonus = 0;
+	int initiative_bonus = 0;
+	int speed_bonus = 0;
+	int save_bonus = 0;
+	int crit_threshold_reduction = 0;
+}
+
+item_def@[] ITEM_CATALOG;
+
+void add_item(string id, string name, int slot, int rarity, string description, int ac = 0, int dmg = 0, int hp = 0, int sdc = 0, int init = 0, int spd = 0, int save = 0, int crit = 0) {
+	item_def d;
+	d.id = id; d.name = name; d.slot = slot; d.rarity = rarity; d.description = description;
+	d.ac_bonus = ac; d.damage_bonus = dmg; d.hp_bonus = hp; d.spell_dc_bonus = sdc;
+	d.initiative_bonus = init; d.speed_bonus = spd; d.save_bonus = save; d.crit_threshold_reduction = crit;
+	ITEM_CATALOG.insert_last(d);
+}
+
+item_def@ find_item(string id) {
+	for (uint i = 0; i < ITEM_CATALOG.length(); i++) {
+		if (ITEM_CATALOG[i].id == id) return ITEM_CATALOG[i];
+	}
+	return null;
+}
+
+string item_stat_summary(item_def@ item) {
+	if (@item == null) return "";
+	string s = "";
+	if (item.ac_bonus != 0) s += (s != "" ? ", " : "") + "+" + item.ac_bonus + " AC";
+	if (item.damage_bonus != 0) s += (s != "" ? ", " : "") + "+" + item.damage_bonus + " damage";
+	if (item.hp_bonus != 0) s += (s != "" ? ", " : "") + "+" + item.hp_bonus + " HP";
+	if (item.spell_dc_bonus != 0) s += (s != "" ? ", " : "") + "+" + item.spell_dc_bonus + " spell DC";
+	if (item.initiative_bonus != 0) s += (s != "" ? ", " : "") + "+" + item.initiative_bonus + " initiative";
+	if (item.speed_bonus != 0) s += (s != "" ? ", " : "") + "+" + item.speed_bonus + " speed";
+	if (item.save_bonus != 0) s += (s != "" ? ", " : "") + "+" + item.save_bonus + " saves";
+	if (item.crit_threshold_reduction != 0) s += (s != "" ? ", " : "") + "crit on " + (20 - item.crit_threshold_reduction) + "+";
+	return s;
+}
+
+string item_display(item_def@ item) {
+	if (@item == null) return "Empty";
+	return item.name + ". " + RARITY_NAMES[item.rarity] + " " + SLOT_NAMES[item.slot] + ". " + item_stat_summary(item) + ". " + item.description;
+}
+
+void init_item_catalog() {
+	if (ITEM_CATALOG.length() > 0) return;
+
+	// ---- COMMON WEAPONS ----
+	add_item("rusty_blade", "Rusty Enchanted Blade", SLOT_WEAPON, RARITY_COMMON, "A dull blade with a faint magical aura.", 0, 1, 0, 0, 0, 0, 0, 0);
+	add_item("hunting_bow", "Hunter's Bow", SLOT_WEAPON, RARITY_COMMON, "A well-crafted bow favored by rangers.", 0, 1, 0, 0, 1, 0, 0, 0);
+	add_item("apprentice_staff", "Apprentice Staff", SLOT_WEAPON, RARITY_COMMON, "A simple staff humming with minor arcane energy.", 0, 0, 0, 1, 0, 0, 0, 0);
+
+	// ---- COMMON ARMOR ----
+	add_item("iron_buckler", "Iron Buckler", SLOT_ARMOR, RARITY_COMMON, "A small iron shield offering basic protection.", 1, 0, 0, 0, 0, 0, 0, 0);
+	add_item("padded_vest", "Padded Vest", SLOT_ARMOR, RARITY_COMMON, "Reinforced leather padding.", 1, 0, 5, 0, 0, 0, 0, 0);
+
+	// ---- COMMON RINGS ----
+	add_item("iron_ring", "Iron Ring", SLOT_RING, RARITY_COMMON, "A plain iron ring with minor warding.", 1, 0, 0, 0, 0, 0, 0, 0);
+	add_item("ring_of_vigor", "Ring of Vigor", SLOT_RING, RARITY_COMMON, "Fills the wearer with endurance.", 0, 0, 10, 0, 0, 0, 0, 0);
+
+	// ---- COMMON AMULETS ----
+	add_item("simple_charm", "Simple Charm", SLOT_AMULET, RARITY_COMMON, "A carved bone charm on a leather cord.", 0, 0, 0, 0, 2, 0, 0, 0);
+	add_item("travelers_pendant", "Traveler's Pendant", SLOT_AMULET, RARITY_COMMON, "Quickens the wearer's step.", 0, 0, 0, 0, 0, 5, 0, 0);
+
+	// ---- UNCOMMON WEAPONS ----
+	add_item("flaming_sword", "Flaming Sword", SLOT_WEAPON, RARITY_UNCOMMON, "The blade burns with magical fire.", 0, 3, 0, 0, 0, 0, 0, 0);
+	add_item("frost_bow", "Frost Bow", SLOT_WEAPON, RARITY_UNCOMMON, "Arrows from this bow trail ice crystals.", 0, 2, 0, 0, 2, 0, 0, 0);
+	add_item("wand_of_sparks", "Wand of Sparks", SLOT_WEAPON, RARITY_UNCOMMON, "A wand crackling with electric energy.", 0, 1, 0, 1, 0, 0, 0, 0);
+
+	// ---- UNCOMMON ARMOR ----
+	add_item("chainmail_fortitude", "Chainmail of Fortitude", SLOT_ARMOR, RARITY_UNCOMMON, "Enchanted chainmail that bolsters vitality.", 2, 0, 10, 0, 0, 0, 0, 0);
+	add_item("elven_leather", "Elven Leather", SLOT_ARMOR, RARITY_UNCOMMON, "Light elven-crafted armor that moves like cloth.", 2, 0, 0, 0, 1, 5, 0, 0);
+
+	// ---- UNCOMMON RINGS ----
+	add_item("ring_of_protection", "Ring of Protection", SLOT_RING, RARITY_UNCOMMON, "A silver ring engraved with protective runes.", 1, 0, 0, 0, 0, 0, 1, 0);
+	add_item("ring_of_striking", "Ring of Striking", SLOT_RING, RARITY_UNCOMMON, "Empowers the wearer's attacks.", 0, 2, 0, 0, 0, 0, 0, 0);
+
+	// ---- UNCOMMON AMULETS ----
+	add_item("amulet_of_health", "Amulet of Health", SLOT_AMULET, RARITY_UNCOMMON, "Radiates warmth and vitality.", 0, 0, 15, 0, 0, 0, 0, 0);
+	add_item("focus_pendant", "Pendant of Focus", SLOT_AMULET, RARITY_UNCOMMON, "Sharpens the mind for spellcasting.", 0, 0, 0, 1, 0, 0, 1, 0);
+
+	// ---- RARE WEAPONS ----
+	add_item("thunderstrike", "Thunderstrike", SLOT_WEAPON, RARITY_RARE, "A warhammer that cracks with thunder on impact.", 0, 4, 0, 0, 0, 0, 0, 0);
+	add_item("shadow_dagger", "Shadow Dagger", SLOT_WEAPON, RARITY_RARE, "A dagger that strikes from unexpected angles.", 0, 3, 0, 0, 3, 0, 0, 0);
+	add_item("staff_of_power", "Staff of Power", SLOT_WEAPON, RARITY_RARE, "A staff brimming with arcane might.", 0, 2, 0, 2, 0, 0, 0, 0);
+
+	// ---- RARE ARMOR ----
+	add_item("mithral_plate", "Mithral Plate", SLOT_ARMOR, RARITY_RARE, "Impossibly light plate armor forged from mithral.", 3, 0, 10, 0, 0, 0, 1, 0);
+	add_item("cloak_of_shadows", "Cloak of Shadows", SLOT_ARMOR, RARITY_RARE, "Wraps the wearer in shifting darkness.", 2, 0, 0, 0, 3, 5, 0, 0);
+
+	// ---- RARE RINGS/AMULETS ----
+	add_item("ring_of_spell_storing", "Ring of Spell Storing", SLOT_RING, RARITY_RARE, "Stores magical energy for later use.", 0, 0, 0, 2, 0, 0, 0, 0);
+	add_item("amulet_of_the_devout", "Amulet of the Devout", SLOT_AMULET, RARITY_RARE, "A holy symbol that amplifies divine magic.", 0, 0, 10, 2, 0, 0, 1, 0);
+
+	// ---- EPIC WEAPONS ----
+	add_item("vorpal_edge", "Vorpal Edge", SLOT_WEAPON, RARITY_EPIC, "A blade of legendary sharpness that seeks the throat.", 0, 5, 0, 0, 0, 0, 0, 1);
+	add_item("staff_of_the_archmage", "Staff of the Archmage", SLOT_WEAPON, RARITY_EPIC, "The pinnacle of arcane craftsmanship.", 0, 3, 0, 3, 0, 0, 0, 0);
+
+	// ---- EPIC ARMOR ----
+	add_item("dragonscale_armor", "Dragonscale Armor", SLOT_ARMOR, RARITY_EPIC, "Forged from the scales of a slain dragon.", 4, 0, 20, 0, 0, 0, 1, 0);
+
+	// ---- EPIC RINGS/AMULETS ----
+	add_item("ring_of_regeneration", "Ring of Regeneration", SLOT_RING, RARITY_EPIC, "Slowly mends wounds over time.", 0, 0, 25, 0, 0, 0, 2, 0);
+	add_item("amulet_of_proof_against_detection", "Amulet of Proof Against Detection", SLOT_AMULET, RARITY_EPIC, "The wearer cannot be targeted by divination or detected through magic.", 2, 0, 0, 0, 4, 0, 2, 0);
+
+	// ---- LEGENDARY ----
+	add_item("crown_of_the_lich", "Crown of the Lich King", SLOT_AMULET, RARITY_LEGENDARY, "A crown of dark iron that commands death itself.", 0, 0, 10, 3, 0, 0, 2, 0);
+	add_item("blade_of_legends", "Blade of Legends", SLOT_WEAPON, RARITY_LEGENDARY, "A weapon spoken of only in myths.", 0, 6, 10, 0, 2, 5, 0, 1);
+	add_item("adamantine_fortress", "Adamantine Fortress Plate", SLOT_ARMOR, RARITY_LEGENDARY, "Indestructible armor that turns critical hits into normal hits.", 5, 0, 30, 0, 0, 0, 2, 0);
+	add_item("ring_of_three_wishes", "Ring of Three Wishes", SLOT_RING, RARITY_LEGENDARY, "A ring of immense power that bends fate.", 1, 2, 15, 2, 3, 5, 2, 0);
+}
+
+// ---- LOOT GENERATION ----
+
+int get_loot_tier(int monster_xp) {
+	if (monster_xp <= 50) return 0;
+	if (monster_xp <= 200) return 1;
+	if (monster_xp <= 700) return 2;
+	if (monster_xp <= 2900) return 3;
+	return 4;
+}
+
+item_def@ generate_loot(int monster_xp, int player_level) {
+	init_item_catalog();
+
+	int tier = get_loot_tier(monster_xp);
+	int roll = random(1, 100);
+
+	// Base drop rates, shifted by tier
+	int nothing_threshold = 40 - (tier * 5);
+	int common_threshold = nothing_threshold + 30 - (tier * 3);
+	int uncommon_threshold = common_threshold + 18 + (tier * 2);
+	int rare_threshold = uncommon_threshold + 8 + (tier * 2);
+	int epic_threshold = rare_threshold + 3 + tier;
+
+	int target_rarity;
+	if (roll <= nothing_threshold) return null;
+	else if (roll <= common_threshold) target_rarity = RARITY_COMMON;
+	else if (roll <= uncommon_threshold) target_rarity = RARITY_UNCOMMON;
+	else if (roll <= rare_threshold) target_rarity = RARITY_RARE;
+	else if (roll <= epic_threshold) target_rarity = RARITY_EPIC;
+	else target_rarity = RARITY_LEGENDARY;
+
+	// Collect items of the target rarity
+	item_def@[] pool;
+	for (uint i = 0; i < ITEM_CATALOG.length(); i++) {
+		if (ITEM_CATALOG[i].rarity == target_rarity) pool.insert_last(ITEM_CATALOG[i]);
+	}
+
+	if (pool.length() == 0) return null;
+	return pool[random(0, pool.length() - 1)];
+}
+
+item_def@ generate_boss_loot(int monster_xp, int player_level) {
+	init_item_catalog();
+
+	int roll = random(1, 100);
+	int target_rarity;
+	if (roll <= 30) target_rarity = RARITY_RARE;
+	else if (roll <= 70) target_rarity = RARITY_EPIC;
+	else target_rarity = RARITY_LEGENDARY;
+
+	item_def@[] pool;
+	for (uint i = 0; i < ITEM_CATALOG.length(); i++) {
+		if (ITEM_CATALOG[i].rarity == target_rarity) pool.insert_last(ITEM_CATALOG[i]);
+	}
+
+	if (pool.length() == 0) return null;
+	return pool[random(0, pool.length() - 1)];
+}
+
+// ---- INVENTORY HELPERS ----
+
+bool inventory_has_item(json_array@ inventory, string item_id) {
+	if (@inventory == null) return false;
+	for (uint i = 0; i < inventory.length(); i++) {
+		json_object@ entry = inventory[i];
+		if (@entry != null and entry.exists("id") and string(entry["id"]) == item_id) return true;
+	}
+	return false;
+}
+
+bool inventory_add_item(json_array@ inventory, string item_id) {
+	if (@inventory == null or int(inventory.length()) >= MAX_INVENTORY) return false;
+	json_object entry;
+	entry["id"] = item_id;
+	inventory.add(entry);
+	return true;
+}
+
+bool inventory_remove_item(json_array@ inventory, string item_id) {
+	if (@inventory == null) return false;
+	for (uint i = 0; i < inventory.length(); i++) {
+		json_object@ entry = inventory[i];
+		if (@entry != null and entry.exists("id") and string(entry["id"]) == item_id) {
+			inventory.remove(i);
+			return true;
+		}
+	}
+	return false;
+}

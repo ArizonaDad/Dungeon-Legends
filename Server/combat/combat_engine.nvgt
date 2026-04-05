@@ -24,6 +24,16 @@ class combatant {
 	int speed;               // in feet
 	int initiative_bonus;    // dex mod + any bonuses
 
+	// Equipment bonuses (from loot items)
+	int equip_ac_bonus = 0;
+	int equip_damage_bonus = 0;
+	int equip_hp_bonus = 0;
+	int equip_spell_dc_bonus = 0;
+	int equip_initiative_bonus = 0;
+	int equip_speed_bonus = 0;
+	int equip_save_bonus = 0;
+	int equip_crit_reduction = 0;
+
 	// Ability scores
 	int[] ability_scores = {10, 10, 10, 10, 10, 10}; // STR DEX CON INT WIS CHA
 	int[] save_proficiencies = {0, 0, 0, 0, 0, 0};   // 1 = proficient

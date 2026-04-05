@@ -721,6 +721,187 @@ void init_monster_defs() {
         d.description = "An undead archmage sustained by a phylactery and dark pacts.";
         MONSTER_DEFS.insert_last(d);
     }
+
+    // --- CR 0 (Rat, tutorial) ---
+    {
+        monster_def d;
+        d.id = "rat";
+        d.name = "Rat";
+        d.type = "beast";
+        d.size = SIZE_TINY;
+        d.ac = 10;
+        d.hp = 1;
+        d.speed = 20;
+        d.str = 2; d.dex = 11; d.con = 9;
+        d.intelligence = 2; d.wis = 10; d.cha = 4;
+        d.attack_name = "Bite";
+        d.attack_bonus = 0;
+        d.damage_dice = 1;
+        d.damage_count = 1;
+        d.damage_mod = 0;
+        d.damage_type = DMG_PIERCING;
+        d.attack_range = 5;
+        d.xp = 10;
+        d.description = "A tiny rodent with sharp teeth.";
+        MONSTER_DEFS.insert_last(d);
+    }
+
+    // --- CR 1/8 (Bandit) ---
+    {
+        monster_def d;
+        d.id = "bandit";
+        d.name = "Bandit";
+        d.type = "humanoid";
+        d.size = SIZE_MEDIUM;
+        d.ac = 12;
+        d.hp = 11;
+        d.speed = 30;
+        d.str = 11; d.dex = 12; d.con = 12;
+        d.intelligence = 10; d.wis = 10; d.cha = 10;
+        d.attack_name = "Scimitar";
+        d.attack_bonus = 3;
+        d.damage_dice = 6;
+        d.damage_count = 1;
+        d.damage_mod = 1;
+        d.damage_type = DMG_SLASHING;
+        d.attack_range = 5;
+        d.xp = 25;
+        d.description = "A common highwayman armed with a scimitar.";
+        MONSTER_DEFS.insert_last(d);
+    }
+
+    // --- CR 2 (Bandit Captain) ---
+    {
+        monster_def d;
+        d.id = "bandit_captain";
+        d.name = "Bandit Captain";
+        d.type = "humanoid";
+        d.size = SIZE_MEDIUM;
+        d.ac = 15;
+        d.hp = 65;
+        d.speed = 30;
+        d.str = 15; d.dex = 16; d.con = 14;
+        d.intelligence = 14; d.wis = 11; d.cha = 14;
+        d.attack_name = "Scimitar";
+        d.attack_bonus = 5;
+        d.damage_dice = 6;
+        d.damage_count = 2;
+        d.damage_mod = 3;
+        d.damage_type = DMG_SLASHING;
+        d.attack_range = 5;
+        d.has_multiattack = true;
+        d.multiattack_count = 2;
+        d.xp = 450;
+        d.description = "A seasoned outlaw who commands a band of thieves.";
+        MONSTER_DEFS.insert_last(d);
+    }
+
+    // --- CR 3 (Wight) ---
+    {
+        monster_def d;
+        d.id = "wight";
+        d.name = "Wight";
+        d.type = "undead";
+        d.size = SIZE_MEDIUM;
+        d.ac = 14;
+        d.hp = 45;
+        d.speed = 30;
+        d.str = 15; d.dex = 14; d.con = 16;
+        d.intelligence = 10; d.wis = 13; d.cha = 15;
+        d.attack_name = "Longsword";
+        d.attack_bonus = 4;
+        d.damage_dice = 8;
+        d.damage_count = 1;
+        d.damage_mod = 2;
+        d.damage_type = DMG_SLASHING;
+        d.attack_range = 5;
+        d.attack2_name = "Life Drain";
+        d.attack2_bonus = 4;
+        d.attack2_dice = 6;
+        d.attack2_count = 1;
+        d.attack2_mod = 2;
+        d.attack2_type = DMG_NECROTIC;
+        d.attack2_range = 5;
+        d.has_multiattack = true;
+        d.multiattack_count = 2;
+        d.xp = 700;
+        d.description = "An undead warrior risen with dark purpose and life-draining touch.";
+        MONSTER_DEFS.insert_last(d);
+    }
+
+    // --- CR 5 (Fire Elemental) ---
+    {
+        monster_def d;
+        d.id = "fire_elemental";
+        d.name = "Fire Elemental";
+        d.type = "elemental";
+        d.size = SIZE_LARGE;
+        d.ac = 13;
+        d.hp = 102;
+        d.speed = 50;
+        d.str = 10; d.dex = 17; d.con = 16;
+        d.intelligence = 6; d.wis = 10; d.cha = 7;
+        d.attack_name = "Touch";
+        d.attack_bonus = 6;
+        d.damage_dice = 6;
+        d.damage_count = 2;
+        d.damage_mod = 3;
+        d.damage_type = DMG_FIRE;
+        d.attack_range = 5;
+        d.has_multiattack = true;
+        d.multiattack_count = 2;
+        d.xp = 1800;
+        d.description = "A roaring pillar of living flame that ignites everything it touches.";
+        MONSTER_DEFS.insert_last(d);
+    }
+
+    // --- CR 4 (Shadow Demon) ---
+    {
+        monster_def d;
+        d.id = "shadow_demon";
+        d.name = "Shadow Demon";
+        d.type = "fiend";
+        d.size = SIZE_MEDIUM;
+        d.ac = 13;
+        d.hp = 66;
+        d.speed = 30;
+        d.str = 1; d.dex = 17; d.con = 12;
+        d.intelligence = 14; d.wis = 13; d.cha = 14;
+        d.attack_name = "Claws";
+        d.attack_bonus = 5;
+        d.damage_dice = 6;
+        d.damage_count = 2;
+        d.damage_mod = 3;
+        d.damage_type = DMG_PSYCHIC;
+        d.attack_range = 5;
+        d.xp = 1100;
+        d.description = "A demon of pure shadow that feeds on psychic anguish.";
+        MONSTER_DEFS.insert_last(d);
+    }
+
+    // --- CR 5 (Wraith) ---
+    {
+        monster_def d;
+        d.id = "wraith";
+        d.name = "Wraith";
+        d.type = "undead";
+        d.size = SIZE_MEDIUM;
+        d.ac = 13;
+        d.hp = 67;
+        d.speed = 0;
+        d.str = 6; d.dex = 16; d.con = 16;
+        d.intelligence = 12; d.wis = 14; d.cha = 15;
+        d.attack_name = "Life Drain";
+        d.attack_bonus = 6;
+        d.damage_dice = 8;
+        d.damage_count = 1;
+        d.damage_mod = 3;
+        d.damage_type = DMG_NECROTIC;
+        d.attack_range = 5;
+        d.xp = 1800;
+        d.description = "A spectral horror that drains life force with its chilling touch.";
+        MONSTER_DEFS.insert_last(d);
+    }
 }
 
 monster_def@ get_monster_def(string id) {

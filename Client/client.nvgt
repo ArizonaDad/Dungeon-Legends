@@ -94,6 +94,109 @@ void create_lobby_for_mode(string game_type) {
 	host_menu();
 }
 
+void show_inventory() {
+	init_item_catalog();
+	// Request inventory from server
+	send({{"type", message_types::inventory_list}});
+	// Wait briefly for response
+	timer inv_wait;
+	while (inv_wait.elapsed < 1500) {
+		wait(10);
+		network_loop();
+		if (@cached_inventory != null) break;
+	}
+	if (@cached_inventory == null or cached_inventory.length() == 0) {
+		speak("Your inventory is empty.", true);
+		return;
+	}
+	while (true) {
+		menu@ inv_menu = setup_sub_menu("Inventory. " + cached_inventory.length() + " of " + MAX_INVENTORY + " slots used.");
+		for (uint i = 0; i < cached_inventory.length(); i++) {
+			json_object@ entry = cached_inventory[i];
+			if (@entry == null or !entry.exists("id")) continue;
+			string item_id = string(entry["id"]);
+			item_def@ item = find_item(item_id);
+			string label = (i + 1) + ". ";
+			if (@item != null) {
+				label += item.name + ". " + RARITY_NAMES[item.rarity] + " " + SLOT_NAMES[item.slot] + ". " + item_stat_summary(item) + ".";
+				// Check if equipped
+				bool equipped = false;
+				if (@cached_equipped != null) {
+					for (uint s = 0; s < SLOT_NAMES.length(); s++) {
+						string slot_key = SLOT_NAMES[s].lower();
+						if (cached_equipped.exists(slot_key) and string(cached_equipped[slot_key]) == item_id) {
+							equipped = true;
+							break;
+						}
+					}
+				}
+				if (equipped) label += " Equipped.";
+			} else {
+				label += "Unknown item: " + item_id + ".";
+			}
+			inv_menu.add_item(label);
+		}
+		int pick = inv_menu.run();
+		if (pick < 0) return;
+		if (pick >= int(cached_inventory.length())) continue;
+		json_object@ selected_entry = cached_inventory[pick];
+		if (@selected_entry == null or !selected_entry.exists("id")) continue;
+		string sel_item_id = string(selected_entry["id"]);
+		item_def@ sel_item = find_item(sel_item_id);
+		string item_name = @sel_item != null ? sel_item.name : sel_item_id;
+		// Check if this item is currently equipped
+		bool is_equipped = false;
+		if (@cached_equipped != null and @sel_item != null) {
+			string slot_key = SLOT_NAMES[sel_item.slot].lower();
+			if (cached_equipped.exists(slot_key) and string(cached_equipped[slot_key]) == sel_item_id) {
+				is_equipped = true;
+			}
+		}
+		menu@ item_menu = setup_sub_menu(item_name + ". Choose an action.");
+		int equip_opt = -1;
+		int unequip_opt = -1;
+		if (is_equipped) {
+			unequip_opt = item_menu.add_item("Unequip " + item_name + ".");
+		} else {
+			equip_opt = item_menu.add_item("Equip " + item_name + ".");
+		}
+		int discard_opt = item_menu.add_item("Discard " + item_name + ".");
+		int back_opt = item_menu.add_item("Back.");
+		int action = item_menu.run();
+		if (action < 0 or action == back_opt) continue;
+		if (equip_opt >= 0 and action == equip_opt) {
+			send({{"type", message_types::equip_item}, {"item_id", sel_item_id}});
+			speak("Equipping " + item_name + ".", false);
+			// Refresh inventory
+			send({{"type", message_types::inventory_list}});
+			wait(500);
+			network_loop();
+		}
+		else if (unequip_opt >= 0 and action == unequip_opt) {
+			send({{"type", message_types::equip_item}, {"item_id", sel_item_id}});
+			speak("Unequipping " + item_name + ".", false);
+			send({{"type", message_types::inventory_list}});
+			wait(500);
+			network_loop();
+		}
+		else if (action == discard_opt) {
+			menu@ confirm_menu = setup_sub_menu("Are you sure you want to discard " + item_name + "? This cannot be undone.");
+			confirm_menu.add_item("Yes, discard it.");
+			confirm_menu.add_item("No, keep it.");
+			int confirm = confirm_menu.run();
+			if (confirm == 0) {
+				send({{"type", message_types::discard_item}, {"item_id", sel_item_id}});
+				speak("Discarded " + item_name + ".", false);
+				send({{"type", message_types::inventory_list}});
+				wait(500);
+				network_loop();
+			} else {
+				speak("Canceled.", false);
+			}
+		}
+	}
+}
+
 void main_menu()
 {
 	music_start("menu");
@@ -105,14 +208,24 @@ void main_menu()
 	while (true) {
 		menu@ m = setup_menu("");
 		@m = main_screen;
-		int total = 8;
-		int create_char = m.add_item("Create Character. 1 of " + total);
+		// Calculate total items dynamically
+		int total = 8; // base: create char, adventure, sandbox, join, friends, online, about, quit
+		bool has_char = has_any_character_profile();
+		if (has_char) total++; // view char
+		total++; // inventory
+		bool show_prestige = (cached_level >= 20);
+		if (show_prestige) total++;
+		int n = 1;
+		int create_char = m.add_item("Create Character. " + n + " of " + total); n++;
 		int view_char = -1;
-		if (has_any_character_profile()) {
-			total = 9;
-			view_char = m.add_item("View My Character. 2 of " + total);
+		if (has_char) {
+			view_char = m.add_item("View My Character. " + n + " of " + total); n++;
 		}
-		int n = total == 9 ? 3 : 2;
+		int inventory_btn = m.add_item("Inventory. " + n + " of " + total); n++;
+		int prestige_btn = -1;
+		if (show_prestige) {
+			prestige_btn = m.add_item("Prestige. Reset to level 1 for permanent bonuses. " + n + " of " + total); n++;
+		}
 		int create_adventure = m.add_item("Adventure. Create or join an adventure lobby. " + n + " of " + total); n++;
 		int create_sandbox = m.add_item("Sandbox. Create or join a sandbox lobby. " + n + " of " + total); n++;
 		int join = m.add_item("Join a game! " + n + " of " + total); n++;
@@ -151,7 +264,12 @@ void main_menu()
 				background_choice_def@ bg = get_background_choice(created_char_background);
 				if (@bg != null) background_text = " Background: " + bg.name + ".";
 			}
-			string summary = room_game_type_label(profile) + " character. " + created_char_name + ". " + created_char_race + " " + created_char_class + subclass_text + ", level " + created_char_level + "." + background_text + " ";
+			// Prestige title prefix
+			string prestige_text = "";
+			if (@cached_stats != null and cached_stats.exists("prestige_title") and string(cached_stats["prestige_title"]) != "") {
+				prestige_text = string(cached_stats["prestige_title"]) + " ";
+			}
+			string summary = prestige_text + room_game_type_label(profile) + " character. " + created_char_name + ". " + created_char_race + " " + created_char_class + subclass_text + ", level " + created_char_level + "." + background_text + " ";
 			summary += "Strength " + created_ability_scores[0] + ". Dexterity " + created_ability_scores[1] + ". Constitution " + created_ability_scores[2] + ". ";
 			summary += "Intelligence " + created_ability_scores[3] + ". Wisdom " + created_ability_scores[4] + ". Charisma " + created_ability_scores[5] + ". ";
 			summary += "Weapon: " + created_weapon + ".";
@@ -169,6 +287,21 @@ void main_menu()
 				summary += achievement_count + " achievement" + (achievement_count == 1 ? "" : "s") + " unlocked.";
 			}
 			speak(summary, true);
+		}
+		else if (res == inventory_btn) {
+			show_inventory();
+		}
+		else if (prestige_btn >= 0 and res == prestige_btn) {
+			menu@ prestige_menu = setup_sub_menu("Prestige will reset your level to 1 but you keep your inventory, achievements, and dungeon completions. You gain plus 1 to all ability scores permanently and a unique title. This cannot be undone. Are you sure?");
+			prestige_menu.add_item("Yes, prestige now.");
+			prestige_menu.add_item("No, cancel.");
+			int prestige_pick = prestige_menu.run();
+			if (prestige_pick == 0) {
+				send({{"type", message_types::prestige_action}});
+				speak("Prestiging! Your level has been reset.", true);
+			} else {
+				speak("Prestige canceled.", false);
+			}
 		}
 		else if (res == create_adventure or res == create_sandbox) {
 			string name, password;
@@ -464,13 +597,28 @@ void host_menu()
 			}
 			if (game_mode == "wave") {
 				menu@ scenario_menu = setup_sub_menu("Choose a scenario.");
-				scenario_menu.add_item("Goblin Ambush. Level 1 to 3. Easy.");
-				scenario_menu.add_item("Crypt of the Undead. Level 3 to 5. Medium.");
-				scenario_menu.add_item("Dragon's Challenge. Level 5 to 10. Hard.");
+				scenario_menu.add_item("Rat Cellar. Level 1 to 2.");
+				scenario_menu.add_item("Goblin Ambush. Level 1 to 3.");
+				scenario_menu.add_item("Bandit Camp. Level 3 to 5.");
+				scenario_menu.add_item("Crypt of Undead. Level 3 to 5.");
+				scenario_menu.add_item("Haunted Catacombs. Level 5 to 8.");
+				scenario_menu.add_item("Dragon's Challenge. Level 5 to 10.");
+				scenario_menu.add_item("Fire Caverns. Level 8 to 12.");
+				scenario_menu.add_item("Shadow Realm. Level 12 to 16.");
+				scenario_menu.add_item("Abyssal Fortress. Level 16 to 20.");
 				int scenario_pick = scenario_menu.run();
-				string[] scenarios = {"goblin_ambush", "crypt_undead", "dragon_challenge"};
-				string scenario_id = scenarios[scenario_pick >= 0 ? scenario_pick : 0];
-				send({{"type", message_types::start_game}, {"mode", game_mode}, {"scenario", scenario_id}});
+				if (scenario_pick < 0) continue;
+				string[] scenarios = {"rat_cellar", "goblin_ambush", "bandit_camp", "crypt_undead", "haunted_catacombs", "dragon_challenge", "fire_caverns", "shadow_realm", "abyssal_fortress"};
+				string scenario_id = scenarios[scenario_pick];
+				// Difficulty selection
+				menu@ diff_menu = setup_sub_menu("Choose difficulty.");
+				diff_menu.add_item("Normal. Standard challenge.");
+				diff_menu.add_item("Hard. Monsters are tougher. Better loot.");
+				diff_menu.add_item("Nightmare. Extreme challenge. Best loot.");
+				int diff_pick = diff_menu.run();
+				string[] difficulties = {"normal", "hard", "nightmare"};
+				string difficulty = difficulties[diff_pick >= 0 ? diff_pick : 0];
+				send({{"type", message_types::start_game}, {"mode", game_mode}, {"scenario", scenario_id}, {"difficulty", difficulty}});
 			} else {
 				send({{"type", message_types::start_game}, {"mode", game_mode}});
 			}

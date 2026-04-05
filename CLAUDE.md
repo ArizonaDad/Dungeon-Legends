@@ -19,10 +19,11 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 | `Server/combat/battle_manager.nvgt` | Core combat loop: roll system, attack/spell/action resolution, monster AI, initiative, Extra Attack, battle end detection, level-up choices |
 | `Server/combat/combat_engine.nvgt` | `combatant` class (HP, AC, abilities, conditions, spell slots), `battle` class (initiative, damage, death saves) |
 | `Server/combat/character_data.nvgt` | `character_sheet` class, 13 class defaults, 33 species bonuses, 38 weapons, spell slot tables |
-| `Server/combat/monster_data.nvgt` | 20 monster definitions (Kobold through Pit Fiend) |
-| `Server/combat/wave_system.nvgt` | 3 wave scenarios, `spawn_wave()` |
+| `Server/combat/monster_data.nvgt` | 27 monster definitions (Rat through Pit Fiend) |
+| `Server/combat/wave_system.nvgt` | 9 wave scenarios, `spawn_wave()` with difficulty multipliers |
 | `Server/combat/spell_data.nvgt` | 53 spell definitions (34 cantrips + 19 leveled), spell helpers |
-| `Server/progression.nvgt` | XP tracking, achievement system, character level progression |
+| `Server/progression.nvgt` | XP tracking, achievement system, character level progression, prestige system, glory points |
+| `common/loot_data.nvgt` | Item catalog (35 items), loot generation, rarity tiers, inventory helpers |
 | `Client/client.nvgt` | Main client entry, login, lobby menus, character viewing, first-time login flow |
 | `Client/net.nvgt` | Network message dispatcher + connection, character_data restore, daily bonus handler |
 | `Client/combat/combat_ui.nvgt` | Combat game loop, action/bonus action menus, scanning, targeting, roll prompts, tab focus, level-up screen |
@@ -112,7 +113,7 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 
 ### Battle Modes
 - **PvP**: Last player standing wins
-- **Wave Survival**: Clear waves of monsters (Goblin Ambush, Crypt of Undead, Dragon's Challenge)
+- **Wave Survival**: Clear waves of monsters (Rat Cellar, Goblin Ambush, Bandit Camp, Crypt of Undead, Dragon's Challenge, Haunted Catacombs, Fire Caverns, Shadow Realm, Abyssal Fortress)
 - **Boss Rush**: Defeat boss monsters
 
 ### Targeting & Scanning
@@ -130,9 +131,31 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 ### Post-Battle Flow
 - Battle end detected (PvP: one standing, Wave: all monsters dead or TPK)
 - Adventure mode: XP awarded (monster kills, healing, match completion, achievements)
+- Loot drops generated per defeated monster (rarity based on monster XP tier; boss mode has guaranteed Rare+ drops)
+- Glory points awarded: 10 normal, 25 boss; dungeon completions tracked
 - Level-up flow: players choose new spells, cantrips, and subclass (at level 3) interactively
 - Room `started` flag reset so new games can be launched
 - Client shows 5-second countdown then returns to lobby
+
+### Loot & Equipment System
+- 35 items across 5 rarity tiers (Common, Uncommon, Rare, Epic, Legendary) and 4 slots (Weapon, Armor, Ring, Amulet)
+- Item stats: AC bonus, damage bonus, HP bonus, spell DC bonus, initiative bonus, speed bonus, save bonus, crit threshold reduction
+- Loot generated after battle from defeated monsters; boss mode gives guaranteed Rare+ loot
+- Max inventory: 20 items per player (stored in account `adventure_inventory` array)
+- Equipment bonuses applied to combatant at battle start from character `equipped` JSON object
+- Message types: `loot_drop`, `inventory_list`, `equip_item`, `discard_item`
+
+### Prestige System
+- Available at level 20 with max 5 ranks: Veteran, Champion, Legend, Mythic, Ascendant
+- Prestige resets level to 1 and XP to 0 but keeps inventory, achievements, glory, and dungeon completions
+- Each prestige rank grants +1 to all ability scores (applied at battle start)
+- Prestige title prepended to player name in combat (e.g., "Veteran PlayerName")
+- Glory points awarded on prestige: 100 per rank
+- Message types: `prestige_action`, `glory_update`
+
+### Glory Points
+- Earned from battle completion (10 normal, 25 boss) and prestige (100 per rank)
+- Tracked in `adventure_progress["glory"]`; dungeon completions tracked in `adventure_progress["dungeons_completed"]`
 
 ### Character Creation
 - Step-by-step wizard: Name -> Species -> Class -> Level -> Background -> Subclass -> Abilities -> Weapon -> Spells -> Summary

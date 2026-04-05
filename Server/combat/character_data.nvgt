@@ -1,5 +1,6 @@
 #include "../../common/combat_constants.nvgt"
 #include "../../common/feat_data.nvgt"
+#include "../../common/loot_data.nvgt"
 
 class character_sheet {
     string name;
@@ -615,4 +616,45 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
     }
 
     return c;
+}
+
+// Apply equipped item bonuses to a combatant from the character's equipped JSON.
+// equipped_json is a json_object with keys "weapon","armor","ring","amulet" mapping to item IDs.
+void apply_equipment_bonuses(combatant@ c, json_object@ equipped_json) {
+    if (@c == null or @equipped_json == null) return;
+    init_item_catalog();
+    string[] slot_keys = {"weapon", "armor", "ring", "amulet"};
+    for (uint i = 0; i < slot_keys.length(); i++) {
+        if (!equipped_json.exists(slot_keys[i])) continue;
+        string item_id = string(equipped_json[slot_keys[i]]);
+        if (item_id == "") continue;
+        item_def@ item = find_item(item_id);
+        if (@item == null) continue;
+        c.equip_ac_bonus += item.ac_bonus;
+        c.equip_damage_bonus += item.damage_bonus;
+        c.equip_hp_bonus += item.hp_bonus;
+        c.equip_spell_dc_bonus += item.spell_dc_bonus;
+        c.equip_initiative_bonus += item.initiative_bonus;
+        c.equip_speed_bonus += item.speed_bonus;
+        c.equip_save_bonus += item.save_bonus;
+        c.equip_crit_reduction += item.crit_threshold_reduction;
+    }
+    // Apply accumulated bonuses to combatant stats
+    c.armor_class += c.equip_ac_bonus;
+    c.max_hp += c.equip_hp_bonus;
+    c.current_hp += c.equip_hp_bonus;
+    c.speed += c.equip_speed_bonus;
+    c.initiative_bonus += c.equip_initiative_bonus;
+}
+
+// Apply prestige rank bonuses: +1 to all ability scores per prestige rank.
+void apply_prestige_bonuses(combatant@ c, int prestige_rank) {
+    if (@c == null or prestige_rank <= 0) return;
+    for (int i = 0; i < 6; i++) {
+        c.ability_scores[i] += prestige_rank;
+    }
+    // Recalculate initiative bonus with updated DEX
+    c.initiative_bonus = ability_modifier(c.ability_scores[ABILITY_DEX]);
+    if (c.has_feat("alert")) c.initiative_bonus += c.proficiency;
+    c.initiative_bonus += c.equip_initiative_bonus;
 }

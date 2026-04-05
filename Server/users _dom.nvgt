@@ -1453,4 +1453,170 @@ void handle_user_message(user@ u, json_object@ msg)
 		// Join the room (bypasses password).
 		u.join_room(target_room);
 	}
+
+	// ---- INVENTORY LIST ----
+	else if (msg_type == message_types::inventory_list) {
+		if (@u.account == null) return;
+		init_item_catalog();
+		json_array@ inv = ensure_json_array_field(u.account.data, "adventure_inventory");
+		json_array items_arr;
+		if (@inv != null) {
+			for (uint ii = 0; ii < inv.length(); ii++) {
+				json_object@ entry = inv[ii];
+				if (@entry == null or !entry.exists("id")) continue;
+				string item_id = string(entry["id"]);
+				item_def@ item = find_item(item_id);
+				if (@item == null) continue;
+				json_object item_obj;
+				item_obj["id"] = item.id;
+				item_obj["name"] = item.name;
+				item_obj["rarity"] = item.rarity;
+				item_obj["slot"] = item.slot;
+				item_obj["description"] = item.description;
+				item_obj["stats"] = item_stat_summary(item);
+				items_arr.add(item_obj);
+			}
+		}
+
+		// Include equipped items info
+		json_object equipped_info;
+		json_object@ character = get_character_profile(u.account, GAME_TYPE_ADVENTURE);
+		if (@character != null and character.exists("equipped")) {
+			json_object@ eq = character["equipped"];
+			if (eq.exists("weapon")) equipped_info["weapon"] = eq["weapon"];
+			if (eq.exists("armor")) equipped_info["armor"] = eq["armor"];
+			if (eq.exists("ring")) equipped_info["ring"] = eq["ring"];
+			if (eq.exists("amulet")) equipped_info["amulet"] = eq["amulet"];
+		}
+
+		u.send({
+			{"type", message_types::inventory_list},
+			{"items", items_arr},
+			{"equipped", equipped_info}
+		});
+	}
+
+	// ---- EQUIP ITEM ----
+	else if (msg_type == message_types::equip_item and msg.exists("item_id") and msg.exists("slot")) {
+		if (@u.account == null) return;
+		init_item_catalog();
+		string item_id = string(msg["item_id"]);
+		string slot_name = string(msg["slot"]);
+
+		// Validate the item exists in catalog
+		item_def@ item = find_item(item_id);
+		if (@item == null) {
+			u.send({{"type", message_types::error}, {"text", "Unknown item."}});
+			return;
+		}
+
+		// Map item slot to the JSON key used in equipped object
+		string[] slot_key_map = {"weapon", "armor", "ring", "amulet"};
+		if (item.slot < 0 or item.slot >= int(slot_key_map.length())) {
+			u.send({{"type", message_types::error}, {"text", "Invalid item slot."}});
+			return;
+		}
+		string expected_slot = slot_key_map[item.slot];
+		if (slot_name.lower() != expected_slot and slot_name != SLOT_NAMES[item.slot]) {
+			u.send({{"type", message_types::error}, {"text", "That item cannot be equipped in that slot."}});
+			return;
+		}
+
+		// Validate item exists in player's inventory
+		json_array@ inv = ensure_json_array_field(u.account.data, "adventure_inventory");
+		if (!inventory_has_item(inv, item_id)) {
+			u.send({{"type", message_types::error}, {"text", "You do not have that item."}});
+			return;
+		}
+
+		// Equip the item on the character
+		json_object@ character = get_character_profile(u.account, GAME_TYPE_ADVENTURE);
+		if (@character == null) {
+			u.send({{"type", message_types::error}, {"text", "No adventure character found."}});
+			return;
+		}
+		json_object@ equipped = ensure_json_object_field(character, "equipped");
+		equipped[expected_slot] = item_id;
+
+		u.account.commit();
+		send_character_profile_to_user(u, GAME_TYPE_ADVENTURE);
+		u.send({{"type", message_types::announce}, {"text", "Equipped " + item.name + " in " + SLOT_NAMES[item.slot] + " slot."}, {"interrupt", false}});
+	}
+
+	// ---- DISCARD ITEM ----
+	else if (msg_type == message_types::discard_item and msg.exists("item_id")) {
+		if (@u.account == null) return;
+		init_item_catalog();
+		string item_id = string(msg["item_id"]);
+
+		json_array@ inv = ensure_json_array_field(u.account.data, "adventure_inventory");
+		if (!inventory_has_item(inv, item_id)) {
+			u.send({{"type", message_types::error}, {"text", "You do not have that item."}});
+			return;
+		}
+
+		// If the item is currently equipped, unequip it first
+		json_object@ character = get_character_profile(u.account, GAME_TYPE_ADVENTURE);
+		if (@character != null and character.exists("equipped")) {
+			json_object@ equipped = character["equipped"];
+			string[] slot_keys = {"weapon", "armor", "ring", "amulet"};
+			for (uint si = 0; si < slot_keys.length(); si++) {
+				if (equipped.exists(slot_keys[si]) and string(equipped[slot_keys[si]]) == item_id) {
+					equipped[slot_keys[si]] = "";
+				}
+			}
+		}
+
+		inventory_remove_item(inv, item_id);
+		u.account.commit();
+
+		item_def@ item = find_item(item_id);
+		string item_name = @item != null ? item.name : item_id;
+		u.send({{"type", message_types::announce}, {"text", "Discarded " + item_name + "."}, {"interrupt", false}});
+		send_character_profile_to_user(u, GAME_TYPE_ADVENTURE);
+	}
+
+	// ---- PRESTIGE ACTION ----
+	else if (msg_type == message_types::prestige_action) {
+		if (@u.account == null) return;
+		ensure_account_progression(u.account);
+		json_object@ progress = get_adventure_progress(u.account);
+		if (@progress == null) {
+			u.send({{"type", message_types::error}, {"text", "No adventure progress found."}});
+			return;
+		}
+
+		int current_level = get_json_int(progress, "level", 1);
+		int current_rank = get_prestige_rank(u.account);
+
+		if (current_level < 20) {
+			u.send({{"type", message_types::error}, {"text", "You must be level 20 to prestige."}});
+			return;
+		}
+		if (current_rank >= 5) {
+			u.send({{"type", message_types::error}, {"text", "You have already reached maximum prestige rank."}});
+			return;
+		}
+
+		if (!apply_prestige(u.account)) {
+			u.send({{"type", message_types::error}, {"text", "Prestige failed."}});
+			return;
+		}
+
+		int new_rank = get_prestige_rank(u.account);
+		string title = get_prestige_title(new_rank);
+		int glory_reward = 100 * new_rank;
+		add_glory(u.account, glory_reward);
+
+		u.account.commit();
+
+		u.send({{"type", message_types::announce}, {"text", "You have prestiged! You are now " + title + " (Rank " + new_rank + "). Level reset to 1. +" + glory_reward + " Glory!"}, {"interrupt", true}});
+		send_character_profile_to_user(u, GAME_TYPE_ADVENTURE);
+		send_adventure_progress_to_user(u, "Prestige complete! Rank " + new_rank + ": " + title + ".");
+		u.send({
+			{"type", message_types::glory_update},
+			{"glory", get_glory(u.account)},
+			{"gained", glory_reward}
+		});
+	}
 }

@@ -90,7 +90,12 @@ void ensure_account_progression(account@ acct) {
 	if (!progress.exists("healing_done")) progress["healing_done"] = 0;
 	if (!progress.exists("waves_cleared")) progress["waves_cleared"] = 0;
 	if (!progress.exists("boss_kills")) progress["boss_kills"] = 0;
+	if (!progress.exists("prestige_rank")) progress["prestige_rank"] = 0;
+	if (!progress.exists("prestige_title")) progress["prestige_title"] = "";
+	if (!progress.exists("glory")) progress["glory"] = 0;
 	ensure_json_array_field(progress, "achievements");
+	ensure_json_object_field(progress, "dungeons_completed");
+	ensure_json_array_field(data, "adventure_inventory");
 
 	if (data.exists(ACCOUNT_KEY_ADVENTURE_CHARACTER)) {
 		json_object@ character = data[ACCOUNT_KEY_ADVENTURE_CHARACTER];
@@ -212,6 +217,16 @@ json_object@ build_character_data_message(account@ acct, string profile) {
 	if (character.exists("weapon")) msg["weapon"] = character["weapon"];
 	if (character.exists("cantrips")) msg["cantrips"] = character["cantrips"];
 	if (character.exists("spells")) msg["spells"] = character["spells"];
+	if (character.exists("equipped")) msg["equipped"] = character["equipped"];
+
+	// Include prestige info for adventure characters
+	if (is_adventure_game_type(profile)) {
+		json_object@ progress = get_adventure_progress(acct);
+		if (@progress != null) {
+			msg["prestige_rank"] = get_json_int(progress, "prestige_rank", 0);
+			msg["prestige_title"] = get_prestige_title(get_json_int(progress, "prestige_rank", 0));
+		}
+	}
 	return msg;
 }
 
@@ -225,6 +240,9 @@ json_object@ build_progression_stats_message(json_object@ progress) {
 	stats["waves_cleared"] = get_json_int(progress, "waves_cleared");
 	stats["boss_kills"] = get_json_int(progress, "boss_kills");
 	stats["achievement_count"] = get_achievement_count(progress);
+	stats["prestige_rank"] = get_prestige_rank_from_progress(progress);
+	stats["prestige_title"] = get_prestige_title(get_prestige_rank_from_progress(progress));
+	stats["glory"] = get_glory_from_progress(progress);
 	return stats;
 }
 
@@ -256,5 +274,82 @@ json_object@ build_progression_update_message(account@ acct, int gained = 0, int
 	msg["achievement_count"] = get_achievement_count(progress);
 	msg["stats"] = build_progression_stats_message(progress);
 	if (summary != "") msg["summary"] = summary;
+
+	// Include prestige and glory data
+	msg["prestige_rank"] = get_prestige_rank_from_progress(progress);
+	msg["prestige_title"] = get_prestige_title(get_prestige_rank_from_progress(progress));
+	msg["glory"] = get_glory_from_progress(progress);
 	return msg;
+}
+
+// ---- PRESTIGE SYSTEM ----
+
+string[] PRESTIGE_TITLES = {"", "Veteran", "Champion", "Legend", "Mythic", "Ascendant"};
+
+string get_prestige_title(int rank) {
+	if (rank < 1 or rank > 5) return "";
+	return PRESTIGE_TITLES[rank];
+}
+
+int get_prestige_rank(account@ acct) {
+	json_object@ progress = get_adventure_progress(acct);
+	return get_prestige_rank_from_progress(progress);
+}
+
+int get_prestige_rank_from_progress(json_object@ progress) {
+	if (@progress == null) return 0;
+	return get_json_int(progress, "prestige_rank", 0);
+}
+
+bool apply_prestige(account@ acct) {
+	if (@acct == null) return false;
+	json_object@ progress = get_adventure_progress(acct);
+	if (@progress == null) return false;
+
+	int current_rank = get_json_int(progress, "prestige_rank", 0);
+	int current_level = get_json_int(progress, "level", 1);
+	if (current_level < 20 or current_rank >= 5) return false;
+
+	int new_rank = current_rank + 1;
+
+	// Reset level and XP but keep inventory, achievements, glory, and dungeons_completed
+	progress["level"] = 1;
+	progress["xp"] = 0;
+	progress["total_xp"] = 0;
+	progress["prestige_rank"] = new_rank;
+	progress["prestige_title"] = get_prestige_title(new_rank);
+
+	// Update adventure character level to 1
+	json_object@ adventure_character = get_character_profile(acct, GAME_TYPE_ADVENTURE);
+	if (@adventure_character != null) adventure_character["level"] = 1;
+
+	return true;
+}
+
+// ---- GLORY POINTS ----
+
+int get_glory(account@ acct) {
+	json_object@ progress = get_adventure_progress(acct);
+	return get_glory_from_progress(progress);
+}
+
+int get_glory_from_progress(json_object@ progress) {
+	if (@progress == null) return 0;
+	return get_json_int(progress, "glory", 0);
+}
+
+void add_glory(account@ acct, int amount) {
+	if (@acct == null or amount <= 0) return;
+	json_object@ progress = get_adventure_progress(acct);
+	if (@progress == null) return;
+	add_json_int(progress, "glory", amount);
+}
+
+void add_dungeon_completion(account@ acct, string dungeon_id) {
+	if (@acct == null or dungeon_id == "") return;
+	json_object@ progress = get_adventure_progress(acct);
+	if (@progress == null) return;
+	json_object@ completions = ensure_json_object_field(progress, "dungeons_completed");
+	if (@completions == null) return;
+	add_json_int(completions, dungeon_id, 1);
 }

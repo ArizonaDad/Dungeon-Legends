@@ -390,7 +390,58 @@ class battle_manager {
 				levels_gained += achievement_levels;
 			}
 
+			// --- Glory Points ---
+			int glory_earned = 10; // normal completion
+			if (combat.mode == "boss") glory_earned = 25;
+			// Future: nightmare mode would grant 50
+			if (victory) {
+				add_glory(player.account, glory_earned);
+			}
+
+			// Track dungeon completions
+			if (victory and scenario_id != "") {
+				add_dungeon_completion(player.account, scenario_id);
+			}
+
+			// --- Loot Generation ---
+			init_item_catalog();
+			int player_level = get_json_int(progress, "level", 1);
+			json_array@ inv = ensure_json_array_field(player.account.data, "adventure_inventory");
+			json_array loot_items_arr;
+			bool is_boss_mode = combat.mode == "boss";
+
+			// Generate loot from each defeated monster
+			for (uint mi = 0; mi < combat.combatants.length(); mi++) {
+				combatant@ mon = combat.combatants[mi];
+				if (@mon == null or mon.is_player or !mon.is_dead) continue;
+				item_def@ dropped = null;
+				if (is_boss_mode) {
+					@dropped = generate_boss_loot(mon.monster_xp_value, player_level);
+				} else {
+					@dropped = generate_loot(mon.monster_xp_value, player_level);
+				}
+				if (@dropped != null and @inv != null and int(inv.length()) < MAX_INVENTORY) {
+					inventory_add_item(inv, dropped.id);
+					json_object loot_entry;
+					loot_entry["id"] = dropped.id;
+					loot_entry["name"] = dropped.name;
+					loot_entry["rarity"] = dropped.rarity;
+					loot_entry["slot"] = dropped.slot;
+					loot_entry["description"] = dropped.description;
+					loot_entry["stats"] = item_stat_summary(dropped);
+					loot_items_arr.add(loot_entry);
+				}
+			}
+
 			player.account.commit();
+
+			// Send loot drop message if any items were found
+			if (loot_items_arr.length() > 0) {
+				player.send({
+					{"type", message_types::loot_drop},
+					{"items", loot_items_arr}
+				});
+			}
 
 			for (uint ai = 0; ai < notices.length(); ai++) {
 				player.send({
@@ -402,6 +453,15 @@ class battle_manager {
 				});
 			}
 
+			// Send glory update
+			if (victory and glory_earned > 0) {
+				player.send({
+					{"type", message_types::glory_update},
+					{"glory", get_glory(player.account)},
+					{"gained", glory_earned}
+				});
+			}
+
 			json_object@ character_msg = build_character_data_message(player.account, GAME_TYPE_ADVENTURE);
 			if (@character_msg != null) player.send(character_msg);
 
@@ -409,6 +469,8 @@ class battle_manager {
 			string summary = "Adventure progress: +" + total_awarded + " XP.";
 			summary += " Monsters +" + kill_xp + ", healing +" + healing_xp + ", completion +" + match_xp + ".";
 			if (achievement_xp > 0) summary += " Achievements +" + achievement_xp + ".";
+			if (victory and glory_earned > 0) summary += " Glory +" + glory_earned + ".";
+			if (int(loot_items_arr.length()) > 0) summary += " Loot: " + int(loot_items_arr.length()) + " item(s) found!";
 			if (levels_gained > 0 and @updated_progress != null) {
 				int new_level = get_json_int(updated_progress, "level", 1);
 				summary += " Level up! You are now level " + new_level + ".";
@@ -1696,6 +1758,30 @@ class battle_manager {
 			finalize_character(cs);
 			// Create combatant from character sheet
 			combatant@ c = create_player_combatant(cs, players[i].username, 1, int(i) + 1);
+
+			// Apply equipment bonuses from equipped items (Adventure mode)
+			if (@players[i].account != null) {
+				json_object@ acct_data = players[i].account.data;
+				string char_key = get_character_storage_key(lobby_game_type);
+				if (acct_data.exists(char_key)) {
+					json_object@ char_obj = acct_data[char_key];
+					if (char_obj.exists("equipped")) {
+						json_object@ equipped = char_obj["equipped"];
+						apply_equipment_bonuses(c, equipped);
+					}
+				}
+
+				// Apply prestige bonuses (Adventure mode)
+				if (progression_enabled) {
+					int prestige_rank = get_prestige_rank(players[i].account);
+					if (prestige_rank > 0) {
+						apply_prestige_bonuses(c, prestige_rank);
+						string title = get_prestige_title(prestige_rank);
+						if (title != "") c.name = title + " " + c.name;
+					}
+				}
+			}
+
 			combat.add_combatant(c);
 		}
 

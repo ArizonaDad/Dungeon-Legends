@@ -18,7 +18,8 @@ uint pending_invite_room_id = 0;
 bool connect(bool blocking = true, int timeout = 3000)
 {
 	net.setup_client(10, 900);
-	uint client_id = net.connect("localhost", 10500);
+	//uint client_id = net.connect("localhost", 10500);
+	uint client_id = net.connect("the-gdn.net", 2000);
 	if (client_id == 0) {
 		net.destroy();
 		return false;
@@ -452,6 +453,20 @@ void handle_message(json_object@ msg)
 		int streak = msg.exists("streak") ? int(msg["streak"]) : 1;
 		int xp = msg.exists("xp") ? int(msg["xp"]) : 0;
 		speak("Daily Login Bonus! Day " + streak + " streak. Plus " + xp + " XP!", true);
+	}
+	// === LOOT & INVENTORY ===
+	else if (msg_type == message_types::loot_drop) {
+		if (msg.exists("items")) {
+			@pending_loot = msg["items"];
+		}
+	}
+	else if (msg_type == message_types::inventory_list) {
+		if (msg.exists("items")) @cached_inventory = msg["items"];
+		if (msg.exists("equipped")) @cached_equipped = msg["equipped"];
+	}
+	else if (msg_type == message_types::glory_update) {
+		int glory = msg.exists("glory") ? int(msg["glory"]) : 0;
+		speak("You now have " + glory + " Glory Points.", false);
 	}
 	// Unknown messages are silently ignored.
 }

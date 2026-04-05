@@ -34,7 +34,7 @@ user@ create_bot_user(string bot_name) {
 user_manager users;    // Manages all connected users.
 void main()
 {
-	chdir(spec::path(SCRIPT_CURRENT_FILE).make_parent());
+	//chdir(spec::path(SCRIPT_CURRENT_FILE).make_parent());
 	if (!svr.create()) {
 		println("[SERVER] FATAL: Failed to start server.");
 		return;
@@ -57,8 +57,8 @@ class server
 			return false;
 		}
 		println("[SERVER] Accounts loaded. Binding to port 10500...");
-		//return net.setup_server(2000, 32, 900);
-		return net.setup_local_server(10500, 255, 4095);
+		return net.setup_server(2000, 32, 900);
+		//return net.setup_local_server(10500, 255, 4095);
 	}
 	// Main event loop  runs until Escape is pressed.
 	void run()

@@ -112,4 +112,14 @@ namespace message_types
 	const string monster_spawn = "monster_spawn";             // Server spawns monster.
 	const string monster_action = "monster_action";           // Server announces monster action.
 	const string monster_update = "monster_update";           // Server sends monster state update.
+
+	// Loot & inventory system
+	const string loot_drop = "loot_drop";                     // Server sends loot items after battle.
+	const string inventory_list = "inventory_list";           // Server sends full inventory to client.
+	const string equip_item = "equip_item";                   // Client equips an item.
+	const string discard_item = "discard_item";               // Client discards an item.
+	const string glory_update = "glory_update";               // Server sends updated Glory Points.
+
+	// Prestige system
+	const string prestige_action = "prestige_action";         // Client requests prestige reset.
 }

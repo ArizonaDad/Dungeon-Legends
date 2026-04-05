@@ -2,6 +2,7 @@
 // Handles turn display, Roll button prompts, action menus, targeting, TTS feedback.
 
 #include "../../common/combat_constants.nvgt"
+#include "../../common/loot_data.nvgt"
 #include "spell_menu.nvgt"
 
 // Client-side view of a combatant
@@ -78,6 +79,11 @@ bool level_up_needs_subclass = false;
 int level_up_new_cantrips = 0;
 int level_up_new_spells = 0;
 bool level_up_is_caster = false;
+
+// Loot & inventory state
+json_array@ pending_loot = null;
+json_array@ cached_inventory = null;
+json_object@ cached_equipped = null;
 
 // Roll state
 bool waiting_for_roll = false;
@@ -1123,6 +1129,7 @@ void reset_combat_state() {
 	combat_entities.resize(0);
 	initiative_order.resize(0);
 	scan_results.resize(0);
+	@pending_loot = null;
 	current_turn_index = -1;
 	current_round = 0;
 	battle_active = false;
@@ -1227,6 +1234,34 @@ string extract_username_from_combat_history(string msg) {
 		if (colon_pos > 0) return rest.substr(0, colon_pos);
 	}
 	return "";
+}
+
+void show_loot_screen() {
+	init_item_catalog();
+	if (@pending_loot == null or pending_loot.length() == 0) return;
+	uint count = pending_loot.length();
+	speak("Loot! You found " + count + " item" + (count == 1 ? "" : "s") + ".", true);
+	wait(1000);
+	for (uint i = 0; i < pending_loot.length(); i++) {
+		json_object@ loot_entry = pending_loot[i];
+		if (@loot_entry == null or !loot_entry.exists("id")) continue;
+		string item_id = string(loot_entry["id"]);
+		item_def@ item = find_item(item_id);
+		if (@item != null) {
+			string rarity = RARITY_NAMES[item.rarity];
+			string slot = SLOT_NAMES[item.slot];
+			string stats = item_stat_summary(item);
+			speak(rarity + " " + slot + ": " + item.name + ". " + stats + ".", false);
+			wait(800);
+		} else {
+			speak("Unknown item: " + item_id + ".", false);
+			wait(400);
+		}
+	}
+	menu@ loot_menu = setup_sub_menu("All loot has been added to your inventory. Press Enter to continue.");
+	loot_menu.add_item("Continue.");
+	loot_menu.run();
+	@pending_loot = null;
 }
 
 void combat_game_loop() {
@@ -1355,6 +1390,12 @@ void combat_game_loop() {
 	}
 
 	speak("Combat ended.", true);
+
+	// Show loot screen if any items dropped
+	if (@pending_loot != null and pending_loot.length() > 0) {
+		show_loot_screen();
+	}
+
 	// Return to lobby
 	speak("Returning to lobby in 5 seconds.", false);
 	wait(5000);

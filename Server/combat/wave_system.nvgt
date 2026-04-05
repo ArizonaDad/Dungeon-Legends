@@ -120,6 +120,216 @@ void init_wave_scenarios() {
 
         WAVE_SCENARIOS.insert_last(s);
     }
+
+    // Scenario 4: Rat Cellar (Level 1-2, tutorial)
+    {
+        wave_scenario s;
+        s.id = "rat_cellar";
+        s.name = "Rat Cellar";
+        s.description = "The tavern cellar is overrun with vermin. A perfect first test of steel.";
+        s.recommended_level = 1;
+        s.recommended_players = 1;
+
+        wave_encounter w1;
+        w1.wave_number = 1;
+        w1.monster_ids = {"rat","rat","rat","rat"};
+        w1.monster_counts = {1,1,1,1};
+        s.waves.insert_last(w1);
+
+        wave_encounter w2;
+        w2.wave_number = 2;
+        w2.monster_ids = {"rat","rat","rat","kobold","kobold"};
+        w2.monster_counts = {1,1,1,1,1};
+        s.waves.insert_last(w2);
+
+        WAVE_SCENARIOS.insert_last(s);
+    }
+
+    // Scenario 5: Bandit Camp (Level 3-5)
+    {
+        wave_scenario s;
+        s.id = "bandit_camp";
+        s.name = "Bandit Camp";
+        s.description = "A gang of bandits has been raiding caravans. Assault their camp!";
+        s.recommended_level = 4;
+        s.recommended_players = 2;
+
+        wave_encounter w1;
+        w1.wave_number = 1;
+        w1.monster_ids = {"bandit","bandit","bandit"};
+        w1.monster_counts = {1,1,1};
+        s.waves.insert_last(w1);
+
+        wave_encounter w2;
+        w2.wave_number = 2;
+        w2.monster_ids = {"bandit","bandit","bandit","bandit","wolf"};
+        w2.monster_counts = {1,1,1,1,1};
+        s.waves.insert_last(w2);
+
+        wave_encounter w3;
+        w3.wave_number = 3;
+        w3.monster_ids = {"bandit","bandit","bandit_captain"};
+        w3.monster_counts = {1,1,1};
+        s.waves.insert_last(w3);
+
+        WAVE_SCENARIOS.insert_last(s);
+    }
+
+    // Scenario 6: Haunted Catacombs (Level 5-8)
+    {
+        wave_scenario s;
+        s.id = "haunted_catacombs";
+        s.name = "Haunted Catacombs";
+        s.description = "Beneath the old cathedral, the dead refuse to stay buried.";
+        s.recommended_level = 6;
+        s.recommended_players = 3;
+
+        wave_encounter w1;
+        w1.wave_number = 1;
+        w1.monster_ids = {"skeleton","skeleton","skeleton","skeleton"};
+        w1.monster_counts = {1,1,1,1};
+        s.waves.insert_last(w1);
+
+        wave_encounter w2;
+        w2.wave_number = 2;
+        w2.monster_ids = {"zombie","zombie","zombie","zombie"};
+        w2.monster_counts = {1,1,1,1};
+        s.waves.insert_last(w2);
+
+        wave_encounter w3;
+        w3.wave_number = 3;
+        w3.monster_ids = {"ghoul","ghoul","ghoul","ghoul"};
+        w3.monster_counts = {1,1,1,1};
+        s.waves.insert_last(w3);
+
+        wave_encounter w4;
+        w4.wave_number = 4;
+        w4.monster_ids = {"wight"};
+        w4.monster_counts = {1};
+        s.waves.insert_last(w4);
+
+        WAVE_SCENARIOS.insert_last(s);
+    }
+
+    // Scenario 7: Fire Caverns (Level 8-12)
+    {
+        wave_scenario s;
+        s.id = "fire_caverns";
+        s.name = "Fire Caverns";
+        s.description = "Deep beneath the volcanic mountains, elemental forces rage unchecked.";
+        s.recommended_level = 10;
+        s.recommended_players = 3;
+
+        wave_encounter w1;
+        w1.wave_number = 1;
+        w1.monster_ids = {"fire_elemental","fire_elemental"};
+        w1.monster_counts = {1,1};
+        s.waves.insert_last(w1);
+
+        wave_encounter w2;
+        w2.wave_number = 2;
+        w2.monster_ids = {"fire_elemental","fire_elemental","fire_elemental"};
+        w2.monster_counts = {1,1,1};
+        s.waves.insert_last(w2);
+
+        wave_encounter w3;
+        w3.wave_number = 3;
+        w3.monster_ids = {"fire_elemental","fire_elemental","troll"};
+        w3.monster_counts = {1,1,1};
+        s.waves.insert_last(w3);
+
+        wave_encounter w4;
+        w4.wave_number = 4;
+        w4.monster_ids = {"ogre","ogre","fire_elemental","fire_elemental"};
+        w4.monster_counts = {1,1,1,1};
+        s.waves.insert_last(w4);
+
+        WAVE_SCENARIOS.insert_last(s);
+    }
+
+    // Scenario 8: Shadow Realm (Level 12-16)
+    {
+        wave_scenario s;
+        s.id = "shadow_realm";
+        s.name = "Shadow Realm";
+        s.description = "A rift to the Shadowfell has torn open. Demons and wraiths pour through.";
+        s.recommended_level = 14;
+        s.recommended_players = 4;
+
+        wave_encounter w1;
+        w1.wave_number = 1;
+        w1.monster_ids = {"shadow_demon","shadow_demon","shadow_demon"};
+        w1.monster_counts = {1,1,1};
+        s.waves.insert_last(w1);
+
+        wave_encounter w2;
+        w2.wave_number = 2;
+        w2.monster_ids = {"wraith","wraith","shadow_demon"};
+        w2.monster_counts = {1,1,1};
+        s.waves.insert_last(w2);
+
+        wave_encounter w3;
+        w3.wave_number = 3;
+        w3.monster_ids = {"wraith","wraith","wraith","shadow_demon","shadow_demon"};
+        w3.monster_counts = {1,1,1,1,1};
+        s.waves.insert_last(w3);
+
+        wave_encounter w4;
+        w4.wave_number = 4;
+        w4.monster_ids = {"shadow_demon","shadow_demon","wraith","wraith"};
+        w4.monster_counts = {1,1,1,1};
+        s.waves.insert_last(w4);
+
+        wave_encounter w5;
+        w5.wave_number = 5;
+        w5.monster_ids = {"lich"};
+        w5.monster_counts = {1};
+        s.waves.insert_last(w5);
+
+        WAVE_SCENARIOS.insert_last(s);
+    }
+
+    // Scenario 9: Abyssal Fortress (Level 16-20)
+    {
+        wave_scenario s;
+        s.id = "abyssal_fortress";
+        s.name = "Abyssal Fortress";
+        s.description = "Storm the fortress at the edge of the Abyss. Only legends survive.";
+        s.recommended_level = 18;
+        s.recommended_players = 4;
+
+        wave_encounter w1;
+        w1.wave_number = 1;
+        w1.monster_ids = {"shadow_demon","shadow_demon","wraith","wraith"};
+        w1.monster_counts = {1,1,1,1};
+        s.waves.insert_last(w1);
+
+        wave_encounter w2;
+        w2.wave_number = 2;
+        w2.monster_ids = {"troll","troll","fire_elemental","fire_elemental"};
+        w2.monster_counts = {1,1,1,1};
+        s.waves.insert_last(w2);
+
+        wave_encounter w3;
+        w3.wave_number = 3;
+        w3.monster_ids = {"wraith","wraith","shadow_demon","shadow_demon","shadow_demon"};
+        w3.monster_counts = {1,1,1,1,1};
+        s.waves.insert_last(w3);
+
+        wave_encounter w4;
+        w4.wave_number = 4;
+        w4.monster_ids = {"adult_black_dragon","wraith","wraith"};
+        w4.monster_counts = {1,1,1};
+        s.waves.insert_last(w4);
+
+        wave_encounter w5;
+        w5.wave_number = 5;
+        w5.monster_ids = {"pit_fiend"};
+        w5.monster_counts = {1};
+        s.waves.insert_last(w5);
+
+        WAVE_SCENARIOS.insert_last(s);
+    }
 }
 
 wave_scenario@ get_scenario(string id) {
@@ -129,8 +339,9 @@ wave_scenario@ get_scenario(string id) {
     return null;
 }
 
-// Spawn all monsters for a specific wave into a battle
-void spawn_wave(battle@ b, wave_encounter@ wave, int map_width) {
+// Spawn all monsters for a specific wave into a battle.
+// hp_multiplier and damage_multiplier scale monster stats for difficulty modes.
+void spawn_wave(battle@ b, wave_encounter@ wave, int map_width, float hp_multiplier = 1.0, float damage_multiplier = 1.0) {
     if (@b == null or @wave == null) return;
     int spawn_y = map_width - 2; // Spawn near top of map
     int spawn_x = 2;
@@ -139,6 +350,17 @@ void spawn_wave(battle@ b, wave_encounter@ wave, int map_width) {
         if (@def == null) continue;
         combatant@ c = create_monster_combatant(def, spawn_x, spawn_y);
         if (@c != null) {
+            // Apply difficulty multipliers
+            if (hp_multiplier != 1.0) {
+                c.max_hp = int(float(c.max_hp) * hp_multiplier);
+                c.current_hp = c.max_hp;
+            }
+            if (damage_multiplier != 1.0) {
+                c.monster_attack_damage_mod = int(float(c.monster_attack_damage_mod) * damage_multiplier);
+                if (c.monster_attack2_mod > 0) {
+                    c.monster_attack2_mod = int(float(c.monster_attack2_mod) * damage_multiplier);
+                }
+            }
             b.add_combatant(c);
         }
         spawn_x += 3; // Space them out
