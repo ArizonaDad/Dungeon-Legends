@@ -105,6 +105,8 @@ class battle_manager {
 	int waves_cleared_this_run = 0;
 	dictionary run_kills;
 	dictionary run_healing;
+	dictionary run_crits;
+	dictionary run_max_damage;
 	dictionary defeated_monsters;
 
 	uint64 monster_turn_start_time = 0;
@@ -240,6 +242,8 @@ class battle_manager {
 		waves_cleared_this_run = 0;
 		run_kills.delete_all();
 		run_healing.delete_all();
+		run_crits.delete_all();
+		run_max_damage.delete_all();
 		defeated_monsters.delete_all();
 	}
 
@@ -265,6 +269,28 @@ class battle_manager {
 		run_healing.set(username, get_run_healing_total(username) + amount);
 	}
 
+	int get_run_crit_count(string username) {
+		int value = 0;
+		if (run_crits.exists(username)) run_crits.get(username, value);
+		return value;
+	}
+
+	void add_run_crits(string username, int amount) {
+		if (username == "" or amount <= 0) return;
+		run_crits.set(username, get_run_crit_count(username) + amount);
+	}
+
+	int get_run_max_damage(string username) {
+		int value = 0;
+		if (run_max_damage.exists(username)) run_max_damage.get(username, value);
+		return value;
+	}
+
+	void set_run_max_damage(string username, int amount) {
+		if (username == "") return;
+		run_max_damage.set(username, amount);
+	}
+
 	int get_monster_progression_xp(combatant@ target) {
 		if (@target == null) return 0;
 		int monster_xp = target.monster_xp_value;
@@ -281,6 +307,52 @@ class battle_manager {
 		if (monster_xp <= 18000) return 520;
 		if (monster_xp <= 25000) return 620;
 		return 750;
+	}
+
+	// ---- Multi-Phase Boss Fights ----
+
+	void check_boss_phase(combatant@ boss) {
+		if (@boss == null or !boss.is_boss or boss.is_dead or @combat == null) return;
+		float hp_pct = float(boss.current_hp) / float(boss.max_hp);
+
+		if (hp_pct <= 0.5 and !boss.phase_2_triggered) {
+			boss.phase_2_triggered = true;
+			boss.boss_phase = 2;
+			boss.armor_class += 3;
+			boss.monster_attack_damage_mod += 2;
+			boss.speed += 10;
+			broadcast_announce(boss.name + " enters Phase 2! It grows stronger!", true);
+			// Spawn 2 minions based on boss tier
+			string minion_id = "skeleton";
+			if (boss.monster_xp_value >= 10000) minion_id = "shadow_demon";
+			else if (boss.monster_xp_value >= 5000) minion_id = "ghoul";
+			for (int m = 0; m < 2; m++) {
+				monster_def@ md = get_monster_def(minion_id);
+				if (@md != null) {
+					combatant@ minion = create_monster_combatant(md, boss.x + (m == 0 ? -2 : 2), boss.y);
+					if (@minion != null) {
+						combat.add_combatant(minion);
+						// Add minion to initiative order so it gets turns
+						int minion_idx = int(combat.combatants.length()) - 1;
+						minion.initiative_roll = boss.initiative_roll - 1;
+						combat.initiative_order.insert_last(minion_idx);
+						broadcast_announce(minion.name + " appears to aid " + boss.name + "!", false);
+					}
+				}
+			}
+			broadcast_state();
+		}
+
+		if (hp_pct <= 0.25 and !boss.phase_3_triggered) {
+			boss.phase_3_triggered = true;
+			boss.boss_phase = 3;
+			boss.monster_attack_damage_mod += 2;
+			int heal = boss.max_hp / 10;
+			boss.current_hp += heal;
+			if (boss.current_hp > boss.max_hp) boss.current_hp = boss.max_hp;
+			broadcast_announce(boss.name + " enters Phase 3! Enraged! It heals " + heal + " HP!", true);
+			broadcast_state();
+		}
 	}
 
 	void record_effective_healing(string username, int amount) {
@@ -331,6 +403,31 @@ class battle_manager {
 			add_json_int(progress, "waves_cleared", waves_cleared_this_run);
 			if (victory) add_json_int(progress, "victories", 1);
 			if (victory and combat.mode == "boss") add_json_int(progress, "boss_kills", 1);
+
+			// Track crit count and max single damage from this run
+			int crit_count = get_run_crit_count(player.username);
+			add_json_int(progress, "crit_count", crit_count);
+			int this_run_max = get_run_max_damage(player.username);
+			int current_max = get_json_int(progress, "max_single_damage");
+			if (this_run_max > current_max) progress["max_single_damage"] = this_run_max;
+
+			// Track class wins
+			if (victory) {
+				json_object@ class_wins = ensure_json_object_field(progress, "class_wins");
+				string player_class = "";
+				for (uint ci = 0; ci < combat.combatants.length(); ci++) {
+					if (combat.combatants[ci].is_player and combat.combatants[ci].player_username == player.username) {
+						player_class = combat.combatants[ci].class_name;
+						break;
+					}
+				}
+				if (player_class != "") add_json_int(class_wins, player_class.lower(), 1);
+			}
+
+			// Track dungeon completions count
+			if (victory and (combat.mode == "wave" or combat.mode == "boss")) {
+				add_json_int(progress, "total_dungeons_cleared", 1);
+			}
 
 			int kill_xp = party_monster_xp;
 			int healing_xp = healing_total / 4;
@@ -385,6 +482,132 @@ class battle_manager {
 				queue_achievement_unlock(progress, "rising_hero", "Rising Hero", "Reach Adventure level 5.", 150, achievement_xp, notices);
 			}
 
+			// ---- New Achievement Checks (40+) ----
+
+			// Combat milestones
+			if (get_json_int(progress, "monster_kills") >= 100)
+				queue_achievement_unlock(progress, "monster_slayer_100", "Monster Slayer", "Defeat 100 monsters.", 200, achievement_xp, notices);
+			if (get_json_int(progress, "monster_kills") >= 500)
+				queue_achievement_unlock(progress, "monster_slayer_500", "Monster Slayer Elite", "Defeat 500 monsters.", 500, achievement_xp, notices);
+			if (get_json_int(progress, "crit_count") >= 25)
+				queue_achievement_unlock(progress, "critical_master", "Critical Master", "Land 25 critical hits.", 150, achievement_xp, notices);
+			if (get_json_int(progress, "max_single_damage") >= 100)
+				queue_achievement_unlock(progress, "overkill", "Overkill", "Deal 100 or more damage in a single hit.", 100, achievement_xp, notices);
+
+			// Class mastery (13 classes)
+			{
+				json_object@ cw = ensure_json_object_field(progress, "class_wins");
+				string[] all_classes = {"barbarian","bard","cleric","druid","fighter","monk","paladin","ranger","rogue","sorcerer","warlock","wizard","artificer"};
+				string[] class_display = {"Barbarian","Bard","Cleric","Druid","Fighter","Monk","Paladin","Ranger","Rogue","Sorcerer","Warlock","Wizard","Artificer"};
+				for (uint ci = 0; ci < all_classes.length(); ci++) {
+					if (get_json_int(cw, all_classes[ci]) >= 10)
+						queue_achievement_unlock(progress, "master_" + all_classes[ci], class_display[ci] + " Master", "Win 10 battles as " + class_display[ci] + ".", 200, achievement_xp, notices);
+				}
+			}
+
+			// Dungeon achievements
+			if (get_json_int(progress, "total_dungeons_cleared") >= 10)
+				queue_achievement_unlock(progress, "dungeon_crawler", "Dungeon Crawler", "Clear 10 dungeons.", 150, achievement_xp, notices);
+
+			// Endless achievements
+			int endless_best = get_json_int(progress, "endless_best_wave");
+			if (endless_best >= 5)
+				queue_achievement_unlock(progress, "endless_5", "Endless Survivor", "Reach wave 5 in Endless.", 100, achievement_xp, notices);
+			if (endless_best >= 10)
+				queue_achievement_unlock(progress, "endless_10", "Endless Warrior", "Reach wave 10 in Endless.", 200, achievement_xp, notices);
+			if (endless_best >= 20)
+				queue_achievement_unlock(progress, "endless_20", "Endless Champion", "Reach wave 20 in Endless.", 500, achievement_xp, notices);
+			if (endless_best >= 30)
+				queue_achievement_unlock(progress, "endless_30", "Endless Legend", "Reach wave 30 in Endless.", 1000, achievement_xp, notices);
+
+			// Loot achievements
+			int items = get_json_int(progress, "items_found");
+			if (items >= 1)
+				queue_achievement_unlock(progress, "first_loot", "First Find", "Find your first item.", 50, achievement_xp, notices);
+			if (items >= 10)
+				queue_achievement_unlock(progress, "collector_10", "Collector", "Find 10 items.", 150, achievement_xp, notices);
+
+			// Trade achievement
+			if (get_json_int(progress, "trades_completed") >= 1)
+				queue_achievement_unlock(progress, "trader", "Trader", "Complete a trade with another player.", 100, achievement_xp, notices);
+
+			// Prestige achievements
+			int prestige = get_json_int(progress, "prestige_rank");
+			if (prestige >= 1)
+				queue_achievement_unlock(progress, "prestige_1", "Prestige Veteran", "Reach Prestige 1.", 300, achievement_xp, notices);
+			if (prestige >= 3)
+				queue_achievement_unlock(progress, "prestige_3", "Prestige Legend", "Reach Prestige 3.", 500, achievement_xp, notices);
+			if (prestige >= 5)
+				queue_achievement_unlock(progress, "prestige_5", "Prestige Ascendant", "Reach Prestige 5.", 1000, achievement_xp, notices);
+
+			// Level milestones
+			if (get_json_int(progress, "level", 1) >= 10)
+				queue_achievement_unlock(progress, "level_10", "Seasoned Adventurer", "Reach Adventure level 10.", 250, achievement_xp, notices);
+			if (get_json_int(progress, "level", 1) >= 15)
+				queue_achievement_unlock(progress, "level_15", "Heroic Champion", "Reach Adventure level 15.", 400, achievement_xp, notices);
+			if (get_json_int(progress, "level", 1) >= 20)
+				queue_achievement_unlock(progress, "level_20", "Legend of the Realm", "Reach Adventure level 20.", 750, achievement_xp, notices);
+
+			// Victory milestones
+			if (get_json_int(progress, "victories") >= 10)
+				queue_achievement_unlock(progress, "victor_10", "Proven Victor", "Win 10 Adventure battles.", 150, achievement_xp, notices);
+			if (get_json_int(progress, "victories") >= 50)
+				queue_achievement_unlock(progress, "victor_50", "Battle Hardened", "Win 50 Adventure battles.", 400, achievement_xp, notices);
+			if (get_json_int(progress, "victories") >= 100)
+				queue_achievement_unlock(progress, "victor_100", "Unstoppable", "Win 100 Adventure battles.", 750, achievement_xp, notices);
+
+			// Match milestones
+			if (get_json_int(progress, "matches_completed") >= 25)
+				queue_achievement_unlock(progress, "matches_25", "Dedicated Fighter", "Complete 25 Adventure runs.", 150, achievement_xp, notices);
+			if (get_json_int(progress, "matches_completed") >= 100)
+				queue_achievement_unlock(progress, "matches_100", "Arena Regular", "Complete 100 Adventure runs.", 400, achievement_xp, notices);
+
+			// Healing milestones
+			if (get_json_int(progress, "healing_done") >= 1000)
+				queue_achievement_unlock(progress, "healing_1000", "Divine Healer", "Restore 1000 effective hit points.", 300, achievement_xp, notices);
+
+			// Wave milestones
+			if (get_json_int(progress, "waves_cleared") >= 25)
+				queue_achievement_unlock(progress, "wave_25", "Wave Master", "Clear 25 total waves.", 250, achievement_xp, notices);
+			if (get_json_int(progress, "waves_cleared") >= 50)
+				queue_achievement_unlock(progress, "wave_50", "Tide Turner", "Clear 50 total waves.", 400, achievement_xp, notices);
+
+			// Boss milestones
+			if (get_json_int(progress, "boss_kills") >= 5)
+				queue_achievement_unlock(progress, "boss_5", "Boss Hunter", "Defeat 5 bosses.", 300, achievement_xp, notices);
+			if (get_json_int(progress, "boss_kills") >= 10)
+				queue_achievement_unlock(progress, "boss_10", "Boss Nemesis", "Defeat 10 bosses.", 500, achievement_xp, notices);
+
+			// Crit milestones
+			if (get_json_int(progress, "crit_count") >= 50)
+				queue_achievement_unlock(progress, "crit_50", "Critical Fury", "Land 50 critical hits.", 300, achievement_xp, notices);
+			if (get_json_int(progress, "crit_count") >= 100)
+				queue_achievement_unlock(progress, "crit_100", "Critical Devastation", "Land 100 critical hits.", 500, achievement_xp, notices);
+
+			// Damage milestones
+			if (get_json_int(progress, "max_single_damage") >= 50)
+				queue_achievement_unlock(progress, "big_hit_50", "Heavy Hitter", "Deal 50 or more damage in a single hit.", 75, achievement_xp, notices);
+			if (get_json_int(progress, "max_single_damage") >= 200)
+				queue_achievement_unlock(progress, "big_hit_200", "Devastating Blow", "Deal 200 or more damage in a single hit.", 300, achievement_xp, notices);
+
+			// Glory milestones
+			if (get_json_int(progress, "glory") >= 100)
+				queue_achievement_unlock(progress, "glory_100", "Rising Fame", "Earn 100 Glory points.", 100, achievement_xp, notices);
+			if (get_json_int(progress, "glory") >= 500)
+				queue_achievement_unlock(progress, "glory_500", "Renowned Champion", "Earn 500 Glory points.", 300, achievement_xp, notices);
+
+			// Items found milestones
+			if (get_json_int(progress, "items_found") >= 25)
+				queue_achievement_unlock(progress, "collector_25", "Treasure Hunter", "Find 25 items.", 250, achievement_xp, notices);
+			if (get_json_int(progress, "items_found") >= 50)
+				queue_achievement_unlock(progress, "collector_50", "Hoarder", "Find 50 items.", 400, achievement_xp, notices);
+
+			// Dungeon milestones
+			if (get_json_int(progress, "total_dungeons_cleared") >= 25)
+				queue_achievement_unlock(progress, "dungeon_25", "Dungeon Delver", "Clear 25 dungeons.", 300, achievement_xp, notices);
+			if (get_json_int(progress, "total_dungeons_cleared") >= 50)
+				queue_achievement_unlock(progress, "dungeon_50", "Dungeon Conqueror", "Clear 50 dungeons.", 500, achievement_xp, notices);
+
 			if (achievement_xp > 0) {
 				int achievement_levels = 0;
 				apply_adventure_xp(player.account, achievement_xp, achievement_levels);
@@ -434,6 +657,11 @@ class battle_manager {
 					loot_entry["stats"] = item_stat_summary(dropped);
 					loot_items_arr.add(loot_entry);
 				}
+			}
+
+			// Track items found for achievements
+			if (int(loot_items_arr.length()) > 0) {
+				add_json_int(progress, "items_found", int(loot_items_arr.length()));
 			}
 
 			player.account.commit();
@@ -1841,6 +2069,7 @@ class battle_manager {
 				scenario_id = boss_def.id;
 				combatant@ boss = create_monster_combatant(boss_def, combat.map_width / 2, combat.map_height - 2);
 				if (@boss != null) {
+					boss.is_boss = true;
 					combat.add_combatant(boss);
 					broadcast_announce("Boss Rush! " + boss_def.name + " enters the battlefield.", false);
 				}
@@ -2917,6 +3146,12 @@ class battle_manager {
 				dmg_type_name = DAMAGE_TYPE_NAMES[pr.damage_type] + " damage";
 			}
 
+			// Track crit and max damage stats for achievements
+			if (c.is_player and c.player_username != "" and progression_enabled) {
+				if (pr.is_crit) add_run_crits(c.player_username, 1);
+				if (total_damage > get_run_max_damage(c.player_username)) set_run_max_damage(c.player_username, total_damage);
+			}
+
 			string damage_reason = pr.attack_name != "" ? pr.attack_name + " damage" : "damage";
 			broadcast_roll(c.name, damage_reason, natural_roll, pr.damage_modifier, total_damage, total_damage + " " + dmg_type_name + " to " + target.name + ".");
 			if (extra_damage > 0 and pr.extra_damage_type >= 0 and pr.extra_damage_type < int(DAMAGE_TYPE_NAMES.length())) {
@@ -2925,6 +3160,9 @@ class battle_manager {
 			string dmg_type_str = (pr.damage_type >= 0 and pr.damage_type < int(DAMAGE_TYPE_NAMES.length())) ? DAMAGE_TYPE_NAMES[pr.damage_type] : "physical";
 			broadcast_to_battle({{"type", message_types::damage_dealt}, {"attacker", c.name}, {"target", target.name}, {"amount", total_damage}, {"damage_type", dmg_type_str}, {"is_crit", pr.is_crit}, {"weapon", pr.attack_name}, {"is_weapon_attack", pr.is_weapon_attack}});
 			combat.apply_damage(target, total_damage, pr.damage_type, c);
+
+			// Check boss phase transitions after damage
+			if (target.is_boss and !target.is_dead) check_boss_phase(target);
 			maybe_apply_on_kill_features(c, target);
 			if (target.wild_shape_just_ended) {
 				broadcast_announce(target.name + "'s Wild Shape ends!", true);

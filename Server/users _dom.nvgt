@@ -510,6 +510,12 @@ class user
 			send_character_profile_to_user(this, GAME_TYPE_SANDBOX);
 			send_character_profile_to_user(this, GAME_TYPE_ADVENTURE);
 			send_adventure_progress_to_user(this);
+			// Send daily dungeon info on login
+			string daily_id = get_daily_dungeon_id();
+			string daily_diff = get_daily_difficulty();
+			string daily_name = get_dungeon_display_name(daily_id);
+			bool daily_claimable = can_claim_daily(this.account);
+			this.send({{"type", message_types::daily_dungeon_info}, {"dungeon_id", daily_id}, {"dungeon_name", daily_name}, {"difficulty", daily_diff}, {"can_claim", daily_claimable}});
 			this.account.commit();
 		}
 	}
@@ -1987,5 +1993,226 @@ void handle_user_message(user@ u, json_object@ msg)
 		ensure_account_progression(u.account);
 		json_object@ challenge_msg = build_weekly_challenges_message(u.account);
 		if (@challenge_msg != null) u.send(challenge_msg);
+	}
+
+	// ---- GLORY SHOP ----
+
+	else if (msg_type == message_types::glory_shop_list) {
+		if (@u.account == null) return;
+		init_glory_shop();
+		ensure_account_progression(u.account);
+		json_object@ progress = get_adventure_progress(u.account);
+		json_array@ inv = ensure_json_array_field(u.account.data, "adventure_inventory");
+		json_array@ owned_titles = @progress != null ? ensure_json_array_field(progress, "owned_titles") : null;
+
+		json_array shop_arr;
+		for (uint si = 0; si < GLORY_SHOP.length(); si++) {
+			shop_entry@ e = GLORY_SHOP[si];
+			json_object entry;
+			entry["id"] = e.id;
+			entry["name"] = e.name;
+			entry["description"] = e.description;
+			entry["type"] = e.type;
+			entry["glory_cost"] = e.glory_cost;
+			bool owned = false;
+			if (e.type == SHOP_TYPE_TITLE and @owned_titles != null) {
+				for (uint ti = 0; ti < owned_titles.length(); ti++) {
+					if (string(owned_titles[ti]) == e.id) { owned = true; break; }
+				}
+			} else if (e.type == SHOP_TYPE_ITEM and @inv != null) {
+				owned = inventory_has_item(inv, e.item_id);
+			}
+			entry["owned"] = owned;
+			if (e.item_id != "") entry["item_id"] = e.item_id;
+			shop_arr.add(entry);
+		}
+		u.send({{"type", message_types::glory_shop_list}, {"items", shop_arr}, {"glory", get_glory(u.account)}});
+	}
+
+	else if (msg_type == message_types::glory_shop_buy and msg.exists("shop_id")) {
+		if (@u.account == null) return;
+		init_glory_shop();
+		ensure_account_progression(u.account);
+		string shop_id = string(msg["shop_id"]);
+		shop_entry@ e = find_shop_entry(shop_id);
+		if (@e == null) {
+			u.send({{"type", message_types::error}, {"text", "Item not found in the Glory Shop."}});
+			return;
+		}
+
+		json_object@ progress = get_adventure_progress(u.account);
+		int current_glory = get_glory(u.account);
+		if (current_glory < e.glory_cost) {
+			u.send({{"type", message_types::error}, {"text", "Not enough Glory Points. You have " + current_glory + " but need " + e.glory_cost + "."}});
+			return;
+		}
+
+		if (e.type == SHOP_TYPE_TITLE) {
+			json_array@ owned_titles = ensure_json_array_field(progress, "owned_titles");
+			// Check if already owned
+			for (uint ti = 0; ti < owned_titles.length(); ti++) {
+				if (string(owned_titles[ti]) == e.id) {
+					u.send({{"type", message_types::error}, {"text", "You already own this title."}});
+					return;
+				}
+			}
+			owned_titles.add(e.id);
+			progress["glory"] = current_glory - e.glory_cost;
+			u.account.commit();
+			u.send({{"type", message_types::glory_update}, {"glory", get_glory(u.account)}, {"gained", 0}});
+			u.send({{"type", message_types::announce}, {"text", "You purchased the title: " + e.name + "!"}, {"interrupt", true}});
+		} else if (e.type == SHOP_TYPE_ITEM) {
+			json_array@ inv = ensure_json_array_field(u.account.data, "adventure_inventory");
+			if (inventory_has_item(inv, e.item_id)) {
+				u.send({{"type", message_types::error}, {"text", "You already own this item."}});
+				return;
+			}
+			if (int(inv.length()) >= MAX_INVENTORY) {
+				u.send({{"type", message_types::error}, {"text", "Your inventory is full! Discard an item first."}});
+				return;
+			}
+			inventory_add_item(inv, e.item_id);
+			progress["glory"] = current_glory - e.glory_cost;
+			u.account.commit();
+			u.send({{"type", message_types::glory_update}, {"glory", get_glory(u.account)}, {"gained", 0}});
+			u.send({{"type", message_types::announce}, {"text", "You purchased: " + e.name + "!"}, {"interrupt", true}});
+		}
+	}
+
+	// ---- SET ACTIVE TITLE ----
+
+	else if (msg_type == message_types::set_active_title and msg.exists("title_id")) {
+		if (@u.account == null) return;
+		ensure_account_progression(u.account);
+		json_object@ progress = get_adventure_progress(u.account);
+		if (@progress == null) return;
+		string title_id = string(msg["title_id"]);
+
+		if (title_id == "") {
+			// Clear active title
+			progress["active_title"] = "";
+			u.account.commit();
+			u.send({{"type", message_types::announce}, {"text", "Title removed."}, {"interrupt", false}});
+			return;
+		}
+
+		json_array@ owned_titles = ensure_json_array_field(progress, "owned_titles");
+		bool found = false;
+		for (uint ti = 0; ti < owned_titles.length(); ti++) {
+			if (string(owned_titles[ti]) == title_id) { found = true; break; }
+		}
+		if (!found) {
+			u.send({{"type", message_types::error}, {"text", "You do not own this title."}});
+			return;
+		}
+
+		init_glory_shop();
+		shop_entry@ se = find_shop_entry(title_id);
+		progress["active_title"] = title_id;
+		u.account.commit();
+		string title_name = @se != null ? se.name : title_id;
+		u.send({{"type", message_types::announce}, {"text", "Active title set to: " + title_name + "."}, {"interrupt", false}});
+	}
+
+	// ---- DAILY DUNGEON INFO ----
+
+	else if (msg_type == message_types::daily_dungeon_info) {
+		if (@u.account == null) return;
+		ensure_account_progression(u.account);
+		string dungeon_id = get_daily_dungeon_id();
+		string difficulty = get_daily_difficulty();
+		string dungeon_name = get_dungeon_display_name(dungeon_id);
+		bool claimable = can_claim_daily(u.account);
+		u.send({{"type", message_types::daily_dungeon_info}, {"dungeon_id", dungeon_id}, {"dungeon_name", dungeon_name}, {"difficulty", difficulty}, {"can_claim", claimable}});
+	}
+
+	// ---- LEADERBOARDS ----
+
+	else if (msg_type == message_types::leaderboard_request and msg.exists("category")) {
+		string category = string(msg["category"]);
+		json_array leaderboard;
+		string my_username = u.username;
+		int my_value = 0;
+		int my_rank = -1;
+
+		// Collect all player scores
+		json_object@[] all_scores;
+		string[] all_usernames;
+		string[] all_prestige_titles;
+		int[] all_values;
+
+		for (uint ai = 0; ai < accounts.length(); ai++) {
+			account@ acct = accounts[ai];
+			if (@acct == null or @acct.data == null) continue;
+			if (!acct.data.exists(ACCOUNT_KEY_ADVENTURE_PROGRESS)) continue;
+			json_object@ prog = acct.data[ACCOUNT_KEY_ADVENTURE_PROGRESS];
+			if (@prog == null) continue;
+
+			int value = 0;
+			if (category == "glory") value = get_json_int(prog, "glory", 0);
+			else if (category == "endless") value = get_json_int(prog, "endless_best_wave", 0);
+			else if (category == "kills") value = get_json_int(prog, "monster_kills", 0);
+			else if (category == "prestige") value = get_json_int(prog, "prestige_rank", 0);
+			else if (category == "dungeons") {
+				int total = 0;
+				if (prog.exists("dungeons_completed")) {
+					json_object@ dc = prog["dungeons_completed"];
+					if (@dc != null) {
+						string[]@ keys = dc.get_keys();
+						for (uint ki = 0; ki < keys.length(); ki++) {
+							total += get_json_int(dc, keys[ki], 0);
+						}
+					}
+				}
+				value = total;
+			}
+
+			if (value <= 0) continue;
+
+			all_usernames.insert_last(acct.username);
+			all_values.insert_last(value);
+			string pt = get_prestige_title(get_json_int(prog, "prestige_rank", 0));
+			all_prestige_titles.insert_last(pt);
+		}
+
+		// Sort descending by value (simple insertion sort for small sets)
+		for (int si = 1; si < int(all_values.length()); si++) {
+			int key_val = all_values[si];
+			string key_name = all_usernames[si];
+			string key_pt = all_prestige_titles[si];
+			int sj = si - 1;
+			while (sj >= 0 and all_values[sj] < key_val) {
+				all_values[sj + 1] = all_values[sj];
+				all_usernames[sj + 1] = all_usernames[sj];
+				all_prestige_titles[sj + 1] = all_prestige_titles[sj];
+				sj--;
+			}
+			all_values[sj + 1] = key_val;
+			all_usernames[sj + 1] = key_name;
+			all_prestige_titles[sj + 1] = key_pt;
+		}
+
+		// Build top 10 and find requesting player
+		int limit = int(all_values.length());
+		if (limit > 10) limit = 10;
+		for (int ri = 0; ri < limit; ri++) {
+			json_object entry;
+			entry["rank"] = ri + 1;
+			entry["username"] = all_usernames[ri];
+			entry["value"] = all_values[ri];
+			entry["prestige_title"] = all_prestige_titles[ri];
+			leaderboard.add(entry);
+		}
+
+		// Find requesting player's rank
+		for (int ri = 0; ri < int(all_values.length()); ri++) {
+			if (all_usernames[ri] == my_username) {
+				my_rank = ri + 1;
+				my_value = all_values[ri];
+				break;
+			}
+		}
+
+		u.send({{"type", message_types::leaderboard_data}, {"category", category}, {"entries", leaderboard}, {"my_rank", my_rank}, {"my_value", my_value}});
 	}
 }

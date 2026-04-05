@@ -412,6 +412,8 @@ void spawn_wave(battle@ b, wave_encounter@ wave, int map_width, float hp_multipl
         if (@def == null) continue;
         combatant@ c = create_monster_combatant(def, spawn_x, spawn_y);
         if (@c != null) {
+            // Mark high-tier monsters as bosses for phase transitions
+            if (c.monster_xp_value >= 5000) c.is_boss = true;
             // Apply difficulty multipliers
             if (hp_multiplier != 1.0) {
                 c.max_hp = int(float(c.max_hp) * hp_multiplier);

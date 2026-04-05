@@ -141,4 +141,16 @@ namespace message_types
 	// Weekly challenges
 	const string weekly_challenges = "weekly_challenges";     // Client requests or server sends weekly challenge data.
 	const string challenge_complete = "challenge_complete";   // Server announces a challenge was completed.
+
+	// Glory shop
+	const string glory_shop_list = "glory_shop_list";         // Client requests or server sends glory shop listings.
+	const string glory_shop_buy = "glory_shop_buy";           // Client requests to buy a glory shop item.
+	const string set_active_title = "set_active_title";       // Client requests to set their active title.
+
+	// Daily dungeon
+	const string daily_dungeon_info = "daily_dungeon_info";   // Server sends daily dungeon info to client.
+
+	// Leaderboards
+	const string leaderboard_request = "leaderboard_request"; // Client requests leaderboard data.
+	const string leaderboard_data = "leaderboard_data";       // Server sends leaderboard data to client.
 }

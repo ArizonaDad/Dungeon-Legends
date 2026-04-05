@@ -1,7 +1,7 @@
 # Dungeon Legends - D&D 5e Battle Simulator
 
 ## Project Overview
-Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (NonVisual Gaming Toolkit, AngelScript-like). Players create characters (33 species, 13 classes, 16 backgrounds, 38 weapons, 68 spells) and fight in turn-based combat with full TTS and HRTF spatial audio. Supports PvP Arena, Wave Survival, Boss Rush, and Endless Survival modes.
+Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (NonVisual Gaming Toolkit, AngelScript-like). Players create characters (33 species, 13 classes, 16 backgrounds, 38 weapons, 86 spells) and fight in turn-based combat with full TTS and HRTF spatial audio. Supports PvP Arena, Wave Survival, Boss Rush, and Endless Survival modes. Features 40+ achievements, glory shop, daily dungeons, leaderboards, loot system, trading, prestige, and multi-phase boss fights.
 
 ## Architecture
 - **Client-server** model using ENet networking with JSON message passing
@@ -214,6 +214,34 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 - Roll requests include `player` field to restrict who can roll
 - Scan direction handled inline in `users_dom.nvgt`
 - Target info includes direction and distance
+
+## Achievements (40+)
+- Combat: Monster Slayer (100/500 kills), Critical Master (25 crits), Overkill (100+ single damage)
+- Class Mastery: Win 10 battles per class (13 total)
+- Dungeons: Crawler (10 clears), Master (all Normal), Hardened/Nightmare Survivor
+- Endless: Wave 5/10/20/30 milestones
+- Loot: First Find, Collector (10 items), Rare/Epic/Legendary finder
+- Social: Friendly (5 friends), Trader (complete a trade), Party Player (5 friend battles)
+- Prestige: Ranks 1/3/5 milestones
+
+## Glory Shop
+- **Titles**: The Brave (50), Dragon Slayer (100), Archmage (100), Shadow Walker (100), The Immortal (200), Godslayer (500), The Conqueror (300), Warden (150)
+- **Exclusive Items**: Glory Blade (150), Glory Shield (150), Ring of Glory (100), Crown of Glory (300)
+- Active title shown in initiative/scan readouts
+
+## Daily Dungeon
+- One featured dungeon + difficulty each day (rotates deterministically)
+- 2x glory and 2x loot drop rate for daily completion
+- Can only claim daily bonus once per day
+
+## Leaderboards
+- Categories: Glory Points, Endless Best Wave, Monster Kills, Prestige Rank, Dungeons Cleared
+- Top 10 shown per category with player's own rank
+
+## Boss Phases
+- Bosses with XP >= 5000 have multi-phase transitions
+- Phase 2 (50% HP): +3 AC, +2 damage, +10 speed, summons 2 minions
+- Phase 3 (25% HP): Additional +2 damage, heals 10% max HP, enrage announcement
 
 ## Development
 - Compile: `C:\Users\16239\Documents\games\nvgt\nvgt.exe -c Server/Server.nvgt` and `C:\Users\16239\Documents\games\nvgt\nvgt.exe -c Client/client.nvgt`

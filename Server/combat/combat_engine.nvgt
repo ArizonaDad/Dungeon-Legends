@@ -183,6 +183,12 @@ class combatant {
 	bool tavern_brawler_push_used = false;
 	bool hunter_colossus_used = false;
 
+	// Boss phase tracking
+	int boss_phase = 0;
+	bool phase_2_triggered = false;
+	bool phase_3_triggered = false;
+	bool is_boss = false;
+
 	// Summoned creature tracking
 	uint summoner_id = 0;
 

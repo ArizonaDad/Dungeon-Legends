@@ -136,6 +136,12 @@ void init_item_catalog() {
 	add_item("blade_of_legends", "Blade of Legends", SLOT_WEAPON, RARITY_LEGENDARY, "A weapon spoken of only in myths.", 0, 6, 10, 0, 2, 5, 0, 1);
 	add_item("adamantine_fortress", "Adamantine Fortress Plate", SLOT_ARMOR, RARITY_LEGENDARY, "Indestructible armor that turns critical hits into normal hits.", 5, 0, 30, 0, 0, 0, 2, 0);
 	add_item("ring_of_three_wishes", "Ring of Three Wishes", SLOT_RING, RARITY_LEGENDARY, "A ring of immense power that bends fate.", 1, 2, 15, 2, 3, 5, 2, 0);
+
+	// Glory Shop exclusive items
+	add_item("glory_blade", "Glory Blade", SLOT_WEAPON, RARITY_EPIC, "A weapon forged from pure glory. Radiates golden light.", 0, 5, 0, 0, 2, 0, 0, 0);
+	add_item("glory_shield", "Glory Shield", SLOT_ARMOR, RARITY_EPIC, "An impenetrable shield of radiant energy.", 4, 0, 15, 0, 0, 0, 0, 0);
+	add_item("ring_of_glory", "Ring of Glory", SLOT_RING, RARITY_RARE, "A ring pulsing with earned power.", 0, 0, 0, 0, 0, 0, 2, 0);
+	add_item("crown_of_glory", "Crown of Glory", SLOT_AMULET, RARITY_LEGENDARY, "The ultimate symbol of achievement.", 2, 0, 20, 3, 0, 0, 0, 0);
 }
 
 // ---- LOOT GENERATION ----

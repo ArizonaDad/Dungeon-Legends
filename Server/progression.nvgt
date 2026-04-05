@@ -94,9 +94,26 @@ void ensure_account_progression(account@ acct) {
 	if (!progress.exists("prestige_title")) progress["prestige_title"] = "";
 	if (!progress.exists("glory")) progress["glory"] = 0;
 	if (!progress.exists("endless_best_wave")) progress["endless_best_wave"] = 0;
+	if (!progress.exists("crit_count")) progress["crit_count"] = 0;
+	if (!progress.exists("max_single_damage")) progress["max_single_damage"] = 0;
+	if (!progress.exists("items_found")) progress["items_found"] = 0;
+	if (!progress.exists("trades_completed")) progress["trades_completed"] = 0;
+	if (!progress.exists("total_dungeons_cleared")) progress["total_dungeons_cleared"] = 0;
+	if (!progress.exists("battles_no_damage_taken")) progress["battles_no_damage_taken"] = 0;
+	if (!progress.exists("revived_and_won")) progress["revived_and_won"] = 0;
+	if (!progress.exists("friends_count")) progress["friends_count"] = 0;
+	if (!progress.exists("battles_with_friends")) progress["battles_with_friends"] = 0;
 	ensure_json_array_field(progress, "achievements");
 	ensure_json_object_field(progress, "dungeons_completed");
+	ensure_json_object_field(progress, "class_wins");
 	ensure_json_array_field(data, "adventure_inventory");
+
+	// Title system
+	ensure_json_array_field(progress, "owned_titles");
+	if (!progress.exists("active_title")) progress["active_title"] = "";
+
+	// Daily dungeon tracking
+	if (!progress.exists("last_daily_day")) progress["last_daily_day"] = 0;
 
 	// Weekly challenge tracking
 	if (!progress.exists("challenge_week")) progress["challenge_week"] = 0;
@@ -230,6 +247,8 @@ json_object@ build_character_data_message(account@ acct, string profile) {
 		if (@progress != null) {
 			msg["prestige_rank"] = get_json_int(progress, "prestige_rank", 0);
 			msg["prestige_title"] = get_prestige_title(get_json_int(progress, "prestige_rank", 0));
+			string active_title = progress.exists("active_title") ? string(progress["active_title"]) : "";
+			msg["active_title"] = active_title;
 		}
 	}
 	return msg;
@@ -249,6 +268,8 @@ json_object@ build_progression_stats_message(json_object@ progress) {
 	stats["prestige_title"] = get_prestige_title(get_prestige_rank_from_progress(progress));
 	stats["glory"] = get_glory_from_progress(progress);
 	stats["endless_best_wave"] = get_json_int(progress, "endless_best_wave", 0);
+	string active_title = progress.exists("active_title") ? string(progress["active_title"]) : "";
+	stats["active_title"] = active_title;
 	return stats;
 }
 
@@ -535,4 +556,49 @@ json_object@ build_weekly_challenges_message(account@ acct) {
 	msg["completed_count"] = total_done;
 	msg["total_count"] = int(challenges.length());
 	return msg;
+}
+
+// ---- DAILY DUNGEON SYSTEM ----
+
+string[] DAILY_DUNGEON_IDS = {"rat_cellar", "goblin_ambush", "bandit_camp", "crypt_undead", "haunted_catacombs", "dragon_challenge", "fire_caverns", "shadow_realm", "abyssal_fortress"};
+string[] DAILY_DIFFICULTIES = {"normal", "hard", "nightmare"};
+
+// Daily dungeon name lookup for display purposes.
+string get_dungeon_display_name(string id) {
+	if (id == "rat_cellar") return "Rat Cellar";
+	if (id == "goblin_ambush") return "Goblin Ambush";
+	if (id == "bandit_camp") return "Bandit Camp";
+	if (id == "crypt_undead") return "Crypt of the Undead";
+	if (id == "haunted_catacombs") return "Haunted Catacombs";
+	if (id == "dragon_challenge") return "Dragon's Challenge";
+	if (id == "fire_caverns") return "Fire Caverns";
+	if (id == "shadow_realm") return "Shadow Realm";
+	if (id == "abyssal_fortress") return "Abyssal Fortress";
+	return id;
+}
+
+int get_current_day_number() {
+	return int(ticks() / (uint64(1000) * 60 * 60 * 24));
+}
+
+string get_daily_dungeon_id() {
+	int day = get_current_day_number();
+	return DAILY_DUNGEON_IDS[day % DAILY_DUNGEON_IDS.length()];
+}
+
+string get_daily_difficulty() {
+	int day = get_current_day_number();
+	return DAILY_DIFFICULTIES[(day / DAILY_DUNGEON_IDS.length()) % DAILY_DIFFICULTIES.length()];
+}
+
+bool can_claim_daily(account@ acct) {
+	json_object@ progress = get_adventure_progress(acct);
+	if (@progress == null) return true;
+	int last_claimed = get_json_int(progress, "last_daily_day", 0);
+	return get_current_day_number() != last_claimed;
+}
+
+void mark_daily_claimed(account@ acct) {
+	json_object@ progress = get_adventure_progress(acct);
+	if (@progress != null) progress["last_daily_day"] = get_current_day_number();
 }

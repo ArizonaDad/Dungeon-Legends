@@ -366,7 +366,7 @@ void main_menu()
 		menu@ m = setup_menu("");
 		@m = main_screen;
 		// Calculate total items dynamically
-		int total = 9; // base: create char, adventure, sandbox, join, weekly, friends, online, about, quit
+		int total = 12; // base: create char, adventure, sandbox, join, weekly, glory shop, daily dungeon, leaderboards, friends, online, about, quit
 		bool has_char = has_any_character_profile();
 		if (has_char) total++; // view char
 		total++; // inventory
@@ -387,6 +387,9 @@ void main_menu()
 		int create_sandbox = m.add_item("Sandbox. Create or join a sandbox lobby. " + n + " of " + total); n++;
 		int join = m.add_item("Join a game! " + n + " of " + total); n++;
 		int challenges_btn = m.add_item("Weekly Challenges. " + n + " of " + total); n++;
+		int glory_shop_btn = m.add_item("Glory Shop. Spend Glory Points on titles and exclusive items. " + n + " of " + total); n++;
+		int daily_btn = m.add_item("Daily Dungeon. Today's featured dungeon with bonus rewards. " + n + " of " + total); n++;
+		int leaderboard_btn = m.add_item("Leaderboards. See the top players. " + n + " of " + total); n++;
 		int social = m.add_item("Friends. " + n + " of " + total); n++;
 		int CHECK_ONLINE = m.add_item("Check who is online. " + n + " of " + total); n++;
 		int About = m.add_item("About us. " + n + " of " + total); n++;
@@ -476,6 +479,15 @@ void main_menu()
 		}
 		else if (res == challenges_btn) {
 			show_weekly_challenges();
+		}
+		else if (res == glory_shop_btn) {
+			show_glory_shop();
+		}
+		else if (res == daily_btn) {
+			show_daily_dungeon();
+		}
+		else if (res == leaderboard_btn) {
+			show_leaderboards();
 		}
 		else if (res == social) {
 			social_panel();
@@ -1128,6 +1140,108 @@ void show_trade_screen() {
 			network_loop();
 		}
 	}
+}
+
+void show_glory_shop() {
+	send({{"type", message_types::glory_shop_list}});
+	wait(500);
+	network_loop();
+	if (@cached_shop_data == null or cached_shop_data.length() == 0) {
+		speak("Glory Shop is empty or unavailable.", true);
+		return;
+	}
+	int glory = @cached_stats != null and cached_stats.exists("glory") ? int(cached_stats["glory"]) : 0;
+	speak("Glory Shop. You have " + glory + " Glory Points.", true);
+	menu@ m = setup_sub_menu("Glory Shop. " + glory + " Glory Points available.");
+	for (uint i = 0; i < cached_shop_data.length(); i++) {
+		json_object@ entry = cached_shop_data[i];
+		if (@entry == null) continue;
+		string name = entry.exists("name") ? string(entry["name"]) : "Unknown";
+		string desc = entry.exists("description") ? string(entry["description"]) : "";
+		int cost = entry.exists("glory_cost") ? int(entry["glory_cost"]) : 0;
+		bool owned = entry.exists("owned") ? bool(entry["owned"]) : false;
+		string type_label = entry.exists("type") and int(entry["type"]) == 0 ? "Title" : "Item";
+		string owned_label = owned ? " Owned." : "";
+		m.add_item(name + ". " + type_label + ". " + cost + " Glory. " + desc + owned_label + " " + (i+1) + " of " + cached_shop_data.length());
+	}
+	int pick = m.run();
+	if (pick < 0 or pick >= int(cached_shop_data.length())) return;
+	json_object@ selected = cached_shop_data[pick];
+	if (@selected == null) return;
+	string shop_id = selected.exists("id") ? string(selected["id"]) : "";
+	bool is_owned = selected.exists("owned") ? bool(selected["owned"]) : false;
+	int shop_type = selected.exists("type") ? int(selected["type"]) : 1;
+	if (is_owned and shop_type == 0) {
+		// Title already owned - offer to set as active
+		menu@ tm = setup_sub_menu("You own this title. Set it as your active title?");
+		tm.add_item("Set as active title.");
+		tm.add_item("Back.");
+		int tp = tm.run();
+		if (tp == 0) {
+			send({{"type", "set_active_title"}, {"title_id", shop_id}});
+			speak("Title set!", true);
+		}
+	} else if (!is_owned) {
+		int cost = selected.exists("glory_cost") ? int(selected["glory_cost"]) : 0;
+		string name = selected.exists("name") ? string(selected["name"]) : "";
+		menu@ bm = setup_sub_menu("Buy " + name + " for " + cost + " Glory?");
+		bm.add_item("Yes, buy it.");
+		bm.add_item("No, go back.");
+		int bp = bm.run();
+		if (bp == 0) {
+			send({{"type", message_types::glory_shop_buy}, {"shop_id", shop_id}});
+			wait(300);
+			network_loop();
+		}
+	}
+}
+
+void show_daily_dungeon() {
+	send({{"type", message_types::daily_dungeon_info}});
+	wait(500);
+	network_loop();
+	if (@cached_daily_dungeon == null) {
+		speak("Daily dungeon information unavailable.", true);
+		return;
+	}
+	string name = cached_daily_dungeon.exists("dungeon_name") ? string(cached_daily_dungeon["dungeon_name"]) : "Unknown";
+	string diff = cached_daily_dungeon.exists("difficulty") ? string(cached_daily_dungeon["difficulty"]) : "normal";
+	bool can_claim = cached_daily_dungeon.exists("can_claim") ? bool(cached_daily_dungeon["can_claim"]) : false;
+	string status = can_claim ? "Bonus available! 2x Glory and loot." : "Already claimed today.";
+	speak("Today's Daily Dungeon: " + name + " on " + diff + " difficulty. " + status, true);
+}
+
+void show_leaderboards() {
+	menu@ cat_menu = setup_sub_menu("Choose a leaderboard category.");
+	cat_menu.add_item("Glory Points.");
+	cat_menu.add_item("Endless Best Wave.");
+	cat_menu.add_item("Monster Kills.");
+	cat_menu.add_item("Prestige Rank.");
+	cat_menu.add_item("Dungeons Cleared.");
+	int cat = cat_menu.run();
+	if (cat < 0) return;
+	string[] categories = {"glory", "endless", "kills", "prestige", "dungeons"};
+	string[] cat_names = {"Glory Points", "Endless Best Wave", "Monster Kills", "Prestige Rank", "Dungeons Cleared"};
+	send({{"type", message_types::leaderboard_request}, {"category", categories[cat]}});
+	@cached_leaderboard = null;
+	wait(500);
+	network_loop();
+	if (@cached_leaderboard == null or cached_leaderboard.length() == 0) {
+		speak("No leaderboard data available yet.", true);
+		return;
+	}
+	menu@ lb = setup_sub_menu(cat_names[cat] + " Leaderboard.");
+	for (uint i = 0; i < cached_leaderboard.length(); i++) {
+		json_object@ entry = cached_leaderboard[i];
+		if (@entry == null) continue;
+		int rank = entry.exists("rank") ? int(entry["rank"]) : int(i + 1);
+		string name = entry.exists("username") ? string(entry["username"]) : "Unknown";
+		int value = entry.exists("value") ? int(entry["value"]) : 0;
+		string title = entry.exists("prestige_title") ? string(entry["prestige_title"]) : "";
+		string prefix = title != "" ? title + " " : "";
+		lb.add_item(rank + ". " + prefix + name + ". " + value + ".");
+	}
+	lb.run();
 }
 
 void show_weekly_challenges() {

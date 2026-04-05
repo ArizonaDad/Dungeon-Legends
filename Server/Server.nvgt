@@ -11,6 +11,7 @@
 #include "combat/monster_data.nvgt"
 #include "combat/wave_system.nvgt"
 #include "combat/spell_data.nvgt"
+#include "../common/glory_shop_data.nvgt"
 network net;           // Low-level network object.
 server svr;            // Our server wrapper.
 room_manager rooms;    // Manages all open rooms.

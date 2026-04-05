@@ -1,0 +1,56 @@
+// Glory Shop - Titles and exclusive items purchasable with Glory Points.
+
+const int SHOP_TYPE_TITLE = 0;
+const int SHOP_TYPE_ITEM = 1;
+
+class shop_entry {
+	string id;
+	string name;
+	string description;
+	int type;
+	int glory_cost;
+	string item_id;
+}
+
+shop_entry@[] GLORY_SHOP;
+
+void init_glory_shop() {
+	if (GLORY_SHOP.length() > 0) return;
+
+	// Titles
+	add_shop_title("title_brave", "The Brave", "A title for courageous adventurers.", 50);
+	add_shop_title("title_dragon_slayer", "Dragon Slayer", "Awarded to those who have felled dragons.", 100);
+	add_shop_title("title_archmage", "Archmage", "A title of supreme magical authority.", 100);
+	add_shop_title("title_shadow_walker", "Shadow Walker", "One who moves unseen through darkness.", 100);
+	add_shop_title("title_immortal", "The Immortal", "Death cannot hold this warrior.", 200);
+	add_shop_title("title_godslayer", "Godslayer", "A title whispered with fear and reverence.", 500);
+	add_shop_title("title_conqueror", "The Conqueror", "None can stand before this champion.", 300);
+	add_shop_title("title_warden", "Warden of the Realm", "Protector of all who dwell within.", 150);
+
+	// Exclusive items (these IDs match items in loot_data.nvgt)
+	add_shop_item("shop_glory_blade", "Glory Blade", "A weapon forged from pure glory.", 150, "glory_blade");
+	add_shop_item("shop_glory_shield", "Glory Shield", "An impenetrable shield of radiant energy.", 150, "glory_shield");
+	add_shop_item("shop_ring_of_glory", "Ring of Glory", "A ring pulsing with earned power.", 100, "ring_of_glory");
+	add_shop_item("shop_crown_of_glory", "Crown of Glory", "The ultimate symbol of achievement.", 300, "crown_of_glory");
+}
+
+void add_shop_title(string id, string name, string description, int cost) {
+	shop_entry e;
+	e.id = id; e.name = name; e.description = description;
+	e.type = SHOP_TYPE_TITLE; e.glory_cost = cost; e.item_id = "";
+	GLORY_SHOP.insert_last(e);
+}
+
+void add_shop_item(string id, string name, string description, int cost, string item_id) {
+	shop_entry e;
+	e.id = id; e.name = name; e.description = description;
+	e.type = SHOP_TYPE_ITEM; e.glory_cost = cost; e.item_id = item_id;
+	GLORY_SHOP.insert_last(e);
+}
+
+shop_entry@ find_shop_entry(string id) {
+	for (uint i = 0; i < GLORY_SHOP.length(); i++) {
+		if (GLORY_SHOP[i].id == id) return GLORY_SHOP[i];
+	}
+	return null;
+}

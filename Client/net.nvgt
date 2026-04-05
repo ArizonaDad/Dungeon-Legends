@@ -533,6 +533,20 @@ void handle_message(json_object@ msg)
 		int glory = msg.exists("glory") ? int(msg["glory"]) : 0;
 		speak("Challenge complete! " + description + ". Plus " + glory + " Glory!", true);
 	}
+	// === GLORY SHOP, LEADERBOARD, DAILY DUNGEON ===
+	else if (msg_type == message_types::glory_shop_list) {
+		if (msg.exists("items")) @cached_shop_data = msg["items"];
+	}
+	else if (msg_type == message_types::leaderboard_data) {
+		if (msg.exists("entries")) @cached_leaderboard = msg["entries"];
+		if (msg.exists("my_rank")) speak("Your rank: " + int(msg["my_rank"]) + ".", false);
+	}
+	else if (msg_type == message_types::daily_dungeon_info) {
+		@cached_daily_dungeon = json_object();
+		if (msg.exists("dungeon_name")) cached_daily_dungeon["dungeon_name"] = msg["dungeon_name"];
+		if (msg.exists("difficulty")) cached_daily_dungeon["difficulty"] = msg["difficulty"];
+		if (msg.exists("can_claim")) cached_daily_dungeon["can_claim"] = msg["can_claim"];
+	}
 	// Unknown messages are silently ignored.
 }
 // send  Send a JSON message to the server.

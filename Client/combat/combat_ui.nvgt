@@ -89,6 +89,11 @@ json_array@ pending_loot = null;
 json_array@ cached_inventory = null;
 json_object@ cached_equipped = null;
 
+// Glory shop, leaderboard, and daily dungeon caches
+json_array@ cached_shop_data = null;
+json_array@ cached_leaderboard = null;
+json_object@ cached_daily_dungeon = null;
+
 // Roll state
 bool waiting_for_roll = false;
 int roll_type = -1;
