@@ -2,3 +2,5 @@
 *.db
 __pycache__/
 *.pyc
+Client/sounds/
+Dungeon Legends/
