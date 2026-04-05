@@ -1,0 +1,212 @@
+// Consumable Items System
+// Potions, throwables, and scrolls usable during combat.
+
+const int CONS_HEALING = 0;
+const int CONS_BUFF = 1;
+const int CONS_THROWABLE = 2;
+const int CONS_SCROLL = 3;
+
+string[] CONS_TYPE_NAMES = {"Healing", "Buff", "Throwable", "Scroll"};
+
+const int CONS_ACTION_BONUS = 0;
+const int CONS_ACTION_FULL = 1;
+
+const int MAX_CONSUMABLE_TYPES = 10;
+const int MAX_CONSUMABLE_STACK = 5;
+
+class consumable_def {
+	string id;
+	string name;
+	int type;
+	int action_type;
+	string description;
+	int gold_cost;
+	int heal_dice = 0;
+	int heal_count = 0;
+	int heal_bonus = 0;
+	int buff_value = 0;
+	string buff_stat = "";
+	int duration_rounds = 0;
+	int damage_dice = 0;
+	int damage_count = 0;
+	int damage_type = -1;
+	int save_type = -1;
+	int range = 0;
+	string spell_id = "";
+}
+
+consumable_def@[] CONSUMABLE_CATALOG;
+
+void add_consumable(string id, string name, int type, int action_type, string description, int gold_cost) {
+	consumable_def d;
+	d.id = id; d.name = name; d.type = type; d.action_type = action_type;
+	d.description = description; d.gold_cost = gold_cost;
+	CONSUMABLE_CATALOG.insert_last(d);
+}
+
+consumable_def@ find_consumable(string id) {
+	for (uint i = 0; i < CONSUMABLE_CATALOG.length(); i++) {
+		if (CONSUMABLE_CATALOG[i].id == id) return CONSUMABLE_CATALOG[i];
+	}
+	return null;
+}
+
+void init_consumable_catalog() {
+	if (CONSUMABLE_CATALOG.length() > 0) return;
+
+	// Healing potions (bonus action)
+	consumable_def@ c;
+
+	add_consumable("minor_heal_potion", "Minor Healing Potion", CONS_HEALING, CONS_ACTION_BONUS, "Restore 2d4 plus 2 hit points.", 15);
+	@c = CONSUMABLE_CATALOG[CONSUMABLE_CATALOG.length() - 1]; c.heal_dice = 4; c.heal_count = 2; c.heal_bonus = 2;
+
+	add_consumable("heal_potion", "Healing Potion", CONS_HEALING, CONS_ACTION_BONUS, "Restore 4d4 plus 4 hit points.", 40);
+	@c = CONSUMABLE_CATALOG[CONSUMABLE_CATALOG.length() - 1]; c.heal_dice = 4; c.heal_count = 4; c.heal_bonus = 4;
+
+	add_consumable("greater_heal_potion", "Greater Healing Potion", CONS_HEALING, CONS_ACTION_BONUS, "Restore 8d4 plus 8 hit points.", 100);
+	@c = CONSUMABLE_CATALOG[CONSUMABLE_CATALOG.length() - 1]; c.heal_dice = 4; c.heal_count = 8; c.heal_bonus = 8;
+
+	add_consumable("supreme_heal_potion", "Supreme Healing Potion", CONS_HEALING, CONS_ACTION_BONUS, "Restore 10d4 plus 20 hit points.", 300);
+	@c = CONSUMABLE_CATALOG[CONSUMABLE_CATALOG.length() - 1]; c.heal_dice = 4; c.heal_count = 10; c.heal_bonus = 20;
+
+	// Buff potions (bonus action, 3 rounds)
+	add_consumable("str_potion", "Potion of Strength", CONS_BUFF, CONS_ACTION_BONUS, "Plus 2 damage for 3 rounds.", 30);
+	@c = CONSUMABLE_CATALOG[CONSUMABLE_CATALOG.length() - 1]; c.buff_stat = "damage"; c.buff_value = 2; c.duration_rounds = 3;
+
+	add_consumable("iron_skin_potion", "Potion of Iron Skin", CONS_BUFF, CONS_ACTION_BONUS, "Plus 2 AC for 3 rounds.", 30);
+	@c = CONSUMABLE_CATALOG[CONSUMABLE_CATALOG.length() - 1]; c.buff_stat = "ac"; c.buff_value = 2; c.duration_rounds = 3;
+
+	add_consumable("speed_potion", "Potion of Speed", CONS_BUFF, CONS_ACTION_BONUS, "Plus 10 movement speed for 3 rounds.", 25);
+	@c = CONSUMABLE_CATALOG[CONSUMABLE_CATALOG.length() - 1]; c.buff_stat = "speed"; c.buff_value = 10; c.duration_rounds = 3;
+
+	add_consumable("focus_potion", "Potion of Focus", CONS_BUFF, CONS_ACTION_BONUS, "Plus 1 spell save DC for 3 rounds.", 35);
+	@c = CONSUMABLE_CATALOG[CONSUMABLE_CATALOG.length() - 1]; c.buff_stat = "spell_dc"; c.buff_value = 1; c.duration_rounds = 3;
+
+	// Throwables (action, ranged)
+	add_consumable("alchemist_fire", "Alchemist's Fire", CONS_THROWABLE, CONS_ACTION_FULL, "Hurl a flask of fire. 2d6 fire damage. Dexterity save. Range 30 feet.", 50);
+	@c = CONSUMABLE_CATALOG[CONSUMABLE_CATALOG.length() - 1]; c.damage_dice = 6; c.damage_count = 2; c.damage_type = DMG_FIRE; c.save_type = ABILITY_DEX; c.range = 30;
+
+	add_consumable("acid_flask", "Acid Flask", CONS_THROWABLE, CONS_ACTION_FULL, "Splash acid on a target. 2d6 acid damage. Dexterity save. Range 20 feet.", 50);
+	@c = CONSUMABLE_CATALOG[CONSUMABLE_CATALOG.length() - 1]; c.damage_dice = 6; c.damage_count = 2; c.damage_type = DMG_ACID; c.save_type = ABILITY_DEX; c.range = 20;
+
+	add_consumable("holy_water", "Holy Water", CONS_THROWABLE, CONS_ACTION_FULL, "Blessed water. 2d6 radiant damage to undead. Range 20 feet.", 25);
+	@c = CONSUMABLE_CATALOG[CONSUMABLE_CATALOG.length() - 1]; c.damage_dice = 6; c.damage_count = 2; c.damage_type = DMG_RADIANT; c.save_type = ABILITY_DEX; c.range = 20;
+
+	add_consumable("smoke_bomb", "Smoke Bomb", CONS_THROWABLE, CONS_ACTION_FULL, "Blinds all creatures within 10 feet for 1 round.", 40);
+	@c = CONSUMABLE_CATALOG[CONSUMABLE_CATALOG.length() - 1]; c.range = 10; c.duration_rounds = 1;
+
+	// Scrolls (action, one-use spells)
+	add_consumable("scroll_shield", "Scroll of Shield", CONS_SCROLL, CONS_ACTION_BONUS, "Plus 5 AC until start of next turn. Reaction.", 60);
+	@c = CONSUMABLE_CATALOG[CONSUMABLE_CATALOG.length() - 1]; c.spell_id = "shield"; c.buff_stat = "ac"; c.buff_value = 5; c.duration_rounds = 1;
+
+	add_consumable("scroll_misty_step", "Scroll of Misty Step", CONS_SCROLL, CONS_ACTION_BONUS, "Teleport up to 30 feet.", 75);
+	@c = CONSUMABLE_CATALOG[CONSUMABLE_CATALOG.length() - 1]; c.spell_id = "misty_step"; c.range = 30;
+
+	add_consumable("scroll_fireball", "Scroll of Fireball", CONS_SCROLL, CONS_ACTION_FULL, "8d6 fire damage in a 20 foot radius. Dexterity save.", 150);
+	@c = CONSUMABLE_CATALOG[CONSUMABLE_CATALOG.length() - 1]; c.spell_id = "fireball"; c.damage_dice = 6; c.damage_count = 8; c.damage_type = DMG_FIRE; c.save_type = ABILITY_DEX; c.range = 150;
+}
+
+// Consumable inventory helpers
+
+int get_consumable_quantity(json_array@ inv, string id) {
+	if (@inv == null) return 0;
+	for (uint i = 0; i < inv.length(); i++) {
+		json_object@ entry = inv[i];
+		if (@entry != null and entry.exists("id") and string(entry["id"]) == id) {
+			return entry.exists("qty") ? int(entry["qty"]) : 0;
+		}
+	}
+	return 0;
+}
+
+bool add_consumable_to_inventory(json_array@ inv, string id, int amount = 1) {
+	if (@inv == null) return false;
+	for (uint i = 0; i < inv.length(); i++) {
+		json_object@ entry = inv[i];
+		if (@entry != null and entry.exists("id") and string(entry["id"]) == id) {
+			int qty = entry.exists("qty") ? int(entry["qty"]) : 0;
+			if (qty >= MAX_CONSUMABLE_STACK) return false;
+			entry["qty"] = qty + amount;
+			return true;
+		}
+	}
+	if (int(inv.length()) >= MAX_CONSUMABLE_TYPES) return false;
+	json_object entry;
+	entry["id"] = id;
+	entry["qty"] = amount;
+	inv.add(entry);
+	return true;
+}
+
+bool remove_consumable_from_inventory(json_array@ inv, string id, int amount = 1) {
+	if (@inv == null) return false;
+	for (uint i = 0; i < inv.length(); i++) {
+		json_object@ entry = inv[i];
+		if (@entry != null and entry.exists("id") and string(entry["id"]) == id) {
+			int qty = entry.exists("qty") ? int(entry["qty"]) : 0;
+			if (qty < amount) return false;
+			qty -= amount;
+			if (qty <= 0) { inv.remove(i); }
+			else { entry["qty"] = qty; }
+			return true;
+		}
+	}
+	return false;
+}
+
+// Modifier system
+
+class modifier_def {
+	string id;
+	string name;
+	string description;
+	string category;
+}
+
+modifier_def@[] MODIFIER_LIST;
+
+void init_modifiers() {
+	if (MODIFIER_LIST.length() > 0) return;
+	add_modifier("empowered", "Empowered", "All players deal plus 3 damage.", "beneficial");
+	add_modifier("swift", "Swift", "All players gain plus 10 movement speed.", "beneficial");
+	add_modifier("fortified", "Fortified", "All players gain plus 2 AC.", "beneficial");
+	add_modifier("blessed_grounds", "Blessed Grounds", "Players heal 5 HP at the start of each turn.", "beneficial");
+	add_modifier("glass_cannon", "Glass Cannon", "All damage is doubled for everyone.", "challenging");
+	add_modifier("no_healing", "No Healing", "Healing spells and potions have no effect.", "challenging");
+	add_modifier("berserker", "Berserker", "Monsters deal plus 2 extra damage per wave cleared.", "challenging");
+	add_modifier("swarming", "Swarming", "Each wave spawns 1 extra monster.", "challenging");
+	add_modifier("armored_foes", "Armored Foes", "All monsters gain plus 3 AC.", "challenging");
+	add_modifier("volatile", "Volatile", "Critical hits deal triple damage instead of double.", "mixed");
+	add_modifier("speed_run", "Speed Run", "Everyone has double movement speed.", "mixed");
+	add_modifier("last_stand", "Last Stand", "Players start at half HP but deal plus 4 damage.", "mixed");
+	add_modifier("no_rest", "No Rest", "No HP restore between endless waves.", "mixed");
+	add_modifier("champions_trial", "Champion's Trial", "Monsters have 25 percent more HP but drop double loot.", "mixed");
+	add_modifier("none", "No Modifier", "Standard rules apply.", "none");
+}
+
+void add_modifier(string id, string name, string description, string category) {
+	modifier_def m;
+	m.id = id; m.name = name; m.description = description; m.category = category;
+	MODIFIER_LIST.insert_last(m);
+}
+
+modifier_def@ find_modifier(string id) {
+	for (uint i = 0; i < MODIFIER_LIST.length(); i++) {
+		if (MODIFIER_LIST[i].id == id) return MODIFIER_LIST[i];
+	}
+	return null;
+}
+
+string pick_random_modifier() {
+	init_modifiers();
+	int idx = random(0, MODIFIER_LIST.length() - 2);
+	return MODIFIER_LIST[idx].id;
+}
+
+int get_gold_for_monster(int monster_xp) {
+	if (monster_xp <= 25) return 5;
+	if (monster_xp <= 100) return 8;
+	if (monster_xp <= 450) return 12;
+	if (monster_xp <= 1800) return 15;
+	return 20;
+}

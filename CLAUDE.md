@@ -24,6 +24,7 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 | `Server/combat/spell_data.nvgt` | 68 spell definitions (34 cantrips + 34 leveled), spell helpers |
 | `Server/progression.nvgt` | XP tracking, achievement system, character level progression, prestige system, glory points |
 | `common/loot_data.nvgt` | Item catalog (35 items), loot generation, rarity tiers, inventory helpers |
+| `common/consumable_data.nvgt` | Consumable catalog (16 items), modifier system, inventory helpers |
 | `Client/client.nvgt` | Main client entry, login, lobby menus, character viewing, first-time login flow |
 | `Client/net.nvgt` | Network message dispatcher + connection, character_data restore, daily bonus handler |
 | `Client/combat/combat_ui.nvgt` | Combat game loop, action/bonus action menus, scanning, targeting, roll prompts, tab focus, level-up screen |
@@ -36,6 +37,7 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 - **Adventure**: Create an adventure lobby with persistent progression (XP, achievements, level-ups)
 - **Sandbox**: Create a sandbox lobby for free-build characters (level 1-20, no persistence)
 - Adventure characters can be used in sandbox mode as fallback
+- **Shop**: Buy consumable items (potions, throwables, scrolls) with gold for use in combat
 - First-time login prompts character creation automatically
 - Daily login bonuses: streak-based XP (50-200 XP, resets after day 7)
 
@@ -147,6 +149,26 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 - Message types: `loot_drop`, `inventory_list`, `equip_item`, `discard_item`
 - **Item Upgrading**: Combine 3 items of the same rarity into 1 random item of the next rarity. Glory cost: Common=10, Uncommon=25, Rare=50, Epic=100. Cannot upgrade Legendary. Message type: `upgrade_item` with `item_ids` array of 3 IDs.
 
+### Consumable Shop & Items
+- 16 consumable items across 4 types: Healing (4 potions), Buff (4 potions), Throwable (4 items), Scroll (3 scrolls)
+- Purchased from Shop menu in main menu using gold earned from combat
+- Max 5 of each consumable type, max 10 different consumable types per player
+- Healing potions: bonus action, restore HP (2d4+2 to 10d4+20)
+- Buff potions: bonus action, 3-round duration (damage, AC, speed, spell DC)
+- Throwables: full action, ranged damage with DEX save (fire, acid, radiant, blind)
+- Scrolls: one-use spells (Shield, Misty Step, Fireball)
+- Used during combat via C key menu; consumables consumed on use
+- Message types: `shop_list`, `shop_buy`, `use_consumable`
+
+### Dungeon Modifiers
+- Random modifiers applied to dungeon runs for variety
+- 15 modifiers across 4 categories: beneficial (4), challenging (5), mixed (5), none (1)
+- Beneficial: Empowered (+3 damage), Swift (+10 speed), Fortified (+2 AC), Blessed Grounds (5 HP/turn)
+- Challenging: Glass Cannon (double damage), No Healing, Berserker, Swarming (+1 monster), Armored Foes (+3 AC)
+- Mixed: Volatile (triple crits), Speed Run (double speed), Last Stand (half HP +4 damage), No Rest, Champion's Trial
+- Active modifier displayed in combat status (H key) and announced on dungeon start
+- Message type: `modifier_info`
+
 ### Prestige System
 - Available at level 20 with max 5 ranks: Veteran, Champion, Legend, Mythic, Ascendant
 - Prestige resets level to 1 and XP to 0 but keeps inventory, achievements, glory, and dungeon completions
@@ -171,6 +193,7 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 ## Controls (Client)
 - **F**: Open action menu (Attack, Cast, Dodge, Dash, Disengage, Help, Hide, Ready, Shove, Grapple, End Turn)
 - **B**: Open bonus action menu (class-specific: Rage, Action Surge, Cunning Action, etc.)
+- **C**: Open consumable items menu (potions, throwables, scrolls)
 - **R/Enter**: Roll dice when prompted (only the prompted player can roll)
 - **WASD**: Movement (5ft per tile)
 - **IJKL**: Scan directions (north/south/west/east)

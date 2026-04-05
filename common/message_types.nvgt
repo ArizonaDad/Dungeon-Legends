@@ -153,4 +153,10 @@ namespace message_types
 	// Leaderboards
 	const string leaderboard_request = "leaderboard_request"; // Client requests leaderboard data.
 	const string leaderboard_data = "leaderboard_data";       // Server sends leaderboard data to client.
+
+	// Consumable shop & modifiers
+	const string shop_list = "shop_list";                     // Client requests or server sends shop item list.
+	const string shop_buy = "shop_buy";                       // Client requests to buy a consumable.
+	const string use_consumable = "use_consumable";           // Client uses a consumable in combat.
+	const string modifier_info = "modifier_info";             // Server sends active dungeon modifier info.
 }

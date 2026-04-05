@@ -6,6 +6,7 @@
 #include "character_data.nvgt"
 #include "monster_data.nvgt"
 #include "wave_system.nvgt"
+#include "../../common/consumable_data.nvgt"
 
 // Pending roll context stored between request and result.
 class pending_roll {
@@ -98,6 +99,7 @@ class battle_manager {
 	bool initiative_phase = false;
 	uint initiative_index = 0;  // Which combatant we are rolling initiative for
 	string scenario_id = "";
+	string active_modifier = "none";
 	bool pending_turn_start_after_interrupt = false;
 	string lobby_game_type = GAME_TYPE_SANDBOX;
 	bool progression_enabled = false;
@@ -240,6 +242,7 @@ class battle_manager {
 		progression_enabled = false;
 		party_monster_xp = 0;
 		waves_cleared_this_run = 0;
+		active_modifier = "none";
 		run_kills.delete_all();
 		run_healing.delete_all();
 		run_crits.delete_all();
@@ -693,6 +696,19 @@ class battle_manager {
 				});
 			}
 
+			// ---- Gold Awards ----
+			init_consumable_catalog();
+			int gold_earned = 0;
+			for (uint gi = 0; gi < combat.combatants.length(); gi++) {
+				combatant@ gmon = combat.combatants[gi];
+				if (@gmon != null and !gmon.is_player and gmon.is_dead) {
+					gold_earned += get_gold_for_monster(gmon.monster_xp_value);
+				}
+			}
+			gold_earned += 10; // completion bonus
+			if (active_modifier == "champions_trial") gold_earned = int(gold_earned * 1.5);
+			if (gold_earned > 0) add_gold(player.account, gold_earned);
+
 			// ---- Weekly Challenge Progress ----
 			update_challenge_progress(player.account, "kills", kill_count);
 			update_challenge_progress(player.account, "matches", 1);
@@ -727,6 +743,7 @@ class battle_manager {
 			summary += " Monsters +" + kill_xp + ", healing +" + healing_xp + ", completion +" + match_xp + ".";
 			if (achievement_xp > 0) summary += " Achievements +" + achievement_xp + ".";
 			if (victory and glory_earned > 0) summary += " Glory +" + glory_earned + ".";
+			if (gold_earned > 0) summary += " Gold +" + gold_earned + ".";
 			if (int(loot_items_arr.length()) > 0) summary += " Loot: " + int(loot_items_arr.length()) + " item(s) found!";
 			if (levels_gained > 0 and @updated_progress != null) {
 				int new_level = get_json_int(updated_progress, "level", 1);
@@ -1925,6 +1942,21 @@ class battle_manager {
 		caster.hex_target_id = 0;
 	}
 
+	// ---- Swarming Modifier Helper ----
+
+	void spawn_swarming_extra(wave_encounter@ wave, float hp_multiplier = 1.0) {
+		if (@wave == null or @combat == null or active_modifier != "swarming") return;
+		if (wave.monster_ids.length() == 0) return;
+		string extra_id = wave.monster_ids[random(0, wave.monster_ids.length() - 1)];
+		monster_def@ def = get_monster_def(extra_id);
+		if (@def == null) return;
+		combatant@ extra = create_monster_combatant(def, combat.map_width - 3, combat.map_height - 3);
+		if (@extra != null) {
+			if (hp_multiplier != 1.0) { extra.max_hp = int(float(extra.max_hp) * hp_multiplier); extra.current_hp = extra.max_hp; }
+			combat.add_combatant(extra);
+		}
+	}
+
 	// ---- Game Start ----
 
 	void start_game(user@ host, string mode = "pvp", string scenario = "") {
@@ -2049,6 +2081,7 @@ class battle_manager {
 				combat.mode = "wave";
 				combat.wave_number = 1;
 				spawn_wave(combat, ws.waves[0], combat.map_width);
+				spawn_swarming_extra(ws.waves[0]);
 				broadcast_announce("Wave 1! " + ws.name + ".", false);
 			} else {
 				broadcast_announce("Unknown scenario. Defaulting to PvP arena.", false);
@@ -2060,6 +2093,7 @@ class battle_manager {
 			combat.wave_number = 1;
 			wave_encounter@ first_wave = generate_endless_wave(1);
 			spawn_wave(combat, first_wave, combat.map_width);
+			spawn_swarming_extra(first_wave);
 			broadcast_announce("Endless Survival! Wave 1!", false);
 		} else if (mode == "boss") {
 			monster_def@ boss_def = choose_boss_monster();
@@ -2075,6 +2109,35 @@ class battle_manager {
 				}
 			}
 		}
+		// ---- Dungeon Modifier System ----
+		init_modifiers();
+		active_modifier = pick_random_modifier();
+		modifier_def@ active_mod = find_modifier(active_modifier);
+		if (@active_mod != null and active_mod.id != "none") {
+			broadcast_announce("Dungeon Modifier: " + active_mod.name + "! " + active_mod.description, true);
+		}
+
+		// Apply modifier effects to combatants
+		for (uint mi = 0; mi < combat.combatants.length(); mi++) {
+			combatant@ mc = combat.combatants[mi];
+			if (@mc == null) continue;
+			if (mc.is_player) {
+				if (active_modifier == "empowered") mc.equip_damage_bonus += 3;
+				if (active_modifier == "fortified") { mc.armor_class += 2; mc.equip_ac_bonus += 2; }
+				if (active_modifier == "swift") { mc.speed += 10; mc.equip_speed_bonus += 10; }
+				if (active_modifier == "last_stand") {
+					mc.current_hp = mc.max_hp / 2;
+					mc.equip_damage_bonus += 4;
+				}
+			} else {
+				if (active_modifier == "armored_foes") mc.armor_class += 3;
+				if (active_modifier == "champions_trial") {
+					mc.max_hp = int(float(mc.max_hp) * 1.25);
+					mc.current_hp = mc.max_hp;
+				}
+			}
+		}
+
 		broadcast_announce("Battle begins! Rolling initiative.", true);
 		broadcast_state();
 
@@ -2249,6 +2312,30 @@ class battle_manager {
 			if (c.temp_hp < c.heroism_temp_hp_amount) c.temp_hp = c.heroism_temp_hp_amount;
 			c.remove_condition(COND_FRIGHTENED);
 			broadcast_announce(c.name + " gains " + c.heroism_temp_hp_amount + " temporary hit points from Heroism.", false);
+		}
+
+		// Tick potion buff durations
+		if (c.potion_damage_rounds > 0) {
+			c.potion_damage_rounds--;
+			if (c.potion_damage_rounds <= 0) { c.potion_damage_bonus = 0; broadcast_announce(c.name + "'s Strength potion wears off."); }
+		}
+		if (c.potion_ac_rounds > 0) {
+			c.potion_ac_rounds--;
+			if (c.potion_ac_rounds <= 0) { c.armor_class -= c.potion_ac_bonus; c.potion_ac_bonus = 0; broadcast_announce(c.name + "'s Iron Skin potion wears off."); }
+		}
+		if (c.potion_speed_rounds > 0) {
+			c.potion_speed_rounds--;
+			if (c.potion_speed_rounds <= 0) { c.speed -= c.potion_speed_bonus; c.potion_speed_bonus = 0; broadcast_announce(c.name + "'s Speed potion wears off."); }
+		}
+		if (c.potion_spell_dc_rounds > 0) {
+			c.potion_spell_dc_rounds--;
+			if (c.potion_spell_dc_rounds <= 0) { c.potion_spell_dc_bonus = 0; broadcast_announce(c.name + "'s Focus potion wears off."); }
+		}
+
+		// Blessed Grounds modifier: heal 5 HP at turn start
+		if (active_modifier == "blessed_grounds" and c.is_player and c.is_alive() and c.current_hp > 0) {
+			int healed = combat.apply_healing(c, 5);
+			if (healed > 0) broadcast_announce(c.name + " heals " + healed + " HP from Blessed Grounds.", false);
 		}
 
 		if (trigger_readied_actions(c)) return;
@@ -2436,6 +2523,20 @@ class battle_manager {
 				// Generate and spawn next wave
 				wave_encounter@ next = generate_endless_wave(combat.wave_number);
 				spawn_wave(combat, next, combat.map_width, hp_mult, 1.0);
+				spawn_swarming_extra(next, hp_mult);
+
+				// Apply armored_foes/champions_trial to newly spawned monsters
+				if (active_modifier == "armored_foes" or active_modifier == "champions_trial") {
+					for (uint nmi = 0; nmi < combat.combatants.length(); nmi++) {
+						if (!combat.combatants[nmi].is_player and combat.combatants[nmi].is_alive()) {
+							if (active_modifier == "armored_foes") combat.combatants[nmi].armor_class += 3;
+							if (active_modifier == "champions_trial") {
+								combat.combatants[nmi].max_hp = int(float(combat.combatants[nmi].max_hp) * 1.25);
+								combat.combatants[nmi].current_hp = combat.combatants[nmi].max_hp;
+							}
+						}
+					}
+				}
 
 				broadcast_to_battle({{"type", message_types::endless_wave_start}, {"wave", combat.wave_number}});
 				broadcast_announce("Endless wave " + combat.wave_number + "!", true);
@@ -2504,6 +2605,19 @@ class battle_manager {
 						}
 						// Spawn next wave
 						spawn_wave(combat, ws.waves[combat.wave_number], combat.map_width);
+						spawn_swarming_extra(ws.waves[combat.wave_number]);
+						// Apply modifiers to newly spawned monsters
+						if (active_modifier == "armored_foes" or active_modifier == "champions_trial") {
+							for (uint nmi = 0; nmi < combat.combatants.length(); nmi++) {
+								if (!combat.combatants[nmi].is_player and combat.combatants[nmi].is_alive()) {
+									if (active_modifier == "armored_foes") combat.combatants[nmi].armor_class += 3;
+									if (active_modifier == "champions_trial") {
+										combat.combatants[nmi].max_hp = int(float(combat.combatants[nmi].max_hp) * 1.25);
+										combat.combatants[nmi].current_hp = combat.combatants[nmi].max_hp;
+									}
+								}
+							}
+						}
 						combat.wave_number++;
 						broadcast_to_battle({{"type", message_types::wave_start}, {"wave", combat.wave_number}});
 						broadcast_announce("Wave " + combat.wave_number + "!", true);
@@ -3099,6 +3213,11 @@ class battle_manager {
 			int total_damage = natural_roll + pr.damage_modifier;
 			if (total_damage < 1) total_damage = 1;
 
+			// Add potion damage bonus
+			if (c.potion_damage_bonus > 0 and pr.is_weapon_attack) {
+				total_damage += c.potion_damage_bonus;
+			}
+
 			int extra_damage = 0;
 			if (pr.extra_damage_dice_count > 0 and pr.extra_damage_dice_sides > 0) {
 				int extra_rolls = pr.is_crit ? pr.extra_damage_dice_count * 2 : pr.extra_damage_dice_count;
@@ -3145,6 +3264,10 @@ class battle_manager {
 			if (pr.damage_type >= 0 and pr.damage_type < int(DAMAGE_TYPE_NAMES.length())) {
 				dmg_type_name = DAMAGE_TYPE_NAMES[pr.damage_type] + " damage";
 			}
+
+			// Apply modifier damage adjustments
+			if (active_modifier == "glass_cannon") total_damage *= 2;
+			if (active_modifier == "volatile" and pr.is_crit) total_damage = int(float(total_damage) * 1.5);
 
 			// Track crit and max damage stats for achievements
 			if (c.is_player and c.player_username != "" and progression_enabled) {
@@ -3966,6 +4089,220 @@ class battle_manager {
 			broadcast_announce(c.name + " fails to grapple " + target.name + ".");
 		}
 		broadcast_state();
+	}
+
+	// ---- Consumable Usage ----
+
+	void handle_use_consumable(user@ u, json_object@ msg) {
+		if (@combat == null or @u == null or @msg == null) return;
+		combatant@ c = combat.current_combatant();
+		if (@c == null or !c.is_player or c.player_username != u.username) {
+			u.send({{"type", message_types::error}, {"text", "It is not your turn."}});
+			return;
+		}
+
+		string consumable_id = msg.exists("consumable_id") ? string(msg["consumable_id"]) : "";
+		uint target_id = msg.exists("target_id") ? uint(int(msg["target_id"])) : 0;
+
+		init_consumable_catalog();
+		consumable_def@ cdef = find_consumable(consumable_id);
+		if (@cdef == null) {
+			u.send({{"type", message_types::error}, {"text", "Unknown consumable."}});
+			return;
+		}
+
+		// Check player has the consumable
+		if (@u.account == null) { u.send({{"type", message_types::error}, {"text", "No account data."}}); return; }
+		json_array@ inv = ensure_json_array_field(u.account.data, "adventure_consumables");
+		if (@inv == null or get_consumable_quantity(inv, consumable_id) <= 0) {
+			u.send({{"type", message_types::error}, {"text", "You do not have any " + cdef.name + "."}});
+			return;
+		}
+
+		// Check action availability
+		if (cdef.action_type == CONS_ACTION_BONUS) {
+			if (!c.has_bonus_action) { u.send({{"type", message_types::error}, {"text", "No bonus action remaining."}}); return; }
+		} else {
+			if (!c.has_action) { u.send({{"type", message_types::error}, {"text", "No action remaining."}}); return; }
+		}
+
+		// Check no_healing modifier
+		if (active_modifier == "no_healing" and cdef.type == CONS_HEALING) {
+			u.send({{"type", message_types::error}, {"text", "Healing is disabled by the No Healing modifier."}});
+			return;
+		}
+
+		// Apply effects based on type
+		if (cdef.type == CONS_HEALING) {
+			int heal_total = 0;
+			for (int hi = 0; hi < cdef.heal_count; hi++) heal_total += random(1, cdef.heal_dice);
+			heal_total += cdef.heal_bonus;
+			int healed = combat.apply_healing(c, heal_total);
+
+			// Consume action
+			if (cdef.action_type == CONS_ACTION_BONUS) { c.has_bonus_action = false; c.used_bonus_action = true; }
+			else { c.has_action = false; c.used_action = true; }
+
+			remove_consumable_from_inventory(inv, consumable_id);
+			u.account.commit();
+
+			broadcast_announce(c.name + " drinks " + cdef.name + " and heals " + healed + " HP! (Rolled " + heal_total + ")", true);
+			broadcast_to_battle({{"type", message_types::healing_done}, {"healer", c.name}, {"target", c.name}, {"amount", healed}});
+			if (c.is_player and c.player_username != "" and progression_enabled) add_run_healing(c.player_username, healed);
+			broadcast_state();
+		}
+		else if (cdef.type == CONS_BUFF) {
+			// Consume action
+			if (cdef.action_type == CONS_ACTION_BONUS) { c.has_bonus_action = false; c.used_bonus_action = true; }
+			else { c.has_action = false; c.used_action = true; }
+
+			if (cdef.buff_stat == "damage") { c.potion_damage_bonus = cdef.buff_value; c.potion_damage_rounds = cdef.duration_rounds; }
+			else if (cdef.buff_stat == "ac") { c.potion_ac_bonus = cdef.buff_value; c.armor_class += cdef.buff_value; c.potion_ac_rounds = cdef.duration_rounds; }
+			else if (cdef.buff_stat == "speed") { c.potion_speed_bonus = cdef.buff_value; c.speed += cdef.buff_value; c.potion_speed_rounds = cdef.duration_rounds; }
+			else if (cdef.buff_stat == "spell_dc") { c.potion_spell_dc_bonus = cdef.buff_value; c.potion_spell_dc_rounds = cdef.duration_rounds; }
+
+			remove_consumable_from_inventory(inv, consumable_id);
+			u.account.commit();
+
+			broadcast_announce(c.name + " drinks " + cdef.name + "! " + cdef.description, true);
+			broadcast_state();
+		}
+		else if (cdef.type == CONS_THROWABLE) {
+			combatant@ target = combat.get_combatant(target_id);
+			if (@target == null or target.is_dead) {
+				u.send({{"type", message_types::error}, {"text", "Choose a valid target."}});
+				return;
+			}
+
+			int dist = feet_distance(c.x, c.y, target.x, target.y);
+			if (cdef.range > 0 and dist > cdef.range) {
+				u.send({{"type", message_types::error}, {"text", "Target is out of range. Range: " + cdef.range + " feet, distance: " + dist + " feet."}});
+				return;
+			}
+
+			// Consume action
+			c.has_action = false;
+			c.used_action = true;
+
+			remove_consumable_from_inventory(inv, consumable_id);
+			u.account.commit();
+
+			// Handle smoke bomb specially (no damage)
+			if (consumable_id == "smoke_bomb") {
+				broadcast_announce(c.name + " throws a Smoke Bomb at " + target.name + "!", true);
+				target.add_condition(COND_BLINDED);
+				broadcast_to_battle({{"type", message_types::condition_applied}, {"name", target.name}, {"condition", "blinded"}});
+				broadcast_state();
+				return;
+			}
+
+			// Roll damage
+			int throw_damage = 0;
+			for (int tdi = 0; tdi < cdef.damage_count; tdi++) throw_damage += random(1, cdef.damage_dice);
+
+			// Target makes save (DC 13)
+			int save_dc = 13;
+			bool saved = false;
+			if (cdef.save_type >= 0) {
+				int save_roll = random(1, 20);
+				int save_mod = target.get_save_bonus(cdef.save_type);
+				int save_total = save_roll + save_mod;
+				saved = save_total >= save_dc;
+				string save_name = cdef.save_type < int(ABILITY_NAMES.length()) ? ABILITY_NAMES[cdef.save_type] : "Ability";
+				broadcast_roll(target.name, save_name + " save (DC " + save_dc + ")", save_roll, save_mod, save_total, saved ? "Saved! Half damage." : "Failed!");
+			}
+
+			if (saved) throw_damage /= 2;
+			if (throw_damage < 1) throw_damage = 1;
+
+			// Apply modifier damage adjustments
+			if (active_modifier == "glass_cannon") throw_damage *= 2;
+
+			broadcast_announce(c.name + " throws " + cdef.name + " at " + target.name + " for " + throw_damage + " damage!", true);
+			combat.apply_damage(target, throw_damage, cdef.damage_type, c);
+
+			if (target.is_dead) {
+				broadcast_announce(target.name + " has been slain!", true);
+				broadcast_to_battle({{"type", message_types::creature_died}, {"name", target.name}, {"id", target.id}, {"killed_by", c.name}});
+			} else if (target.current_hp == 0 and target.has_condition(COND_UNCONSCIOUS)) {
+				broadcast_announce(target.name + " falls unconscious!", true);
+			} else {
+				broadcast_announce(target.name + " has " + target.current_hp + " of " + target.max_hp + " HP remaining.");
+			}
+
+			broadcast_state();
+			check_battle_end();
+		}
+		else if (cdef.type == CONS_SCROLL) {
+			// Consume action
+			if (cdef.action_type == CONS_ACTION_BONUS) { c.has_bonus_action = false; c.used_bonus_action = true; }
+			else { c.has_action = false; c.used_action = true; }
+
+			remove_consumable_from_inventory(inv, consumable_id);
+			u.account.commit();
+
+			if (cdef.spell_id == "shield") {
+				// Shield scroll: +5 AC for 1 round
+				c.potion_ac_bonus = cdef.buff_value;
+				c.armor_class += cdef.buff_value;
+				c.potion_ac_rounds = cdef.duration_rounds;
+				broadcast_announce(c.name + " uses " + cdef.name + "! Plus " + cdef.buff_value + " AC until next turn.", true);
+				broadcast_state();
+			}
+			else if (cdef.spell_id == "misty_step") {
+				// Teleport 30 feet toward target or random safe position
+				combatant@ target = combat.get_combatant(target_id);
+				int new_x = c.x;
+				int new_y = c.y;
+				if (@target != null and !target.is_dead) {
+					int dx = target.x - c.x;
+					int dy = target.y - c.y;
+					if (dx != 0) dx = dx > 0 ? 1 : -1;
+					if (dy != 0) dy = dy > 0 ? 1 : -1;
+					new_x = c.x + dx * 6; // 30 feet = 6 tiles
+					new_y = c.y + dy * 6;
+				} else {
+					new_x = c.x + random(-6, 6);
+					new_y = c.y + random(-6, 6);
+				}
+				if (new_x < 0) new_x = 0;
+				if (new_x >= combat.map_width) new_x = combat.map_width - 1;
+				if (new_y < 0) new_y = 0;
+				if (new_y >= combat.map_height) new_y = combat.map_height - 1;
+				c.x = new_x;
+				c.y = new_y;
+				broadcast_announce(c.name + " uses " + cdef.name + " and teleports!", true);
+				broadcast_state();
+			}
+			else if (cdef.spell_id == "fireball") {
+				// AoE fire damage - use spell handler
+				json_object cast_msg;
+				cast_msg["spell"] = "fireball";
+				cast_msg["target_id"] = target_id;
+				// Restore the action we consumed since handle_cast will consume one
+				if (cdef.action_type == CONS_ACTION_BONUS) { c.has_bonus_action = true; c.used_bonus_action = false; }
+				else { c.has_action = true; c.used_action = false; }
+				// Temporarily give a fireball spell slot and knowledge so handle_cast works
+				bool already_knows = c.knows_spell("fireball");
+				if (!already_knows) c.prepared_spells.insert_last("fireball");
+				// Ensure spell slot available
+				bool had_slot = false;
+				for (int sl = 3; sl <= 9; sl++) {
+					if (c.spell_slots_current[sl] > 0) { had_slot = true; break; }
+				}
+				if (!had_slot) { c.spell_slots_current[3]++; }
+				handle_cast(u, cast_msg);
+				if (!already_knows) {
+					for (int si = int(c.prepared_spells.length()) - 1; si >= 0; si--) {
+						if (c.prepared_spells[si] == "fireball") { c.prepared_spells.remove_at(si); break; }
+					}
+				}
+			}
+			else {
+				broadcast_announce(c.name + " uses " + cdef.name + "!", true);
+				broadcast_state();
+			}
+		}
 	}
 
 	// ---- Spell Casting ----

@@ -2215,4 +2215,96 @@ void handle_user_message(user@ u, json_object@ msg)
 
 		u.send({{"type", message_types::leaderboard_data}, {"category", category}, {"entries", leaderboard}, {"my_rank", my_rank}, {"my_value", my_value}});
 	}
+
+	// ---- Consumable Shop ----
+	else if (msg_type == message_types::shop_list) {
+		if (@u.account == null) return;
+		ensure_account_progression(u.account);
+		init_consumable_catalog();
+		json_array@ cons_inv = ensure_json_array_field(u.account.data, "adventure_consumables");
+
+		json_array shop_arr;
+		for (uint si = 0; si < CONSUMABLE_CATALOG.length(); si++) {
+			consumable_def@ cd = CONSUMABLE_CATALOG[si];
+			json_object entry;
+			entry["id"] = cd.id;
+			entry["name"] = cd.name;
+			entry["type"] = cd.type;
+			entry["type_name"] = CONS_TYPE_NAMES[cd.type];
+			entry["action_type"] = cd.action_type;
+			entry["description"] = cd.description;
+			entry["gold_cost"] = cd.gold_cost;
+			entry["owned"] = get_consumable_quantity(cons_inv, cd.id);
+			entry["max_stack"] = MAX_CONSUMABLE_STACK;
+			shop_arr.add(entry);
+		}
+		u.send({{"type", message_types::shop_list}, {"items", shop_arr}, {"gold", get_gold(u.account)}});
+	}
+
+	else if (msg_type == message_types::shop_buy and msg.exists("consumable_id")) {
+		if (@u.account == null) return;
+		ensure_account_progression(u.account);
+		init_consumable_catalog();
+
+		string buy_id = string(msg["consumable_id"]);
+		consumable_def@ cd = find_consumable(buy_id);
+		if (@cd == null) {
+			u.send({{"type", message_types::error}, {"text", "Unknown item."}});
+			return;
+		}
+
+		int current_gold = get_gold(u.account);
+		if (current_gold < cd.gold_cost) {
+			u.send({{"type", message_types::error}, {"text", "Not enough gold. Need " + cd.gold_cost + ", have " + current_gold + "."}});
+			return;
+		}
+
+		json_array@ cons_inv = ensure_json_array_field(u.account.data, "adventure_consumables");
+		int current_qty = get_consumable_quantity(cons_inv, buy_id);
+		if (current_qty >= MAX_CONSUMABLE_STACK) {
+			u.send({{"type", message_types::error}, {"text", "Already at max stack (" + MAX_CONSUMABLE_STACK + ") for " + cd.name + "."}});
+			return;
+		}
+
+		if (!spend_gold(u.account, cd.gold_cost)) {
+			u.send({{"type", message_types::error}, {"text", "Failed to deduct gold."}});
+			return;
+		}
+
+		if (!add_consumable_to_inventory(cons_inv, buy_id)) {
+			// Refund gold if inventory add fails
+			add_gold(u.account, cd.gold_cost);
+			u.send({{"type", message_types::error}, {"text", "Inventory full."}});
+			return;
+		}
+
+		u.account.commit();
+		int new_qty = get_consumable_quantity(cons_inv, buy_id);
+		u.send({{"type", message_types::announce}, {"text", "Purchased " + cd.name + "! You now have " + new_qty + ". Gold remaining: " + get_gold(u.account) + "."}, {"interrupt", false}});
+		// Send updated shop list
+		json_array updated_shop;
+		for (uint si = 0; si < CONSUMABLE_CATALOG.length(); si++) {
+			consumable_def@ ucd = CONSUMABLE_CATALOG[si];
+			json_object entry;
+			entry["id"] = ucd.id;
+			entry["name"] = ucd.name;
+			entry["type"] = ucd.type;
+			entry["type_name"] = CONS_TYPE_NAMES[ucd.type];
+			entry["action_type"] = ucd.action_type;
+			entry["description"] = ucd.description;
+			entry["gold_cost"] = ucd.gold_cost;
+			entry["owned"] = get_consumable_quantity(cons_inv, ucd.id);
+			entry["max_stack"] = MAX_CONSUMABLE_STACK;
+			updated_shop.add(entry);
+		}
+		u.send({{"type", message_types::shop_list}, {"items", updated_shop}, {"gold", get_gold(u.account)}});
+	}
+
+	else if (msg_type == message_types::use_consumable) {
+		if (@u.room == null or @u.room.bm == null) {
+			u.send({{"type", message_types::error}, {"text", "Not in a battle."}});
+			return;
+		}
+		u.room.bm.handle_use_consumable(u, msg);
+	}
 }

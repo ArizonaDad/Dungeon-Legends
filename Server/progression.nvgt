@@ -115,6 +115,10 @@ void ensure_account_progression(account@ acct) {
 	// Daily dungeon tracking
 	if (!progress.exists("last_daily_day")) progress["last_daily_day"] = 0;
 
+	// Gold currency
+	if (!progress.exists("gold")) progress["gold"] = 0;
+	ensure_json_array_field(data, "adventure_consumables");
+
 	// Weekly challenge tracking
 	if (!progress.exists("challenge_week")) progress["challenge_week"] = 0;
 	ensure_json_object_field(progress, "challenge_progress");
@@ -302,10 +306,11 @@ json_object@ build_progression_update_message(account@ acct, int gained = 0, int
 	msg["stats"] = build_progression_stats_message(progress);
 	if (summary != "") msg["summary"] = summary;
 
-	// Include prestige and glory data
+	// Include prestige, glory, and gold data
 	msg["prestige_rank"] = get_prestige_rank_from_progress(progress);
 	msg["prestige_title"] = get_prestige_title(get_prestige_rank_from_progress(progress));
 	msg["glory"] = get_glory_from_progress(progress);
+	msg["gold"] = get_json_int(progress, "gold", 0);
 	return msg;
 }
 
@@ -350,6 +355,31 @@ bool apply_prestige(account@ acct) {
 	json_object@ adventure_character = get_character_profile(acct, GAME_TYPE_ADVENTURE);
 	if (@adventure_character != null) adventure_character["level"] = 1;
 
+	return true;
+}
+
+// ---- GOLD CURRENCY ----
+
+int get_gold(account@ acct) {
+	json_object@ progress = get_adventure_progress(acct);
+	if (@progress == null) return 0;
+	return get_json_int(progress, "gold", 0);
+}
+
+void add_gold(account@ acct, int amount) {
+	if (@acct == null or amount <= 0) return;
+	json_object@ progress = get_adventure_progress(acct);
+	if (@progress == null) return;
+	add_json_int(progress, "gold", amount);
+}
+
+bool spend_gold(account@ acct, int amount) {
+	if (@acct == null or amount <= 0) return false;
+	json_object@ progress = get_adventure_progress(acct);
+	if (@progress == null) return false;
+	int current = get_json_int(progress, "gold", 0);
+	if (current < amount) return false;
+	progress["gold"] = current - amount;
 	return true;
 }
 

@@ -213,6 +213,7 @@ void handle_message(json_object@ msg)
 	}
 	else if (msg_type == message_types::game_state) {
 		parse_game_state(msg);
+		if (msg.exists("consumables")) @my_consumables = msg["consumables"];
 	}
 	else if (msg_type == message_types::turn_start) {
 		string name = msg.exists("name") ? string(msg["name"]) : "";
@@ -546,6 +547,22 @@ void handle_message(json_object@ msg)
 		if (msg.exists("dungeon_name")) cached_daily_dungeon["dungeon_name"] = msg["dungeon_name"];
 		if (msg.exists("difficulty")) cached_daily_dungeon["difficulty"] = msg["difficulty"];
 		if (msg.exists("can_claim")) cached_daily_dungeon["can_claim"] = msg["can_claim"];
+	}
+	// === CONSUMABLE SHOP & MODIFIERS ===
+	else if (msg_type == message_types::shop_list) {
+		if (msg.exists("items")) @cached_shop_list = msg["items"];
+		if (msg.exists("gold")) {
+			// Update cached gold
+			if (@cached_stats == null) @cached_stats = json_object();
+			cached_stats["gold"] = msg["gold"];
+		}
+	}
+	else if (msg_type == message_types::modifier_info) {
+		active_modifier_name = msg.exists("name") ? string(msg["name"]) : "";
+		active_modifier_desc = msg.exists("description") ? string(msg["description"]) : "";
+		if (active_modifier_name != "" and active_modifier_name != "No Modifier") {
+			speak("Dungeon Modifier: " + active_modifier_name + ". " + active_modifier_desc, true);
+		}
 	}
 	// Unknown messages are silently ignored.
 }

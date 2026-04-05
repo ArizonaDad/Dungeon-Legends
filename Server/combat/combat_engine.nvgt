@@ -183,6 +183,16 @@ class combatant {
 	bool tavern_brawler_push_used = false;
 	bool hunter_colossus_used = false;
 
+	// Potion buff tracking
+	int potion_damage_bonus = 0;
+	int potion_ac_bonus = 0;
+	int potion_speed_bonus = 0;
+	int potion_spell_dc_bonus = 0;
+	int potion_damage_rounds = 0;
+	int potion_ac_rounds = 0;
+	int potion_speed_rounds = 0;
+	int potion_spell_dc_rounds = 0;
+
 	// Boss phase tracking
 	int boss_phase = 0;
 	bool phase_2_triggered = false;

@@ -3,6 +3,7 @@
 
 #include "../../common/combat_constants.nvgt"
 #include "../../common/loot_data.nvgt"
+#include "../../common/consumable_data.nvgt"
 #include "spell_menu.nvgt"
 
 // Client-side view of a combatant
@@ -93,6 +94,12 @@ json_object@ cached_equipped = null;
 json_array@ cached_shop_data = null;
 json_array@ cached_leaderboard = null;
 json_object@ cached_daily_dungeon = null;
+
+// Consumable shop and modifier state
+json_array@ cached_shop_list = null;
+json_array@ my_consumables = null;
+string active_modifier_name = "";
+string active_modifier_desc = "";
 
 // Roll state
 bool waiting_for_roll = false;
@@ -745,6 +752,52 @@ void show_spell_menu() {
 }
 
 // ============================================================
+// CONSUMABLE MENU
+// ============================================================
+
+void show_consumable_menu() {
+	if (!is_my_turn) {
+		speak("It's not your turn.", true);
+		return;
+	}
+	init_consumable_catalog();
+	if (@my_consumables == null or my_consumables.length() == 0) {
+		speak("You have no consumable items. Buy some from the Shop in the main menu.", true);
+		return;
+	}
+	menu@ m = setup_sub_menu("Use a consumable item.");
+	string[] valid_ids;
+	for (uint i = 0; i < my_consumables.length(); i++) {
+		json_object@ entry = my_consumables[i];
+		if (@entry == null) continue;
+		string id = entry.exists("id") ? string(entry["id"]) : "";
+		int qty = entry.exists("qty") ? int(entry["qty"]) : 0;
+		if (id == "" or qty <= 0) continue;
+		consumable_def@ c = find_consumable(id);
+		if (@c == null) continue;
+		string action_label = c.action_type == 0 ? "Bonus action" : "Action";
+		m.add_item(c.name + ". " + action_label + ". " + qty + " remaining. " + c.description);
+		valid_ids.insert_last(id);
+	}
+	if (valid_ids.length() == 0) {
+		speak("No consumables available.", true);
+		return;
+	}
+	int pick = m.run();
+	if (pick < 0 or pick >= int(valid_ids.length())) return;
+	string selected_id = valid_ids[pick];
+	consumable_def@ selected = find_consumable(selected_id);
+	// For throwables, need a target
+	uint target = current_target_id;
+	if (@selected != null and selected.type == CONS_THROWABLE and target == 0) {
+		speak("No target selected. Scan with I J K L and lock a target first.", true);
+		return;
+	}
+	send({{"type", message_types::use_consumable}, {"consumable_id", selected_id}, {"target_id", target}});
+	speak("Using " + (@selected != null ? selected.name : selected_id) + ".", true);
+}
+
+// ============================================================
 // STATUS READOUTS
 // ============================================================
 
@@ -799,6 +852,10 @@ void speak_my_status() {
 		} else {
 			text += "Targeting " + current_target_name + ". ";
 		}
+	}
+
+	if (active_modifier_name != "" and active_modifier_name != "No Modifier") {
+		text += " Modifier: " + active_modifier_name + ".";
 	}
 
 	speak(text, true);
@@ -1174,6 +1231,7 @@ void show_combat_help() {
 	m.add_item("Enter. Lock onto scanned target.");
 	m.add_item("F. Open action menu on your turn. Attack, cast spell, dodge, dash, and more.");
 	m.add_item("B. Open bonus action menu on your turn. Class features like Rage, Action Surge, Cunning Action.");
+	m.add_item("C. Open consumable items menu. Use potions, throwables, or scrolls.");
 	m.add_item("R. Roll one die when prompted. If an action needs multiple dice, you will be prompted once per die.");
 	m.add_item("H. Hear your current status. Health, AC, conditions, position.");
 	m.add_item("O. Hear initiative order. Who goes when.");
@@ -1240,6 +1298,9 @@ void reset_combat_state() {
 	combat_history_cursor = -1;
 	tutorial_mode = false;
 	tutorial_step = 0;
+	@my_consumables = null;
+	active_modifier_name = "";
+	active_modifier_desc = "";
 }
 
 // ============================================================
@@ -1424,6 +1485,7 @@ void combat_game_loop() {
 			// Action menus
 			else if (key_pressed(KEY_F)) show_action_menu();
 			else if (key_pressed(KEY_B)) show_bonus_action_menu();
+			else if (key_pressed(KEY_C)) show_consumable_menu();
 		}
 
 		// Volume controls (available any time)

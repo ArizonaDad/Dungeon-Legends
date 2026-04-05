@@ -320,6 +320,42 @@ void show_inventory() {
 	}
 }
 
+void show_shop() {
+	init_consumable_catalog();
+	send({{"type", message_types::shop_list}});
+	wait(500);
+	network_loop();
+	int gold = @cached_stats != null and cached_stats.exists("gold") ? int(cached_stats["gold"]) : 0;
+	menu@ m = setup_sub_menu("Item Shop. You have " + gold + " gold.");
+	for (uint i = 0; i < CONSUMABLE_CATALOG.length(); i++) {
+		consumable_def@ c = CONSUMABLE_CATALOG[i];
+		string owned = "";
+		// Check quantity from cached shop data if available
+		if (@cached_shop_list != null) {
+			for (uint j = 0; j < cached_shop_list.length(); j++) {
+				json_object@ entry = cached_shop_list[j];
+				if (@entry != null and entry.exists("id") and string(entry["id"]) == c.id) {
+					int qty = entry.exists("qty") ? int(entry["qty"]) : 0;
+					if (qty > 0) owned = " Owned: " + qty + ".";
+					break;
+				}
+			}
+		}
+		m.add_item(c.name + ". " + c.gold_cost + " gold. " + c.description + owned);
+	}
+	int pick = m.run();
+	if (pick < 0 or pick >= int(CONSUMABLE_CATALOG.length())) return;
+	consumable_def@ selected = CONSUMABLE_CATALOG[pick];
+	menu@ confirm = setup_sub_menu("Buy " + selected.name + " for " + selected.gold_cost + " gold?");
+	confirm.add_item("Yes, buy it.");
+	confirm.add_item("No, go back.");
+	if (confirm.run() == 0) {
+		send({{"type", message_types::shop_buy}, {"consumable_id", selected.id}});
+		wait(300);
+		network_loop();
+	}
+}
+
 void main_menu()
 {
 	music_start("menu");
@@ -366,7 +402,7 @@ void main_menu()
 		menu@ m = setup_menu("");
 		@m = main_screen;
 		// Calculate total items dynamically
-		int total = 12; // base: create char, adventure, sandbox, join, weekly, glory shop, daily dungeon, leaderboards, friends, online, about, quit
+		int total = 13; // base: create char, adventure, sandbox, join, weekly, glory shop, daily dungeon, leaderboards, shop, friends, online, about, quit
 		bool has_char = has_any_character_profile();
 		if (has_char) total++; // view char
 		total++; // inventory
@@ -390,6 +426,7 @@ void main_menu()
 		int glory_shop_btn = m.add_item("Glory Shop. Spend Glory Points on titles and exclusive items. " + n + " of " + total); n++;
 		int daily_btn = m.add_item("Daily Dungeon. Today's featured dungeon with bonus rewards. " + n + " of " + total); n++;
 		int leaderboard_btn = m.add_item("Leaderboards. See the top players. " + n + " of " + total); n++;
+		int shop_btn = m.add_item("Shop. Buy consumable items for combat. " + n + " of " + total); n++;
 		int social = m.add_item("Friends. " + n + " of " + total); n++;
 		int CHECK_ONLINE = m.add_item("Check who is online. " + n + " of " + total); n++;
 		int About = m.add_item("About us. " + n + " of " + total); n++;
@@ -488,6 +525,9 @@ void main_menu()
 		}
 		else if (res == leaderboard_btn) {
 			show_leaderboards();
+		}
+		else if (res == shop_btn) {
+			show_shop();
 		}
 		else if (res == social) {
 			social_panel();
