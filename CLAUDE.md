@@ -157,8 +157,18 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 - **T**: Whose turn it is
 - **Tab**: Switch focus forward (Game -> Chat -> Chat History)
 - **Shift+Tab**: Switch focus backward (Game -> Chat History -> Chat)
+- **Page Up**: Volume up (+3dB)
+- **Page Down**: Volume down (-3dB)
 - **F1**: Combat help
 - **Escape x 2**: Forfeit
+
+## Sound System
+- **Encrypted sound pack**: All 121 sound files packed into `sounds.dat` with encryption key
+- **Build workflow**: Run `pack_sounds.nvgt` to create sounds.dat, then compile client
+- **`set_sound_default_pack()`** makes all `sound.load()` calls read from the pack automatically
+- **Dual-layer audio**: Synthesized spatial cues (combat_audio.nvgt) + pre-recorded files (audio_manager.nvgt)
+- **Music manager**: Auto-advances random tracks. Categories: menu, wait room, battle
+- **Volume control**: Page Up/Down adjusts master volume offset (±3dB, range -30 to +12)
 
 ## NVGT Language Notes
 - AngelScript-based: `@` = handle (reference), `@obj = null` = null check
