@@ -9,6 +9,7 @@ string created_char_background = "";
 int created_char_level = 1;
 int[] created_ability_scores = {10,10,10,10,10,10};
 string created_weapon = "Longsword";
+int created_weapon_range = 5;
 string[] created_cantrips;
 string[] created_spells;
 string[] created_bonus_cantrips;
@@ -22,9 +23,238 @@ string[] created_free_cast_spells;
 bool creation_back_requested = false;
 int[] created_pre_progression_ability_scores = {10,10,10,10,10,10};
 
+string active_character_profile = "sandbox";
+
+string sandbox_char_name = "";
+string sandbox_char_race = "";
+string sandbox_char_class = "";
+string sandbox_char_subclass = "";
+int sandbox_char_level = 1;
+int[] sandbox_ability_scores = {10,10,10,10,10,10};
+string sandbox_weapon = "Longsword";
+string[] sandbox_cantrips;
+string[] sandbox_spells;
+
+string adventure_char_name = "";
+string adventure_char_race = "";
+string adventure_char_class = "";
+string adventure_char_subclass = "";
+int adventure_char_level = 1;
+int[] adventure_ability_scores = {10,10,10,10,10,10};
+string adventure_weapon = "Longsword";
+string[] adventure_cantrips;
+string[] adventure_spells;
+
 void add_text_pair(string[]@ names, string[]@ descriptions, string name, string description) {
     names.insert_last(name);
     descriptions.insert_last(description);
+}
+
+string normalize_character_profile(string profile) {
+    string lc = profile.lower();
+    if (lc == "adventure") return "adventure";
+    return "sandbox";
+}
+
+string character_profile_display_name(string profile) {
+    return normalize_character_profile(profile) == "adventure" ? "Adventure" : "Sandbox";
+}
+
+void copy_string_array(string[]@ source, string[]@ target) {
+    target.resize(0);
+    if (@source == null) return;
+    for (uint i = 0; i < source.length(); i++) target.insert_last(source[i]);
+}
+
+void parse_spell_csv(string csv, string[]@ target) {
+    target.resize(0);
+    if (csv == "") return;
+    string[]@ parts = csv.split(",");
+    for (uint i = 0; i < parts.length(); i++) {
+        if (parts[i] != "") target.insert_last(parts[i]);
+    }
+}
+
+void clear_character_buffer() {
+    created_char_name = "";
+    created_char_race = "";
+    created_char_class = "";
+    created_char_subclass = "";
+    created_char_background = "";
+    created_char_level = 1;
+    created_ability_scores = {10,10,10,10,10,10};
+    created_pre_progression_ability_scores = {10,10,10,10,10,10};
+    created_weapon = "Longsword";
+    created_weapon_range = 5;
+    created_cantrips.resize(0);
+    created_spells.resize(0);
+    created_bonus_cantrips.resize(0);
+    created_bonus_spells.resize(0);
+    created_char_feats.resize(0);
+    created_char_skill_proficiencies.resize(0);
+    created_char_tool_proficiencies.resize(0);
+    created_spellcasting_override_spells.resize(0);
+    created_spellcasting_override_abilities.resize(0);
+    created_free_cast_spells.resize(0);
+}
+
+bool buffer_has_character() {
+    return created_char_class != "";
+}
+
+void clear_profile_cache(string profile) {
+    profile = normalize_character_profile(profile);
+    if (profile == "adventure") {
+        adventure_char_name = "";
+        adventure_char_race = "";
+        adventure_char_class = "";
+        adventure_char_subclass = "";
+        adventure_char_level = 1;
+        adventure_ability_scores = {10,10,10,10,10,10};
+        adventure_weapon = "Longsword";
+        adventure_cantrips.resize(0);
+        adventure_spells.resize(0);
+        return;
+    }
+    sandbox_char_name = "";
+    sandbox_char_race = "";
+    sandbox_char_class = "";
+    sandbox_char_subclass = "";
+    sandbox_char_level = 1;
+    sandbox_ability_scores = {10,10,10,10,10,10};
+    sandbox_weapon = "Longsword";
+    sandbox_cantrips.resize(0);
+    sandbox_spells.resize(0);
+}
+
+bool profile_has_character(string profile) {
+    profile = normalize_character_profile(profile);
+    return profile == "adventure" ? adventure_char_class != "" : sandbox_char_class != "";
+}
+
+bool has_any_character_profile() {
+    return profile_has_character("adventure") or profile_has_character("sandbox");
+}
+
+void load_profile_cache_to_buffer(string profile) {
+    profile = normalize_character_profile(profile);
+    clear_character_buffer();
+    if (!profile_has_character(profile)) return;
+
+    if (profile == "adventure") {
+        created_char_name = adventure_char_name;
+        created_char_race = adventure_char_race;
+        created_char_class = adventure_char_class;
+        created_char_subclass = adventure_char_subclass;
+        created_char_level = adventure_char_level;
+        created_ability_scores = adventure_ability_scores;
+        created_weapon = adventure_weapon;
+        copy_string_array(adventure_cantrips, created_cantrips);
+        copy_string_array(adventure_spells, created_spells);
+        return;
+    }
+
+    created_char_name = sandbox_char_name;
+    created_char_race = sandbox_char_race;
+    created_char_class = sandbox_char_class;
+    created_char_subclass = sandbox_char_subclass;
+    created_char_level = sandbox_char_level;
+    created_ability_scores = sandbox_ability_scores;
+    created_weapon = sandbox_weapon;
+    copy_string_array(sandbox_cantrips, created_cantrips);
+    copy_string_array(sandbox_spells, created_spells);
+}
+
+void store_buffer_to_profile_cache(string profile) {
+    profile = normalize_character_profile(profile);
+    clear_profile_cache(profile);
+    if (!buffer_has_character()) return;
+
+    if (profile == "adventure") {
+        adventure_char_name = created_char_name;
+        adventure_char_race = created_char_race;
+        adventure_char_class = created_char_class;
+        adventure_char_subclass = created_char_subclass;
+        adventure_char_level = created_char_level;
+        adventure_ability_scores = created_ability_scores;
+        adventure_weapon = created_weapon;
+        copy_string_array(created_cantrips, adventure_cantrips);
+        copy_string_array(created_spells, adventure_spells);
+        return;
+    }
+
+    sandbox_char_name = created_char_name;
+    sandbox_char_race = created_char_race;
+    sandbox_char_class = created_char_class;
+    sandbox_char_subclass = created_char_subclass;
+    sandbox_char_level = created_char_level;
+    sandbox_ability_scores = created_ability_scores;
+    sandbox_weapon = created_weapon;
+    copy_string_array(created_cantrips, sandbox_cantrips);
+    copy_string_array(created_spells, sandbox_spells);
+}
+
+void set_active_character_profile(string profile) {
+    active_character_profile = normalize_character_profile(profile);
+    load_profile_cache_to_buffer(active_character_profile);
+}
+
+void update_profile_level(string profile, int level) {
+    profile = normalize_character_profile(profile);
+    if (level < 1) level = 1;
+    if (profile == "adventure") adventure_char_level = level;
+    else sandbox_char_level = level;
+    if (active_character_profile == profile and buffer_has_character()) created_char_level = level;
+}
+
+void apply_character_message_to_profile(string profile, json_object@ msg) {
+    profile = normalize_character_profile(profile);
+    clear_profile_cache(profile);
+    if (@msg == null) return;
+
+    string local_name = msg.exists("name") ? string(msg["name"]) : "";
+    string local_race = msg.exists("race") ? string(msg["race"]) : "";
+    string local_class = msg.exists("class") ? string(msg["class"]) : "";
+    string local_subclass = msg.exists("subclass") ? string(msg["subclass"]) : "";
+    int local_level = msg.exists("level") ? int(msg["level"]) : 1;
+    int[] local_scores = {10,10,10,10,10,10};
+    if (msg.exists("str")) local_scores[0] = int(msg["str"]);
+    if (msg.exists("dex")) local_scores[1] = int(msg["dex"]);
+    if (msg.exists("con")) local_scores[2] = int(msg["con"]);
+    if (msg.exists("int")) local_scores[3] = int(msg["int"]);
+    if (msg.exists("wis")) local_scores[4] = int(msg["wis"]);
+    if (msg.exists("cha")) local_scores[5] = int(msg["cha"]);
+    string local_weapon = msg.exists("weapon") ? string(msg["weapon"]) : "Longsword";
+    string[] local_cantrips;
+    string[] local_spells;
+    if (msg.exists("cantrips")) parse_spell_csv(string(msg["cantrips"]), local_cantrips);
+    if (msg.exists("spells")) parse_spell_csv(string(msg["spells"]), local_spells);
+
+    if (profile == "adventure") {
+        adventure_char_name = local_name;
+        adventure_char_race = local_race;
+        adventure_char_class = local_class;
+        adventure_char_subclass = local_subclass;
+        adventure_char_level = local_level;
+        adventure_ability_scores = local_scores;
+        adventure_weapon = local_weapon;
+        copy_string_array(local_cantrips, adventure_cantrips);
+        copy_string_array(local_spells, adventure_spells);
+    } else {
+        sandbox_char_name = local_name;
+        sandbox_char_race = local_race;
+        sandbox_char_class = local_class;
+        sandbox_char_subclass = local_subclass;
+        sandbox_char_level = local_level;
+        sandbox_ability_scores = local_scores;
+        sandbox_weapon = local_weapon;
+        copy_string_array(local_cantrips, sandbox_cantrips);
+        copy_string_array(local_spells, sandbox_spells);
+    }
+
+    if (active_character_profile == profile or !profile_has_character(active_character_profile)) {
+        set_active_character_profile(profile);
+    }
 }
 
 int progression_value(int[]@ values, int level) {
@@ -822,8 +1052,117 @@ void choose_subclass_step() {
     }
 }
 
+int choose_subclass_step_profile() {
+    created_char_subclass = "";
+    if (created_char_level < 3) {
+        speak("Subclass selection unlocks at level 3.", false);
+        return 0;
+    }
+
+    string[] subclass_names;
+    string[] subclass_descriptions;
+    get_subclass_options(created_char_class, subclass_names, subclass_descriptions);
+    if (subclass_names.length() == 0) return 0;
+
+    menu@ subclass_menu = setup_sub_menu("Choose your subclass.");
+    for (uint i = 0; i < subclass_descriptions.length(); i++) subclass_menu.add_item(subclass_descriptions[i]);
+    int pick = subclass_menu.run();
+    if (pick < 0) return -1;
+    created_char_subclass = subclass_names[pick];
+    speak("You chose " + created_char_subclass + ".", true);
+
+    if (created_char_subclass == "Eldritch Knight") {
+        speak("Eldritch Knight uses the Wizard spell list and gains limited spellcasting.", false);
+    } else if (created_char_subclass == "Arcane Trickster") {
+        speak("Arcane Trickster uses the Wizard spell list, gains Mage Hand automatically, and focuses on enchantment and illusion spells.", false);
+    }
+    return 0;
+}
+
+const int STEP_NAME = 0;
+const int STEP_SPECIES = 1;
+const int STEP_CLASS = 2;
+const int STEP_LEVEL = 3;
+const int STEP_SUBCLASS = 4;
+const int STEP_ABILITIES = 5;
+const int STEP_WEAPON = 6;
+const int STEP_SPELLS = 7;
+const int STEP_SUMMARY = 8;
+
+int run_weapon_step() {
+    menu@ weapon_cat_menu = setup_sub_menu("Choose a weapon category.");
+    weapon_cat_menu.add_item("Simple Melee Weapons.");
+    weapon_cat_menu.add_item("Simple Ranged Weapons.");
+    weapon_cat_menu.add_item("Martial Melee Weapons.");
+    weapon_cat_menu.add_item("Martial Ranged Weapons.");
+    int cat_pick = weapon_cat_menu.run();
+    if (cat_pick < 0) return -1;
+
+    menu@ weapon_menu;
+    string[] weapon_names;
+
+    if (cat_pick == 0) {
+        @weapon_menu = setup_sub_menu("Choose a simple melee weapon.");
+        weapon_names = {"Club", "Dagger", "Greatclub", "Handaxe", "Javelin", "Light Hammer", "Mace", "Quarterstaff", "Sickle", "Spear"};
+        weapon_menu.add_item("Club. 1 d 4 bludgeoning. Light. Slow mastery.");
+        weapon_menu.add_item("Dagger. 1 d 4 piercing. Finesse. Light. Thrown 20 / 60. Nick mastery.");
+        weapon_menu.add_item("Greatclub. 1 d 8 bludgeoning. Two-handed. Push mastery.");
+        weapon_menu.add_item("Handaxe. 1 d 6 slashing. Light. Thrown 20 / 60. Vex mastery.");
+        weapon_menu.add_item("Javelin. 1 d 6 piercing. Thrown 30 / 120. Slow mastery.");
+        weapon_menu.add_item("Light Hammer. 1 d 4 bludgeoning. Light. Thrown 20 / 60. Nick mastery.");
+        weapon_menu.add_item("Mace. 1 d 6 bludgeoning. Sap mastery.");
+        weapon_menu.add_item("Quarterstaff. 1 d 6 bludgeoning. Versatile 1 d 8. Topple mastery.");
+        weapon_menu.add_item("Sickle. 1 d 4 slashing. Light. Nick mastery.");
+        weapon_menu.add_item("Spear. 1 d 6 piercing. Versatile 1 d 8. Thrown 20 / 60. Sap mastery.");
+    } else if (cat_pick == 1) {
+        @weapon_menu = setup_sub_menu("Choose a simple ranged weapon.");
+        weapon_names = {"Dart", "Light Crossbow", "Shortbow", "Sling"};
+        weapon_menu.add_item("Dart. 1 d 4 piercing. Finesse. Thrown 20 / 60. Vex mastery.");
+        weapon_menu.add_item("Light Crossbow. 1 d 8 piercing. Range 80 / 320. Loading. Two-handed. Slow mastery.");
+        weapon_menu.add_item("Shortbow. 1 d 6 piercing. Range 80 / 320. Two-handed. Vex mastery.");
+        weapon_menu.add_item("Sling. 1 d 4 bludgeoning. Range 30 / 120. Slow mastery.");
+    } else if (cat_pick == 2) {
+        @weapon_menu = setup_sub_menu("Choose a martial melee weapon.");
+        weapon_names = {"Battleaxe", "Flail", "Glaive", "Greataxe", "Greatsword", "Halberd", "Lance", "Longsword", "Maul", "Morningstar", "Pike", "Rapier", "Scimitar", "Shortsword", "Trident", "War Pick", "Warhammer", "Whip"};
+        weapon_menu.add_item("Battleaxe. 1 d 8 slashing. Versatile 1 d 10. Topple mastery.");
+        weapon_menu.add_item("Flail. 1 d 8 bludgeoning. Sap mastery.");
+        weapon_menu.add_item("Glaive. 1 d 10 slashing. Heavy. Reach. Two-handed. Graze mastery.");
+        weapon_menu.add_item("Greataxe. 1 d 12 slashing. Heavy. Two-handed. Cleave mastery.");
+        weapon_menu.add_item("Greatsword. 2 d 6 slashing. Heavy. Two-handed. Graze mastery.");
+        weapon_menu.add_item("Halberd. 1 d 10 slashing. Heavy. Reach. Two-handed. Cleave mastery.");
+        weapon_menu.add_item("Lance. 1 d 10 piercing. Reach. Topple mastery.");
+        weapon_menu.add_item("Longsword. 1 d 8 slashing. Versatile 1 d 10. Sap mastery.");
+        weapon_menu.add_item("Maul. 2 d 6 bludgeoning. Heavy. Two-handed. Topple mastery.");
+        weapon_menu.add_item("Morningstar. 1 d 8 piercing. Sap mastery.");
+        weapon_menu.add_item("Pike. 1 d 10 piercing. Heavy. Reach. Two-handed. Push mastery.");
+        weapon_menu.add_item("Rapier. 1 d 8 piercing. Finesse. Vex mastery.");
+        weapon_menu.add_item("Scimitar. 1 d 6 slashing. Finesse. Light. Nick mastery.");
+        weapon_menu.add_item("Shortsword. 1 d 6 piercing. Finesse. Light. Vex mastery.");
+        weapon_menu.add_item("Trident. 1 d 8 piercing. Versatile 1 d 10. Thrown 20 / 60. Topple mastery.");
+        weapon_menu.add_item("War Pick. 1 d 8 piercing. Versatile 1 d 10. Sap mastery.");
+        weapon_menu.add_item("Warhammer. 1 d 8 bludgeoning. Versatile 1 d 10. Push mastery.");
+        weapon_menu.add_item("Whip. 1 d 4 slashing. Finesse. Reach. Slow mastery.");
+    } else {
+        @weapon_menu = setup_sub_menu("Choose a martial ranged weapon.");
+        weapon_names = {"Blowgun", "Hand Crossbow", "Heavy Crossbow", "Longbow", "Musket", "Pistol"};
+        weapon_menu.add_item("Blowgun. 1 piercing. Range 25 / 100. Loading. Vex mastery.");
+        weapon_menu.add_item("Hand Crossbow. 1 d 6 piercing. Range 30 / 120. Light. Loading. Vex mastery.");
+        weapon_menu.add_item("Heavy Crossbow. 1 d 10 piercing. Range 100 / 400. Heavy. Loading. Two-handed. Push mastery.");
+        weapon_menu.add_item("Longbow. 1 d 8 piercing. Range 150 / 600. Heavy. Two-handed. Slow mastery.");
+        weapon_menu.add_item("Musket. 1 d 12 piercing. Range 40 / 120. Loading. Two-handed. Slow mastery.");
+        weapon_menu.add_item("Pistol. 1 d 10 piercing. Range 30 / 90. Loading. Vex mastery.");
+    }
+
+    int weapon_pick = weapon_menu.run();
+    if (weapon_pick < 0) return -1;
+    created_weapon = weapon_names[weapon_pick];
+    speak("You chose " + created_weapon + ".", true);
+    return 0;
+}
+
 bool choose_race_step() {
     menu@ race_menu = setup_sub_menu("Choose your species. In this rules pass, ability score increases come from your background, not your species.");
+
     string[] races = {
         "Aasimar", "Dragonborn", "Dwarf", "Elf", "Gnome",
         "Goliath", "Halfling", "Human", "Orc", "Tiefling",
@@ -902,7 +1241,12 @@ bool choose_class_step() {
     return true;
 }
 
-bool choose_level_step() {
+bool choose_level_step(string profile = "sandbox", int forced_level = -1) {
+    if (profile == "adventure") {
+        created_char_level = forced_level > 0 ? forced_level : 1;
+        speak("Adventure characters use your current Adventure level of " + created_char_level + ".", true);
+        return true;
+    }
     menu@ level_menu = setup_sub_menu("Choose your level. 1 through 20.");
     for (int lv = 1; lv <= 20; lv++) level_menu.add_item("Level " + lv);
     int level_pick = creation_menu_run(level_menu);
@@ -1092,7 +1436,7 @@ bool confirm_character_summary_step() {
     return false;
 }
 
-void character_creation_menu() {
+void character_creation_menu(string profile = "sandbox", int forced_level = -1) {
     init_feat_data();
     created_char_background = "";
     created_char_subclass = "";
@@ -1124,7 +1468,7 @@ void character_creation_menu() {
             if (choose_class_step()) step = 4;
             else step = 2;
         } else if (step == 4) {
-            if (choose_level_step()) step = 5;
+            if (choose_level_step(profile, forced_level)) step = 5;
             else step = 3;
         } else if (step == 5) {
             created_char_subclass = "";
@@ -1153,7 +1497,6 @@ void character_creation_menu() {
         }
     }
 
-    // Build comma-separated spell strings for network send
     string cantrip_str = "";
     for (uint ci = 0; ci < created_cantrips.length(); ci++) {
         if (ci > 0) cantrip_str += ",";
@@ -1165,9 +1508,9 @@ void character_creation_menu() {
         spell_str += created_spells[ci];
     }
 
-    // Send to server
     send({
         {"type", message_types::character_create},
+        {"profile", profile},
         {"name", created_char_name},
         {"race", created_char_race},
         {"class", created_char_class},
@@ -1195,6 +1538,8 @@ void character_creation_menu() {
         {"cantrips", cantrip_str},
         {"spells", spell_str}
     });
+    store_buffer_to_profile_cache(profile);
+    set_active_character_profile(profile);
     string created_summary = created_char_name + ", " + created_char_race + " " + created_char_class;
     if (created_char_subclass != "") created_summary += " " + created_char_subclass;
     if (created_char_background != "") {
@@ -1202,5 +1547,5 @@ void character_creation_menu() {
         if (@bg != null) created_summary += ", " + bg.name + " background";
     }
     created_summary += ", level " + created_char_level + ".";
-    speak("Character created! " + created_summary, true);
+    speak(character_profile_display_name(profile) + " character created! " + created_summary, true);
 }

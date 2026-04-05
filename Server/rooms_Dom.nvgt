@@ -17,7 +17,7 @@ class room_manager
 		new_room.name = name;
 		new_room.id = current_room_id;
 		new_room.password = password;
-		new_room.game_type = game_type;
+		new_room.game_type = normalize_game_type(game_type);
 		this.rooms.insert_last(new_room);
 		this.current_room_id++;
 		this.total++;
@@ -51,7 +51,7 @@ class room
 	string name;                 // Display name set by the creator.
 	uint id;                     // Unique room id.
 	string password;             // Empty = public, non-empty = private.
-	string game_type = "";
+	string game_type = GAME_TYPE_SANDBOX;
 	bool get_is_private() const property { return !password.empty(); }
 	user@[] players;             // Players currently in the room.
 	bool started = false;        // True once a game has been started.

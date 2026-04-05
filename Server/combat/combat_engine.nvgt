@@ -69,6 +69,9 @@ class combatant {
 	uint bless_source_id = 0;
 	bool guiding_bolt_advantage = false;
 	uint guiding_bolt_source_id = 0;
+	int longstrider_bonus = 0;
+	int pass_without_trace_bonus = 0;
+	uint pass_without_trace_source_id = 0;
 	int focus_points = 0;
 	int lay_on_hands_pool = 0;
 	int bardic_inspiration_uses = 0;
@@ -86,14 +89,13 @@ class combatant {
 	bool hasted = false;
 	uint haste_source_id = 0;
 	bool haste_loses_next_turn = false;
-	int longstrider_bonus = 0;
-	int pass_without_trace_bonus = 0;
-	uint pass_without_trace_source_id = 0;
 	int mage_armor_bonus = 0;
 	uint heroism_source_id = 0;
 	int heroism_temp_hp_amount = 0;
 	uint hunters_mark_target_id = 0;
 	uint hex_target_id = 0;
+	bool spiritual_weapon_active = false;
+	int spiritual_weapon_slot_level = 0;
 	bool wild_shape_active = false;
 	string wild_shape_form_id = "";
 	bool wild_shape_just_ended = false;
@@ -152,6 +154,8 @@ class combatant {
 	int monster_attack2_mod = 0;
 	int monster_attack2_type = DMG_SLASHING;
 	int monster_attack2_range = 0;
+	string monster_def_id = "";
+	int monster_xp_value = 0;
 	int extra_attacks = 0;             // Extra Attack feature
 	int attacks_remaining_this_turn = 0; // Tracks remaining attacks in current Attack action
 	bool divine_smite_pending = false;    // Paladin: next melee hit adds radiant damage
@@ -167,6 +171,7 @@ class combatant {
 	bool savage_attacker_used = false;
 	bool combat_prowess_used = false;
 	bool tavern_brawler_push_used = false;
+	bool hunter_colossus_used = false;
 
 	// Helpers
 	int get_ability_mod(int ability_id) {
@@ -382,6 +387,7 @@ class battle {
 		c.savage_attacker_used = false;
 		c.combat_prowess_used = false;
 		c.tavern_brawler_push_used = false;
+		c.hunter_colossus_used = false;
 
 		// Reaction resets at start of YOUR turn
 		c.has_reaction = true;
@@ -499,13 +505,15 @@ class battle {
 	}
 
 	// Apply healing
-	void apply_healing(combatant@ target, int amount) {
-		if (@target == null or target.is_dead) return;
-		if (amount <= 0) return;
+	int apply_healing(combatant@ target, int amount) {
+		if (@target == null or target.is_dead) return 0;
+		if (amount <= 0) return 0;
 
 		bool was_unconscious = target.current_hp == 0;
+		int before = target.current_hp;
 		target.current_hp += amount;
 		if (target.current_hp > target.max_hp) target.current_hp = target.max_hp;
+		int effective = target.current_hp - before;
 
 		// Regaining HP from 0 removes unconscious
 		if (was_unconscious and target.current_hp > 0) {
@@ -514,6 +522,7 @@ class battle {
 			target.death_save_failures = 0;
 			target.is_stable = false;
 		}
+		return effective;
 	}
 
 	// Process a death saving throw result
@@ -698,6 +707,7 @@ class battle {
 				state["my_has_bonus_action"] = c.has_bonus_action;
 				state["my_has_reaction"] = c.has_reaction;
 				state["my_attacks_remaining"] = c.attacks_remaining_this_turn;
+				state["my_spiritual_weapon_active"] = c.spiritual_weapon_active;
 				break;
 			}
 		}

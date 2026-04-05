@@ -83,6 +83,7 @@ bool login(uint timeout = 3000)
 		if (msg["type"] == message_types::login and msg.exists("id")) {
 			player_id = uint(msg["id"]);
 			username = username_val; // Store our username globally.
+			if (msg.exists("is_new_account")) is_new_account = bool(msg["is_new_account"]);
 			if (config.read_bool("remember_login")) {
 				config["username"] = username_val;
 				config["password"] = password;
@@ -151,7 +152,9 @@ void handle_message(json_object@ msg)
 	}
 	else if (msg_type == message_types::announce and msg.exists("text")) {
 		bool interrupt = msg.exists("interrupt") ? bool(msg["interrupt"]) : false;
-		speak(string(msg["text"]), interrupt);
+		string announce_text = string(msg["text"]);
+		if (battle_active) combat_history_add(announce_text);
+		speak(announce_text, interrupt);
 	}
 	else if (msg_type == message_types::pop_text and msg.exists("text") and msg.exists("timeout")) {
 		pop_text(string(msg["text"]), uint(msg["timeout"]));
@@ -191,7 +194,7 @@ void handle_message(json_object@ msg)
 	else if (msg_type == message_types::room_players and msg.exists("players")) {
 		@room_player_names = msg["players"];
 		if (msg.exists("host")) room_host_name = msg["host"];
-		if (msg.exists("game_type")) current_room_game_type = string(msg["game_type"]);
+		if (msg.exists("game_type")) current_room_game_type = normalize_character_profile(string(msg["game_type"]));
 		if (msg.exists("bots")) @room_player_bots = msg["bots"];
 		else { room_player_bots = json_array(); for (uint rpi = 0; rpi < room_player_names.length(); rpi++) room_player_bots.add(false); }
 	}
@@ -224,11 +227,14 @@ void handle_message(json_object@ msg)
 		speak_turn_start(name, is_me);
 	}
 	else if (msg_type == message_types::roll_request) {
+		string roll_player = msg.exists("player") ? string(msg["player"]) : "";
+		if (roll_player != "" and roll_player != username) return;
 		string reason = msg.exists("reason") ? string(msg["reason"]) : "Roll";
 		int dice = msg.exists("dice") ? int(msg["dice"]) : 20;
 		int count = msg.exists("count") ? int(msg["count"]) : 1;
 		int modifier = msg.exists("modifier") ? int(msg["modifier"]) : 0;
 		roll_type = msg.exists("roll_type") ? int(msg["roll_type"]) : -1;
+		roll_target_player = roll_player;
 		prompt_roll(reason, dice, modifier, count);
 	}
 	else if (msg_type == message_types::bardic_prompt) {
@@ -293,8 +299,10 @@ void handle_message(json_object@ msg)
 		int ac = msg.exists("ac") ? int(msg["ac"]) : 0;
 		int distance = msg.exists("distance") ? int(msg["distance"]) : 0;
 		string direction = msg.exists("direction") ? string(msg["direction"]) : "";
-		string text = target_name + ". " + hp + " of " + max_hp + " hit points. Armor class " + ac + ". Distance " + distance + " feet.";
-		if (direction != "") text += " Direction " + direction + ".";
+		string text = target_name + ". " + hp + " of " + max_hp + " hit points. Armor class " + ac + ". " + distance + " feet";
+		if (direction != "" and direction != "here") text += " to the " + direction;
+		else if (direction == "here") text += ", same position";
+		text += ".";
 		text += " Your weapon range is " + my_weapon_range + " feet.";
 		if (distance <= my_weapon_range) text += " Target is within weapon range.";
 		else text += " Target is outside your weapon range.";
@@ -310,6 +318,15 @@ void handle_message(json_object@ msg)
 			}
 		}
 		speak(text, false);
+	}
+	else if (msg_type == message_types::level_up_choices) {
+		pending_level_up = true;
+		level_up_new_level = msg.exists("new_level") ? int(msg["new_level"]) : 0;
+		level_up_class = msg.exists("class") ? string(msg["class"]) : "";
+		level_up_needs_subclass = msg.exists("needs_subclass") ? bool(msg["needs_subclass"]) : false;
+		level_up_new_cantrips = msg.exists("new_cantrips") ? int(msg["new_cantrips"]) : 0;
+		level_up_new_spells = msg.exists("new_spells") ? int(msg["new_spells"]) : 0;
+		level_up_is_caster = msg.exists("is_caster") ? bool(msg["is_caster"]) : false;
 	}
 	else if (msg_type == message_types::game_end_battle) {
 		string result = msg.exists("result") ? string(msg["result"]) : "";
@@ -329,68 +346,32 @@ void handle_message(json_object@ msg)
 		string text = msg.exists("text") ? string(msg["text"]) : "";
 		if (text != "") speak(text, false);
 	}
+	else if (msg_type == message_types::progression_update) {
+		if (msg.exists("level")) cached_level = int(msg["level"]);
+		if (msg.exists("xp")) cached_xp = int(msg["xp"]);
+		if (msg.exists("xp_needed")) cached_xp_needed = int(msg["xp_needed"]);
+		if (msg.exists("stats")) @cached_stats = msg["stats"];
+		update_profile_level("adventure", cached_level);
+		string summary = msg.exists("summary") ? string(msg["summary"]) : "";
+		if (summary != "") speak(summary, false);
+	}
+	else if (msg_type == message_types::achievement_unlocked) {
+		string name = msg.exists("name") ? string(msg["name"]) : "Achievement unlocked";
+		string description = msg.exists("description") ? string(msg["description"]) : "";
+		int xp_reward = msg.exists("xp_reward") ? int(msg["xp_reward"]) : 0;
+		string text = name + ".";
+		if (description != "") text += " " + description;
+		if (xp_reward > 0) text += " +" + xp_reward + " XP.";
+		speak(text, true);
+	}
 	else if (msg_type == message_types::character_data) {
 		init_feat_data();
-		// Restore saved character from server on login.
-		if (msg.exists("name")) created_char_name = string(msg["name"]);
-		if (msg.exists("race")) created_char_race = string(msg["race"]);
-		if (msg.exists("class")) created_char_class = string(msg["class"]);
-		if (msg.exists("subclass")) created_char_subclass = string(msg["subclass"]);
-		if (msg.exists("background")) created_char_background = string(msg["background"]);
-		if (msg.exists("level")) created_char_level = int(msg["level"]);
-		if (msg.exists("str")) created_ability_scores[0] = int(msg["str"]);
-		if (msg.exists("dex")) created_ability_scores[1] = int(msg["dex"]);
-		if (msg.exists("con")) created_ability_scores[2] = int(msg["con"]);
-		if (msg.exists("int")) created_ability_scores[3] = int(msg["int"]);
-		if (msg.exists("wis")) created_ability_scores[4] = int(msg["wis"]);
-		if (msg.exists("cha")) created_ability_scores[5] = int(msg["cha"]);
-		created_pre_progression_ability_scores = created_ability_scores;
-		if (msg.exists("base_str")) created_pre_progression_ability_scores[0] = int(msg["base_str"]);
-		if (msg.exists("base_dex")) created_pre_progression_ability_scores[1] = int(msg["base_dex"]);
-		if (msg.exists("base_con")) created_pre_progression_ability_scores[2] = int(msg["base_con"]);
-		if (msg.exists("base_int")) created_pre_progression_ability_scores[3] = int(msg["base_int"]);
-		if (msg.exists("base_wis")) created_pre_progression_ability_scores[4] = int(msg["base_wis"]);
-		if (msg.exists("base_cha")) created_pre_progression_ability_scores[5] = int(msg["base_cha"]);
-		if (msg.exists("weapon")) created_weapon = string(msg["weapon"]);
-		if (msg.exists("feats")) parse_csv_into_string_array(string(msg["feats"]), created_char_feats);
-		if (msg.exists("skills")) parse_csv_into_string_array(string(msg["skills"]), created_char_skill_proficiencies);
-		if (msg.exists("tools")) parse_csv_into_string_array(string(msg["tools"]), created_char_tool_proficiencies);
-		if (msg.exists("free_cast_spells")) parse_csv_into_string_array(string(msg["free_cast_spells"]), created_free_cast_spells);
-		created_spellcasting_override_spells.resize(0);
-		created_spellcasting_override_abilities.resize(0);
-		if (msg.exists("spell_ability_overrides")) {
-			string specs = string(msg["spell_ability_overrides"]);
-			if (specs != "") {
-				string[]@ parts = specs.split(",");
-				for (uint si = 0; si < parts.length(); si++) {
-					if (parts[si] == "") continue;
-					int split_at = parts[si].find(":");
-					if (split_at <= 0) continue;
-					string spell_id = parts[si].substr(0, split_at);
-					string ability_key = parts[si].substr(split_at + 1);
-					int ability_id = ability_id_from_key(ability_key);
-					if (spell_id != "" and ability_id >= 0) {
-						created_spellcasting_override_spells.insert_last(spell_id);
-						created_spellcasting_override_abilities.insert_last(ability_id);
-					}
-				}
-			}
-		}
-		if (msg.exists("cantrips")) {
-			string cantrip_str = string(msg["cantrips"]);
-			parse_csv_into_string_array(cantrip_str, created_cantrips);
-		}
-		if (msg.exists("spells")) {
-			string spell_str = string(msg["spells"]);
-			parse_csv_into_string_array(spell_str, created_spells);
-		}
+		string profile = msg.exists("profile") ? normalize_character_profile(string(msg["profile"])) : "sandbox";
+		apply_character_message_to_profile(profile, msg);
+		if (profile == "adventure" and msg.exists("level")) cached_level = int(msg["level"]);
+		set_active_character_profile(profile);
 		string subclass_text = created_char_subclass != "" ? " " + created_char_subclass : "";
-		string background_text = "";
-		if (created_char_background != "") {
-			background_choice_def@ bg = get_background_choice(created_char_background);
-			if (@bg != null) background_text = ", " + bg.name + " background";
-		}
-		speak("Character loaded: " + created_char_name + ", " + created_char_race + " " + created_char_class + subclass_text + background_text + ", level " + created_char_level + ".", false);
+		speak(character_profile_display_name(profile) + " character loaded: " + created_char_name + ", " + created_char_race + " " + created_char_class + subclass_text + " level " + created_char_level + ".", false);
 	}
 	else if (msg_type == message_types::leave_room) {
 		if (msg.exists("close")) {
@@ -398,7 +379,7 @@ void handle_message(json_object@ msg)
 			json_array empty_players;
 			@room_player_names = empty_players;
 			room_host_name = "";
-			current_room_game_type = "default";
+			current_room_game_type = "sandbox";
 			room_closed_flag = true;
 			speak("You have been removed from the room.", false);
 		}
@@ -413,11 +394,11 @@ void handle_message(json_object@ msg)
 		}
 	}
 	else if (msg_type == message_types::join_room and msg.exists("player")) {
-		if (msg.exists("game_type")) current_room_game_type = string(msg["game_type"]);
+		if (msg.exists("game_type")) current_room_game_type = normalize_character_profile(string(msg["game_type"]));
 		wait_menu();
 	}
 	else if (msg_type == message_types::join_room and msg.exists("host")) {
-		if (msg.exists("game_type")) current_room_game_type = string(msg["game_type"]);
+		if (msg.exists("game_type")) current_room_game_type = normalize_character_profile(string(msg["game_type"]));
 	}
 	// Server notifies that the room was closed.
 	else if (msg_type == message_types::room_closed) {
@@ -448,6 +429,11 @@ void handle_message(json_object@ msg)
 		pending_invite_room_id = room_id;
 		has_pending_invite = true;
 		speak(from + " has invited you to join their game: " + room_name + ". Press F3 to accept or decline.", false);
+	}
+	else if (msg_type == message_types::daily_bonus) {
+		int streak = msg.exists("streak") ? int(msg["streak"]) : 1;
+		int xp = msg.exists("xp") ? int(msg["xp"]) : 0;
+		speak("Daily Login Bonus! Day " + streak + " streak. Plus " + xp + " XP!", true);
 	}
 	// Unknown messages are silently ignored.
 }

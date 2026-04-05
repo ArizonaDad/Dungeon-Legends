@@ -1,0 +1,396 @@
+const int COMBAT_AUDIO_SAMPLE_RATE = 22050;
+const float COMBAT_AUDIO_PI = 3.14159265f;
+const float COMBAT_AUDIO_WORLD_SCALE = 1.0f;
+
+sound@[] combat_audio_oneshots;
+sound@ combat_ambience_loop = null;
+string combat_ambience_mode = "";
+uint64 combat_last_target_ping_at = 0;
+
+combat_entity@ combat_audio_find_entity_by_id(uint id) {
+	for (uint i = 0; i < combat_entities.length(); i++) {
+		if (combat_entities[i].id == id) return combat_entities[i];
+	}
+	return null;
+}
+
+combat_entity@ combat_audio_find_entity_by_name(string name) {
+	for (uint i = 0; i < combat_entities.length(); i++) {
+		if (combat_entities[i].name == name and !combat_entities[i].is_dead) return combat_entities[i];
+	}
+	for (uint i = 0; i < combat_entities.length(); i++) {
+		if (combat_entities[i].name == name) return combat_entities[i];
+	}
+	return null;
+}
+
+float combat_audio_abs(float value) {
+	return value < 0.0f ? -value : value;
+}
+
+float combat_audio_clamp(float value, float minimum = -0.95f, float maximum = 0.95f) {
+	if (value < minimum) return minimum;
+	if (value > maximum) return maximum;
+	return value;
+}
+
+float combat_audio_envelope(uint index, uint sample_count, float attack_ratio = 0.08f, float release_ratio = 0.28f) {
+	if (sample_count <= 1) return 1.0f;
+	uint attack_samples = uint(float(sample_count) * attack_ratio);
+	uint release_samples = uint(float(sample_count) * release_ratio);
+	if (attack_samples < 1) attack_samples = 1;
+	if (release_samples < 1) release_samples = 1;
+	float env = 1.0f;
+	if (index < attack_samples) env = float(index) / float(attack_samples);
+	if (index + release_samples >= sample_count) {
+		float tail = float(sample_count - index) / float(release_samples);
+		if (tail < env) env = tail;
+	}
+	if (env < 0.0f) env = 0.0f;
+	if (env > 1.0f) env = 1.0f;
+	return env;
+}
+
+vector combat_audio_world_position(float x, float y, float z = 0.0f) {
+	return vector(x * COMBAT_AUDIO_WORLD_SCALE, y * COMBAT_AUDIO_WORLD_SCALE, z);
+}
+
+vector combat_audio_world_position_entity(combat_entity@ e, float z = 0.0f) {
+	if (@e == null) return vector();
+	return combat_audio_world_position(float(e.x), float(e.y), z);
+}
+
+void combat_audio_configure_spatial(sound@ s, float min_distance = 0.45f, float max_distance = 14.0f, float rolloff = 1.05f) {
+	if (@s == null) return;
+	s.set_hrtf(true);
+	s.spatialization_enabled = true;
+	s.positioning = AUDIO_POSITIONING_ABSOLUTE;
+	s.min_distance = min_distance;
+	s.max_distance = max_distance;
+	s.rolloff = rolloff;
+}
+
+sound@ combat_audio_build_sound(array<float>@ pcm, float volume_db, bool spatial = false) {
+	sound@ s = sound();
+	if (!s.load_pcm(pcm, COMBAT_AUDIO_SAMPLE_RATE, 1)) return null;
+	s.volume = volume_db;
+	if (spatial) combat_audio_configure_spatial(s);
+	return s;
+}
+
+sound@ combat_audio_make_sweep(float start_freq, float end_freq, int duration_ms, float volume_db = -12.0f, float overtone = 0.22f, float tremolo_hz = 0.0f, float attack_ratio = 0.04f, float release_ratio = 0.30f, float harmonic = 2.0f) {
+	uint sample_count = uint((COMBAT_AUDIO_SAMPLE_RATE * duration_ms) / 1000);
+	if (sample_count < 32) sample_count = 32;
+	array<float> pcm(sample_count);
+	float phase_primary = 0.0f;
+	float phase_harmonic = 0.0f;
+	for (uint i = 0; i < sample_count; i++) {
+		float progress = sample_count > 1 ? float(i) / float(sample_count - 1) : 0.0f;
+		float freq = start_freq + (end_freq - start_freq) * progress;
+		float t = float(i) / float(COMBAT_AUDIO_SAMPLE_RATE);
+		phase_primary += (COMBAT_AUDIO_PI * 2.0f * freq) / float(COMBAT_AUDIO_SAMPLE_RATE);
+		phase_harmonic += (COMBAT_AUDIO_PI * 2.0f * freq * harmonic) / float(COMBAT_AUDIO_SAMPLE_RATE);
+		float tremolo = tremolo_hz > 0.0f ? (0.8f + 0.2f * sin(COMBAT_AUDIO_PI * 2.0f * tremolo_hz * t)) : 1.0f;
+		float sample = (sin(phase_primary) + overtone * sin(phase_harmonic)) * combat_audio_envelope(i, sample_count, attack_ratio, release_ratio) * tremolo * 0.7f;
+		pcm[i] = combat_audio_clamp(sample);
+	}
+	return combat_audio_build_sound(pcm, volume_db, true);
+}
+
+sound@ combat_audio_make_ambience(string mode) {
+	float base = 82.0f;
+	float accent = 123.0f;
+	float pulse = 1.0f;
+	float volume_db = -30.0f;
+	if (mode == "pvp") {
+		base = 98.0f;
+		accent = 147.0f;
+		pulse = 1.5f;
+		volume_db = -28.0f;
+	} else if (mode == "boss") {
+		base = 52.0f;
+		accent = 78.0f;
+		pulse = 0.5f;
+		volume_db = -26.0f;
+	}
+	uint sample_count = COMBAT_AUDIO_SAMPLE_RATE * 2;
+	array<float> pcm(sample_count);
+	for (uint i = 0; i < sample_count; i++) {
+		float t = float(i) / float(COMBAT_AUDIO_SAMPLE_RATE);
+		float lfo = 0.55f + 0.45f * (0.5f + 0.5f * sin(COMBAT_AUDIO_PI * 2.0f * pulse * t));
+		float sample = 0.55f * sin(COMBAT_AUDIO_PI * 2.0f * base * t);
+		sample += 0.25f * sin(COMBAT_AUDIO_PI * 2.0f * (base * 0.5f) * t);
+		sample += 0.20f * sin(COMBAT_AUDIO_PI * 2.0f * accent * t);
+		pcm[i] = combat_audio_clamp(sample * lfo * 0.28f);
+	}
+	sound@ s = combat_audio_build_sound(pcm, volume_db, false);
+	if (@s != null) s.spatialization_enabled = false;
+	return s;
+}
+
+void combat_audio_track(sound@ s) {
+	if (@s == null) return;
+	combat_audio_oneshots.insert_last(s);
+}
+
+void combat_audio_play_at_world(sound@ s, float x, float y, float z = 0.0f) {
+	if (@s == null) return;
+	combat_audio_configure_spatial(s);
+	s.set_position_3d(combat_audio_world_position(x, y, z));
+	s.play();
+	combat_audio_track(s);
+}
+
+void combat_audio_play_at_entity(sound@ s, combat_entity@ e, float z = 0.0f) {
+	if (@e == null) return;
+	combat_audio_play_at_world(s, float(e.x), float(e.y), z);
+}
+
+void combat_audio_cleanup_finished() {
+	for (int i = int(combat_audio_oneshots.length()) - 1; i >= 0; i--) {
+		if (@combat_audio_oneshots[i] == null or !combat_audio_oneshots[i].playing) {
+			if (@combat_audio_oneshots[i] != null) combat_audio_oneshots[i].close();
+			combat_audio_oneshots.remove_at(i);
+		}
+	}
+}
+
+void combat_audio_sync_listener() {
+	if (@sound_default_engine == null) return;
+	set_sound_global_hrtf(true);
+	combat_entity@ me = combat_audio_find_entity_by_id(my_combatant_id);
+	if (@me == null) return;
+	vector listener_position = combat_audio_world_position_entity(me, 0.0f);
+	sound_default_engine.set_listener_world_up(0, vector(0.0f, 0.0f, 1.0f));
+	sound_default_engine.set_listener_position(0, listener_position);
+	sound_default_engine.set_listener_direction(0, vector(0.0f, 1.0f, 0.0f));
+	sound_default_engine.set_listener_velocity(0, vector(0.0f, 0.0f, 0.0f));
+}
+
+void combat_audio_stop_ambience() {
+	if (@combat_ambience_loop != null) {
+		combat_ambience_loop.stop();
+		combat_ambience_loop.close();
+		@combat_ambience_loop = null;
+	}
+	combat_ambience_mode = "";
+}
+
+void combat_audio_refresh_ambience() {
+	if (!battle_active) {
+		combat_audio_stop_ambience();
+		return;
+	}
+	string desired_mode = battle_mode != "" ? battle_mode : "pvp";
+	if (@combat_ambience_loop != null and combat_ambience_mode == desired_mode) return;
+	combat_audio_stop_ambience();
+	@combat_ambience_loop = combat_audio_make_ambience(desired_mode);
+	combat_ambience_mode = desired_mode;
+	if (@combat_ambience_loop != null) combat_ambience_loop.play_looped();
+}
+
+void combat_audio_play_direction_ping(string dir) {
+	combat_entity@ me = combat_audio_find_entity_by_id(my_combatant_id);
+	if (@me == null) return;
+	float dx = 0.0f;
+	float dy = 0.0f;
+	if (dir == "north") dy = 1.4f;
+	else if (dir == "south") dy = -1.4f;
+	else if (dir == "east") dx = 1.4f;
+	else if (dir == "west") dx = -1.4f;
+	sound@ s = combat_audio_make_sweep(300.0f, 540.0f, 80, -24.0f, 0.12f);
+	combat_audio_play_at_world(s, float(me.x) + dx, float(me.y) + dy, 0.0f);
+}
+
+void combat_audio_play_empty_scan() {
+	sound@ s = combat_audio_make_sweep(220.0f, 160.0f, 120, -22.0f, 0.10f);
+	if (@s == null) return;
+	s.spatialization_enabled = false;
+	s.play();
+	combat_audio_track(s);
+}
+
+void combat_audio_play_scan_target(combat_entity@ e) {
+	if (@e == null) return;
+	float start_freq = e.is_player ? 620.0f : 420.0f;
+	float end_freq = e.is_player ? 760.0f : 560.0f;
+	sound@ s = combat_audio_make_sweep(start_freq, end_freq, 140, e.is_player ? -21.0f : -18.0f, 0.18f);
+	combat_audio_play_at_entity(s, e, 0.0f);
+}
+
+void combat_audio_play_target_lock(combat_entity@ e) {
+	if (@e == null) return;
+	float start_freq = e.is_player ? 700.0f : 480.0f;
+	float end_freq = e.is_player ? 980.0f : 820.0f;
+	sound@ s = combat_audio_make_sweep(start_freq, end_freq, 220, -17.0f, 0.28f, 6.0f, 0.03f, 0.38f, 3.0f);
+	combat_audio_play_at_entity(s, e, 0.0f);
+	combat_last_target_ping_at = 0;
+}
+
+void combat_audio_play_movement(combat_entity@ old_e, combat_entity@ new_e) {
+	if (@new_e == null) return;
+	int dx = @old_e != null ? new_e.x - old_e.x : 0;
+	int dy = @old_e != null ? new_e.y - old_e.y : 0;
+	float start_freq = new_e.id == my_combatant_id ? 220.0f : (new_e.is_player ? 250.0f : 170.0f);
+	float end_freq = start_freq - 80.0f;
+	sound@ s = combat_audio_make_sweep(start_freq, end_freq, 95, new_e.id == my_combatant_id ? -16.0f : -21.0f, 0.08f);
+	if (@s == null) return;
+	if (dx != 0 or dy != 0) s.set_direction(vector(float(dx), float(dy), 0.0f));
+	combat_audio_play_at_world(s, float(new_e.x), float(new_e.y), 0.0f);
+}
+
+void combat_audio_play_damage(string attacker_name, string target_name, bool is_crit, int amount) {
+	combat_entity@ target_entity = combat_audio_find_entity_by_name(target_name);
+	float end_freq = is_crit ? 70.0f : 120.0f;
+	float volume_db = amount >= 15 ? -12.0f : -16.0f;
+	sound@ impact = combat_audio_make_sweep(320.0f, end_freq, is_crit ? 240 : 170, volume_db, 0.16f, is_crit ? 9.0f : 0.0f, 0.02f, 0.42f, 2.6f);
+	if (@target_entity != null) combat_audio_play_at_entity(impact, target_entity, 0.0f);
+	else if (@impact != null) {
+		impact.spatialization_enabled = false;
+		impact.play();
+		combat_audio_track(impact);
+	}
+	if (is_crit and @target_entity != null) {
+		sound@ sparkle = combat_audio_make_sweep(920.0f, 1240.0f, 120, -23.0f, 0.34f, 8.0f, 0.01f, 0.22f, 3.0f);
+		combat_audio_play_at_entity(sparkle, target_entity, 0.0f);
+	}
+}
+
+void combat_audio_play_heal(string target_name, int amount) {
+	combat_entity@ target_entity = combat_audio_find_entity_by_name(target_name);
+	float start_freq = amount >= 10 ? 420.0f : 520.0f;
+	float end_freq = amount >= 10 ? 880.0f : 760.0f;
+	sound@ heal = combat_audio_make_sweep(start_freq, end_freq, 220, -18.0f, 0.24f, 4.0f, 0.02f, 0.35f, 2.5f);
+	if (@target_entity != null) combat_audio_play_at_entity(heal, target_entity, 0.0f);
+}
+
+void combat_audio_play_condition(string target_name, bool removed) {
+	combat_entity@ target_entity = combat_audio_find_entity_by_name(target_name);
+	sound@ cue = removed
+		? combat_audio_make_sweep(360.0f, 620.0f, 160, -22.0f, 0.16f)
+		: combat_audio_make_sweep(520.0f, 260.0f, 190, -20.0f, 0.18f, 8.0f, 0.02f, 0.32f, 2.4f);
+	if (@target_entity != null) combat_audio_play_at_entity(cue, target_entity, 0.0f);
+}
+
+void combat_audio_play_death(string target_name) {
+	combat_entity@ target_entity = combat_audio_find_entity_by_name(target_name);
+	sound@ cue = combat_audio_make_sweep(260.0f, 52.0f, 420, -15.0f, 0.10f, 4.0f, 0.02f, 0.48f, 2.0f);
+	if (@target_entity != null) combat_audio_play_at_entity(cue, target_entity, 0.0f);
+	else if (@cue != null) {
+		cue.spatialization_enabled = false;
+		cue.play();
+		combat_audio_track(cue);
+	}
+}
+
+void combat_audio_play_miss(string target_name) {
+	combat_entity@ target_entity = combat_audio_find_entity_by_name(target_name);
+	sound@ cue = combat_audio_make_sweep(640.0f, 420.0f, 110, -23.0f, 0.10f);
+	if (@target_entity != null) combat_audio_play_at_entity(cue, target_entity, 0.0f);
+}
+
+void combat_audio_play_turn_start(string name, bool is_me) {
+	if (is_me) {
+		sound@ cue = combat_audio_make_sweep(520.0f, 920.0f, 220, -14.0f, 0.25f, 5.0f, 0.02f, 0.28f, 3.0f);
+		if (@cue != null) {
+			cue.spatialization_enabled = false;
+			cue.play();
+			combat_audio_track(cue);
+		}
+		return;
+	}
+	combat_entity@ actor = combat_audio_find_entity_by_name(name);
+	sound@ cue = combat_audio_make_sweep(240.0f, 340.0f, 150, -22.0f, 0.14f);
+	if (@actor != null) combat_audio_play_at_entity(cue, actor, 0.0f);
+}
+
+void combat_audio_play_hide_state(bool hidden) {
+	sound@ cue = hidden
+		? combat_audio_make_sweep(780.0f, 320.0f, 220, -18.0f, 0.18f, 7.0f, 0.02f, 0.38f, 2.2f)
+		: combat_audio_make_sweep(260.0f, 760.0f, 180, -18.0f, 0.18f, 0.0f, 0.02f, 0.30f, 2.5f);
+	if (@cue != null) {
+		cue.spatialization_enabled = false;
+		cue.play();
+		combat_audio_track(cue);
+	}
+}
+
+void combat_audio_play_battle_start() {
+	sound@ cue = combat_audio_make_sweep(280.0f, 680.0f, 360, -16.0f, 0.24f, 3.0f, 0.02f, 0.30f, 2.8f);
+	if (@cue != null) {
+		cue.spatialization_enabled = false;
+		cue.play();
+		combat_audio_track(cue);
+	}
+}
+
+void combat_audio_play_wave_start() {
+	sound@ cue = combat_audio_make_sweep(340.0f, 900.0f, 260, -17.0f, 0.24f, 5.0f, 0.02f, 0.28f, 2.6f);
+	if (@cue != null) {
+		cue.spatialization_enabled = false;
+		cue.play();
+		combat_audio_track(cue);
+	}
+}
+
+void combat_audio_play_battle_end(string result) {
+	combat_entity@ me = combat_audio_find_entity_by_id(my_combatant_id);
+	bool victory = result == "victory" or (@me != null and result == me.name);
+	bool defeat = result == "defeat";
+	sound@ cue = victory
+		? combat_audio_make_sweep(360.0f, 980.0f, 520, -14.0f, 0.28f, 4.0f, 0.02f, 0.32f, 2.8f)
+		: (defeat ? combat_audio_make_sweep(420.0f, 90.0f, 620, -14.0f, 0.16f, 2.0f, 0.02f, 0.45f, 2.0f) : combat_audio_make_sweep(260.0f, 520.0f, 260, -17.0f, 0.18f));
+	combat_audio_stop_ambience();
+	if (@cue != null) {
+		cue.spatialization_enabled = false;
+		cue.play();
+		combat_audio_track(cue);
+	}
+}
+
+void combat_audio_update_target_beacon() {
+	if (!battle_active or current_target_id == 0) return;
+	combat_entity@ target = combat_audio_find_entity_by_id(current_target_id);
+	if (@target == null or target.is_dead) return;
+	uint64 now = ticks();
+	if (combat_last_target_ping_at > 0 and now - combat_last_target_ping_at < 900) return;
+	combat_last_target_ping_at = now;
+	float start_freq = target.is_player ? 620.0f : 420.0f;
+	float end_freq = target.is_player ? 760.0f : 560.0f;
+	sound@ cue = combat_audio_make_sweep(start_freq, end_freq, 110, target.is_player ? -27.0f : -24.0f, 0.14f);
+	combat_audio_play_at_entity(cue, target, 0.0f);
+}
+
+void combat_audio_update() {
+	combat_audio_cleanup_finished();
+	combat_audio_sync_listener();
+	combat_audio_refresh_ambience();
+	combat_audio_update_target_beacon();
+}
+
+void combat_audio_process_state_update(combat_entity[]&in previous_entities, bool previous_hidden) {
+	for (uint i = 0; i < combat_entities.length(); i++) {
+		combat_entity@ current = combat_entities[i];
+		for (uint j = 0; j < previous_entities.length(); j++) {
+			if (previous_entities[j].id != current.id) continue;
+			if (previous_entities[j].x != current.x or previous_entities[j].y != current.y) {
+				combat_audio_play_movement(previous_entities[j], current);
+			}
+			break;
+		}
+	}
+	if (previous_hidden != my_is_hidden) combat_audio_play_hide_state(my_is_hidden);
+	combat_audio_update();
+}
+
+void combat_audio_reset() {
+	combat_audio_stop_ambience();
+	for (int i = int(combat_audio_oneshots.length()) - 1; i >= 0; i--) {
+		if (@combat_audio_oneshots[i] != null) {
+			combat_audio_oneshots[i].stop();
+			combat_audio_oneshots[i].close();
+		}
+	}
+	combat_audio_oneshots.resize(0);
+	combat_last_target_ping_at = 0;
+}

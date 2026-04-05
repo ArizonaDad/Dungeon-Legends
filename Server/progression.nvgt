@@ -1,0 +1,260 @@
+const string GAME_TYPE_SANDBOX = "sandbox";
+const string GAME_TYPE_ADVENTURE = "adventure";
+const string ACCOUNT_KEY_LEGACY_CHARACTER = "character";
+const string ACCOUNT_KEY_SANDBOX_CHARACTER = "sandbox_character";
+const string ACCOUNT_KEY_ADVENTURE_CHARACTER = "adventure_character";
+const string ACCOUNT_KEY_ADVENTURE_PROGRESS = "adventure_progress";
+
+string normalize_game_type(string game_type) {
+	string lc = game_type.lower();
+	if (lc == GAME_TYPE_ADVENTURE) return GAME_TYPE_ADVENTURE;
+	return GAME_TYPE_SANDBOX;
+}
+
+bool is_adventure_game_type(string game_type) {
+	return normalize_game_type(game_type) == GAME_TYPE_ADVENTURE;
+}
+
+string display_game_type(string game_type) {
+	return is_adventure_game_type(game_type) ? "Adventure" : "Sandbox";
+}
+
+string get_character_storage_key(string profile) {
+	return is_adventure_game_type(profile) ? ACCOUNT_KEY_ADVENTURE_CHARACTER : ACCOUNT_KEY_SANDBOX_CHARACTER;
+}
+
+int get_json_int(json_object@ obj, string key, int fallback = 0) {
+	if (@obj == null or !obj.exists(key)) return fallback;
+	return int(obj[key]);
+}
+
+void add_json_int(json_object@ obj, string key, int amount) {
+	if (@obj == null or amount == 0) return;
+	obj[key] = get_json_int(obj, key) + amount;
+}
+
+json_object@ ensure_json_object_field(json_object@ parent, string key) {
+	if (@parent == null) return null;
+	if (!parent.exists(key)) {
+		json_object child;
+		parent[key] = child;
+	}
+	return parent[key];
+}
+
+json_array@ ensure_json_array_field(json_object@ parent, string key) {
+	if (@parent == null) return null;
+	if (!parent.exists(key)) {
+		json_array arr;
+		parent[key] = arr;
+	}
+	return parent[key];
+}
+
+int adventure_xp_needed_for_next_level(int level) {
+	int[] xp_curve = {
+		100, 175, 275, 400, 600,
+		850, 1150, 1500, 1900, 2350,
+		2850, 3400, 4000, 4700, 5500,
+		6400, 7400, 8500, 10000
+	};
+	if (level < 1) level = 1;
+	if (level >= 20) return 0;
+	return xp_curve[level - 1];
+}
+
+int adventure_total_xp_for_level(int level) {
+	if (level <= 1) return 0;
+	int total = 0;
+	for (int current = 1; current < level and current < 20; current++) {
+		total += adventure_xp_needed_for_next_level(current);
+	}
+	return total;
+}
+
+void ensure_account_progression(account@ acct) {
+	if (@acct == null or @acct.data == null) return;
+	json_object@ data = acct.data;
+	if (data.exists(ACCOUNT_KEY_LEGACY_CHARACTER) and !data.exists(ACCOUNT_KEY_SANDBOX_CHARACTER)) {
+		data[ACCOUNT_KEY_SANDBOX_CHARACTER] = data[ACCOUNT_KEY_LEGACY_CHARACTER];
+	}
+
+	json_object@ progress = ensure_json_object_field(data, ACCOUNT_KEY_ADVENTURE_PROGRESS);
+	if (@progress == null) return;
+	if (!progress.exists("level")) progress["level"] = 1;
+	if (!progress.exists("xp")) progress["xp"] = 0;
+	if (!progress.exists("total_xp")) progress["total_xp"] = adventure_total_xp_for_level(get_json_int(progress, "level", 1));
+	if (!progress.exists("matches_completed")) progress["matches_completed"] = 0;
+	if (!progress.exists("victories")) progress["victories"] = 0;
+	if (!progress.exists("monster_kills")) progress["monster_kills"] = 0;
+	if (!progress.exists("healing_done")) progress["healing_done"] = 0;
+	if (!progress.exists("waves_cleared")) progress["waves_cleared"] = 0;
+	if (!progress.exists("boss_kills")) progress["boss_kills"] = 0;
+	ensure_json_array_field(progress, "achievements");
+
+	if (data.exists(ACCOUNT_KEY_ADVENTURE_CHARACTER)) {
+		json_object@ character = data[ACCOUNT_KEY_ADVENTURE_CHARACTER];
+		int progress_level = get_json_int(progress, "level", 1);
+		int character_level = get_json_int(character, "level", progress_level);
+		if (progress_level < 1) progress_level = 1;
+		if (character_level < 1) character_level = 1;
+		if (character_level > progress_level) {
+			progress["level"] = character_level;
+		} else if (progress_level != character_level) {
+			character["level"] = progress_level;
+		}
+	}
+
+	int current_level = get_json_int(progress, "level", 1);
+	if (current_level < 1) current_level = 1;
+	if (current_level > 20) current_level = 20;
+	progress["level"] = current_level;
+	if (get_json_int(progress, "xp") < 0) progress["xp"] = 0;
+	if (get_json_int(progress, "total_xp") < adventure_total_xp_for_level(current_level)) {
+		progress["total_xp"] = adventure_total_xp_for_level(current_level) + get_json_int(progress, "xp");
+	}
+	if (current_level >= 20) progress["xp"] = 0;
+}
+
+json_object@ get_character_profile(account@ acct, string profile) {
+	if (@acct == null or @acct.data == null) return null;
+	ensure_account_progression(acct);
+	string key = get_character_storage_key(profile);
+	if (!acct.data.exists(key)) return null;
+	return acct.data[key];
+}
+
+bool account_has_character_profile(account@ acct, string profile) {
+	return @get_character_profile(acct, profile) != null;
+}
+
+json_object@ get_adventure_progress(account@ acct) {
+	if (@acct == null or @acct.data == null) return null;
+	ensure_account_progression(acct);
+	return ensure_json_object_field(acct.data, ACCOUNT_KEY_ADVENTURE_PROGRESS);
+}
+
+int get_achievement_count(json_object@ progress) {
+	if (@progress == null or !progress.exists("achievements")) return 0;
+	json_array@ achievements = progress["achievements"];
+	return @achievements == null ? 0 : int(achievements.length());
+}
+
+bool has_progress_achievement(json_object@ progress, string achievement_id) {
+	if (@progress == null or !progress.exists("achievements")) return false;
+	json_array@ achievements = progress["achievements"];
+	if (@achievements == null) return false;
+	for (uint i = 0; i < achievements.length(); i++) {
+		if (string(achievements[i]) == achievement_id) return true;
+	}
+	return false;
+}
+
+bool unlock_progress_achievement(json_object@ progress, string achievement_id) {
+	if (@progress == null or achievement_id == "") return false;
+	if (has_progress_achievement(progress, achievement_id)) return false;
+	json_array@ achievements = ensure_json_array_field(progress, "achievements");
+	if (@achievements == null) return false;
+	achievements.add(achievement_id);
+	return true;
+}
+
+bool apply_adventure_xp(account@ acct, int amount, int&out levels_gained) {
+	levels_gained = 0;
+	if (@acct == null or amount <= 0) return false;
+	json_object@ progress = get_adventure_progress(acct);
+	if (@progress == null) return false;
+
+	int level = get_json_int(progress, "level", 1);
+	int xp = get_json_int(progress, "xp", 0) + amount;
+	int total_xp = get_json_int(progress, "total_xp", adventure_total_xp_for_level(level)) + amount;
+
+	while (level < 20) {
+		int needed = adventure_xp_needed_for_next_level(level);
+		if (needed <= 0 or xp < needed) break;
+		xp -= needed;
+		level++;
+		levels_gained++;
+	}
+
+	if (level >= 20) {
+		level = 20;
+		xp = 0;
+	}
+
+	progress["level"] = level;
+	progress["xp"] = xp;
+	progress["total_xp"] = total_xp;
+
+	json_object@ adventure_character = get_character_profile(acct, GAME_TYPE_ADVENTURE);
+	if (@adventure_character != null) adventure_character["level"] = level;
+	return true;
+}
+
+json_object@ build_character_data_message(account@ acct, string profile) {
+	json_object@ character = get_character_profile(acct, profile);
+	if (@character == null) return null;
+
+	json_object@ msg = json_object();
+	msg["type"] = message_types::character_data;
+	msg["profile"] = normalize_game_type(profile);
+	if (character.exists("name")) msg["name"] = character["name"];
+	if (character.exists("race")) msg["race"] = character["race"];
+	if (character.exists("class")) msg["class"] = character["class"];
+	if (character.exists("subclass")) msg["subclass"] = character["subclass"];
+	if (character.exists("level")) msg["level"] = character["level"];
+	if (character.exists("str")) msg["str"] = character["str"];
+	if (character.exists("dex")) msg["dex"] = character["dex"];
+	if (character.exists("con")) msg["con"] = character["con"];
+	if (character.exists("int")) msg["int"] = character["int"];
+	if (character.exists("wis")) msg["wis"] = character["wis"];
+	if (character.exists("cha")) msg["cha"] = character["cha"];
+	if (character.exists("weapon")) msg["weapon"] = character["weapon"];
+	if (character.exists("cantrips")) msg["cantrips"] = character["cantrips"];
+	if (character.exists("spells")) msg["spells"] = character["spells"];
+	return msg;
+}
+
+json_object@ build_progression_stats_message(json_object@ progress) {
+	json_object@ stats = json_object();
+	if (@progress == null) return stats;
+	stats["matches_completed"] = get_json_int(progress, "matches_completed");
+	stats["victories"] = get_json_int(progress, "victories");
+	stats["monster_kills"] = get_json_int(progress, "monster_kills");
+	stats["healing_done"] = get_json_int(progress, "healing_done");
+	stats["waves_cleared"] = get_json_int(progress, "waves_cleared");
+	stats["boss_kills"] = get_json_int(progress, "boss_kills");
+	stats["achievement_count"] = get_achievement_count(progress);
+	return stats;
+}
+
+json_object@ build_progression_update_message(account@ acct, int gained = 0, int kill_xp = 0, int healing_xp = 0, int match_xp = 0, int achievement_xp = 0, int levels_gained = 0, string summary = "") {
+	json_object@ progress = get_adventure_progress(acct);
+	json_object@ msg = json_object();
+	msg["type"] = message_types::progression_update;
+	msg["profile"] = GAME_TYPE_ADVENTURE;
+	if (@progress == null) {
+		msg["level"] = 1;
+		msg["xp"] = 0;
+		msg["xp_needed"] = adventure_xp_needed_for_next_level(1);
+		msg["total_xp"] = 0;
+		msg["stats"] = build_progression_stats_message(null);
+		return msg;
+	}
+
+	int level = get_json_int(progress, "level", 1);
+	msg["level"] = level;
+	msg["xp"] = get_json_int(progress, "xp");
+	msg["xp_needed"] = adventure_xp_needed_for_next_level(level);
+	msg["total_xp"] = get_json_int(progress, "total_xp");
+	msg["gained"] = gained;
+	msg["kill_xp"] = kill_xp;
+	msg["healing_xp"] = healing_xp;
+	msg["match_xp"] = match_xp;
+	msg["achievement_xp"] = achievement_xp;
+	msg["levels_gained"] = levels_gained;
+	msg["achievement_count"] = get_achievement_count(progress);
+	msg["stats"] = build_progression_stats_message(progress);
+	if (summary != "") msg["summary"] = summary;
+	return msg;
+}

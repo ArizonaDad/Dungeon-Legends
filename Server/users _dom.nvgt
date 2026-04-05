@@ -100,6 +100,57 @@ void apply_wild_shape_form(combatant@ c, monster_def@ def)
 	if (c.movement_remaining > c.speed) c.movement_remaining = c.speed;
 }
 
+void send_character_profile_to_user(user@ u, string profile)
+{
+	if (@u == null or @u.account == null) return;
+	json_object@ msg = build_character_data_message(u.account, profile);
+	if (@msg != null) u.send(msg);
+}
+
+void send_adventure_progress_to_user(user@ u, string summary = "", int gained = 0, int kill_xp = 0, int healing_xp = 0, int match_xp = 0, int achievement_xp = 0, int levels_gained = 0)
+{
+	if (@u == null or @u.account == null) return;
+	u.send(build_progression_update_message(u.account, gained, kill_xp, healing_xp, match_xp, achievement_xp, levels_gained, summary));
+}
+
+int get_daily_bonus_xp(int streak) {
+	if (streak <= 0) streak = 1;
+	if (streak >= 7) return 200;
+	int[] xp_table = {50, 75, 100, 125, 150, 175, 200};
+	return xp_table[streak - 1];
+}
+
+void process_daily_bonus(user@ u)
+{
+	if (@u == null or @u.account == null) return;
+	json_object@ data = u.account.data;
+	uint64 now = ticks();
+	uint64 last_login = data.exists("last_login_timestamp") ? uint64(int(data["last_login_timestamp"])) : 0;
+	int streak = data.exists("login_streak") ? int(data["login_streak"]) : 0;
+	uint64 elapsed = (last_login > 0 and now > last_login) ? now - last_login : 0;
+	uint64 ms_24h = 86400000;
+	uint64 ms_48h = 172800000;
+	if (last_login > 0 and elapsed < ms_24h) {
+		data["last_login_timestamp"] = int(now);
+		return;
+	}
+	if (last_login > 0 and elapsed < ms_48h) {
+		streak++;
+	} else {
+		streak = 1;
+	}
+	if (streak > 7) streak = 1;
+	int bonus_xp = get_daily_bonus_xp(streak);
+	data["last_login_timestamp"] = int(now);
+	data["login_streak"] = streak;
+	int levels_gained = 0;
+	if (account_has_character_profile(u.account, GAME_TYPE_ADVENTURE)) {
+		apply_adventure_xp(u.account, bonus_xp, levels_gained);
+	}
+	u.send({{"type", message_types::daily_bonus}, {"streak", streak}, {"xp", bonus_xp}});
+	println("[DAILY] " + u.username + " day " + streak + " streak, +" + bonus_xp + " XP");
+}
+
 class user_manager
 {
 	user@[] user_list;       // Every connected user.
@@ -324,49 +375,20 @@ class user
 	{
 		this.speak("Main menu, Welcome. Use page up and page down to adjust the volume.  Select an option.");
 
-		// Deliver any pending friend requests that arrived while offline.
 		if (@this.account != null) {
 			json_object@ data = this.account.data;
+			ensure_account_progression(this.account);
 			if (data.exists("pending_friend_requests")) {
 				json_array@ pending = data["pending_friend_requests"];
 				if (pending.length() > 0) {
 					this.send({{"type", message_types::announce}, {"text", "You have " + pending.length() + " pending friend request" + (pending.length() == 1 ? "" : "s") + "!"}, {"interrupt", false}});
 				}
 			}
-			// Send saved character data to client on login.
-			if (data.exists("character")) {
-				json_object@ char_data = data["character"];
-				json_object@ char_msg = json_object();
-				char_msg["type"] = message_types::character_data;
-				if (char_data.exists("name")) char_msg["name"] = char_data["name"];
-				if (char_data.exists("race")) char_msg["race"] = char_data["race"];
-				if (char_data.exists("class")) char_msg["class"] = char_data["class"];
-				if (char_data.exists("subclass")) char_msg["subclass"] = char_data["subclass"];
-				if (char_data.exists("background")) char_msg["background"] = char_data["background"];
-				if (char_data.exists("level")) char_msg["level"] = char_data["level"];
-				if (char_data.exists("str")) char_msg["str"] = char_data["str"];
-				if (char_data.exists("dex")) char_msg["dex"] = char_data["dex"];
-				if (char_data.exists("con")) char_msg["con"] = char_data["con"];
-				if (char_data.exists("int")) char_msg["int"] = char_data["int"];
-				if (char_data.exists("wis")) char_msg["wis"] = char_data["wis"];
-				if (char_data.exists("cha")) char_msg["cha"] = char_data["cha"];
-				if (char_data.exists("base_str")) char_msg["base_str"] = char_data["base_str"];
-				if (char_data.exists("base_dex")) char_msg["base_dex"] = char_data["base_dex"];
-				if (char_data.exists("base_con")) char_msg["base_con"] = char_data["base_con"];
-				if (char_data.exists("base_int")) char_msg["base_int"] = char_data["base_int"];
-				if (char_data.exists("base_wis")) char_msg["base_wis"] = char_data["base_wis"];
-				if (char_data.exists("base_cha")) char_msg["base_cha"] = char_data["base_cha"];
-				if (char_data.exists("weapon")) char_msg["weapon"] = char_data["weapon"];
-				if (char_data.exists("feats")) char_msg["feats"] = char_data["feats"];
-				if (char_data.exists("skills")) char_msg["skills"] = char_data["skills"];
-				if (char_data.exists("tools")) char_msg["tools"] = char_data["tools"];
-				if (char_data.exists("spell_ability_overrides")) char_msg["spell_ability_overrides"] = char_data["spell_ability_overrides"];
-				if (char_data.exists("free_cast_spells")) char_msg["free_cast_spells"] = char_data["free_cast_spells"];
-				if (char_data.exists("cantrips")) char_msg["cantrips"] = char_data["cantrips"];
-				if (char_data.exists("spells")) char_msg["spells"] = char_data["spells"];
-				this.send(char_msg);
-				println("[CHAR] Sent saved character to " + this.username);
-			}
+			process_daily_bonus(this);
+			send_character_profile_to_user(this, GAME_TYPE_SANDBOX);
+			send_character_profile_to_user(this, GAME_TYPE_ADVENTURE);
+			send_adventure_progress_to_user(this);
+			this.account.commit();
 		}
 	}
 
@@ -860,6 +882,27 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.send({{"type", message_types::announce}, {"text", "Only the host can start the game."}, {"interrupt", true}});
 			return;
 		}
+		string room_game_type = normalize_game_type(u.room.game_type);
+		string required_profile = room_game_type;
+		string[] missing_players;
+		for (uint i = 0; i < u.room.players.length(); i++) {
+			user@ participant = u.room.players[i];
+			if (@participant == null or participant.is_bot or @participant.account == null) continue;
+			ensure_account_progression(participant.account);
+			if (!account_has_character_profile(participant.account, required_profile)) {
+				missing_players.insert_last(participant.username);
+				participant.send({{"type", message_types::announce}, {"text", "You need a " + display_game_type(required_profile) + " character before this lobby can start."}, {"interrupt", true}});
+			}
+		}
+		if (missing_players.length() > 0) {
+			string missing_text = "";
+			for (uint i = 0; i < missing_players.length(); i++) {
+				if (i > 0) missing_text += i == missing_players.length() - 1 ? " and " : ", ";
+				missing_text += missing_players[i];
+			}
+			u.send({{"type", message_types::announce}, {"text", "Cannot start the " + display_game_type(room_game_type) + " lobby yet. Missing characters: " + missing_text + "."}, {"interrupt", true}});
+			return;
+		}
 		u.room.started = true;
 		string mode = msg.exists("mode") ? string(msg["mode"]) : "pvp";
 		string scenario = msg.exists("scenario") ? string(msg["scenario"]) : "";
@@ -875,14 +918,24 @@ void handle_user_message(user@ u, json_object@ msg)
 	// --- Character Creation (save to account) ---
 	else if (msg_type == message_types::character_create) {
 		if (@u.account != null) {
+			ensure_account_progression(u.account);
 			json_object@ data = u.account.data;
+			string profile = msg.exists("profile") ? normalize_game_type(string(msg["profile"])) : GAME_TYPE_SANDBOX;
+			string storage_key = get_character_storage_key(profile);
 			json_object char_data;
 			if (msg.exists("name")) char_data["name"] = msg["name"];
 			if (msg.exists("race")) char_data["race"] = msg["race"];
 			if (msg.exists("class")) char_data["class"] = msg["class"];
 			if (msg.exists("subclass")) char_data["subclass"] = msg["subclass"];
 			if (msg.exists("background")) char_data["background"] = msg["background"];
-			if (msg.exists("level")) char_data["level"] = msg["level"];
+			int stored_level = msg.exists("level") ? int(msg["level"]) : 1;
+			if (profile == GAME_TYPE_ADVENTURE) {
+				json_object@ progress = get_adventure_progress(u.account);
+				stored_level = @progress != null ? get_json_int(progress, "level", 1) : 1;
+				if (stored_level < 1) stored_level = 1;
+				if (stored_level < 3) char_data["subclass"] = "";
+			}
+			char_data["level"] = stored_level;
 			if (msg.exists("str")) char_data["str"] = msg["str"];
 			if (msg.exists("dex")) char_data["dex"] = msg["dex"];
 			if (msg.exists("con")) char_data["con"] = msg["con"];
@@ -903,18 +956,57 @@ void handle_user_message(user@ u, json_object@ msg)
 			if (msg.exists("free_cast_spells")) char_data["free_cast_spells"] = msg["free_cast_spells"];
 			if (msg.exists("cantrips")) char_data["cantrips"] = msg["cantrips"];
 			if (msg.exists("spells")) char_data["spells"] = msg["spells"];
-			data["character"] = char_data;
+			data[storage_key] = char_data;
+			if (!data.exists("first_login_done")) data["first_login_done"] = true;
 			u.account.commit();
-			u.send({{"type", message_types::announce}, {"text", "Character saved."}, {"interrupt", false}});
-			println("[CHAR] " + u.username + " created character: " + string(msg["name"]));
+			send_character_profile_to_user(u, profile);
+			if (profile == GAME_TYPE_ADVENTURE) send_adventure_progress_to_user(u);
+			u.send({{"type", message_types::announce}, {"text", display_game_type(profile) + " character saved."}, {"interrupt", false}});
+			println("[CHAR] " + u.username + " saved " + profile + " character: " + string(msg["name"]));
+		}
+	}
+
+	else if (msg_type == message_types::level_up_response) {
+		if (@u.account != null) {
+			ensure_account_progression(u.account);
+			json_object@ character = get_character_profile(u.account, GAME_TYPE_ADVENTURE);
+			if (@character != null) {
+				if (msg.exists("subclass") and string(msg["subclass"]) != "") {
+					character["subclass"] = msg["subclass"];
+				}
+				if (msg.exists("new_cantrips")) {
+					json_array@ existing = null;
+					if (character.exists("cantrips")) @existing = character["cantrips"];
+					if (@existing == null) { json_array arr; character["cantrips"] = arr; @existing = character["cantrips"]; }
+					json_array@ new_cantrips = msg["new_cantrips"];
+					if (@new_cantrips != null) {
+						for (uint i = 0; i < new_cantrips.length(); i++) existing.add(new_cantrips[i]);
+					}
+				}
+				if (msg.exists("new_spells")) {
+					json_array@ existing = null;
+					if (character.exists("spells")) @existing = character["spells"];
+					if (@existing == null) { json_array arr; character["spells"] = arr; @existing = character["spells"]; }
+					json_array@ new_spells = msg["new_spells"];
+					if (@new_spells != null) {
+						for (uint i = 0; i < new_spells.length(); i++) existing.add(new_spells[i]);
+					}
+				}
+				u.account.commit();
+				send_character_profile_to_user(u, GAME_TYPE_ADVENTURE);
+				u.send({{"type", message_types::announce}, {"text", "Level-up choices saved!"}, {"interrupt", false}});
+			}
 		}
 	}
 
 	// --- Combat Message Routing (forward to battle_manager) ---
 	else if (msg_type == message_types::roll_result) {
 		if (@u.room != null and @u.room.bm != null and @u.room.bm.current_roll != null) {
-			// Player pressed Roll — server rolls the dice
-			if (u.room.bm.current_roll.player_username != u.username) return;
+			// Player pressed Roll -- server rolls the dice
+			if (u.room.bm.current_roll.player_username != u.username) {
+				u.send({{"type", message_types::announce}, {"text", "It is not your turn to roll."}, {"interrupt", false}});
+				return;
+			}
 			u.room.bm.handle_roll_result(u);
 			return;
 		}
@@ -986,7 +1078,8 @@ void handle_user_message(user@ u, json_object@ msg)
 			c.used_bonus_action = true;
 			c.second_wind_available = false;
 			int heal = random(1, 10) + c.level;
-			u.room.bm.combat.apply_healing(c, heal);
+			int effective_heal = u.room.bm.combat.apply_healing(c, heal);
+			u.room.bm.record_effective_healing(c.player_username, effective_heal);
 			u.room.bm.broadcast_roll(c.name, "Second Wind healing", heal, c.level, heal, "");
 			u.room.bm.broadcast_announce(c.name + " uses Second Wind! Healed " + heal + " HP. Now at " + c.current_hp + ".", false);
 		}
@@ -1063,7 +1156,10 @@ void handle_user_message(user@ u, json_object@ msg)
 			c.has_bonus_action = false;
 			c.used_bonus_action = true;
 			c.lay_on_hands_pool -= total_cost;
-			if (heal > 0) u.room.bm.combat.apply_healing(target, heal);
+			if (heal > 0) {
+				int effective_heal = u.room.bm.combat.apply_healing(target, heal);
+				u.room.bm.record_effective_healing(c.player_username, effective_heal);
+			}
 			for (uint ci = 0; ci < conditions_to_remove.length(); ci++) {
 				target.remove_condition(conditions_to_remove[ci]);
 				u.room.bm.broadcast_to_battle({{"type", message_types::condition_removed}, {"target", target.name}, {"condition", condition_names[ci]}});
@@ -1143,6 +1239,27 @@ void handle_user_message(user@ u, json_object@ msg)
 			target.bardic_inspiration_die = c.bardic_inspiration_grant_die;
 			target.bardic_inspiration_source_id = c.id;
 			u.room.bm.broadcast_announce(c.name + " grants Bardic Inspiration (" + u.room.bm.die_label(c.bardic_inspiration_grant_die) + ") to " + target.name + ". " + c.bardic_inspiration_uses + " use" + (c.bardic_inspiration_uses == 1 ? "" : "s") + " remain.", true);
+		}
+		else if (feature == "spiritual_weapon_attack") {
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
+			if (!c.spiritual_weapon_active or c.spiritual_weapon_slot_level < 2) {
+				u.send({{"type", message_types::announce}, {"text", "You do not currently have a Spiritual Weapon to command."}, {"interrupt", true}});
+				return;
+			}
+			combatant@ target = u.room.bm.combat.get_combatant(target_id);
+			if (@target == null or target.is_dead) {
+				u.send({{"type", message_types::announce}, {"text", "Choose a valid target for Spiritual Weapon."}, {"interrupt", true}});
+				return;
+			}
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			if (!u.room.bm.start_spiritual_weapon_attack(c, target)) {
+				c.has_bonus_action = true;
+				c.used_bonus_action = false;
+				u.send({{"type", message_types::announce}, {"text", "Spiritual Weapon cannot strike that target right now."}, {"interrupt", true}});
+				return;
+			}
+			u.room.bm.broadcast_announce(c.name + " commands Spiritual Weapon to strike " + target.name + "!", true);
 		}
 		else if (feature == "wild_shape") {
 			if (c.class_name != "Druid" or c.level < 2) {

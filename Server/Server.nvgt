@@ -4,6 +4,7 @@
 #include "speech.nvgt"
 #include "account.nvgt"
 #include "../common/message_types.nvgt"
+#include "progression.nvgt"
 #include "../common/utils.nvgt"
 #include "combat/battle_manager.nvgt"
 #include "combat/character_data.nvgt"
@@ -151,7 +152,11 @@ class server
 				send(peer_id, {{"type", message_types::error}, {"text", !errmsg.empty() ? errmsg : "Unknown login failure, please try again."}});
 			} else {
 				println("[AUTH] " + u.username + " logged in (peer=" + peer_id + ")");
-				u.send({{"type", message_types::login}, {"id", u.id}});
+				json_object@ login_msg = {{"type", message_types::login}, {"id", u.id}};
+				if (@u.account != null and !u.account.data.exists("first_login_done")) {
+					login_msg["is_new_account"] = true;
+				}
+				u.send(login_msg);
 				u.on_login();
 			}
 		}

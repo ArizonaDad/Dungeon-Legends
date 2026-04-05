@@ -29,6 +29,11 @@ class pending_roll {
 	int damage_dice_sides = 0;
 	int damage_modifier = 0;
 	int damage_type = DMG_SLASHING;
+	int extra_damage_dice_count = 0;
+	int extra_damage_dice_sides = 0;
+	int extra_damage_modifier = 0;
+	int extra_damage_type = -1;
+	bool is_weapon_attack = false;
 	bool is_crit = false;
 	bool is_spell_effect = false;
 	bool spell_uses_attack_roll = false;
@@ -58,6 +63,13 @@ class pending_bardic_prompt {
 	int die_size = 0;
 }
 
+class achievement_notice {
+	string id;
+	string name;
+	string description;
+	int xp_reward = 0;
+}
+
 const int READIED_ACTION_ATTACK = 0;
 
 class battle_manager {
@@ -69,11 +81,21 @@ class battle_manager {
 	uint initiative_index = 0;  // Which combatant we are rolling initiative for
 	string scenario_id = "";
 	bool pending_turn_start_after_interrupt = false;
+	string lobby_game_type = GAME_TYPE_SANDBOX;
+	bool progression_enabled = false;
+	int party_monster_xp = 0;
+	int waves_cleared_this_run = 0;
+	dictionary run_kills;
+	dictionary run_healing;
+	dictionary defeated_monsters;
+
+	uint64 monster_turn_start_time = 0;
 
 	battle_manager() {
 		@combat = null;
 		@current_roll = null;
 		@current_bardic_prompt = null;
+		reset_progression_tracking();
 	}
 
 	// ---- Broadcasting ----
@@ -99,6 +121,7 @@ class battle_manager {
 		if (natural_roll == 20) text = roller_name + " rolls " + reason + ". Natural 20!" + mod_text + ", total " + total + ". " + outcome;
 		else if (natural_roll == 1) text = roller_name + " rolls " + reason + ". Natural 1!" + mod_text + ", total " + total + ". " + outcome;
 		broadcast_to_battle({{"type", message_types::announce}, {"text", text}, {"interrupt", false}});
+		broadcast_to_battle({{"type", message_types::roll_result}, {"natural", natural_roll}, {"total", total}, {"outcome", outcome}});
 	}
 
 	void broadcast_state() {
@@ -190,7 +213,272 @@ class battle_manager {
 		broadcast_state();
 	}
 
-	// ---- Roll Request Helpers ----
+	void reset_progression_tracking() {
+		lobby_game_type = GAME_TYPE_SANDBOX;
+		progression_enabled = false;
+		party_monster_xp = 0;
+		waves_cleared_this_run = 0;
+		run_kills.delete_all();
+		run_healing.delete_all();
+		defeated_monsters.delete_all();
+	}
+
+	int get_run_kill_count(string username) {
+		int value = 0;
+		if (run_kills.exists(username)) run_kills.get(username, value);
+		return value;
+	}
+
+	int get_run_healing_total(string username) {
+		int value = 0;
+		if (run_healing.exists(username)) run_healing.get(username, value);
+		return value;
+	}
+
+	void add_run_kills(string username, int amount) {
+		if (username == "" or amount <= 0) return;
+		run_kills.set(username, get_run_kill_count(username) + amount);
+	}
+
+	void add_run_healing(string username, int amount) {
+		if (username == "" or amount <= 0) return;
+		run_healing.set(username, get_run_healing_total(username) + amount);
+	}
+
+	int get_monster_progression_xp(combatant@ target) {
+		if (@target == null) return 0;
+		int monster_xp = target.monster_xp_value;
+		if (monster_xp <= 25) return 30;
+		if (monster_xp <= 50) return 40;
+		if (monster_xp <= 100) return 55;
+		if (monster_xp <= 200) return 75;
+		if (monster_xp <= 450) return 105;
+		if (monster_xp <= 700) return 135;
+		if (monster_xp <= 1800) return 190;
+		if (monster_xp <= 2900) return 240;
+		if (monster_xp <= 5900) return 320;
+		if (monster_xp <= 11500) return 420;
+		if (monster_xp <= 18000) return 520;
+		if (monster_xp <= 25000) return 620;
+		return 750;
+	}
+
+	void record_effective_healing(string username, int amount) {
+		if (!progression_enabled or amount <= 0) return;
+		add_run_healing(username, amount);
+	}
+
+	void record_monster_defeat(combatant@ attacker, combatant@ target) {
+		if (!progression_enabled or @target == null or target.is_player) return;
+		string monster_key = "" + target.id;
+		if (defeated_monsters.exists(monster_key)) return;
+		defeated_monsters.set(monster_key, true);
+		party_monster_xp += get_monster_progression_xp(target);
+		if (@attacker != null and attacker.is_player and attacker.player_username != "") {
+			add_run_kills(attacker.player_username, 1);
+		}
+	}
+
+	bool queue_achievement_unlock(json_object@ progress, string id, string name, string description, int reward_xp, int&inout achievement_xp, achievement_notice@[]@ notices) {
+		if (@progress == null or !unlock_progress_achievement(progress, id)) return false;
+		achievement_xp += reward_xp;
+		achievement_notice notice;
+		notice.id = id;
+		notice.name = name;
+		notice.description = description;
+		notice.xp_reward = reward_xp;
+		notices.insert_last(notice);
+		return true;
+	}
+
+	void finalize_adventure_progress(string result) {
+		if (!progression_enabled) return;
+		bool victory = result == "victory";
+		for (uint i = 0; i < players.length(); i++) {
+			user@ player = players[i];
+			if (@player == null or player.is_bot or @player.account == null) continue;
+			ensure_account_progression(player.account);
+			if (!account_has_character_profile(player.account, GAME_TYPE_ADVENTURE)) continue;
+
+			json_object@ progress = get_adventure_progress(player.account);
+			if (@progress == null) continue;
+
+			int kill_count = get_run_kill_count(player.username);
+			int healing_total = get_run_healing_total(player.username);
+			add_json_int(progress, "matches_completed", 1);
+			add_json_int(progress, "monster_kills", kill_count);
+			add_json_int(progress, "healing_done", healing_total);
+			add_json_int(progress, "waves_cleared", waves_cleared_this_run);
+			if (victory) add_json_int(progress, "victories", 1);
+			if (victory and combat.mode == "boss") add_json_int(progress, "boss_kills", 1);
+
+			int kill_xp = party_monster_xp;
+			int healing_xp = healing_total / 4;
+			if (healing_xp > 250) healing_xp = 250;
+			int match_xp = 60;
+			if (victory) match_xp += 60;
+			if (combat.mode == "wave") {
+				match_xp += waves_cleared_this_run * 20;
+			} else if (combat.mode == "boss") {
+				match_xp += victory ? 120 : 30;
+			}
+
+			int base_xp = kill_xp + healing_xp + match_xp;
+			int total_awarded = 0;
+			int levels_gained = 0;
+			if (base_xp > 0) {
+				int gained_levels = 0;
+				apply_adventure_xp(player.account, base_xp, gained_levels);
+				total_awarded += base_xp;
+				levels_gained += gained_levels;
+			}
+
+			achievement_notice@[] notices;
+			int achievement_xp = 0;
+			if (get_json_int(progress, "matches_completed") >= 1) {
+				queue_achievement_unlock(progress, "first_steps", "First Steps", "Complete your first Adventure run.", 75, achievement_xp, notices);
+			}
+			if (get_json_int(progress, "victories") >= 1) {
+				queue_achievement_unlock(progress, "first_victory", "First Victory", "Win your first Adventure run.", 100, achievement_xp, notices);
+			}
+			if (get_json_int(progress, "monster_kills") >= 10) {
+				queue_achievement_unlock(progress, "monster_hunter", "Monster Hunter", "Defeat 10 monsters in Adventure.", 125, achievement_xp, notices);
+			}
+			if (get_json_int(progress, "monster_kills") >= 50) {
+				queue_achievement_unlock(progress, "slayer_veteran", "Slayer Veteran", "Defeat 50 monsters in Adventure.", 300, achievement_xp, notices);
+			}
+			if (get_json_int(progress, "healing_done") >= 100) {
+				queue_achievement_unlock(progress, "field_medic", "Field Medic", "Restore 100 effective hit points in Adventure.", 75, achievement_xp, notices);
+			}
+			if (get_json_int(progress, "healing_done") >= 500) {
+				queue_achievement_unlock(progress, "battlefield_surgeon", "Battlefield Surgeon", "Restore 500 effective hit points in Adventure.", 175, achievement_xp, notices);
+			}
+			if (get_json_int(progress, "waves_cleared") >= 5) {
+				queue_achievement_unlock(progress, "wavebreaker", "Wavebreaker", "Clear 5 Adventure waves.", 125, achievement_xp, notices);
+			}
+			if (get_json_int(progress, "boss_kills") >= 1) {
+				queue_achievement_unlock(progress, "boss_slayer", "Boss Slayer", "Defeat your first Adventure boss.", 200, achievement_xp, notices);
+			}
+			if (get_json_int(progress, "level", 1) >= 5) {
+				queue_achievement_unlock(progress, "rising_hero", "Rising Hero", "Reach Adventure level 5.", 150, achievement_xp, notices);
+			}
+
+			if (achievement_xp > 0) {
+				int achievement_levels = 0;
+				apply_adventure_xp(player.account, achievement_xp, achievement_levels);
+				total_awarded += achievement_xp;
+				levels_gained += achievement_levels;
+			}
+
+			player.account.commit();
+
+			for (uint ai = 0; ai < notices.length(); ai++) {
+				player.send({
+					{"type", message_types::achievement_unlocked},
+					{"id", notices[ai].id},
+					{"name", notices[ai].name},
+					{"description", notices[ai].description},
+					{"xp_reward", notices[ai].xp_reward}
+				});
+			}
+
+			json_object@ character_msg = build_character_data_message(player.account, GAME_TYPE_ADVENTURE);
+			if (@character_msg != null) player.send(character_msg);
+
+			json_object@ updated_progress = get_adventure_progress(player.account);
+			string summary = "Adventure progress: +" + total_awarded + " XP.";
+			summary += " Monsters +" + kill_xp + ", healing +" + healing_xp + ", completion +" + match_xp + ".";
+			if (achievement_xp > 0) summary += " Achievements +" + achievement_xp + ".";
+			if (levels_gained > 0 and @updated_progress != null) {
+				int new_level = get_json_int(updated_progress, "level", 1);
+				summary += " Level up! You are now level " + new_level + ".";
+				send_level_up_choices(player, new_level, levels_gained);
+			}
+			player.send(build_progression_update_message(player.account, total_awarded, kill_xp, healing_xp, match_xp, achievement_xp, levels_gained, summary));
+		}
+	}
+
+	// ---- Level-Up Choices ----
+
+	void send_level_up_choices(user@ player, int new_level, int levels_gained) {
+		if (@player == null or @player.account == null) return;
+		json_object@ character = get_character_profile(player.account, GAME_TYPE_ADVENTURE);
+		if (@character == null) return;
+
+		string class_name = character.exists("class") ? string(character["class"]) : "";
+		string subclass = character.exists("subclass") ? string(character["subclass"]) : "";
+		int old_level = new_level - levels_gained;
+		if (old_level < 1) old_level = 1;
+
+		bool needs_subclass = (new_level >= 3 and subclass == "");
+
+		json_object msg;
+		msg["type"] = message_types::level_up_choices;
+		msg["new_level"] = new_level;
+		msg["old_level"] = old_level;
+		msg["levels_gained"] = levels_gained;
+		msg["class"] = class_name;
+		msg["needs_subclass"] = needs_subclass;
+
+		bool is_caster = false;
+		string[] caster_classes = {"Bard", "Cleric", "Druid", "Sorcerer", "Warlock", "Wizard", "Paladin", "Ranger"};
+		for (uint i = 0; i < caster_classes.length(); i++) {
+			if (class_name == caster_classes[i]) { is_caster = true; break; }
+		}
+		if (subclass == "Eldritch Knight" or subclass == "Arcane Trickster") is_caster = true;
+
+		int cantrip_slots_old = get_cantrip_count_for_class(class_name, subclass, old_level);
+		int cantrip_slots_new = get_cantrip_count_for_class(class_name, subclass, new_level);
+		int new_cantrips = cantrip_slots_new - cantrip_slots_old;
+		if (new_cantrips < 0) new_cantrips = 0;
+
+		int spells_old = get_known_spells_count_for_class(class_name, subclass, old_level);
+		int spells_new = get_known_spells_count_for_class(class_name, subclass, new_level);
+		int new_spells = spells_new - spells_old;
+		if (new_spells < 0) new_spells = 0;
+
+		msg["is_caster"] = is_caster;
+		msg["new_cantrips"] = new_cantrips;
+		msg["new_spells"] = new_spells;
+
+		player.send(msg);
+	}
+
+	int get_cantrip_count_for_class(string class_name, string subclass, int level) {
+		if (class_name == "Bard" or class_name == "Druid" or class_name == "Warlock") {
+			if (level >= 10) return 5;
+			if (level >= 4) return 4;
+			return level >= 1 ? 3 : 2;
+		}
+		if (class_name == "Cleric" or class_name == "Wizard") {
+			if (level >= 10) return 6;
+			if (level >= 4) return 5;
+			return level >= 1 ? 4 : 3;
+		}
+		if (class_name == "Sorcerer") {
+			if (level >= 10) return 7;
+			if (level >= 4) return 6;
+			return level >= 1 ? 5 : 4;
+		}
+		if (subclass == "Eldritch Knight" or subclass == "Arcane Trickster") {
+			if (level >= 10) return 4;
+			return level >= 3 ? 3 : 0;
+		}
+		return 0;
+	}
+
+	int get_known_spells_count_for_class(string class_name, string subclass, int level) {
+		if (class_name == "Bard") return level >= 1 ? level + 3 : 0;
+		if (class_name == "Sorcerer") return level >= 1 ? level + 1 : 0;
+		if (class_name == "Warlock") return level >= 1 ? level + 1 : 0;
+		if (class_name == "Ranger") return level >= 2 ? (level / 2) + 1 : 0;
+		if (subclass == "Eldritch Knight") return level >= 3 ? (level <= 7 ? 3 : (level <= 10 ? 4 + (level - 8) : (level <= 13 ? 7 + (level - 11) : (level <= 19 ? 10 + (level - 14) : 13)))) : 0;
+		if (subclass == "Arcane Trickster") return level >= 3 ? (level <= 7 ? 3 : (level <= 10 ? 4 + (level - 8) : (level <= 13 ? 7 + (level - 11) : (level <= 19 ? 10 + (level - 14) : 13)))) : 0;
+		if (class_name == "Cleric" or class_name == "Druid" or class_name == "Wizard" or class_name == "Paladin") {
+			return -1; // Prepared casters: they pick from full list, not "known"
+		}
+		return 0;
+	}
 
 	// Send a roll request to a specific player. Bots auto-resolve immediately.
 	// Returns true if the roll was sent to a real player (awaiting response).
@@ -218,13 +506,7 @@ class battle_manager {
 		}
 
 		// Send roll_request to the human player.
-		u.send({
-			{"type", message_types::roll_request},
-			{"roll_type", roll_type},
-			{"dice", dice_sides},
-			{"modifier", modifier},
-			{"reason", reason}
-		});
+		send_roll_request(u, current_roll);
 		return true;
 	}
 
@@ -381,6 +663,59 @@ class battle_manager {
 		return get_weapon_attack_ability_mod(c);
 	}
 
+	int get_spellcasting_ability_mod(combatant@ c) {
+		if (@c == null) return 0;
+		int spell_ability = c.spellcasting_ability;
+		if (spell_ability < 0 or spell_ability > 5) spell_ability = ABILITY_INT;
+		return c.get_ability_mod(spell_ability);
+	}
+
+	int get_critical_threshold(combatant@ attacker, pending_roll@ pr = null) {
+		if (@attacker == null) return 20;
+		bool weapon_attack = @pr == null ? false : pr.is_weapon_attack;
+		if (attacker.class_name == "Fighter" and attacker.subclass == "Champion" and weapon_attack and attacker.level >= 3) {
+			return 19;
+		}
+		return 20;
+	}
+
+	int get_life_domain_healing_bonus(combatant@ caster, spell_def@ spell, int cast_slot_level) {
+		if (@caster == null or @spell == null) return 0;
+		if (caster.class_name != "Cleric" or caster.subclass != "Life Domain") return 0;
+		if (cast_slot_level <= 0 or spell.level <= 0) return 0;
+		return 2 + cast_slot_level;
+	}
+
+	int spiritual_weapon_damage_count_for_slot(int slot_level) {
+		if (slot_level < 2) slot_level = 2;
+		return 1 + ((slot_level - 2) / 2);
+	}
+
+	void clear_spiritual_weapon_effect(combatant@ caster, bool announce = false) {
+		if (@caster == null or !caster.spiritual_weapon_active) return;
+		caster.spiritual_weapon_active = false;
+		caster.spiritual_weapon_slot_level = 0;
+		if (announce) {
+			broadcast_announce(caster.name + "'s Spiritual Weapon fades.", false);
+		}
+	}
+
+	void maybe_apply_on_kill_features(combatant@ attacker, combatant@ target) {
+		if (@attacker == null or @target == null or @combat == null) return;
+		if (!combat.are_hostile(attacker, target)) return;
+		if (target.current_hp > 0 and !target.is_dead) return;
+		record_monster_defeat(attacker, target);
+
+		if (attacker.class_name == "Warlock" and attacker.subclass == "Fiend Patron") {
+			int temp_hp = attacker.level + attacker.get_ability_mod(ABILITY_CHA);
+			if (temp_hp < 1) temp_hp = 1;
+			if (temp_hp > attacker.temp_hp) {
+				attacker.temp_hp = temp_hp;
+				broadcast_announce(attacker.name + " gains " + temp_hp + " temporary hit points from Fiend Patron.", false);
+			}
+		}
+	}
+
 	void clear_readied_action(combatant@ c) {
 		if (@c == null) return;
 		c.readied_action = -1;
@@ -471,7 +806,8 @@ class battle_manager {
 			{"dice", pr.dice_sides},
 			{"count", 1},
 			{"modifier", build_roll_request_modifier(pr)},
-			{"reason", build_roll_request_reason(pr)}
+			{"reason", build_roll_request_reason(pr)},
+			{"player", pr.player_username}
 		});
 	}
 
@@ -898,6 +1234,7 @@ class battle_manager {
 		pr.damage_dice_sides = get_attack_damage_dice(monster, use_secondary);
 		pr.damage_modifier = get_damage_modifier_for_attack(monster, use_secondary);
 		pr.damage_type = get_attack_damage_type(monster, use_secondary);
+		pr.is_weapon_attack = true;
 		pr.attacks_remaining = attacks_remaining;
 		@current_roll = pr;
 
@@ -1140,6 +1477,7 @@ class battle_manager {
 			pr.damage_dice_sides = get_attack_damage_dice(reactor, false);
 			pr.damage_modifier = get_damage_modifier_for_attack(reactor, false);
 			pr.damage_type = reactor.main_hand_damage_type;
+			pr.is_weapon_attack = true;
 			pr.resume_turn_start = true;
 			@current_roll = pr;
 
@@ -1244,6 +1582,9 @@ class battle_manager {
 
 	void start_game(user@ host, string mode = "pvp", string scenario = "") {
 		if (@host == null or @host.room == null) return;
+		reset_progression_tracking();
+		lobby_game_type = normalize_game_type(host.room.game_type);
+		progression_enabled = is_adventure_game_type(lobby_game_type);
 
 		// Copy room players into battle manager.
 		players.resize(0);
@@ -1265,8 +1606,9 @@ class battle_manager {
 			bool has_char = false;
 			if (@players[i].account != null) {
 				json_object@ data = players[i].account.data;
-				if (data.exists("character")) {
-					json_object@ ch = data["character"];
+				string character_key = get_character_storage_key(lobby_game_type);
+				if (data.exists(character_key)) {
+					json_object@ ch = data[character_key];
 					cs.name = ch.exists("name") ? string(ch["name"]) : players[i].username;
 					cs.race = ch.exists("race") ? string(ch["race"]) : "Human";
 					cs.class_name = ch.exists("class") ? string(ch["class"]) : "Fighter";
@@ -1285,6 +1627,23 @@ class battle_manager {
 					if (ch.exists("tools")) parse_csv_list(string(ch["tools"]), cs.tool_proficiencies);
 					if (ch.exists("spell_ability_overrides")) parse_spell_override_specs(string(ch["spell_ability_overrides"]), cs.spellcasting_override_spells, cs.spellcasting_override_abilities);
 					if (ch.exists("free_cast_spells")) parse_csv_list(string(ch["free_cast_spells"]), cs.free_cast_spells);
+					if (ch.exists("cantrips")) parse_csv_list(string(ch["cantrips"]), cs.cantrips);
+					if (ch.exists("spells")) parse_csv_list(string(ch["spells"]), cs.spells);
+					has_char = true;
+				} else if (lobby_game_type == GAME_TYPE_SANDBOX and data.exists(ACCOUNT_KEY_LEGACY_CHARACTER)) {
+					json_object@ ch = data[ACCOUNT_KEY_LEGACY_CHARACTER];
+					cs.name = ch.exists("name") ? string(ch["name"]) : players[i].username;
+					cs.race = ch.exists("race") ? string(ch["race"]) : "Human";
+					cs.class_name = ch.exists("class") ? string(ch["class"]) : "Fighter";
+					cs.subclass = ch.exists("subclass") ? string(ch["subclass"]) : "";
+					cs.level = ch.exists("level") ? int(ch["level"]) : 1;
+					cs.strength = ch.exists("str") ? int(ch["str"]) : 10;
+					cs.dexterity = ch.exists("dex") ? int(ch["dex"]) : 10;
+					cs.constitution = ch.exists("con") ? int(ch["con"]) : 10;
+					cs.intelligence = ch.exists("int") ? int(ch["int"]) : 10;
+					cs.wisdom = ch.exists("wis") ? int(ch["wis"]) : 10;
+					cs.charisma = ch.exists("cha") ? int(ch["cha"]) : 10;
+					cs.weapon_name = ch.exists("weapon") ? string(ch["weapon"]) : "Longsword";
 					if (ch.exists("cantrips")) parse_csv_list(string(ch["cantrips"]), cs.cantrips);
 					if (ch.exists("spells")) parse_csv_list(string(ch["spells"]), cs.spells);
 					has_char = true;
@@ -1605,6 +1964,7 @@ class battle_manager {
 				// Total party kill.
 				combat.battle_active = false;
 				broadcast_announce("All players have fallen! Defeat!", true);
+				finalize_adventure_progress("defeat");
 				broadcast_to_battle({{"type", message_types::game_end_battle}, {"winner", "monsters"}, {"mode", combat.mode}, {"result", "defeat"}});
 				broadcast_state();
 				cleanup_after_battle();
@@ -1626,6 +1986,7 @@ class battle_manager {
 					if (@boss_def != null) boss_name = boss_def.name;
 					combat.battle_active = false;
 					broadcast_announce(boss_name + " is defeated! Victory!", true);
+					finalize_adventure_progress("victory");
 					broadcast_to_battle({{"type", message_types::game_end_battle}, {"winner", "players"}, {"mode", combat.mode}, {"result", "victory"}});
 					broadcast_state();
 					cleanup_after_battle();
@@ -1633,6 +1994,7 @@ class battle_manager {
 				}
 
 				broadcast_announce("Wave " + combat.wave_number + " complete!", true);
+				waves_cleared_this_run++;
 				broadcast_to_battle({{"type", message_types::wave_complete}, {"wave", combat.wave_number}});
 				broadcast_state();
 
@@ -1660,6 +2022,7 @@ class battle_manager {
 				// No more waves or not wave mode — victory
 				broadcast_announce("Victory! All waves cleared!", true);
 				combat.battle_active = false;
+				finalize_adventure_progress("victory");
 				broadcast_to_battle({{"type", message_types::game_end_battle}, {"winner", "players"}, {"mode", combat.mode}, {"result", "victory"}});
 				broadcast_state();
 				cleanup_after_battle();
@@ -1744,6 +2107,7 @@ class battle_manager {
 
 						broadcast_roll(enemy.name, "opportunity attack damage", dmg_natural, dmg_mod, total_damage, total_damage + " " + dmg_type_name + " to " + mover.name + ".");
 						combat.apply_damage(mover, total_damage, enemy.main_hand_damage_type, enemy);
+						maybe_apply_on_kill_features(enemy, mover);
 						check_concentration(mover, total_damage);
 
 						if (mover.is_dead) {
@@ -1776,6 +2140,7 @@ class battle_manager {
 						pr.damage_dice_sides = get_attack_damage_dice(enemy, false);
 						pr.damage_modifier = get_damage_modifier_for_attack(enemy, false);
 						pr.damage_type = enemy.main_hand_damage_type;
+						pr.is_weapon_attack = true;
 						pr.resolution_tag = "resume_current_turn";
 						@current_roll = pr;
 						if (opp_user.is_bot) {
@@ -1801,7 +2166,11 @@ class battle_manager {
 	// ---- Monster AI Turn ----
 
 	void execute_monster_turn(combatant@ monster) {
-		if (@monster == null or @combat == null or monster.is_dead) return;
+		if (@monster == null or @combat == null or monster.is_dead) {
+			if (@combat != null and combat.battle_active) advance_turn();
+			return;
+		}
+		monster_turn_start_time = ticks();
 
 		combatant@ nearest = find_nearest_target_for_monster(monster);
 		int nearest_dist = @nearest != null ? feet_distance(monster.x, monster.y, nearest.x, nearest.y) : 9999;
@@ -1901,12 +2270,111 @@ class battle_manager {
 		pr.damage_modifier = attacker.get_ability_mod(ABILITY_DEX);
 		if (pr.damage_modifier < 0) pr.damage_modifier = 0;
 		pr.damage_type = DMG_BLUDGEONING;
+		pr.is_weapon_attack = true;
 		pr.attacks_remaining = remaining_after_current;
 		pr.resolution_tag = "flurry";
 		@current_roll = pr;
 
 		user@ u = find_user_for_combatant(attacker);
 		if (@u != null and !u.is_bot and attacker.is_player) {
+			send_roll_request(u, pr);
+		} else {
+			int roll1 = random(1, 20);
+			int roll2 = random(1, 20);
+			int natural = roll1;
+			if (adv and !disadv) natural = roll1 > roll2 ? roll1 : roll2;
+			else if (disadv and !adv) natural = roll1 < roll2 ? roll1 : roll2;
+			process_roll_result(natural);
+		}
+		return true;
+	}
+
+	bool start_true_strike_attack(combatant@ caster, combatant@ target) {
+		if (@combat == null or @caster == null or @target == null) return false;
+		if (target.is_dead or !target.is_alive()) return false;
+		int dist = feet_distance(caster.x, caster.y, target.x, target.y);
+		if (dist > caster.main_hand_range) return false;
+		if (!combat.can_see(caster, target)) return false;
+
+		bool attack_is_ranged = caster.main_hand_is_ranged;
+		bool adv = false;
+		bool disadv = false;
+		apply_attack_advantage_state(caster, target, dist, attack_is_ranged, adv, disadv);
+		reveal_hidden_combatant(caster, "making a True Strike attack");
+
+		pending_roll pr;
+		pr.combatant_id = caster.id;
+		pr.player_username = caster.is_player ? caster.player_username : caster.name;
+		pr.roll_type = ROLL_ATTACK;
+		pr.dice_sides = 20;
+		pr.modifier = spell_attack_bonus(caster) - caster.exhaustion_level * 2;
+		pr.reason = "True Strike against " + target.name;
+		pr.target_id = target.id;
+		pr.has_advantage = adv;
+		pr.has_disadvantage = disadv;
+		pr.attack_name = "True Strike";
+		pr.damage_dice_count = caster.main_hand_damage_count;
+		pr.damage_dice_sides = caster.main_hand_damage_dice;
+		pr.damage_modifier = get_spellcasting_ability_mod(caster);
+		pr.damage_type = caster.main_hand_damage_type;
+		pr.extra_damage_dice_count = cantrip_dice_count(1, caster.level);
+		pr.extra_damage_dice_sides = 6;
+		pr.extra_damage_type = DMG_RADIANT;
+		pr.is_weapon_attack = true;
+		pr.resolution_tag = "true_strike";
+		@current_roll = pr;
+
+		user@ u = find_user_for_combatant(caster);
+		if (@u != null and !u.is_bot and caster.is_player) {
+			send_roll_request(u, pr);
+		} else {
+			int roll1 = random(1, 20);
+			int roll2 = random(1, 20);
+			int natural = roll1;
+			if (adv and !disadv) natural = roll1 > roll2 ? roll1 : roll2;
+			else if (disadv and !adv) natural = roll1 < roll2 ? roll1 : roll2;
+			process_roll_result(natural);
+		}
+		return true;
+	}
+
+	bool start_spiritual_weapon_attack(combatant@ caster, combatant@ target) {
+		if (@combat == null or @caster == null or @target == null) return false;
+		if (!caster.spiritual_weapon_active or caster.spiritual_weapon_slot_level < 2) return false;
+		if (target.is_dead or !target.is_alive()) return false;
+		int dist = feet_distance(caster.x, caster.y, target.x, target.y);
+		if (dist > 60) return false;
+		if (!combat.can_see(caster, target)) return false;
+
+		bool adv = false;
+		bool disadv = false;
+		if (target.has_condition(COND_PARALYZED) or target.has_condition(COND_STUNNED) or target.has_condition(COND_UNCONSCIOUS)) adv = true;
+		if (caster.has_condition(COND_BLINDED) or caster.has_condition(COND_POISONED)) disadv = true;
+		if (target.is_dodging and !caster.has_condition(COND_BLINDED)) disadv = true;
+		if (target.has_condition(COND_INVISIBLE)) disadv = true;
+		if (target.has_condition(COND_RESTRAINED)) adv = true;
+		reveal_hidden_combatant(caster, "commanding Spiritual Weapon");
+
+		pending_roll pr;
+		pr.combatant_id = caster.id;
+		pr.player_username = caster.is_player ? caster.player_username : caster.name;
+		pr.roll_type = ROLL_ATTACK;
+		pr.dice_sides = 20;
+		pr.modifier = spell_attack_bonus(caster) - caster.exhaustion_level * 2;
+		pr.reason = "Spiritual Weapon attack against " + target.name;
+		pr.target_id = target.id;
+		pr.has_advantage = adv;
+		pr.has_disadvantage = disadv;
+		pr.attack_name = "Spiritual Weapon";
+		pr.damage_dice_count = spiritual_weapon_damage_count_for_slot(caster.spiritual_weapon_slot_level);
+		pr.damage_dice_sides = 8;
+		pr.damage_modifier = get_spellcasting_ability_mod(caster);
+		pr.damage_type = DMG_FORCE;
+		pr.resolution_tag = "spiritual_weapon";
+		@current_roll = pr;
+
+		user@ u = find_user_for_combatant(caster);
+		if (@u != null and !u.is_bot and caster.is_player) {
 			send_roll_request(u, pr);
 		} else {
 			int roll1 = random(1, 20);
@@ -2002,7 +2470,8 @@ class battle_manager {
 			combatant@ target = combat.get_combatant(pr.target_id);
 			if (@target == null) return;
 
-			bool is_crit = (natural_roll == 20) or (c.subclass == "Champion" and c.level >= 3 and natural_roll == 19);
+			int crit_threshold = get_critical_threshold(c, pr);
+			bool is_crit = (natural_roll >= crit_threshold);
 			bool is_fumble = (natural_roll == 1);
 			bool hit = false;
 			string outcome = "";
@@ -2047,6 +2516,11 @@ class battle_manager {
 				dmg_pr.damage_dice_sides = dmg_sides;
 				dmg_pr.damage_modifier = dmg_mod;
 				dmg_pr.damage_type = dmg_type;
+				dmg_pr.extra_damage_dice_count = pr.extra_damage_dice_count;
+				dmg_pr.extra_damage_dice_sides = pr.extra_damage_dice_sides;
+				dmg_pr.extra_damage_modifier = pr.extra_damage_modifier;
+				dmg_pr.extra_damage_type = pr.extra_damage_type;
+				dmg_pr.is_weapon_attack = pr.is_weapon_attack;
 				dmg_pr.is_crit = is_crit;
 				dmg_pr.is_spell_effect = pr.is_spell_effect;
 				dmg_pr.spell_uses_attack_roll = pr.spell_uses_attack_roll;
@@ -2057,8 +2531,9 @@ class battle_manager {
 				dmg_pr.spell_save_dc = pr.spell_save_dc;
 				dmg_pr.spell_is_aoe = pr.spell_is_aoe;
 				dmg_pr.spell_aoe_radius = pr.spell_aoe_radius;
-				if (is_crit) dmg_pr.damage_dice_count = dmg_count * 2;
+				dmg_pr.damage_dice_count = is_crit ? dmg_count * 2 : dmg_count;
 				dmg_pr.attacks_remaining = pr.attacks_remaining;
+				dmg_pr.resolution_tag = pr.resolution_tag;
 				dmg_pr.resume_turn_start = pr.resume_turn_start;
 				@current_roll = dmg_pr;
 
@@ -2121,8 +2596,17 @@ class battle_manager {
 			int total_damage = natural_roll + pr.damage_modifier;
 			if (total_damage < 1) total_damage = 1;
 
+			int extra_damage = 0;
+			if (pr.extra_damage_dice_count > 0 and pr.extra_damage_dice_sides > 0) {
+				int extra_rolls = pr.is_crit ? pr.extra_damage_dice_count * 2 : pr.extra_damage_dice_count;
+				for (int edi = 0; edi < extra_rolls; edi++) extra_damage += random(1, pr.extra_damage_dice_sides);
+				extra_damage += pr.extra_damage_modifier;
+				if (extra_damage < 0) extra_damage = 0;
+				total_damage += extra_damage;
+			}
+
 			int smite_damage = 0;
-			if (!pr.is_spell_effect and c.divine_smite_pending) {
+			if (!pr.is_spell_effect and c.divine_smite_pending and pr.is_weapon_attack and !c.main_hand_is_ranged and get_attack_range(c, false) <= 5) {
 				int smite_dice = c.divine_smite_slot_level + 1;
 				for (int sd = 0; sd < smite_dice; sd++) smite_damage += random(1, 8);
 				total_damage += smite_damage;
@@ -2146,6 +2630,14 @@ class battle_manager {
 				broadcast_announce(c.name + "'s Boon of Irresistible Offense adds " + boon_damage + " extra damage!", false);
 			}
 
+			int hunter_damage = 0;
+			if (pr.is_weapon_attack and c.class_name == "Ranger" and c.subclass == "Hunter" and !c.hunter_colossus_used and target.current_hp < target.max_hp and target.current_hp > 0) {
+				hunter_damage = random(1, 8);
+				total_damage += hunter_damage;
+				c.hunter_colossus_used = true;
+				broadcast_announce(c.name + "'s Colossus Slayer deals " + hunter_damage + " extra damage!", false);
+			}
+
 			string dmg_type_name = "damage";
 			if (pr.damage_type >= 0 and pr.damage_type < int(DAMAGE_TYPE_NAMES.length())) {
 				dmg_type_name = DAMAGE_TYPE_NAMES[pr.damage_type] + " damage";
@@ -2153,7 +2645,11 @@ class battle_manager {
 
 			string damage_reason = pr.attack_name != "" ? pr.attack_name + " damage" : "damage";
 			broadcast_roll(c.name, damage_reason, natural_roll, pr.damage_modifier, total_damage, total_damage + " " + dmg_type_name + " to " + target.name + ".");
+			if (extra_damage > 0 and pr.extra_damage_type >= 0 and pr.extra_damage_type < int(DAMAGE_TYPE_NAMES.length())) {
+				broadcast_announce(c.name + " adds " + extra_damage + " " + DAMAGE_TYPE_NAMES[pr.extra_damage_type] + " damage.", false);
+			}
 			combat.apply_damage(target, total_damage, pr.damage_type, c);
+			maybe_apply_on_kill_features(c, target);
 			if (target.wild_shape_just_ended) {
 				broadcast_announce(target.name + "'s Wild Shape ends!", true);
 				target.wild_shape_just_ended = false;
@@ -2497,7 +2993,7 @@ class battle_manager {
 		pr.roll_type = ROLL_ATTACK;
 		pr.dice_sides = 20;
 		pr.modifier = atk_bonus;
-		pr.reason = "to attack " + target.name;
+		pr.reason = c.main_hand + " attack against " + target.name;
 		pr.target_id = target_id;
 		pr.has_advantage = adv;
 		pr.has_disadvantage = disadv;
@@ -2506,6 +3002,7 @@ class battle_manager {
 		pr.damage_dice_sides = get_attack_damage_dice(c, false);
 		pr.damage_modifier = get_damage_modifier_for_attack(c, false);
 		pr.damage_type = c.main_hand_damage_type;
+		pr.is_weapon_attack = true;
 		pr.attacks_remaining = 0; // Not used for player auto-chain anymore
 		@current_roll = pr;
 
@@ -2790,6 +3287,42 @@ class battle_manager {
 			return;
 		}
 
+		combatant@ target = combat.get_combatant(target_id);
+		if (spell.id == "true_strike") {
+			if (@target == null or target.is_dead) {
+				u.send({{"type", message_types::announce}, {"text", "Choose a living target for True Strike."}, {"interrupt", true}});
+				return;
+			}
+			if (!combat.can_see(c, target)) {
+				u.send({{"type", message_types::announce}, {"text", "You cannot see that target for True Strike."}, {"interrupt", true}});
+				return;
+			}
+			int weapon_range = c.main_hand_range > 0 ? c.main_hand_range : 5;
+			int true_strike_dist = feet_distance(c.x, c.y, target.x, target.y);
+			if (true_strike_dist > weapon_range) {
+				u.send({{"type", message_types::announce}, {"text", "True Strike must target a creature within your weapon's range."}, {"interrupt", true}});
+				return;
+			}
+		}
+		else if (spell.id == "spiritual_weapon" and @target != null) {
+			if (!combat.can_see(c, target)) {
+				u.send({{"type", message_types::announce}, {"text", "You cannot see that target for Spiritual Weapon."}, {"interrupt", true}});
+				return;
+			}
+			int spiritual_dist = feet_distance(c.x, c.y, target.x, target.y);
+			if (spiritual_dist > 60) {
+				u.send({{"type", message_types::announce}, {"text", "That target is out of range for Spiritual Weapon."}, {"interrupt", true}});
+				return;
+			}
+		}
+		else if (@target != null and spell.range > 0) {
+			int target_dist = feet_distance(c.x, c.y, target.x, target.y);
+			if (target_dist > spell.range) {
+				u.send({{"type", message_types::announce}, {"text", "That target is out of range for " + spell.name + "."}, {"interrupt", true}});
+				return;
+			}
+		}
+
 		// Check casting time: 0=action, 1=bonus action, 2=reaction
 		if (spell.casting_time == 0 and !c.has_action) {
 			u.send({{"type", message_types::announce}, {"text", "No action remaining."}, {"interrupt", true}});
@@ -2853,13 +3386,11 @@ class battle_manager {
 			c.add_condition(COND_CONCENTRATING);
 		}
 
-		// Get target
-		combatant@ target = combat.get_combatant(target_id);
-
 		// Calculate spell attack bonus and save DC
 		int spell_atk = spell_attack_bonus(c, spell.id);
 		int save_dc = spell_save_dc(c, spell.id);
 		int spell_mod = spell_atk - c.proficiency; // just the ability mod
+		int healing_bonus = get_life_domain_healing_bonus(c, spell, cast_slot_level);
 		int upcast_levels = cast_slot_level - spell.level;
 		if (upcast_levels < 0) upcast_levels = 0;
 
@@ -2877,8 +3408,13 @@ class battle_manager {
 				heal_amount += die_roll;
 			}
 			heal_amount += spell_mod;
+			heal_amount += healing_bonus;
 			if (heal_amount < 1) heal_amount = 1;
-			combat.apply_healing(target, heal_amount);
+			int effective_heal = combat.apply_healing(target, heal_amount);
+			record_effective_healing(c.player_username, effective_heal);
+			if (healing_bonus > 0) {
+				broadcast_announce(c.name + "'s Life Domain adds " + healing_bonus + " extra healing.", false);
+			}
 			broadcast_roll(c.name, spell.name + " healing", heal_amount, spell_mod, heal_amount, "");
 			broadcast_to_battle({{"type", message_types::healing_done}, {"source", c.name}, {"target", target.name}, {"amount", heal_amount}});
 			broadcast_announce(target.name + " healed for " + heal_amount + ". Now at " + target.current_hp + " of " + target.max_hp + " HP.", false);
@@ -2895,8 +3431,36 @@ class battle_manager {
 		}
 		// Heal spell (flat 70 HP)
 		else if (spell.id == "heal" and @target != null) {
-			combat.apply_healing(target, 70);
-			broadcast_announce(target.name + " healed for 70 HP! Now at " + target.current_hp + ".", true);
+			int heal_amount = 70 + healing_bonus;
+			int effective_heal = combat.apply_healing(target, heal_amount);
+			record_effective_healing(c.player_username, effective_heal);
+			if (target.has_condition(COND_BLINDED)) {
+				target.remove_condition(COND_BLINDED);
+				broadcast_to_battle({{"type", message_types::condition_removed}, {"target", target.name}, {"condition", "Blinded"}});
+			}
+			if (target.has_condition(COND_DEAFENED)) {
+				target.remove_condition(COND_DEAFENED);
+				broadcast_to_battle({{"type", message_types::condition_removed}, {"target", target.name}, {"condition", "Deafened"}});
+			}
+			if (healing_bonus > 0) {
+				broadcast_announce(c.name + "'s Life Domain adds " + healing_bonus + " extra healing.", false);
+			}
+			broadcast_announce(target.name + " healed for " + heal_amount + " HP! Now at " + target.current_hp + ".", true);
+		}
+		else if (spell.id == "spiritual_weapon") {
+			clear_spiritual_weapon_effect(c, false);
+			c.spiritual_weapon_active = true;
+			c.spiritual_weapon_slot_level = cast_slot_level;
+			if (@target != null and !target.is_dead and start_spiritual_weapon_attack(c, target)) {
+				broadcast_announce(c.name + " summons a Spiritual Weapon and strikes at " + target.name + "!", true);
+			} else {
+				broadcast_announce(c.name + " summons a Spiritual Weapon.", true);
+			}
+		}
+		else if (spell.id == "true_strike") {
+			if (!start_true_strike_attack(c, target)) {
+				u.send({{"type", message_types::announce}, {"text", "True Strike cannot reach that target right now."}, {"interrupt", true}});
+			}
 		}
 		// Damage spells with save
 		else if (spell.damage_count > 0 and spell.save_type >= 0) {
@@ -3001,6 +3565,32 @@ class battle_manager {
 				}
 				broadcast_announce(c.name + " casts Bless on " + bless_text + "! They add 1d4 to attack rolls and saving throws.", true);
 			}
+			else if (spell.id == "lesser_restoration") {
+				if (@target == null) @target = c;
+				bool removed_any = false;
+				if (target.has_condition(COND_BLINDED)) {
+					target.remove_condition(COND_BLINDED);
+					broadcast_to_battle({{"type", message_types::condition_removed}, {"target", target.name}, {"condition", "Blinded"}});
+					removed_any = true;
+				}
+				if (target.has_condition(COND_DEAFENED)) {
+					target.remove_condition(COND_DEAFENED);
+					broadcast_to_battle({{"type", message_types::condition_removed}, {"target", target.name}, {"condition", "Deafened"}});
+					removed_any = true;
+				}
+				if (target.has_condition(COND_PARALYZED)) {
+					target.remove_condition(COND_PARALYZED);
+					broadcast_to_battle({{"type", message_types::condition_removed}, {"target", target.name}, {"condition", "Paralyzed"}});
+					removed_any = true;
+				}
+				if (target.has_condition(COND_POISONED)) {
+					target.remove_condition(COND_POISONED);
+					broadcast_to_battle({{"type", message_types::condition_removed}, {"target", target.name}, {"condition", "Poisoned"}});
+					removed_any = true;
+				}
+				if (removed_any) broadcast_announce(c.name + " restores " + target.name + " with Lesser Restoration.", true);
+				else broadcast_announce(c.name + " casts Lesser Restoration, but there is nothing for it to cure on " + target.name + ".", false);
+			}
 			else if (spell.id == "pass_without_trace") {
 				string[] hidden_names;
 				for (uint pi = 0; pi < combat.combatants.length(); pi++) {
@@ -3081,19 +3671,6 @@ class battle_manager {
 					target.add_condition(COND_INCAPACITATED);
 					broadcast_announce(target.name + " is banished to a harmless demiplane!", true);
 				}
-			}
-			else if (spell.id == "lesser_restoration" and @target != null) {
-				int[] clear_order = {COND_POISONED, COND_PARALYZED, COND_BLINDED, COND_DEAFENED};
-				string removed = "";
-				for (uint ci = 0; ci < clear_order.length(); ci++) {
-					if (target.has_condition(clear_order[ci])) {
-						target.remove_condition(clear_order[ci]);
-						removed = CONDITION_NAMES[clear_order[ci]];
-						break;
-					}
-				}
-				if (removed == "") broadcast_announce(target.name + " is unaffected by Lesser Restoration.", false);
-				else broadcast_announce(c.name + " removes " + removed + " from " + target.name + " with Lesser Restoration.", true);
 			}
 			else {
 				broadcast_announce(c.name + " casts " + spell.name + ".", false);
@@ -3196,15 +3773,30 @@ class battle_manager {
 
 	void tick() {
 		if (@combat == null or !combat.battle_active) return;
-		if (@current_roll != null) return;  // Waiting for a roll.
+		if (@current_roll != null) return;
 
 		combatant@ c = combat.current_combatant();
 		if (@c == null or c.is_dead) return;
-		if (!c.is_player) {
-			execute_monster_turn(c);
+		if (c.is_player) {
+			if (combatant_is_controlled_by_bot(c)) execute_player_bot_turn(c);
 			return;
 		}
-		if (combatant_is_controlled_by_bot(c)) execute_player_bot_turn(c);
+
+		if (monster_turn_start_time > 0 and ticks() - monster_turn_start_time > 10000) {
+			broadcast_announce(c.name + " ends its turn.");
+			monster_turn_start_time = 0;
+			advance_turn();
+			return;
+		}
+
+		if (!c.has_action and c.movement_remaining < FEET_PER_TILE) {
+			broadcast_announce(c.name + " ends its turn.");
+			monster_turn_start_time = 0;
+			advance_turn();
+			return;
+		}
+
+		execute_monster_turn(c);
 	}
 
 	// ---- Battle End (legacy wrapper) ----
@@ -3223,5 +3815,6 @@ class battle_manager {
 				break;
 			}
 		}
+		reset_progression_tracking();
 	}
 }

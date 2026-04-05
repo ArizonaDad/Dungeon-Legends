@@ -9,19 +9,25 @@
 #include "../common/utils.nvgt"
 bool game = false;
 bool start_game_pending = false;
+bool is_new_account = false;
 string pending_view = "";
 tts_voice v;
 settings config;
 string username;
 menu@ main_screen = null;
 int f_main_history, f_main_chat, f_main_chat_send, f_main_cancel, f_main_keyboard_area;
-string current_room_game_type = "default"; // Tracks the game type of the current room.
+string current_room_game_type = "sandbox"; // Tracks the game type of the current room.
 json_array@ room_player_names = json_array();  // Usernames of players in the current room.
 json_array@ room_player_bots = json_array();   // Parallel array: true if player is a bot.
 string room_host_name;          // Username of the room host.
 json_array@ cached_friends = json_array();     // Most recent friends list from server.
 json_array@ cached_pending = json_array();     // Most recent pending friend requests.
 bool has_pending_notification = false; // True when we got a friend request notification.
+
+string room_game_type_label(string game_type) {
+	game_type = normalize_character_profile(game_type);
+	return game_type == "adventure" ? "Adventure" : "Sandbox";
+}
 // Check if a player name corresponds to a bot in the current room.
 bool is_room_bot(string name) {
 	for (uint i = 0; i < room_player_names.length(); i++) {
@@ -61,10 +67,15 @@ bool launch_pending_game_if_needed()
 {
 	if (!start_game_pending) return false;
 	start_game_pending = false;
-	// Check if character exists
-	if (created_char_class == "") {
-		speak("You need to create a character first.", true);
-		character_creation_menu();
+	string profile = normalize_character_profile(current_room_game_type);
+	set_active_character_profile(profile);
+	if (!profile_has_character(profile)) {
+		if (profile == "sandbox" and profile_has_character("adventure")) {
+			set_active_character_profile("adventure");
+		} else {
+			speak("That " + room_game_type_label(profile) + " character is missing on this client. The lobby host needs everyone to create one before starting.", true);
+			return false;
+		}
 	}
 	combat_game_loop();
 	return true;
@@ -79,33 +90,61 @@ void create_lobby_for_mode(string game_type) {
 
 void main_menu()
 {
+	if (is_new_account) {
+		speak("Welcome to Souls MMO! Let's create your first character.", true);
+		character_creation_menu("adventure", 1);
+		is_new_account = false;
+	}
 	while (true) {
 		menu@ m = setup_menu("");
 		@m = main_screen;
-		int create_char = m.add_item("Create or update character.");
+		int total = 8;
+		int create_char = m.add_item("Create Character. 1 of " + total);
 		int view_char = -1;
-		if (created_char_class != "") {
-			view_char = m.add_item("View current character.");
+		if (has_any_character_profile()) {
+			total = 9;
+			view_char = m.add_item("View My Character. 2 of " + total);
 		}
-		int create_adventure = m.add_item("Adventure. Create an Adventure lobby.");
-		int create_sandbox = m.add_item("Sandbox. Create a Sandbox lobby.");
-		int join = m.add_item("Join a lobby.");
-		int social = m.add_item("Friends.");
-		int CHECK_ONLINE = m.add_item("Check who is online.");
-		int About = m.add_item("About us.");
-		int quit = m.add_item("Quit.");
+		int n = total == 9 ? 3 : 2;
+		int create_adventure = m.add_item("Adventure. Create or join an adventure lobby. " + n + " of " + total); n++;
+		int create_sandbox = m.add_item("Sandbox. Create or join a sandbox lobby. " + n + " of " + total); n++;
+		int join = m.add_item("Join a game! " + n + " of " + total); n++;
+		int social = m.add_item("Friends. " + n + " of " + total); n++;
+		int CHECK_ONLINE = m.add_item("Check who is online. " + n + " of " + total); n++;
+		int About = m.add_item("About us. " + n + " of " + total); n++;
+		int quit = m.add_item("Quit. " + n + " of " + total);
 		int res = m.run();
 		if (res == create_char) {
-			character_creation_menu();
+			menu@ profile_menu = setup_sub_menu("Choose which character profile to edit.");
+			profile_menu.add_item("Adventure Character. Persistent progression. Uses your current Adventure level.");
+			profile_menu.add_item("Sandbox Character. Free-build from level 1 through 20.");
+			int profile_pick = profile_menu.run();
+			if (profile_pick >= 0) {
+				string profile = profile_pick == 0 ? "adventure" : "sandbox";
+				int forced_level = profile == "adventure" ? cached_level : -1;
+				character_creation_menu(profile, forced_level);
+			}
 		}
 		else if (view_char >= 0 and res == view_char) {
+			string profile = "adventure";
+			if (profile_has_character("adventure") and profile_has_character("sandbox")) {
+				menu@ view_menu = setup_sub_menu("Choose which character to inspect.");
+				view_menu.add_item("Adventure Character.");
+				view_menu.add_item("Sandbox Character.");
+				int view_pick = view_menu.run();
+				if (view_pick < 0) continue;
+				profile = view_pick == 0 ? "adventure" : "sandbox";
+			} else if (profile_has_character("sandbox") and !profile_has_character("adventure")) {
+				profile = "sandbox";
+			}
+			set_active_character_profile(profile);
 			string subclass_text = created_char_subclass != "" ? " " + created_char_subclass : "";
 			string background_text = "";
 			if (created_char_background != "") {
 				background_choice_def@ bg = get_background_choice(created_char_background);
 				if (@bg != null) background_text = " Background: " + bg.name + ".";
 			}
-			string summary = created_char_name + ". " + created_char_race + " " + created_char_class + subclass_text + ", level " + created_char_level + "." + background_text + " ";
+			string summary = room_game_type_label(profile) + " character. " + created_char_name + ". " + created_char_race + " " + created_char_class + subclass_text + ", level " + created_char_level + "." + background_text + " ";
 			summary += "Strength " + created_ability_scores[0] + ". Dexterity " + created_ability_scores[1] + ". Constitution " + created_ability_scores[2] + ". ";
 			summary += "Intelligence " + created_ability_scores[3] + ". Wisdom " + created_ability_scores[4] + ". Charisma " + created_ability_scores[5] + ". ";
 			summary += "Weapon: " + created_weapon + ".";
@@ -116,15 +155,22 @@ void main_menu()
 			if (created_spells.length() > 0) {
 				summary += " Spells: " + join_spell_names(created_spells) + ".";
 			}
+			if (profile == "adventure") {
+				int achievement_count = 0;
+				if (@cached_stats != null and cached_stats.exists("achievement_count")) achievement_count = int(cached_stats["achievement_count"]);
+				summary += " Adventure progress: " + cached_xp + " of " + cached_xp_needed + " XP toward level " + cached_level + ". ";
+				summary += achievement_count + " achievement" + (achievement_count == 1 ? "" : "s") + " unlocked.";
+			}
 			speak(summary, true);
 		}
-		else if (res == create_adventure) {
-			create_lobby_for_mode("adventure");
-			m.play(m.select_sound);
-		}
-		else if (res == create_sandbox) {
-			create_lobby_for_mode("sandbox");
-			m.play(m.select_sound);
+		else if (res == create_adventure or res == create_sandbox) {
+			string name, password;
+			if (create_room_form(name, password)) {
+				current_room_game_type = res == create_adventure ? "adventure" : "sandbox";
+				send({{"type", message_types::new_room}, {"name", name}, {"password", password}, {"game_type", current_room_game_type}});
+				host_menu();
+				m.play(m.select_sound);
+			}
 		}
 		else if (res == join) {
 			send({{"type", message_types::list_rooms}});
@@ -179,19 +225,6 @@ bool main_screen_loop()
 				wait(50);
 				show_player_context_menu(msg_user, false);
 			}
-		}
-	}
-	// Tab: switch between chat history and chat input
-	if (key_pressed(KEY_TAB)) {
-		if (focus == f_main_history) {
-			main_screen.form.focus(f_main_chat);
-			speak("Chat message.", false);
-		} else if (focus == f_main_chat or focus == f_main_chat_send) {
-			main_screen.form.focus(f_main_history);
-			speak("Chat history.", false);
-		} else {
-			main_screen.form.focus(f_main_history);
-			speak("Chat history.", false);
 		}
 	}
 	if (key_pressed(KEY_F4)) {
@@ -294,7 +327,8 @@ void on_list_rooms(json_array@ rooms_list)
 		// Fix 11: Show locked status for password-protected rooms.
 		string lock_label = "";
 		if (room_obj.exists("locked") and bool(room_obj["locked"])) lock_label = " (Locked)";
-		string game_label = room_obj.exists("game_type") ? " [" + string(room_obj["game_type"]) + "]" : "";
+		string game_type = room_obj.exists("game_type") ? normalize_character_profile(string(room_obj["game_type"])) : "sandbox";
+		string game_label = " [" + room_game_type_label(game_type) + "]";
 		rm.add_item(room_obj["name"] + game_label + lock_label + " with " + pretty_print(room_obj["players"], empty_text = "0 players") + " " + (i + 1) + " of " + rooms_list.length());
 	}
 	int res = rm.run();
@@ -322,6 +356,7 @@ void on_incoming_chat(string sender_name, string message)
 {
 	string msg = sender_name.empty() ? message : ("%0 says: %1".format(sender_name, message));
 	speak(msg, false);
+	if (battle_active) combat_history_add(msg);
 	if (@main_screen == null) return;
 	main_screen.form.add_list_item(f_main_history, msg + "  ( " + calendar().format(DATE_TIME_FORMAT_RFC822) + ")", message);
 }
@@ -392,13 +427,24 @@ void host_menu()
 		}
 		else if (res == start) {
 			menu@ mode_menu = setup_sub_menu("Choose game mode.");
-			mode_menu.add_item("PvP Arena. Players fight each other.");
-			mode_menu.add_item("Wave Survival. Fight waves of monsters together.");
-			mode_menu.add_item("Boss Rush. Challenge powerful bosses with your party.");
-			int mode_pick = mode_menu.run();
-			string game_mode = "pvp";
-			if (mode_pick == 1) game_mode = "wave";
-			else if (mode_pick == 2) game_mode = "boss";
+			string lobby_type = normalize_character_profile(current_room_game_type);
+			string game_mode = "wave";
+			if (lobby_type == "sandbox") {
+				mode_menu.add_item("PvP Arena. Players fight each other with Sandbox characters.");
+				mode_menu.add_item("Wave Survival. Fight waves of monsters together with Sandbox characters.");
+				mode_menu.add_item("Boss Rush. Challenge powerful bosses with your Sandbox party.");
+				int mode_pick = mode_menu.run();
+				if (mode_pick < 0) continue;
+				game_mode = "pvp";
+				if (mode_pick == 1) game_mode = "wave";
+				else if (mode_pick == 2) game_mode = "boss";
+			} else {
+				mode_menu.add_item("Adventure Run. Fight a wave scenario together and earn XP.");
+				mode_menu.add_item("Boss Hunt. Challenge a boss together and earn XP.");
+				int mode_pick = mode_menu.run();
+				if (mode_pick < 0) continue;
+				game_mode = mode_pick == 0 ? "wave" : "boss";
+			}
 			if (game_mode == "wave") {
 				menu@ scenario_menu = setup_sub_menu("Choose a scenario.");
 				scenario_menu.add_item("Goblin Ambush. Level 1 to 3. Easy.");

@@ -759,6 +759,8 @@ combatant@ create_monster_combatant(monster_def@ def, int x, int y) {
     c.main_hand_range = def.attack_range;
     c.main_hand_finesse = false;
     c.main_hand_is_ranged = false;
+    c.monster_def_id = def.id;
+    c.monster_xp_value = def.xp;
 
     // Store secondary attack data when the stat block defines one.
     c.monster_attack2_name = def.attack2_name;

@@ -94,6 +94,13 @@ namespace message_types
 	const string level_up = "level_up";                       // Client levels up.
 	const string spell_list = "spell_list";                   // Server sends available spells.
 	const string inventory_update = "inventory_update";       // Server sends inventory changes.
+	const string progression_update = "progression_update";   // Server sends Adventure XP/progression updates.
+	const string achievement_unlocked = "achievement_unlocked"; // Server announces a newly earned achievement.
+
+	// Level-up / daily
+	const string level_up_choices = "level_up_choices";       // Server sends level-up options after Adventure battle.
+	const string level_up_response = "level_up_response";     // Client sends chosen spells/subclass.
+	const string daily_bonus = "daily_bonus";                 // Server sends daily login bonus info.
 
 	// Monster/wave system
 	const string wave_start = "wave_start";                   // Server announces new wave.

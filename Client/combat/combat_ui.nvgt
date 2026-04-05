@@ -70,16 +70,37 @@ uint my_combatant_id = 0;
 string battle_mode = "pvp";
 int wave_number = 0;
 
+// Level-up state
+bool pending_level_up = false;
+int level_up_new_level = 0;
+string level_up_class = "";
+bool level_up_needs_subclass = false;
+int level_up_new_cantrips = 0;
+int level_up_new_spells = 0;
+bool level_up_is_caster = false;
+
 // Roll state
 bool waiting_for_roll = false;
 int roll_type = -1;
+string roll_reason = "";
+int roll_dice_sides = 20;
+int roll_modifier = 0;
+uint64 next_roll_prompt_reminder = 0;
+string roll_target_player = "";
 bool waiting_for_bardic_prompt = false;
+string bardic_prompt_text = "";
+uint64 next_bardic_prompt_reminder = 0;
 
 // Targeting
 uint current_target_id = 0;
 string current_target_name = "";
 int scan_cursor = 0;
 combat_entity[] scan_results;
+
+// Focus mode (0=game, 1=chat, 2=history)
+int combat_focus = 0;
+string[] combat_history;
+int combat_history_cursor = -1;
 
 // Personal combat resources
 int my_focus_points = 0;
@@ -100,6 +121,9 @@ bool my_has_action = false;
 bool my_has_bonus_action = false;
 bool my_has_reaction = false;
 int my_attacks_remaining = 0;
+bool my_spiritual_weapon_active = false;
+
+#include "combat_audio.nvgt"
 
 // ============================================================
 // ROLL BUTTON - The core interaction for blind D&D
@@ -107,6 +131,10 @@ int my_attacks_remaining = 0;
 
 void prompt_roll(string reason, int dice, int modifier, int count = 1) {
 	waiting_for_roll = true;
+	roll_reason = reason;
+	roll_dice_sides = dice;
+	roll_modifier = modifier;
+	next_roll_prompt_reminder = ticks() + 3500;
 
 	string mod_text = "";
 	if (modifier > 0) mod_text = " plus " + modifier;
@@ -114,7 +142,7 @@ void prompt_roll(string reason, int dice, int modifier, int count = 1) {
 
 	string dice_text = "a d " + dice;
 	if (count > 1) dice_text = count + " d " + dice;
-	speak(reason + ". Press R to roll " + dice_text + mod_text + ".", false);
+	speak(reason + ". Press R or Enter to roll " + dice_text + mod_text + ".", true);
 }
 
 string die_label(int die_size) {
@@ -176,13 +204,21 @@ string describe_target_position(combat_entity@ source, combat_entity@ target) {
 
 void prompt_bardic_choice(string text) {
 	waiting_for_bardic_prompt = true;
+	bardic_prompt_text = text;
+	next_bardic_prompt_reminder = ticks() + 3500;
 	speak(text, true);
 }
 
 bool check_roll_input() {
 	if (!waiting_for_roll) return false;
 	if (key_pressed(KEY_R) or key_pressed(KEY_RETURN)) {
+		if (roll_target_player != "" and roll_target_player != username) {
+			speak("It is not your turn to roll.", true);
+			return false;
+		}
 		waiting_for_roll = false;
+		next_roll_prompt_reminder = 0;
+		roll_target_player = "";
 		send({{"type", message_types::roll_result}, {"rolled", true}});
 		speak("Rolling.", true);
 		return true;
@@ -194,12 +230,14 @@ bool check_bardic_prompt_input() {
 	if (!waiting_for_bardic_prompt) return false;
 	if (key_pressed(KEY_RETURN) or key_pressed(KEY_R)) {
 		waiting_for_bardic_prompt = false;
+		next_bardic_prompt_reminder = 0;
 		send({{"type", message_types::bardic_response}, {"use", true}});
 		speak("Using Bardic Inspiration.", true);
 		return true;
 	}
 	if (key_pressed(KEY_ESCAPE)) {
 		waiting_for_bardic_prompt = false;
+		next_bardic_prompt_reminder = 0;
 		send({{"type", message_types::bardic_response}, {"use", false}});
 		speak("Saving Bardic Inspiration.", true);
 		return true;
@@ -213,6 +251,14 @@ void show_roll_result(int natural_roll, int total, string outcome) {
 	else if (natural_roll == 1) text = "Natural 1!";
 	if (total != natural_roll) text += ", total " + total;
 	text += ". " + outcome;
+	if (natural_roll == 20 or natural_roll == 1) {
+		sound@ cue = combat_audio_make_sweep(natural_roll == 20 ? 640.0f : 320.0f, natural_roll == 20 ? 1180.0f : 120.0f, natural_roll == 20 ? 260 : 320, -16.0f, 0.24f, 4.0f, 0.02f, 0.34f, 2.8f);
+		if (@cue != null) {
+			cue.spatialization_enabled = false;
+			cue.play();
+			combat_audio_track(cue);
+		}
+	}
 	speak(text, true);
 }
 
@@ -367,6 +413,7 @@ void show_bonus_action_menu() {
 	int flurry_opt = -1;
 	int bardic_opt = -1;
 	int wild_shape_opt = -1;
+	int spiritual_weapon_opt = -1;
 
 	if (lc == "barbarian" and !my_is_raging and my_rage_uses_remaining > 0) rage_opt = m.add_item("Rage. Bonus action. Uses left: " + my_rage_uses_remaining + ". Damage bonus: " + my_rage_damage_bonus + ".");
 	if (lc == "fighter" and my_second_wind_available) second_wind_opt = m.add_item("Second Wind. Bonus action. Heal 1d10 plus fighter level.");
@@ -378,6 +425,7 @@ void show_bonus_action_menu() {
 		if (currently_wild_shaped) wild_shape_opt = m.add_item("Wild Shape. Revert or choose a new beast form.");
 		else wild_shape_opt = m.add_item("Wild Shape. Bonus action. Transform into a beast.");
 	}
+	if (my_spiritual_weapon_active) spiritual_weapon_opt = m.add_item("Spiritual Weapon. Strike a target within 60 feet with your summoned weapon.");
 
 	int options = 1;
 	if (rage_opt >= 0) options++;
@@ -387,6 +435,7 @@ void show_bonus_action_menu() {
 	if (flurry_opt >= 0) options++;
 	if (bardic_opt >= 0) options++;
 	if (wild_shape_opt >= 0) options++;
+	if (spiritual_weapon_opt >= 0) options++;
 	if (options == 1) {
 		speak("No class bonus actions are available right now. You can still use a bonus action spell if you know one.", true);
 	}
@@ -423,6 +472,13 @@ void show_bonus_action_menu() {
 	}
 	else if (wild_shape_opt >= 0 and res == wild_shape_opt) {
 		show_wild_shape_menu(currently_wild_shaped);
+	}
+	else if (spiritual_weapon_opt >= 0 and res == spiritual_weapon_opt) {
+		if (current_target_id == 0) {
+			speak("No target selected. Scan with I J K L and press Enter to lock a target.", true);
+			return;
+		}
+		send({{"type", message_types::bonus_action}, {"feature", "spiritual_weapon_attack"}, {"target_id", current_target_id}});
 	}
 }
 
@@ -595,6 +651,7 @@ void speak_my_status() {
 	else if (my_rage_uses_remaining > 0) text += "Rages remaining: " + my_rage_uses_remaining + ". ";
 	if (my_action_surge_uses_remaining > 0) text += "Action Surge uses remaining: " + my_action_surge_uses_remaining + ". ";
 	if (my_second_wind_available) text += "Second Wind available. ";
+	if (my_spiritual_weapon_active) text += "Spiritual Weapon is active. ";
 	if (my_has_action) text += "Action available. ";
 	else if (my_attacks_remaining > 0) text += my_attacks_remaining + " extra attack" + (my_attacks_remaining == 1 ? "" : "s") + " remaining. ";
 	else text += "Action spent. ";
@@ -651,9 +708,12 @@ void speak_initiative_order() {
 }
 
 void speak_turn_start(string name, bool is_me) {
+	combat_audio_play_turn_start(name, is_me);
 	if (is_me) {
-		speak("Your turn! Round " + current_round + ". Press F or B for actions, W A S D to move, I J K L to scan.", true);
+		combat_history_add("Your turn! Round " + current_round + ".");
+		speak("Your turn! Round " + current_round + ". Press F for actions, B for bonus actions, W A S D to move, I J K L to scan.", true);
 	} else {
+		combat_history_add(name + "'s turn.");
 		speak(name + "'s turn.", false);
 	}
 }
@@ -701,6 +761,7 @@ void speak_current_turn_status() {
 // ============================================================
 
 void scan_direction(string dir) {
+	combat_audio_play_direction_ping(dir);
 	send({{"type", message_types::scan_direction}, {"dir", dir}});
 	scan_cursor = 0;
 }
@@ -708,6 +769,7 @@ void scan_direction(string dir) {
 void receive_scan_results(json_array@ results) {
 	scan_results.resize(0);
 	if (@results == null or results.length() == 0) {
+		combat_audio_play_empty_scan();
 		speak("Nothing in that direction.", true);
 		return;
 	}
@@ -723,6 +785,7 @@ void receive_scan_results(json_array@ results) {
 	if (scan_results.length() > 0) {
 		announce_scan_target(0);
 	} else {
+		combat_audio_play_empty_scan();
 		speak("Nothing in that direction.", true);
 	}
 }
@@ -743,20 +806,34 @@ void announce_scan_target(int index) {
 	combat_entity@ e = @scan_results[index];
 	combat_entity@ me = get_entity(my_combatant_id);
 	int dist = 0;
-	if (@me != null) dist = feet_distance(me.x, me.y, e.x, e.y);
+	string dir = "";
+	if (@me != null) {
+		dist = feet_distance(me.x, me.y, e.x, e.y);
+		int dx = e.x - me.x;
+		int dy = e.y - me.y;
+		if (dx == 0 and dy == 0) dir = "here";
+		else if (dx == 0 and dy > 0) dir = "north";
+		else if (dx == 0 and dy < 0) dir = "south";
+		else if (dx > 0 and dy == 0) dir = "east";
+		else if (dx < 0 and dy == 0) dir = "west";
+		else if (dx > 0 and dy > 0) dir = "northeast";
+		else if (dx < 0 and dy > 0) dir = "northwest";
+		else if (dx > 0 and dy < 0) dir = "southeast";
+		else if (dx < 0 and dy < 0) dir = "southwest";
+	}
 
 	string text = "";
 	if (e.is_player) text = "Ally: ";
 	string direction = @me != null ? relative_direction_text(me.x, me.y, e.x, e.y) : "unknown direction";
 	text += e.name + ", " + dist + " feet to the " + direction + ", " + e.health_status();
-	// Show conditions
 	for (uint c = 0; c < e.conditions.length(); c++) {
 		int cond = e.conditions[c];
 		if (cond > 0 and cond < int(CONDITION_NAMES.length())) {
 			text += ", " + CONDITION_NAMES[cond];
 		}
 	}
-	text += ". " + (index + 1) + " of " + scan_results.length() + ". Press left or right bracket to cycle, Enter to target.";
+	text += ". " + (index + 1) + " of " + scan_results.length() + ". Press left or right bracket, or Caps Lock, to cycle, or Enter to target.";
+	combat_audio_play_scan_target(e);
 	speak(text, true);
 }
 
@@ -769,6 +846,7 @@ void lock_target() {
 	current_target_id = e.id;
 	current_target_name = e.name;
 	send({{"type", message_types::set_target}, {"target_id", current_target_id}});
+	combat_audio_play_target_lock(e);
 	combat_entity@ me = get_my_entity();
 	if (@me != null) speak("Targeting " + e.name + ", " + describe_target_position(me, e) + ".", true);
 	else speak("Targeting " + e.name + ".", true);
@@ -778,43 +856,69 @@ void lock_target() {
 // COMBAT FEEDBACK (from server messages)
 // ============================================================
 
+void combat_history_add(string msg) {
+	combat_history.insert_last(msg);
+}
+
 void on_damage_dealt(string attacker, string target, int amount, string damage_type, bool is_crit) {
 	string text = attacker + " hits " + target + " for " + amount + " " + damage_type + " damage";
 	if (is_crit) text += "! Critical hit!";
 	else text += ".";
+	combat_history_add(text);
+	combat_audio_play_damage(attacker, target, is_crit, amount);
 	speak(text, true);
 }
 
 void on_healing_done(string source, string target, int amount) {
-	speak(source + " heals " + target + " for " + amount + " hit points.", true);
+	string text = source + " heals " + target + " for " + amount + " hit points.";
+	combat_history_add(text);
+	combat_audio_play_heal(target, amount);
+	speak(text, true);
 }
 
 void on_condition_applied(string target, string condition) {
-	speak(target + " is now " + condition + ".", false);
+	string text = target + " is now " + condition + ".";
+	combat_history_add(text);
+	combat_audio_play_condition(target, false);
+	speak(text, false);
 }
 
 void on_condition_removed(string target, string condition) {
-	speak(target + " is no longer " + condition + ".", false);
+	string text = target + " is no longer " + condition + ".";
+	combat_history_add(text);
+	combat_audio_play_condition(target, true);
+	speak(text, false);
 }
 
 void on_creature_died(string name, bool is_player) {
-	if (is_player) speak(name + " has fallen!", true);
-	else speak(name + " is defeated!", true);
+	string text = is_player ? name + " has fallen!" : name + " is defeated!";
+	combat_history_add(text);
+	combat_audio_play_death(name);
+	speak(text, true);
 }
 
 void on_death_save_result(string name, int roll, string outcome) {
-	speak(name + " death saving throw. " + outcome, true);
+	string text = name + " death saving throw. " + outcome;
+	combat_history_add(text);
+	speak(text, true);
 }
 
 void on_miss(string attacker, string target) {
-	speak(attacker + " misses " + target + ".", true);
+	string text = attacker + " misses " + target + ".";
+	combat_history_add(text);
+	combat_audio_play_miss(target);
+	speak(text, true);
 }
 
 void on_battle_start(string mode_text) {
+	combat_history_add("Battle begins! " + mode_text);
+	combat_audio_play_battle_start();
+	combat_audio_refresh_ambience();
 	speak("Battle begins! " + mode_text, true);
 }
 
 void on_battle_end(string result) {
+	combat_audio_play_battle_end(result);
 	if (result == "victory") speak("Victory! You have won the battle!", true);
 	else if (result == "defeat") speak("Defeat! Your party has fallen.", true);
 	else speak("Battle over! " + result, true);
@@ -823,6 +927,7 @@ void on_battle_end(string result) {
 
 void on_wave_start(int wave_num) {
 	wave_number = wave_num;
+	combat_audio_play_wave_start();
 	speak("Wave " + wave_num + "!", true);
 }
 
@@ -844,6 +949,9 @@ combat_entity@ get_entity_by_index(int idx) {
 
 void parse_game_state(json_object@ msg) {
 	if (@msg == null) return;
+	combat_entity[] previous_entities;
+	previous_entities = combat_entities;
+	bool previous_hidden = my_is_hidden;
 	if (msg.exists("round")) current_round = int(msg["round"]);
 	if (msg.exists("turn_index")) current_turn_index = int(msg["turn_index"]);
 	if (msg.exists("battle_active")) battle_active = bool(msg["battle_active"]);
@@ -867,6 +975,7 @@ void parse_game_state(json_object@ msg) {
 	my_has_bonus_action = msg.exists("my_has_bonus_action") ? bool(msg["my_has_bonus_action"]) : false;
 	my_has_reaction = msg.exists("my_has_reaction") ? bool(msg["my_has_reaction"]) : false;
 	my_attacks_remaining = msg.exists("my_attacks_remaining") ? int(msg["my_attacks_remaining"]) : 0;
+	my_spiritual_weapon_active = msg.exists("my_spiritual_weapon_active") ? bool(msg["my_spiritual_weapon_active"]) : false;
 
 	// Parse combatants
 	if (msg.exists("combatants")) {
@@ -912,22 +1021,23 @@ void parse_game_state(json_object@ msg) {
 			}
 		}
 	}
+	combat_audio_process_state_update(previous_entities, previous_hidden);
 }
 
 void show_combat_help() {
 	menu@ m = setup_sub_menu("Combat Help.");
 	m.add_item("W A S D. Move your character on your turn. Each step is 5 feet.");
 	m.add_item("I J K L. Scan for creatures. I north, K south, J west, L east.");
-	m.add_item("Left and right bracket keys. Cycle through scan targets.");
+	m.add_item("Left and right bracket keys, or Caps Lock. Cycle through scan targets. Shift plus Caps Lock cycles backward.");
 	m.add_item("Enter. Lock onto scanned target.");
-	m.add_item("F. Open your action menu on your turn.");
-	m.add_item("B. Open your bonus action menu on your turn.");
+	m.add_item("F. Open action menu on your turn. Attack, cast spell, dodge, dash, and more.");
+	m.add_item("B. Open bonus action menu on your turn. Class features like Rage, Action Surge, Cunning Action.");
 	m.add_item("R. Roll one die when prompted. If an action needs multiple dice, you will be prompted once per die.");
 	m.add_item("H. Hear your current status. Health, AC, conditions, position.");
 	m.add_item("O. Hear initiative order. Who goes when.");
 	m.add_item("T. Hear whose turn it is and who acts next.");
-	m.add_item("Tab. Switch between chat and chat history.");
-	m.add_item("Escape. Forfeit the battle. Press twice to confirm.");
+	m.add_item("Tab. Switch focus between Game, Chat, and History. Shift plus Tab switches backward.");
+	m.add_item("Escape. Forfeit the battle. Press twice to confirm. In Chat or History mode, returns to Game.");
 	m.add_item("Turn structure. Move up to your speed, then take an action. You can move before or after your action.");
 	m.add_item("Actions. Attack, Cast a Spell, Dodge, Dash, Disengage, Help, Hide, Ready attack, Shove, Grapple.");
 	m.add_item("Dodge. Attacks against you have disadvantage until your next turn.");
@@ -938,6 +1048,7 @@ void show_combat_help() {
 }
 
 void reset_combat_state() {
+	combat_audio_reset();
 	combat_entities.resize(0);
 	initiative_order.resize(0);
 	scan_results.resize(0);
@@ -948,6 +1059,8 @@ void reset_combat_state() {
 	my_combatant_id = 0;
 	waiting_for_roll = false;
 	waiting_for_bardic_prompt = false;
+	next_roll_prompt_reminder = 0;
+	next_bardic_prompt_reminder = 0;
 	roll_type = -1;
 	current_target_id = 0;
 	current_target_name = "";
@@ -971,38 +1084,126 @@ void reset_combat_state() {
 	my_has_bonus_action = false;
 	my_has_reaction = false;
 	my_attacks_remaining = 0;
+	my_spiritual_weapon_active = false;
+	combat_focus = 0;
+	combat_history.resize(0);
+	combat_history_cursor = -1;
 }
 
 // ============================================================
 // MAIN COMBAT GAME LOOP
 // ============================================================
 
+string[] combat_focus_names = {"Game", "Chat", "History"};
+
+void combat_switch_focus(int dir) {
+	combat_focus += dir;
+	if (combat_focus > 2) combat_focus = 0;
+	if (combat_focus < 0) combat_focus = 2;
+	speak(combat_focus_names[combat_focus] + " mode.", true);
+}
+
+void combat_enter_chat() {
+	bool canceled = false;
+	string msg = input_box_form("Combat Chat", "Type a message to send:", "", canceled);
+	if (canceled or msg == "") {
+		combat_focus = 0;
+		speak("Game mode.", true);
+		return;
+	}
+	send({{"type", message_types::chat_message}, {"message", msg}});
+	combat_focus = 0;
+	speak("Message sent. Game mode.", true);
+}
+
+void combat_browse_history() {
+	if (combat_history.length() == 0) {
+		speak("No combat history.", true);
+		combat_focus = 0;
+		speak("Game mode.", true);
+		return;
+	}
+	menu@ m = setup_sub_menu("Combat History. " + combat_history.length() + " messages. Select a message for options.");
+	uint start = 0;
+	if (combat_history.length() > 50) start = combat_history.length() - 50;
+	for (uint i = start; i < combat_history.length(); i++) {
+		m.add_item(combat_history[i]);
+	}
+	int res = m.run();
+	if (res >= 0) {
+		uint actual_index = start + uint(res);
+		string selected_msg = combat_history[actual_index];
+		string msg_user = extract_username_from_combat_history(selected_msg);
+		if (msg_user != "") {
+			show_player_context_menu(msg_user, false);
+		} else {
+			speak(selected_msg, true);
+		}
+	}
+	combat_focus = 0;
+}
+
+string extract_username_from_combat_history(string msg) {
+	int says_pos = msg.find(" says: ");
+	if (says_pos > 0) return msg.substr(0, says_pos);
+	if (msg.find("PM from ") == 0) {
+		string rest = msg.substr(8);
+		int colon_pos = rest.find(": ");
+		if (colon_pos > 0) return rest.substr(0, colon_pos);
+	}
+	return "";
+}
+
 void combat_game_loop() {
 	battle_active = true;
 	is_my_turn = false;
-	speak("Entering combat. I J K L to scan for creatures. Enter locks a target. T tells you whose turn it is. F for actions on your turn. H for status. O for initiative order.", true);
+	combat_focus = 0;
+	speak("Entering combat. I J K L to scan for creatures. Enter locks a target. T tells you whose turn it is. F for actions, B for bonus actions on your turn. H for status. O for initiative order. Tab to switch focus.", true);
 
 	while (battle_active) {
 		wait(10);
 		network_loop();
 		if (@main_screen != null) main_screen.form.monitor();
+		combat_audio_update();
 
-		// Roll button check - blocks other input while waiting for a roll
 		if (waiting_for_roll) {
+			if (next_roll_prompt_reminder > 0 and ticks() >= next_roll_prompt_reminder) {
+				string mod_text = "";
+				if (roll_modifier > 0) mod_text = " plus " + roll_modifier;
+				else if (roll_modifier < 0) mod_text = " minus " + (-roll_modifier);
+				speak("Still waiting on your roll. " + roll_reason + ". Press R or Enter to roll a d " + roll_dice_sides + mod_text + ".", true);
+				next_roll_prompt_reminder = ticks() + 3500;
+			}
 			check_roll_input();
 			continue;
 		}
 		if (waiting_for_bardic_prompt) {
+			if (next_bardic_prompt_reminder > 0 and ticks() >= next_bardic_prompt_reminder) {
+				speak("Still waiting. " + bardic_prompt_text, true);
+				next_bardic_prompt_reminder = ticks() + 3500;
+			}
 			check_bardic_prompt_input();
 			continue;
 		}
 		if (@main_screen != null and !main_screen_loop()) continue;
+
+		if (key_pressed(KEY_TAB)) {
+			if ((keyboard_modifiers & KEYMOD_SHIFT) != 0) combat_switch_focus(-1);
+			else combat_switch_focus(1);
+			if (combat_focus == 1) combat_enter_chat();
+			else if (combat_focus == 2) combat_browse_history();
+			continue;
+		}
+
+		if (combat_focus != 0) continue;
 
 		// IJKL scanning
 		if (key_pressed(KEY_I)) scan_direction("north");
 		else if (key_pressed(KEY_K)) scan_direction("south");
 		else if (key_pressed(KEY_J)) scan_direction("west");
 		else if (key_pressed(KEY_L)) scan_direction("east");
+		else if (key_pressed(KEY_CAPSLOCK)) cycle_scan((keyboard_modifiers & KEYMOD_SHIFT) != 0 ? -1 : 1);
+
 		// Target cycling with bracket keys, Enter to lock
 		else if (key_pressed(KEY_LEFTBRACKET)) cycle_scan(-1);
 		else if (key_pressed(KEY_RIGHTBRACKET)) cycle_scan(1);
@@ -1023,7 +1224,7 @@ void combat_game_loop() {
 				send({{"type", message_types::action_move}, {"dx", 1}, {"dy", 0}});
 			}
 
-			// Action menu
+			// Action menus
 			else if (key_pressed(KEY_F)) show_action_menu();
 			else if (key_pressed(KEY_B)) show_bonus_action_menu();
 		}
@@ -1043,7 +1244,6 @@ void combat_game_loop() {
 					confirmed = true;
 					break;
 				}
-				// Any other key cancels
 				if (key_pressed(KEY_RETURN) or key_pressed(KEY_SPACE) or key_pressed(KEY_A) or key_pressed(KEY_W) or key_pressed(KEY_S) or key_pressed(KEY_D)) {
 					break;
 				}
@@ -1062,5 +1262,109 @@ void combat_game_loop() {
 	// Return to lobby
 	speak("Returning to lobby in 5 seconds.", false);
 	wait(5000);
+
+	if (pending_level_up) {
+		show_level_up_screen();
+	}
+
 	reset_combat_state();
+}
+
+void show_level_up_screen() {
+	pending_level_up = false;
+	speak("Level Up! You are now level " + level_up_new_level + "!", true);
+	wait(1500);
+
+	string chosen_subclass = "";
+	json_array new_cantrip_names;
+	json_array new_spell_names;
+
+	if (level_up_needs_subclass) {
+		speak("Choose a subclass for your " + level_up_class + ".", true);
+		string[] sub_names;
+		string[] sub_descs;
+		get_subclass_options(level_up_class, sub_names, sub_descs);
+		if (sub_names.length() > 0) {
+			menu@ sm = setup_sub_menu("Choose your subclass.");
+			for (uint i = 0; i < sub_names.length(); i++) {
+				string label = sub_names[i];
+				if (i < sub_descs.length() and sub_descs[i] != "") label += ". " + sub_descs[i];
+				sm.add_item(label);
+			}
+			int pick = sm.run();
+			if (pick >= 0 and pick < int(sub_names.length())) {
+				chosen_subclass = sub_names[pick];
+				speak("You chose " + chosen_subclass + "!", true);
+			}
+		}
+	}
+
+	if (level_up_is_caster and level_up_new_cantrips > 0) {
+		speak("You can learn " + level_up_new_cantrips + " new cantrip" + (level_up_new_cantrips > 1 ? "s" : "") + ".", true);
+		ensure_client_spell_catalog();
+		for (int i = 0; i < level_up_new_cantrips; i++) {
+			menu@ cm = setup_sub_menu("Choose cantrip " + (i + 1) + " of " + level_up_new_cantrips + ".");
+			string[] available;
+			for (uint j = 0; j < SPELL_CATALOG.length(); j++) {
+				if (SPELL_CATALOG[j].level != 0) continue;
+				if (!is_spell_available_for_class(SPELL_CATALOG[j].name, level_up_class)) continue;
+				bool already_known = false;
+				for (uint k = 0; k < created_cantrips.length(); k++) {
+					if (created_cantrips[k] == SPELL_CATALOG[j].name) { already_known = true; break; }
+				}
+				for (uint k = 0; k < new_cantrip_names.length(); k++) {
+					if (string(new_cantrip_names[k]) == SPELL_CATALOG[j].name) { already_known = true; break; }
+				}
+				if (!already_known) {
+					available.insert_last(SPELL_CATALOG[j].name);
+					cm.add_item(SPELL_CATALOG[j].name);
+				}
+			}
+			int pick = cm.run();
+			if (pick >= 0 and pick < int(available.length())) {
+				new_cantrip_names.add(available[pick]);
+				speak("Learned " + available[pick] + "!", true);
+			}
+		}
+	}
+
+	if (level_up_is_caster and level_up_new_spells > 0) {
+		speak("You can learn " + level_up_new_spells + " new spell" + (level_up_new_spells > 1 ? "s" : "") + ".", true);
+		ensure_client_spell_catalog();
+		int max_spell_level = (level_up_new_level + 1) / 2;
+		if (max_spell_level > 9) max_spell_level = 9;
+		for (int i = 0; i < level_up_new_spells; i++) {
+			menu@ sm = setup_sub_menu("Choose spell " + (i + 1) + " of " + level_up_new_spells + ".");
+			string[] available;
+			for (uint j = 0; j < SPELL_CATALOG.length(); j++) {
+				if (SPELL_CATALOG[j].level < 1 or SPELL_CATALOG[j].level > max_spell_level) continue;
+				if (!is_spell_available_for_class(SPELL_CATALOG[j].name, level_up_class)) continue;
+				bool already_known = false;
+				for (uint k = 0; k < created_spells.length(); k++) {
+					if (created_spells[k] == SPELL_CATALOG[j].name) { already_known = true; break; }
+				}
+				for (uint k = 0; k < new_spell_names.length(); k++) {
+					if (string(new_spell_names[k]) == SPELL_CATALOG[j].name) { already_known = true; break; }
+				}
+				if (!already_known) {
+					string label = SPELL_CATALOG[j].name + " (Level " + SPELL_CATALOG[j].level + ")";
+					available.insert_last(SPELL_CATALOG[j].name);
+					sm.add_item(label);
+				}
+			}
+			int pick = sm.run();
+			if (pick >= 0 and pick < int(available.length())) {
+				new_spell_names.add(available[pick]);
+				speak("Learned " + available[pick] + "!", true);
+			}
+		}
+	}
+
+	json_object response;
+	response["type"] = message_types::level_up_response;
+	if (chosen_subclass != "") response["subclass"] = chosen_subclass;
+	if (new_cantrip_names.length() > 0) response["new_cantrips"] = new_cantrip_names;
+	if (new_spell_names.length() > 0) response["new_spells"] = new_spell_names;
+	send(response);
+	speak("Level-up complete!", true);
 }
