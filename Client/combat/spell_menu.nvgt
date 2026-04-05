@@ -95,14 +95,42 @@ void ensure_client_spell_catalog() {
     add_client_spell("pass_without_trace", "Pass without Trace", 2, "abjuration", "You and nearby allies gain a plus 10 bonus to Hide checks while you maintain concentration.", "druid,ranger");
     add_client_spell("scorching_ray", "Scorching Ray", 2, "evocation", "Create three rays of fire. Each requires a spell attack and deals 2d6 fire damage.", "sorcerer,wizard");
 
+    // Level 2 (new)
+    add_client_spell("web", "Web", 2, "conjuration", "Creatures in a 20 foot area make a Dexterity save or become restrained. Concentration.", "wizard,sorcerer");
+    add_client_spell("blindness_deafness", "Blindness/Deafness", 2, "enchantment", "Constitution save or target is blinded or deafened for 1 minute. No concentration.", "cleric,sorcerer,wizard,bard");
+    add_client_spell("shatter", "Shatter", 2, "evocation", "Creatures in a 10 foot radius make a Constitution save or take 3d8 thunder damage.", "bard,sorcerer,wizard");
+    add_client_spell("acid_arrow", "Acid Arrow", 2, "evocation", "Ranged spell attack. 4d4 acid damage on hit, plus 2d4 acid at the end of the target's next turn.", "wizard");
+
+    // Level 3 (new)
+    add_client_spell("lightning_bolt", "Lightning Bolt", 3, "evocation", "Creatures in a 100 foot line make a Dexterity save or take 8d6 lightning damage. Half on success.", "sorcerer,wizard");
+    add_client_spell("animate_dead", "Animate Dead", 3, "necromancy", "Raise a skeleton or zombie to fight for you. Concentration.", "cleric,wizard");
+    add_client_spell("fear", "Fear", 3, "illusion", "Creatures in a 30 foot cone make a Wisdom save or become frightened and must dash away. Concentration.", "bard,sorcerer,warlock,wizard");
+    add_client_spell("hypnotic_pattern", "Hypnotic Pattern", 3, "enchantment", "Creatures in a 30 foot area make a Wisdom save or become charmed and incapacitated. Concentration.", "bard,sorcerer,warlock,wizard");
+
     add_client_spell("fireball", "Fireball", 3, "evocation", "Creatures in a 20-foot radius make a Dexterity save or take 8d6 fire damage.", "sorcerer,wizard");
     add_client_spell("counterspell", "Counterspell", 3, "abjuration", "Reaction. Interrupt a spell being cast.", "sorcerer,warlock,wizard");
     add_client_spell("spirit_guardians", "Spirit Guardians", 3, "conjuration", "Hostile creatures near you make a Wisdom save or take radiant damage. Concentration.", "cleric");
     add_client_spell("revivify", "Revivify", 3, "necromancy", "Return a creature that died within the last minute to life with 1 hit point.", "cleric,paladin,druid,ranger,artificer");
     add_client_spell("haste", "Haste", 3, "transmutation", "Double a creature's speed, give it plus 2 AC, and grant an extra action. Concentration.", "sorcerer,wizard,artificer");
 
+    // Level 4 (new)
+    add_client_spell("polymorph", "Polymorph", 4, "transmutation", "Wisdom save or target transforms into a beast. If willing, no save. Concentration.", "bard,druid,sorcerer,wizard");
+    add_client_spell("ice_storm", "Ice Storm", 4, "evocation", "Creatures in a 20 foot radius make a Dexterity save or take 2d8 bludgeoning plus 4d6 cold damage.", "druid,sorcerer,wizard");
+
     add_client_spell("banishment", "Banishment", 4, "abjuration", "Charisma save or a creature is banished. Concentration.", "cleric,paladin,sorcerer,warlock,wizard");
+
+    // Level 5 (new)
+    add_client_spell("cone_of_cold", "Cone of Cold", 5, "evocation", "Creatures in a 60 foot cone make a Constitution save or take 8d8 cold damage. Half on success.", "sorcerer,wizard");
+    add_client_spell("flame_strike", "Flame Strike", 5, "evocation", "Creatures in a 10 foot radius make a Dexterity save or take 4d6 fire plus 4d6 radiant damage.", "cleric");
+    add_client_spell("wall_of_force", "Wall of Force", 5, "evocation", "Create an impassable invisible wall. Nothing can physically pass through it. Concentration.", "wizard");
+
     add_client_spell("heal", "Heal", 6, "evocation", "Restore 70 hit points and purge certain debilitating effects.", "cleric,druid");
+
+    // Level 7 (new)
+    add_client_spell("finger_of_death", "Finger of Death", 7, "necromancy", "Constitution save or take 7d8 plus 30 necrotic damage. Half on success.", "sorcerer,warlock,wizard");
+
+    // Level 8 (new)
+    add_client_spell("power_word_stun", "Power Word Stun", 8, "enchantment", "If target has 150 or fewer hit points, it is stunned. No save.", "bard,sorcerer,warlock,wizard");
 }
 
 client_spell@ find_client_spell(string id) {

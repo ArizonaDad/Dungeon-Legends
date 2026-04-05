@@ -71,6 +71,10 @@ uint my_combatant_id = 0;
 string battle_mode = "pvp";
 int wave_number = 0;
 
+// Tutorial state
+bool tutorial_mode = false;
+int tutorial_step = 0;
+
 // Level-up state
 bool pending_level_up = false;
 int level_up_new_level = 0;
@@ -156,6 +160,48 @@ void prompt_roll(string reason, int dice, int modifier, int count = 1) {
 	string dice_text = "a d " + dice;
 	if (count > 1) dice_text = count + " d " + dice;
 	speak(reason + ". Press R or Enter to roll " + dice_text + mod_text + ".", true);
+	tutorial_check("roll_prompt");
+}
+
+// ============================================================
+// TUTORIAL SYSTEM
+// ============================================================
+
+void tutorial_check(string event) {
+	if (!tutorial_mode) return;
+	if (event == "battle_start" and tutorial_step == 0) {
+		wait(1500);
+		speak("Welcome to combat! Press I, J, K, or L to scan for enemies nearby.", true);
+		tutorial_step = 1;
+	}
+	else if (event == "scan_result" and tutorial_step == 1) {
+		speak("You found an enemy! Press Enter to lock onto them as your target.", true);
+		tutorial_step = 2;
+	}
+	else if (event == "target_locked" and tutorial_step == 2) {
+		speak("Target locked! Now press W, A, S, or D to move closer. Each step is 5 feet.", true);
+		tutorial_step = 3;
+	}
+	else if (event == "turn_start" and tutorial_step <= 3) {
+		speak("It's your turn! Press F to open your action menu.", true);
+		tutorial_step = 4;
+	}
+	else if (event == "action_menu" and tutorial_step == 4) {
+		speak("Choose Attack to strike your target with your weapon. You'll roll to hit, then roll for damage if you hit.", true);
+		tutorial_step = 5;
+	}
+	else if (event == "roll_prompt" and tutorial_step == 5) {
+		speak("Press R or Enter to roll the dice!", true);
+		tutorial_step = 6;
+	}
+	else if (event == "damage_dealt" and tutorial_step >= 5) {
+		speak("Nice hit! You can press F for another action, or choose End Turn when you're done.", true);
+		tutorial_step = 7;
+	}
+	else if (event == "battle_end" and tutorial_mode) {
+		speak("Victory! You've completed the tutorial. You're ready for real battles! Returning to the main menu.", true);
+		tutorial_step = 8;
+	}
 }
 
 string die_label(int die_size) {
@@ -336,6 +382,7 @@ void show_action_menu() {
 		speak("It's not your turn.", true);
 		return;
 	}
+	tutorial_check("action_menu");
 
 	menu@ m = setup_sub_menu("Your turn. Choose an action.");
 	combat_entity@ me = get_my_entity();
@@ -778,6 +825,7 @@ void speak_turn_start(string name, bool is_me) {
 	if (is_me) {
 		combat_history_add("Your turn! Round " + current_round + ".");
 		speak("Your turn! Round " + current_round + ". Press F for actions, B for bonus actions, W A S D to move, I J K L to scan.", true);
+		tutorial_check("turn_start");
 	} else {
 		combat_history_add(name + "'s turn.");
 		speak(name + "'s turn.", false);
@@ -850,6 +898,7 @@ void receive_scan_results(json_array@ results) {
 
 	if (scan_results.length() > 0) {
 		announce_scan_target(0);
+		tutorial_check("scan_result");
 	} else {
 		combat_audio_play_empty_scan();
 		speak("Nothing in that direction.", true);
@@ -916,6 +965,7 @@ void lock_target() {
 	combat_entity@ me = get_my_entity();
 	if (@me != null) speak("Targeting " + e.name + ", " + describe_target_position(me, e) + ".", true);
 	else speak("Targeting " + e.name + ".", true);
+	tutorial_check("target_locked");
 }
 
 // ============================================================
@@ -934,6 +984,7 @@ void on_damage_dealt(string attacker, string target, int amount, string damage_t
 	combat_audio_play_damage(attacker, target, is_crit, amount);
 	audio_on_damage(attacker, target, amount, damage_type, is_crit, weapon_name, is_weapon_attack, is_spell);
 	speak(text, true);
+	tutorial_check("damage_dealt");
 }
 
 void on_healing_done(string source, string target, int amount) {
@@ -987,6 +1038,7 @@ void on_battle_start(string mode_text) {
 	audio_on_battle_start();
 	combat_audio_refresh_ambience();
 	speak("Battle begins! " + mode_text, true);
+	tutorial_check("battle_start");
 }
 
 void on_battle_end(string result) {
@@ -995,6 +1047,7 @@ void on_battle_end(string result) {
 	if (result == "victory") speak("Victory! You have won the battle!", true);
 	else if (result == "defeat") speak("Defeat! Your party has fallen.", true);
 	else speak("Battle over! " + result, true);
+	tutorial_check("battle_end");
 	battle_active = false;
 }
 
@@ -1170,6 +1223,8 @@ void reset_combat_state() {
 	combat_focus = 0;
 	combat_history.resize(0);
 	combat_history_cursor = -1;
+	tutorial_mode = false;
+	tutorial_step = 0;
 }
 
 // ============================================================

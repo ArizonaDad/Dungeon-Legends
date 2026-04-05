@@ -330,6 +330,22 @@ void init_wave_scenarios() {
 
         WAVE_SCENARIOS.insert_last(s);
     }
+
+    // Scenario 10: Combat Tutorial (Level 1, solo)
+    {
+        wave_scenario@ tutorial_scenario = wave_scenario();
+        tutorial_scenario.id = "tutorial";
+        tutorial_scenario.name = "Combat Tutorial";
+        tutorial_scenario.description = "Learn the basics of combat.";
+        tutorial_scenario.recommended_level = 1;
+        tutorial_scenario.recommended_players = 1;
+        wave_encounter tutorial_wave;
+        tutorial_wave.wave_number = 1;
+        tutorial_wave.monster_ids.insert_last("rat");
+        tutorial_wave.monster_counts.insert_last(2);
+        tutorial_scenario.waves.insert_last(tutorial_wave);
+        WAVE_SCENARIOS.insert_last(tutorial_scenario);
+    }
 }
 
 wave_scenario@ get_scenario(string id) {

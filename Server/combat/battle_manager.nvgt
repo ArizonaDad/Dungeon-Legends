@@ -3782,6 +3782,72 @@ class battle_manager {
 				u.send({{"type", message_types::announce}, {"text", "True Strike cannot reach that target right now."}, {"interrupt", true}});
 			}
 		}
+		// Ice Storm: 2d8 bludgeoning + 4d6 cold, DEX save, AoE
+		else if (spell.id == "ice_storm") {
+			int bludgeon_count = 2 + upcast_levels;
+			int cold_count = 4;
+			int total_damage = 0;
+			for (int d = 0; d < bludgeon_count; d++) total_damage += random(1, 8);
+			for (int d = 0; d < cold_count; d++) total_damage += random(1, 6);
+			// Apply to all targets in AoE
+			combatant@[] targets_hit;
+			for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+				combatant@ t = combat.combatants[ti];
+				if (@t == null or t.is_dead or t.id == c.id) continue;
+				if (t.is_player == c.is_player and combat.mode != "pvp") continue;
+				if (@target != null and feet_distance(target.x, target.y, t.x, t.y) <= 20) targets_hit.insert_last(t);
+				else if (@target == null and feet_distance(c.x, c.y, t.x, t.y) <= 20) targets_hit.insert_last(t);
+			}
+			if (targets_hit.length() == 0 and @target != null) targets_hit.insert_last(target);
+			for (uint ti = 0; ti < targets_hit.length(); ti++) {
+				combatant@ t = targets_hit[ti];
+				int save_roll = random(1, 20);
+				int save_bonus = t.get_save_bonus(ABILITY_DEX);
+				int bless_bonus = roll_bless_bonus(t);
+				int save_total = save_roll + save_bonus + bless_bonus;
+				bool saved = save_total >= save_dc;
+				int dmg = saved ? total_damage / 2 : total_damage;
+				if (dmg < 1) dmg = 1;
+				if (bless_bonus > 0) broadcast_announce(t.name + "'s Bless adds " + bless_bonus + " to the save.", false);
+				broadcast_roll(t.name, "DEX save vs Ice Storm", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+				combat.apply_damage(t, dmg, DMG_COLD, c);
+				broadcast_announce(t.name + " takes " + dmg + " damage from Ice Storm.", false);
+			}
+			broadcast_state();
+			check_battle_end();
+			return;
+		}
+		// Finger of Death: 7d8 + 30 necrotic, CON save, single target
+		else if (spell.id == "finger_of_death" and @target != null and !target.is_dead) {
+			int total_damage = 30;
+			for (int d = 0; d < 7; d++) total_damage += random(1, 8);
+			int save_roll = random(1, 20);
+			int save_bonus = target.get_save_bonus(ABILITY_CON);
+			int bless_bonus = roll_bless_bonus(target);
+			int save_total = save_roll + save_bonus + bless_bonus;
+			bool saved = save_total >= save_dc;
+			int dmg = saved ? total_damage / 2 : total_damage;
+			if (dmg < 1) dmg = 1;
+			if (bless_bonus > 0) broadcast_announce(target.name + "'s Bless adds " + bless_bonus + " to the save.", false);
+			broadcast_roll(target.name, "CON save vs Finger of Death", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+			combat.apply_damage(target, dmg, DMG_NECROTIC, c);
+			broadcast_announce(target.name + " takes " + dmg + " necrotic damage from Finger of Death!", true);
+			broadcast_state();
+			check_battle_end();
+			return;
+		}
+		// Power Word Stun: no save, stun if HP <= 150
+		else if (spell.id == "power_word_stun" and @target != null and !target.is_dead) {
+			if (target.current_hp <= 150) {
+				target.add_condition(COND_STUNNED);
+				broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Stunned"}});
+				broadcast_announce(target.name + " is stunned by Power Word Stun!", true);
+			} else {
+				broadcast_announce(target.name + " has too many hit points for Power Word Stun to take effect.", false);
+			}
+			broadcast_state();
+			return;
+		}
 		// Damage spells with save
 		else if (spell.damage_count > 0 and spell.save_type >= 0) {
 			int damage_count = get_spell_damage_dice_count_for_cast(spell, c, cast_slot_level);
@@ -3965,6 +4031,137 @@ class battle_manager {
 					target.armor_class = desired_ac;
 				}
 				broadcast_announce(target.name + " is protected by Mage Armor.", true);
+			}
+			else if (spell.id == "web") {
+				// AoE DEX save or restrained
+				combatant@[] targets_hit;
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (t.is_player == c.is_player and combat.mode != "pvp") continue;
+					if (@target != null and feet_distance(target.x, target.y, t.x, t.y) <= 20) targets_hit.insert_last(t);
+					else if (@target == null and feet_distance(c.x, c.y, t.x, t.y) <= 20) targets_hit.insert_last(t);
+				}
+				if (targets_hit.length() == 0 and @target != null) targets_hit.insert_last(target);
+				for (uint ti = 0; ti < targets_hit.length(); ti++) {
+					combatant@ t = targets_hit[ti];
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_DEX);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					if (bless_bonus > 0) broadcast_announce(t.name + "'s Bless adds " + bless_bonus + " to the save.", false);
+					broadcast_roll(t.name, "DEX save vs Web", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Restrained!");
+					if (!saved) {
+						t.add_condition(COND_RESTRAINED);
+						broadcast_to_battle({{"type", message_types::condition_applied}, {"target", t.name}, {"condition", "Restrained"}});
+					}
+				}
+			}
+			else if (spell.id == "blindness_deafness" and @target != null) {
+				int save_roll = random(1, 20);
+				int save_bonus = target.get_save_bonus(ABILITY_CON);
+				int bless_bonus = roll_bless_bonus(target);
+				int save_total = save_roll + save_bonus + bless_bonus;
+				bool saved = save_total >= save_dc;
+				if (bless_bonus > 0) broadcast_announce(target.name + "'s Bless adds " + bless_bonus + " to the save.", false);
+				broadcast_roll(target.name, "CON save vs Blindness/Deafness", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Blinded!");
+				if (!saved) {
+					target.add_condition(COND_BLINDED);
+					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Blinded"}});
+				}
+			}
+			else if (spell.id == "animate_dead") {
+				// Spawn a skeleton combatant on the caster's side
+				monster_def@ skel_def = get_monster_def("skeleton");
+				if (@skel_def != null) {
+					combatant@ minion = create_monster_combatant(skel_def, c.x + 5, c.y);
+					if (@minion != null) {
+						minion.name = c.name + "'s Skeleton";
+						minion.is_player = false;
+						minion.summoner_id = c.id;
+						combat.combatants.insert_last(minion);
+						broadcast_announce(c.name + " raises a Skeleton to fight!", true);
+					}
+				}
+			}
+			else if (spell.id == "fear") {
+				// AoE WIS save or frightened
+				combatant@[] targets_hit;
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (t.is_player == c.is_player and combat.mode != "pvp") continue;
+					if (feet_distance(c.x, c.y, t.x, t.y) <= 30) targets_hit.insert_last(t);
+				}
+				for (uint ti = 0; ti < targets_hit.length(); ti++) {
+					combatant@ t = targets_hit[ti];
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_WIS);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					if (bless_bonus > 0) broadcast_announce(t.name + "'s Bless adds " + bless_bonus + " to the save.", false);
+					broadcast_roll(t.name, "WIS save vs Fear", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Frightened!");
+					if (!saved) {
+						t.add_condition(COND_FRIGHTENED);
+						broadcast_to_battle({{"type", message_types::condition_applied}, {"target", t.name}, {"condition", "Frightened"}});
+					}
+				}
+			}
+			else if (spell.id == "hypnotic_pattern") {
+				// AoE WIS save or charmed + incapacitated
+				combatant@[] targets_hit;
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (t.is_player == c.is_player and combat.mode != "pvp") continue;
+					if (@target != null and feet_distance(target.x, target.y, t.x, t.y) <= 30) targets_hit.insert_last(t);
+					else if (@target == null and feet_distance(c.x, c.y, t.x, t.y) <= 30) targets_hit.insert_last(t);
+				}
+				if (targets_hit.length() == 0 and @target != null) targets_hit.insert_last(target);
+				for (uint ti = 0; ti < targets_hit.length(); ti++) {
+					combatant@ t = targets_hit[ti];
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_WIS);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					if (bless_bonus > 0) broadcast_announce(t.name + "'s Bless adds " + bless_bonus + " to the save.", false);
+					broadcast_roll(t.name, "WIS save vs Hypnotic Pattern", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Charmed!");
+					if (!saved) {
+						t.add_condition(COND_CHARMED);
+						t.add_condition(COND_INCAPACITATED);
+						broadcast_to_battle({{"type", message_types::condition_applied}, {"target", t.name}, {"condition", "Charmed"}});
+						broadcast_to_battle({{"type", message_types::condition_applied}, {"target", t.name}, {"condition", "Incapacitated"}});
+					}
+				}
+			}
+			else if (spell.id == "polymorph" and @target != null) {
+				// WIS save for unwilling targets; on fail reduce AC by 5 and set HP to 30
+				bool is_enemy = target.is_player != c.is_player or combat.mode == "pvp";
+				bool saved = false;
+				if (is_enemy) {
+					int save_roll = random(1, 20);
+					int save_bonus = target.get_save_bonus(ABILITY_WIS);
+					int bless_bonus = roll_bless_bonus(target);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					saved = save_total >= save_dc;
+					if (bless_bonus > 0) broadcast_announce(target.name + "'s Bless adds " + bless_bonus + " to the save.", false);
+					broadcast_roll(target.name, "WIS save vs Polymorph", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Polymorphed!");
+				}
+				if (!saved) {
+					target.polymorph_original_hp = target.current_hp;
+					target.polymorph_original_ac = target.armor_class;
+					target.armor_class -= 5;
+					if (target.armor_class < 5) target.armor_class = 5;
+					target.current_hp = 30;
+					target.add_condition(COND_CHARMED);
+					broadcast_announce(target.name + " is polymorphed into a beast!", true);
+				}
+			}
+			else if (spell.id == "wall_of_force") {
+				broadcast_announce(c.name + " conjures an invisible Wall of Force! Nothing can physically pass through it.", true);
 			}
 			else if (spell.id == "hold_person" and @target != null) {
 				int save_roll = random(1, 20);

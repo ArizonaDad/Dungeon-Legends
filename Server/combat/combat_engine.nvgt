@@ -183,6 +183,13 @@ class combatant {
 	bool tavern_brawler_push_used = false;
 	bool hunter_colossus_used = false;
 
+	// Summoned creature tracking
+	uint summoner_id = 0;
+
+	// Polymorph tracking
+	int polymorph_original_hp = 0;
+	int polymorph_original_ac = 0;
+
 	// Lucky feat
 	int luck_points = 0;
 	int luck_points_max = 0;

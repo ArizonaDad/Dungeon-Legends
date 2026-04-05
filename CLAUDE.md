@@ -1,7 +1,7 @@
 # Dungeon Legends - D&D 5e Battle Simulator
 
 ## Project Overview
-Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (NonVisual Gaming Toolkit, AngelScript-like). Players create characters (33 species, 13 classes, 16 backgrounds, 38 weapons, 53 spells) and fight in turn-based combat with full TTS and HRTF spatial audio. Supports PvP Arena, Wave Survival, and Boss Rush modes.
+Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (NonVisual Gaming Toolkit, AngelScript-like). Players create characters (33 species, 13 classes, 16 backgrounds, 38 weapons, 68 spells) and fight in turn-based combat with full TTS and HRTF spatial audio. Supports PvP Arena, Wave Survival, and Boss Rush modes.
 
 ## Architecture
 - **Client-server** model using ENet networking with JSON message passing
@@ -19,9 +19,9 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 | `Server/combat/battle_manager.nvgt` | Core combat loop: roll system, attack/spell/action resolution, monster AI, initiative, Extra Attack, battle end detection, level-up choices |
 | `Server/combat/combat_engine.nvgt` | `combatant` class (HP, AC, abilities, conditions, spell slots), `battle` class (initiative, damage, death saves) |
 | `Server/combat/character_data.nvgt` | `character_sheet` class, 13 class defaults, 33 species bonuses, 38 weapons, spell slot tables |
-| `Server/combat/monster_data.nvgt` | 27 monster definitions (Rat through Pit Fiend) |
+| `Server/combat/monster_data.nvgt` | 32 monster definitions (Rat through Archmage) |
 | `Server/combat/wave_system.nvgt` | 9 wave scenarios, `spawn_wave()` with difficulty multipliers |
-| `Server/combat/spell_data.nvgt` | 53 spell definitions (34 cantrips + 19 leveled), spell helpers |
+| `Server/combat/spell_data.nvgt` | 68 spell definitions (34 cantrips + 34 leveled), spell helpers |
 | `Server/progression.nvgt` | XP tracking, achievement system, character level progression, prestige system, glory points |
 | `common/loot_data.nvgt` | Item catalog (35 items), loot generation, rarity tiers, inventory helpers |
 | `Client/client.nvgt` | Main client entry, login, lobby menus, character viewing, first-time login flow |
@@ -57,7 +57,7 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 - Line of sight required (`can_see` check)
 
 ### Spell System
-- 53 spells fully resolved server-side via `handle_cast()`
+- 68 spells fully resolved server-side via `handle_cast()`
 - Spell menu shows range and concentration status for each spell
 - Save-based damage (DEX/CON/WIS saves, half on success)
 - Attack-roll spells (spell attack bonus vs AC)

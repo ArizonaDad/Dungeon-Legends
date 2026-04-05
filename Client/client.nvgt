@@ -204,6 +204,35 @@ void main_menu()
 		speak("Welcome to Dungeon Legends! Let's create your first character.", true);
 		character_creation_menu("adventure", 1);
 		is_new_account = false;
+		menu@ tut_menu = setup_sub_menu("Would you like to play a quick tutorial to learn the combat controls?");
+		tut_menu.add_item("Yes, teach me how to play.");
+		tut_menu.add_item("No, I already know how to play.");
+		int tut_pick = tut_menu.run();
+		if (tut_pick == 0) {
+			tutorial_mode = true;
+			tutorial_step = 0;
+			// Create a tutorial room and start the game
+			send({{"type", message_types::new_room}, {"name", "Tutorial"}, {"password", ""}, {"game_type", "sandbox"}});
+			wait(500);
+			network_loop();
+			send({{"type", message_types::start_game}, {"mode", "wave"}, {"scenario", "tutorial"}, {"difficulty", "normal"}});
+			// Wait for game to start
+			timer tut_timer;
+			while (!start_game_pending and tut_timer.elapsed < 5000) {
+				wait(50);
+				network_loop();
+			}
+			if (start_game_pending) {
+				start_game_pending = false;
+				set_active_character_profile("adventure");
+				combat_game_loop();
+			}
+			tutorial_mode = false;
+			// Leave the tutorial room
+			send({{"type", message_types::leave_room}});
+			wait(200);
+			network_loop();
+		}
 	}
 	while (true) {
 		menu@ m = setup_menu("");

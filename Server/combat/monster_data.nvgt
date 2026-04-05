@@ -902,6 +902,148 @@ void init_monster_defs() {
         d.description = "A spectral horror that drains life force with its chilling touch.";
         MONSTER_DEFS.insert_last(d);
     }
+
+    // --- CR 8 (Frost Giant) ---
+    {
+        monster_def d;
+        d.id = "frost_giant";
+        d.name = "Frost Giant";
+        d.type = "giant";
+        d.size = SIZE_HUGE;
+        d.ac = 15;
+        d.hp = 138;
+        d.speed = 40;
+        d.str = 23; d.dex = 9; d.con = 21;
+        d.intelligence = 9; d.wis = 10; d.cha = 12;
+        d.attack_name = "Greataxe";
+        d.attack_bonus = 9;
+        d.damage_dice = 12;
+        d.damage_count = 3;
+        d.damage_mod = 6;
+        d.damage_type = DMG_SLASHING;
+        d.attack_range = 10;
+        d.attack2_name = "Rock";
+        d.attack2_bonus = 9;
+        d.attack2_dice = 10;
+        d.attack2_count = 4;
+        d.attack2_mod = 6;
+        d.attack2_type = DMG_BLUDGEONING;
+        d.attack2_range = 60;
+        d.has_multiattack = true;
+        d.multiattack_count = 2;
+        d.xp = 3900;
+        d.description = "A towering blue-skinned giant wielding an enormous icy greataxe.";
+        MONSTER_DEFS.insert_last(d);
+    }
+
+    // --- CR 10 (Guardian Naga) ---
+    {
+        monster_def d;
+        d.id = "guardian_naga";
+        d.name = "Guardian Naga";
+        d.type = "monstrosity";
+        d.size = SIZE_LARGE;
+        d.ac = 18;
+        d.hp = 136;
+        d.speed = 40;
+        d.str = 19; d.dex = 18; d.con = 16;
+        d.intelligence = 16; d.wis = 19; d.cha = 18;
+        d.attack_name = "Bite";
+        d.attack_bonus = 8;
+        d.damage_dice = 8;
+        d.damage_count = 1;
+        d.damage_mod = 4;
+        d.damage_type = DMG_PIERCING;
+        d.attack_range = 10;
+        d.attack2_name = "Spit Poison";
+        d.attack2_bonus = 8;
+        d.attack2_dice = 8;
+        d.attack2_count = 3;
+        d.attack2_mod = 0;
+        d.attack2_type = DMG_POISON;
+        d.attack2_range = 15;
+        d.has_multiattack = true;
+        d.multiattack_count = 2;
+        d.xp = 5900;
+        d.description = "A radiant serpentine guardian that protects sacred places with divine magic.";
+        MONSTER_DEFS.insert_last(d);
+    }
+
+    // --- CR 10 (Aboleth) ---
+    {
+        monster_def d;
+        d.id = "aboleth";
+        d.name = "Aboleth";
+        d.type = "aberration";
+        d.size = SIZE_LARGE;
+        d.ac = 17;
+        d.hp = 135;
+        d.speed = 10;
+        d.str = 21; d.dex = 9; d.con = 15;
+        d.intelligence = 18; d.wis = 15; d.cha = 18;
+        d.attack_name = "Tentacle";
+        d.attack_bonus = 9;
+        d.damage_dice = 6;
+        d.damage_count = 2;
+        d.damage_mod = 5;
+        d.damage_type = DMG_BLUDGEONING;
+        d.attack_range = 10;
+        d.has_multiattack = true;
+        d.multiattack_count = 3;
+        d.xp = 5900;
+        d.description = "An ancient aquatic horror with psychic powers.";
+        MONSTER_DEFS.insert_last(d);
+    }
+
+    // --- CR 11 (Remorhaz) ---
+    {
+        monster_def d;
+        d.id = "remorhaz";
+        d.name = "Remorhaz";
+        d.type = "monstrosity";
+        d.size = SIZE_HUGE;
+        d.ac = 17;
+        d.hp = 195;
+        d.speed = 30;
+        d.str = 24; d.dex = 13; d.con = 21;
+        d.intelligence = 4; d.wis = 10; d.cha = 5;
+        d.attack_name = "Bite";
+        d.attack_bonus = 11;
+        d.damage_dice = 10;
+        d.damage_count = 6;
+        d.damage_mod = 7;
+        d.damage_type = DMG_PIERCING;
+        d.attack_range = 10;
+        d.xp = 7200;
+        d.description = "A massive centipede-like creature radiating intense heat.";
+        MONSTER_DEFS.insert_last(d);
+    }
+
+    // --- CR 12 (Archmage) ---
+    {
+        monster_def d;
+        d.id = "archmage";
+        d.name = "Archmage";
+        d.type = "humanoid";
+        d.size = SIZE_MEDIUM;
+        d.ac = 15;
+        d.hp = 99;
+        d.speed = 30;
+        d.str = 10; d.dex = 14; d.con = 12;
+        d.intelligence = 20; d.wis = 15; d.cha = 16;
+        d.attack_name = "Arcane Burst";
+        d.attack_bonus = 9;
+        d.damage_dice = 10;
+        d.damage_count = 3;
+        d.damage_mod = 5;
+        d.damage_type = DMG_FORCE;
+        d.attack_range = 120;
+        d.has_multiattack = true;
+        d.multiattack_count = 2;
+        d.xp = 8400;
+        d.description = "A powerful spellcaster wielding devastating arcane magic.";
+        MONSTER_DEFS.insert_last(d);
+    }
 }
 
 monster_def@ get_monster_def(string id) {
