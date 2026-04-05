@@ -1457,6 +1457,353 @@ void handle_user_message(user@ u, json_object@ msg)
 				u.room.bm.broadcast_announce(base_name + " uses Wild Shape as a " + cost_text + " and becomes a " + form.name + "!", true);
 			}
 		}
+		// ---- Subclass Bonus Actions ----
+
+		else if (feature == "frenzy_attack") {
+			// Berserker: bonus action melee attack while raging with Frenzy
+			if (c.class_name != "Barbarian" or c.subclass != "Berserker") { u.send({{"type", message_types::announce}, {"text", "Only Berserker barbarians can use Frenzy Attack."}, {"interrupt", true}}); return; }
+			if (!c.raging or !c.has_frenzy) { u.send({{"type", message_types::announce}, {"text", "You must be raging with Frenzy to use this."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
+			combatant@ target = u.room.bm.combat.get_combatant(target_id);
+			if (@target == null or target.is_dead) { u.send({{"type", message_types::announce}, {"text", "No valid target."}, {"interrupt", true}}); return; }
+			int dist = feet_distance(c.x, c.y, target.x, target.y);
+			if (dist > 5) { u.send({{"type", message_types::announce}, {"text", "Target must be within 5 feet for Frenzy Attack."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			// Start a melee attack against the target (uses the existing flurry strike mechanism for bonus attacks)
+			if (!u.room.bm.start_flurry_strike(c, target, 0)) {
+				c.has_bonus_action = true;
+				c.used_bonus_action = false;
+				u.send({{"type", message_types::announce}, {"text", "Cannot make that attack right now."}, {"interrupt", true}});
+				return;
+			}
+			u.room.bm.broadcast_announce(c.name + " makes a Frenzy attack!", true);
+		}
+
+		else if (feature == "channel_sacred_weapon") {
+			// Devotion Paladin: Channel Divinity - Sacred Weapon
+			if (c.class_name != "Paladin" or c.subclass != "Oath of Devotion") { u.send({{"type", message_types::announce}, {"text", "Only Devotion paladins can use Sacred Weapon."}, {"interrupt", true}}); return; }
+			if (c.channel_divinity_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Channel Divinity uses remaining."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
+			if (c.sacred_weapon_active) { u.send({{"type", message_types::announce}, {"text", "Sacred Weapon is already active."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.channel_divinity_uses--;
+			c.sacred_weapon_active = true;
+			int cha_mod = c.get_ability_mod(ABILITY_CHA);
+			if (cha_mod < 1) cha_mod = 1;
+			u.room.bm.broadcast_announce(c.name + " channels Sacred Weapon! +" + cha_mod + " to attack rolls for 1 minute. " + c.channel_divinity_uses + " Channel Divinity use" + (c.channel_divinity_uses == 1 ? "" : "s") + " remain.", true);
+		}
+
+		else if (feature == "channel_vow_of_enmity") {
+			// Vengeance Paladin: Channel Divinity - Vow of Enmity
+			if (c.class_name != "Paladin" or c.subclass != "Oath of Vengeance") { u.send({{"type", message_types::announce}, {"text", "Only Vengeance paladins can use Vow of Enmity."}, {"interrupt", true}}); return; }
+			if (c.channel_divinity_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Channel Divinity uses remaining."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
+			combatant@ target = u.room.bm.combat.get_combatant(target_id);
+			if (@target == null or target.is_dead) { u.send({{"type", message_types::announce}, {"text", "Choose a target for Vow of Enmity."}, {"interrupt", true}}); return; }
+			int dist = feet_distance(c.x, c.y, target.x, target.y);
+			if (dist > 10) { u.send({{"type", message_types::announce}, {"text", "Target must be within 10 feet."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.channel_divinity_uses--;
+			c.vow_of_enmity_target = target.id;
+			u.room.bm.broadcast_announce(c.name + " swears a Vow of Enmity against " + target.name + "! Advantage on attack rolls against them. " + c.channel_divinity_uses + " Channel Divinity use" + (c.channel_divinity_uses == 1 ? "" : "s") + " remain.", true);
+		}
+
+		else if (feature == "channel_preserve_life") {
+			// Life Cleric: Channel Divinity - Preserve Life
+			if (c.class_name != "Cleric" or c.subclass != "Life Domain") { u.send({{"type", message_types::announce}, {"text", "Only Life Domain clerics can use Preserve Life."}, {"interrupt", true}}); return; }
+			if (c.channel_divinity_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Channel Divinity uses remaining."}, {"interrupt", true}}); return; }
+			if (!c.has_action) { u.send({{"type", message_types::announce}, {"text", "No action remaining (Preserve Life uses your action)."}, {"interrupt", true}}); return; }
+			c.has_action = false;
+			c.used_action = true;
+			c.channel_divinity_uses--;
+			int pool = c.level * 5;
+			int total_healed = 0;
+			// Heal allies below half HP within 30 feet
+			for (uint pi = 0; pi < u.room.bm.combat.combatants.length(); pi++) {
+				combatant@ ally = u.room.bm.combat.combatants[pi];
+				if (@ally == null or ally.is_dead or !ally.is_player or ally.id == c.id) continue;
+				if (u.room.bm.combat.are_hostile(c, ally)) continue;
+				if (ally.current_hp >= ally.max_hp / 2) continue;
+				int dist = feet_distance(c.x, c.y, ally.x, ally.y);
+				if (dist > 30) continue;
+				int deficit = (ally.max_hp / 2) - ally.current_hp;
+				int heal_amount = deficit;
+				if (heal_amount > pool) heal_amount = pool;
+				if (heal_amount <= 0) continue;
+				int healed = u.room.bm.combat.apply_healing(ally, heal_amount);
+				u.room.bm.record_effective_healing(c.player_username, healed);
+				pool -= heal_amount;
+				total_healed += healed;
+				u.room.bm.broadcast_announce(c.name + "'s Preserve Life heals " + ally.name + " for " + healed + " HP.", false);
+				if (pool <= 0) break;
+			}
+			u.room.bm.broadcast_announce(c.name + " channels Preserve Life! Healed " + total_healed + " total HP among allies.", true);
+		}
+
+		else if (feature == "channel_natures_wrath") {
+			// Ancients Paladin: Channel Divinity - Nature's Wrath (restrain a target)
+			if (c.class_name != "Paladin" or c.subclass != "Oath of the Ancients") { u.send({{"type", message_types::announce}, {"text", "Only Ancients paladins can use Nature's Wrath."}, {"interrupt", true}}); return; }
+			if (c.channel_divinity_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Channel Divinity uses remaining."}, {"interrupt", true}}); return; }
+			if (!c.has_action) { u.send({{"type", message_types::announce}, {"text", "No action remaining."}, {"interrupt", true}}); return; }
+			combatant@ target = u.room.bm.combat.get_combatant(target_id);
+			if (@target == null or target.is_dead) { u.send({{"type", message_types::announce}, {"text", "Choose a target for Nature's Wrath."}, {"interrupt", true}}); return; }
+			int dist = feet_distance(c.x, c.y, target.x, target.y);
+			if (dist > 15) { u.send({{"type", message_types::announce}, {"text", "Target must be within 15 feet."}, {"interrupt", true}}); return; }
+			c.has_action = false;
+			c.used_action = true;
+			c.channel_divinity_uses--;
+			// Target makes STR or DEX save (their choice, we use higher)
+			int save_dc = 8 + c.proficiency + c.get_ability_mod(ABILITY_CHA);
+			int str_save = random(1, 20) + target.get_save_bonus(ABILITY_STR);
+			int dex_save = random(1, 20) + target.get_save_bonus(ABILITY_DEX);
+			int save_total = str_save > dex_save ? str_save : dex_save;
+			if (save_total < save_dc) {
+				target.add_condition(COND_RESTRAINED);
+				u.room.bm.broadcast_announce(c.name + "'s Nature's Wrath restrains " + target.name + " in spectral vines!", true);
+			} else {
+				u.room.bm.broadcast_announce(c.name + "'s Nature's Wrath fails to restrain " + target.name + ".", true);
+			}
+		}
+
+		else if (feature == "trip_attack") {
+			// Battle Master: Trip Attack maneuver
+			if (c.class_name != "Fighter" or c.subclass != "Battle Master") { u.send({{"type", message_types::announce}, {"text", "Only Battle Masters can use Trip Attack."}, {"interrupt", true}}); return; }
+			if (c.superiority_dice <= 0) { u.send({{"type", message_types::announce}, {"text", "No superiority dice remaining."}, {"interrupt", true}}); return; }
+			c.trip_attack_pending = true;
+			u.room.bm.broadcast_announce(c.name + " prepares Trip Attack! Next weapon hit will add 1d8 damage and attempt to knock the target prone. (" + c.superiority_dice + " superiority dice remaining)", false);
+		}
+
+		else if (feature == "precision_attack") {
+			// Battle Master: Precision Attack maneuver
+			if (c.class_name != "Fighter" or c.subclass != "Battle Master") { u.send({{"type", message_types::announce}, {"text", "Only Battle Masters can use Precision Attack."}, {"interrupt", true}}); return; }
+			if (c.superiority_dice <= 0) { u.send({{"type", message_types::announce}, {"text", "No superiority dice remaining."}, {"interrupt", true}}); return; }
+			c.precision_attack_pending = true;
+			u.room.bm.broadcast_announce(c.name + " prepares Precision Attack! Next attack roll will add 1d8. (" + c.superiority_dice + " superiority dice remaining)", false);
+		}
+
+		else if (feature == "riposte") {
+			// Battle Master: Riposte maneuver (readied reaction)
+			if (c.class_name != "Fighter" or c.subclass != "Battle Master") { u.send({{"type", message_types::announce}, {"text", "Only Battle Masters can use Riposte."}, {"interrupt", true}}); return; }
+			if (c.superiority_dice <= 0) { u.send({{"type", message_types::announce}, {"text", "No superiority dice remaining."}, {"interrupt", true}}); return; }
+			if (!c.has_reaction) { u.send({{"type", message_types::announce}, {"text", "No reaction available."}, {"interrupt", true}}); return; }
+			c.riposte_ready = true;
+			u.room.bm.broadcast_announce(c.name + " readies Riposte! If an enemy misses, " + c.name + " will counterattack with an extra 1d8 damage.", false);
+		}
+
+		else if (feature == "shadow_step") {
+			// Shadow Monk: teleport 60 ft to dim/dark location, advantage on next melee
+			if (c.class_name != "Monk" or c.subclass != "Way of Shadow") { u.send({{"type", message_types::announce}, {"text", "Only Shadow monks can use Shadow Step."}, {"interrupt", true}}); return; }
+			if (c.level < 6) { u.send({{"type", message_types::announce}, {"text", "Shadow Step requires level 6."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
+			combatant@ target = u.room.bm.combat.get_combatant(target_id);
+			if (@target == null or target.is_dead) { u.send({{"type", message_types::announce}, {"text", "Choose a target to teleport near."}, {"interrupt", true}}); return; }
+			int dist = feet_distance(c.x, c.y, target.x, target.y);
+			if (dist > 60) { u.send({{"type", message_types::announce}, {"text", "Target is too far for Shadow Step (60 ft max)."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			// Teleport adjacent to target
+			int new_x = target.x;
+			int new_y = target.y + 1;
+			c.x = new_x;
+			c.y = new_y;
+			u.room.bm.broadcast_announce(c.name + " Shadow Steps to " + target.name + "! Advantage on next melee attack.", true);
+		}
+
+		else if (feature == "hands_of_healing") {
+			// Mercy Monk: Hands of Healing
+			if (c.class_name != "Monk" or c.subclass != "Way of Mercy") { u.send({{"type", message_types::announce}, {"text", "Only Mercy monks can use Hands of Healing."}, {"interrupt", true}}); return; }
+			if (c.level < 3) { u.send({{"type", message_types::announce}, {"text", "Hands of Healing requires level 3."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
+			if (c.focus_points <= 0) { u.send({{"type", message_types::announce}, {"text", "You need 1 Focus Point."}, {"interrupt", true}}); return; }
+			combatant@ target = target_id != 0 ? u.room.bm.combat.get_combatant(target_id) : c;
+			if (@target == null or target.is_dead) { u.send({{"type", message_types::announce}, {"text", "Choose a valid target."}, {"interrupt", true}}); return; }
+			int dist = feet_distance(c.x, c.y, target.x, target.y);
+			if (dist > 5 and target.id != c.id) { u.send({{"type", message_types::announce}, {"text", "Target must be within 5 feet."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.focus_points--;
+			int martial_die = 4;
+			if (c.level >= 17) martial_die = 12;
+			else if (c.level >= 11) martial_die = 10;
+			else if (c.level >= 5) martial_die = 8;
+			else martial_die = 6;
+			int heal = random(1, martial_die) + c.get_ability_mod(ABILITY_WIS);
+			if (heal < 1) heal = 1;
+			int effective = u.room.bm.combat.apply_healing(target, heal);
+			u.room.bm.record_effective_healing(c.player_username, effective);
+			u.room.bm.broadcast_announce(c.name + " uses Hands of Healing on " + target.name + ", restoring " + effective + " HP.", true);
+		}
+
+		else if (feature == "elemental_burst") {
+			// Elements Monk: Elemental Burst (AoE ki attack)
+			if (c.class_name != "Monk" or c.subclass != "Way of the Four Elements") { u.send({{"type", message_types::announce}, {"text", "Only Elements monks can use Elemental Burst."}, {"interrupt", true}}); return; }
+			if (c.level < 3) { u.send({{"type", message_types::announce}, {"text", "Elemental Burst requires level 3."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
+			if (c.focus_points < 2) { u.send({{"type", message_types::announce}, {"text", "You need 2 Focus Points."}, {"interrupt", true}}); return; }
+			combatant@ target = u.room.bm.combat.get_combatant(target_id);
+			if (@target == null or target.is_dead) { u.send({{"type", message_types::announce}, {"text", "Choose a target."}, {"interrupt", true}}); return; }
+			int dist = feet_distance(c.x, c.y, target.x, target.y);
+			if (dist > 20) { u.send({{"type", message_types::announce}, {"text", "Target must be within 20 feet."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.focus_points -= 2;
+			int martial_die = 6;
+			if (c.level >= 17) martial_die = 12;
+			else if (c.level >= 11) martial_die = 10;
+			else if (c.level >= 5) martial_die = 8;
+			int damage = random(1, martial_die) + random(1, martial_die) + c.get_ability_mod(ABILITY_WIS);
+			if (damage < 1) damage = 1;
+			// DEX save for half
+			int save_dc = 8 + c.proficiency + c.get_ability_mod(ABILITY_WIS);
+			int save_roll = random(1, 20) + target.get_save_bonus(ABILITY_DEX);
+			if (save_roll >= save_dc) damage = damage / 2;
+			u.room.bm.combat.apply_damage(target, damage, DMG_FIRE, c);
+			u.room.bm.broadcast_announce(c.name + " unleashes Elemental Burst on " + target.name + " for " + damage + " elemental damage!" + (save_roll >= save_dc ? " (saved for half)" : ""), true);
+		}
+
+		else if (feature == "healing_light") {
+			// Celestial Warlock: Healing Light
+			if (c.class_name != "Warlock" or c.subclass != "Celestial") { u.send({{"type", message_types::announce}, {"text", "Only Celestial warlocks can use Healing Light."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
+			if (c.healing_light_dice <= 0) { u.send({{"type", message_types::announce}, {"text", "No Healing Light dice remaining."}, {"interrupt", true}}); return; }
+			combatant@ target = target_id != 0 ? u.room.bm.combat.get_combatant(target_id) : c;
+			if (@target == null or target.is_dead) { u.send({{"type", message_types::announce}, {"text", "Choose a valid target."}, {"interrupt", true}}); return; }
+			int dist = feet_distance(c.x, c.y, target.x, target.y);
+			if (dist > 60 and target.id != c.id) { u.send({{"type", message_types::announce}, {"text", "Target must be within 60 feet."}, {"interrupt", true}}); return; }
+			int dice_to_use = msg.exists("dice_count") ? int(msg["dice_count"]) : 1;
+			int max_dice = c.get_ability_mod(ABILITY_CHA);
+			if (max_dice < 1) max_dice = 1;
+			if (dice_to_use > max_dice) dice_to_use = max_dice;
+			if (dice_to_use > c.healing_light_dice) dice_to_use = c.healing_light_dice;
+			if (dice_to_use < 1) dice_to_use = 1;
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.healing_light_dice -= dice_to_use;
+			int heal = 0;
+			for (int di = 0; di < dice_to_use; di++) heal += random(1, 6);
+			int effective = u.room.bm.combat.apply_healing(target, heal);
+			u.room.bm.record_effective_healing(c.player_username, effective);
+			u.room.bm.broadcast_announce(c.name + " uses Healing Light (" + dice_to_use + "d6) on " + target.name + ", restoring " + effective + " HP. " + c.healing_light_dice + " dice remain.", true);
+		}
+
+		else if (feature == "fey_presence") {
+			// Archfey Warlock: Fey Presence (charm/frighten enemies in 10ft)
+			if (c.class_name != "Warlock" or c.subclass != "Archfey") { u.send({{"type", message_types::announce}, {"text", "Only Archfey warlocks can use Fey Presence."}, {"interrupt", true}}); return; }
+			if (c.fey_presence_used) { u.send({{"type", message_types::announce}, {"text", "You have already used Fey Presence this battle."}, {"interrupt", true}}); return; }
+			if (!c.has_action) { u.send({{"type", message_types::announce}, {"text", "No action remaining."}, {"interrupt", true}}); return; }
+			c.has_action = false;
+			c.used_action = true;
+			c.fey_presence_used = true;
+			int save_dc = 8 + c.proficiency + c.get_ability_mod(ABILITY_CHA);
+			int affected = 0;
+			for (uint pi = 0; pi < u.room.bm.combat.combatants.length(); pi++) {
+				combatant@ enemy = u.room.bm.combat.combatants[pi];
+				if (@enemy == null or enemy.is_dead or enemy.id == c.id) continue;
+				if (!u.room.bm.combat.are_hostile(c, enemy)) continue;
+				int dist = feet_distance(c.x, c.y, enemy.x, enemy.y);
+				if (dist > 10) continue;
+				int save_roll = random(1, 20) + enemy.get_save_bonus(ABILITY_WIS);
+				if (save_roll < save_dc) {
+					enemy.add_condition(COND_CHARMED);
+					affected++;
+					u.room.bm.broadcast_announce(enemy.name + " is charmed by " + c.name + "'s Fey Presence!", false);
+				}
+			}
+			u.room.bm.broadcast_announce(c.name + " unleashes Fey Presence! " + affected + " creature" + (affected == 1 ? "" : "s") + " charmed.", true);
+		}
+
+		else if (feature == "mantle_of_inspiration") {
+			// Glamour Bard: Mantle of Inspiration (temp HP to allies)
+			if (c.class_name != "Bard" or c.subclass != "College of Glamour") { u.send({{"type", message_types::announce}, {"text", "Only Glamour bards can use Mantle of Inspiration."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
+			if (c.bardic_inspiration_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Bardic Inspiration uses remaining."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.bardic_inspiration_uses--;
+			int temp_hp = random(1, c.bardic_inspiration_grant_die) + c.get_ability_mod(ABILITY_CHA);
+			if (temp_hp < 1) temp_hp = 1;
+			int allies_affected = 0;
+			int cha_mod = c.get_ability_mod(ABILITY_CHA);
+			int max_allies = cha_mod > 0 ? cha_mod : 1;
+			for (uint pi = 0; pi < u.room.bm.combat.combatants.length(); pi++) {
+				if (allies_affected >= max_allies) break;
+				combatant@ ally = u.room.bm.combat.combatants[pi];
+				if (@ally == null or ally.is_dead or !ally.is_player) continue;
+				if (u.room.bm.combat.are_hostile(c, ally)) continue;
+				int dist = feet_distance(c.x, c.y, ally.x, ally.y);
+				if (dist > 60) continue;
+				if (ally.temp_hp < temp_hp) ally.temp_hp = temp_hp;
+				allies_affected++;
+			}
+			u.room.bm.broadcast_announce(c.name + " inspires with Mantle of Inspiration! " + allies_affected + " allies gain " + temp_hp + " temporary HP.", true);
+		}
+
+		else if (feature == "psychic_blades") {
+			// Soulknife Rogue: Psychic Blades (bonus action attack with psychic blade)
+			if (c.class_name != "Rogue" or c.subclass != "Soulknife") { u.send({{"type", message_types::announce}, {"text", "Only Soulknife rogues can use Psychic Blades."}, {"interrupt", true}}); return; }
+			if (c.level < 3) { u.send({{"type", message_types::announce}, {"text", "Psychic Blades requires level 3."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
+			combatant@ target = u.room.bm.combat.get_combatant(target_id);
+			if (@target == null or target.is_dead) { u.send({{"type", message_types::announce}, {"text", "Choose a target."}, {"interrupt", true}}); return; }
+			int dist = feet_distance(c.x, c.y, target.x, target.y);
+			if (dist > 60) { u.send({{"type", message_types::announce}, {"text", "Target must be within 60 feet."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			// Psychic blade bonus attack: d4 + DEX/STR
+			int atk_mod = c.get_ability_mod(ABILITY_DEX);
+			int str_mod = c.get_ability_mod(ABILITY_STR);
+			if (str_mod > atk_mod) atk_mod = str_mod;
+			int atk_bonus = atk_mod + c.proficiency;
+			int atk_roll = random(1, 20);
+			int total = atk_roll + atk_bonus;
+			bool hit = (atk_roll == 20) or (atk_roll != 1 and total >= target.armor_class);
+			if (hit) {
+				int dmg = random(1, 4) + atk_mod;
+				if (dmg < 1) dmg = 1;
+				if (atk_roll == 20) dmg += random(1, 4); // crit
+				u.room.bm.combat.apply_damage(target, dmg, DMG_PSYCHIC, c);
+				u.room.bm.broadcast_roll(c.name, "Psychic Blade attack", atk_roll, atk_bonus, total, "Hit!");
+				u.room.bm.broadcast_announce(c.name + "'s Psychic Blade deals " + dmg + " psychic damage to " + target.name + "!", false);
+			} else {
+				u.room.bm.broadcast_roll(c.name, "Psychic Blade attack", atk_roll, atk_bonus, total, "Miss!");
+			}
+		}
+
+		else if (feature == "war_priest_attack") {
+			// War Cleric: War Priest bonus action attack
+			if (c.class_name != "Cleric" or c.subclass != "War Domain") { u.send({{"type", message_types::announce}, {"text", "Only War Domain clerics can use War Priest."}, {"interrupt", true}}); return; }
+			if (c.war_priest_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No War Priest uses remaining."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
+			combatant@ target = u.room.bm.combat.get_combatant(target_id);
+			if (@target == null or target.is_dead) { u.send({{"type", message_types::announce}, {"text", "No valid target."}, {"interrupt", true}}); return; }
+			int dist = feet_distance(c.x, c.y, target.x, target.y);
+			if (dist > c.main_hand_range) { u.send({{"type", message_types::announce}, {"text", "Target out of weapon range."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.war_priest_uses--;
+			// Make a weapon attack
+			if (!u.room.bm.start_flurry_strike(c, target, 0)) {
+				c.has_bonus_action = true;
+				c.used_bonus_action = false;
+				c.war_priest_uses++;
+				u.send({{"type", message_types::announce}, {"text", "Cannot make that attack right now."}, {"interrupt", true}});
+				return;
+			}
+			u.room.bm.broadcast_announce(c.name + " invokes War Priest for a bonus weapon attack! " + c.war_priest_uses + " use" + (c.war_priest_uses == 1 ? "" : "s") + " remain.", true);
+		}
+
+		else if (feature == "warding_flare") {
+			// Light Cleric: Warding Flare (reaction - impose disadvantage on attacker)
+			if (c.class_name != "Cleric" or c.subclass != "Light Domain") { u.send({{"type", message_types::announce}, {"text", "Only Light Domain clerics can use Warding Flare."}, {"interrupt", true}}); return; }
+			if (c.warding_flare_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Warding Flare uses remaining."}, {"interrupt", true}}); return; }
+			if (!c.has_reaction) { u.send({{"type", message_types::announce}, {"text", "No reaction available."}, {"interrupt", true}}); return; }
+			c.warding_flare_uses--;
+			u.room.bm.broadcast_announce(c.name + " readies Warding Flare! The next attack against them or an ally within 30 feet has disadvantage. " + c.warding_flare_uses + " use" + (c.warding_flare_uses == 1 ? "" : "s") + " remain.", false);
+		}
+
 		else {
 			u.send({{"type", message_types::announce}, {"text", "That bonus action is not available to your character."}, {"interrupt", true}});
 			return;

@@ -615,6 +615,95 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         c.has_heroic_inspiration = true;
     }
 
+    // ---- Subclass field initialization ----
+    int prof = proficiency_bonus(cs.level);
+
+    // Fighter subclasses
+    if (cs.class_name == "Fighter") {
+        if (cs.subclass == "Battle Master" and cs.level >= 3) {
+            c.superiority_dice = 4;
+            c.superiority_dice_max = 4;
+            if (cs.level >= 7) { c.superiority_dice = 5; c.superiority_dice_max = 5; }
+            if (cs.level >= 15) { c.superiority_dice = 6; c.superiority_dice_max = 6; }
+        }
+        if (cs.subclass == "Psi Warrior" and cs.level >= 3) {
+            c.psionic_strike_uses = prof;
+        }
+    }
+
+    // Barbarian subclasses
+    if (cs.class_name == "Barbarian") {
+        if (cs.subclass == "Berserker") {
+            c.has_frenzy = true;
+        }
+        if (cs.subclass == "Zealot") {
+            c.zealot_fury_used = 0;
+        }
+    }
+
+    // Rogue subclasses
+    if (cs.class_name == "Rogue") {
+        if (cs.subclass == "Assassin" and cs.level >= 3) {
+            c.assassinate_available = true;
+        }
+    }
+
+    // Paladin subclasses
+    if (cs.class_name == "Paladin") {
+        c.channel_divinity_uses = cs.channel_divinity_uses;
+    }
+
+    // Cleric subclasses
+    if (cs.class_name == "Cleric") {
+        c.channel_divinity_uses = cs.channel_divinity_uses;
+        if (cs.subclass == "Light Domain" and cs.level >= 2) {
+            c.warding_flare_uses = ability_modifier(cs.wisdom);
+            if (c.warding_flare_uses < 1) c.warding_flare_uses = 1;
+        }
+        if (cs.subclass == "War Domain") {
+            c.war_priest_uses = ability_modifier(cs.wisdom);
+            if (c.war_priest_uses < 1) c.war_priest_uses = 1;
+        }
+    }
+
+    // Wizard subclasses
+    if (cs.class_name == "Wizard") {
+        if (cs.subclass == "Diviner" and cs.level >= 2) {
+            c.portent_roll_1 = random(1, 20);
+            c.portent_roll_2 = random(1, 20);
+            c.portent_1_used = false;
+            c.portent_2_used = false;
+        }
+        if (cs.subclass == "Abjurer" and cs.level >= 2) {
+            c.arcane_ward_max = cs.level * 2;
+            c.arcane_ward_hp = c.arcane_ward_max;
+        }
+    }
+
+    // Bard subclasses
+    if (cs.class_name == "Bard") {
+        if (cs.subclass == "College of Valor" and cs.level >= 6) {
+            c.extra_attacks = 1;
+        }
+        if (cs.subclass == "College of Swords" and cs.level >= 6) {
+            c.extra_attacks = 1;
+        }
+    }
+
+    // Warlock subclasses
+    if (cs.class_name == "Warlock") {
+        if (cs.subclass == "Celestial") {
+            c.healing_light_dice = 1 + cs.level;
+        }
+    }
+
+    // Ranger subclasses
+    if (cs.class_name == "Ranger") {
+        if (cs.subclass == "Gloom Stalker" and cs.level >= 3) {
+            c.dread_ambusher_used = false;
+        }
+    }
+
     return c;
 }
 

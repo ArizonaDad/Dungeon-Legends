@@ -538,6 +538,25 @@ void show_bonus_action_menu() {
 	int bardic_opt = -1;
 	int wild_shape_opt = -1;
 	int spiritual_weapon_opt = -1;
+	// Subclass bonus action options
+	int trip_opt = -1;
+	int precision_opt = -1;
+	int riposte_opt = -1;
+	int psi_opt = -1;
+	int frenzy_opt = -1;
+	int psychic_blade_opt = -1;
+	int sacred_opt = -1;
+	int vow_opt = -1;
+	int inspire_opt = -1;
+	int nature_opt = -1;
+	int preserve_opt = -1;
+	int war_priest_opt = -1;
+	int shadow_opt = -1;
+	int mercy_opt = -1;
+	int element_opt = -1;
+	int heal_light_opt = -1;
+	int fey_opt = -1;
+	int mantle_opt = -1;
 
 	if (lc == "barbarian" and !my_is_raging and my_rage_uses_remaining > 0) rage_opt = m.add_item("Rage. Bonus action. Uses left: " + my_rage_uses_remaining + ". Damage bonus: " + my_rage_damage_bonus + ".");
 	if (lc == "fighter" and my_second_wind_available) second_wind_opt = m.add_item("Second Wind. Bonus action. Heal 1d10 plus fighter level.");
@@ -551,6 +570,74 @@ void show_bonus_action_menu() {
 	}
 	if (my_spiritual_weapon_active) spiritual_weapon_opt = m.add_item("Spiritual Weapon. Strike a target within 60 feet with your summoned weapon.");
 
+	// Subclass-specific bonus actions
+	if (lc == "fighter") {
+		if (subclass == "Battle Master") {
+			trip_opt = m.add_item("Trip Attack. Use a superiority die. Your next hit knocks the target prone.");
+			precision_opt = m.add_item("Precision Attack. Add a d8 to your next attack roll.");
+			riposte_opt = m.add_item("Riposte. Ready a reaction attack when an enemy misses you.");
+		}
+		if (subclass == "Psi Warrior") {
+			psi_opt = m.add_item("Psionic Strike. Your next hit deals bonus 1d6 plus Intelligence force damage.");
+		}
+	}
+	if (lc == "barbarian") {
+		if (subclass == "Berserker" and my_is_raging) {
+			frenzy_opt = m.add_item("Frenzy Attack. Bonus action melee attack while raging.");
+		}
+	}
+	if (lc == "rogue") {
+		if (subclass == "Soulknife") {
+			psychic_blade_opt = m.add_item("Psychic Blades. Bonus action. Strike with a psychic blade for 1d4 psychic damage.");
+		}
+	}
+	if (lc == "paladin") {
+		if (subclass == "Oath of Devotion") {
+			sacred_opt = m.add_item("Sacred Weapon. Channel Divinity. Add Charisma to attack rolls for the battle.");
+		}
+		if (subclass == "Oath of Vengeance") {
+			vow_opt = m.add_item("Vow of Enmity. Channel Divinity. Gain advantage on attacks against your target.");
+		}
+		if (subclass == "Oath of Glory") {
+			inspire_opt = m.add_item("Inspiring Smite. After your next Divine Smite, grant temporary HP to nearby allies.");
+		}
+		if (subclass == "Oath of Ancients") {
+			nature_opt = m.add_item("Nature's Wrath. Channel Divinity. Restrain a target. Strength or Dexterity save.");
+		}
+	}
+	if (lc == "cleric") {
+		if (subclass == "Life Domain") {
+			preserve_opt = m.add_item("Preserve Life. Channel Divinity. Heal allies below half health.");
+		}
+		if (subclass == "War Domain") {
+			war_priest_opt = m.add_item("War Priest. Bonus action weapon attack.");
+		}
+	}
+	if (lc == "monk") {
+		if (subclass == "Warrior of Shadow") {
+			shadow_opt = m.add_item("Shadow Step. Bonus action. Teleport up to 60 feet.");
+		}
+		if (subclass == "Warrior of Mercy") {
+			mercy_opt = m.add_item("Hands of Healing. 1 Focus Point. Heal a target for 1d6 plus Wisdom.");
+		}
+		if (subclass == "Warrior of the Elements") {
+			element_opt = m.add_item("Elemental Burst. Spend Focus Points for 1d6 elemental damage per point.");
+		}
+	}
+	if (lc == "warlock") {
+		if (subclass == "Celestial Patron") {
+			heal_light_opt = m.add_item("Healing Light. Bonus action. Heal a target using d6 dice from your pool.");
+		}
+		if (subclass == "Archfey Patron") {
+			fey_opt = m.add_item("Fey Presence. Charm or frighten nearby creatures. Wisdom save.");
+		}
+	}
+	if (lc == "bard") {
+		if (subclass == "College of Glamour") {
+			mantle_opt = m.add_item("Mantle of Inspiration. Grant temporary HP to all allies.");
+		}
+	}
+
 	int options = 1;
 	if (rage_opt >= 0) options++;
 	if (second_wind_opt >= 0) options++;
@@ -560,6 +647,24 @@ void show_bonus_action_menu() {
 	if (bardic_opt >= 0) options++;
 	if (wild_shape_opt >= 0) options++;
 	if (spiritual_weapon_opt >= 0) options++;
+	if (trip_opt >= 0) options++;
+	if (precision_opt >= 0) options++;
+	if (riposte_opt >= 0) options++;
+	if (psi_opt >= 0) options++;
+	if (frenzy_opt >= 0) options++;
+	if (psychic_blade_opt >= 0) options++;
+	if (sacred_opt >= 0) options++;
+	if (vow_opt >= 0) options++;
+	if (inspire_opt >= 0) options++;
+	if (nature_opt >= 0) options++;
+	if (preserve_opt >= 0) options++;
+	if (war_priest_opt >= 0) options++;
+	if (shadow_opt >= 0) options++;
+	if (mercy_opt >= 0) options++;
+	if (element_opt >= 0) options++;
+	if (heal_light_opt >= 0) options++;
+	if (fey_opt >= 0) options++;
+	if (mantle_opt >= 0) options++;
 	if (options == 1) {
 		speak("No class bonus actions are available right now. You can still use a bonus action spell if you know one.", true);
 	}
@@ -603,6 +708,111 @@ void show_bonus_action_menu() {
 			return;
 		}
 		send({{"type", message_types::bonus_action}, {"feature", "spiritual_weapon_attack"}, {"target_id", current_target_id}});
+	}
+	// Subclass bonus action handlers
+	else if (trip_opt >= 0 and res == trip_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "trip_attack"}});
+		speak("Trip Attack prepared. Your next hit knocks the target prone.", true);
+	}
+	else if (precision_opt >= 0 and res == precision_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "precision_attack"}});
+		speak("Precision Attack. A d8 is added to your next attack roll.", true);
+	}
+	else if (riposte_opt >= 0 and res == riposte_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "riposte"}});
+		speak("Riposte readied. You will counterattack when an enemy misses you.", true);
+	}
+	else if (psi_opt >= 0 and res == psi_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "psionic_strike"}});
+		speak("Psionic Strike prepared. Your next hit deals bonus force damage.", true);
+	}
+	else if (frenzy_opt >= 0 and res == frenzy_opt) {
+		if (current_target_id == 0) {
+			speak("No target selected. Scan with I J K L and press Enter to lock a target.", true);
+			return;
+		}
+		send({{"type", message_types::bonus_action}, {"feature", "frenzy_attack"}, {"target_id", current_target_id}});
+		speak("Frenzy Attack! Bonus action melee strike.", true);
+	}
+	else if (psychic_blade_opt >= 0 and res == psychic_blade_opt) {
+		if (current_target_id == 0) {
+			speak("No target selected. Scan with I J K L and press Enter to lock a target.", true);
+			return;
+		}
+		send({{"type", message_types::bonus_action}, {"feature", "psychic_blades"}, {"target_id", current_target_id}});
+		speak("Psychic Blades. Striking with a psychic blade.", true);
+	}
+	else if (sacred_opt >= 0 and res == sacred_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "sacred_weapon"}});
+		speak("Sacred Weapon. Charisma added to your attack rolls.", true);
+	}
+	else if (vow_opt >= 0 and res == vow_opt) {
+		if (current_target_id == 0) {
+			speak("No target selected. Scan with I J K L and press Enter to lock a target.", true);
+			return;
+		}
+		send({{"type", message_types::bonus_action}, {"feature", "vow_of_enmity"}, {"target_id", current_target_id}});
+		speak("Vow of Enmity. You have advantage on attacks against that target.", true);
+	}
+	else if (inspire_opt >= 0 and res == inspire_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "inspiring_smite"}});
+		speak("Inspiring Smite prepared. Your next Divine Smite grants temporary HP to allies.", true);
+	}
+	else if (nature_opt >= 0 and res == nature_opt) {
+		if (current_target_id == 0) {
+			speak("No target selected. Scan with I J K L and press Enter to lock a target.", true);
+			return;
+		}
+		send({{"type", message_types::bonus_action}, {"feature", "natures_wrath"}, {"target_id", current_target_id}});
+		speak("Nature's Wrath. Restraining the target.", true);
+	}
+	else if (preserve_opt >= 0 and res == preserve_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "preserve_life"}});
+		speak("Preserve Life. Healing allies below half health.", true);
+	}
+	else if (war_priest_opt >= 0 and res == war_priest_opt) {
+		if (current_target_id == 0) {
+			speak("No target selected. Scan with I J K L and press Enter to lock a target.", true);
+			return;
+		}
+		send({{"type", message_types::bonus_action}, {"feature", "war_priest"}, {"target_id", current_target_id}});
+		speak("War Priest. Bonus action weapon attack.", true);
+	}
+	else if (shadow_opt >= 0 and res == shadow_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "shadow_step"}});
+		speak("Shadow Step. Teleporting up to 60 feet.", true);
+	}
+	else if (mercy_opt >= 0 and res == mercy_opt) {
+		if (current_target_id == 0) {
+			speak("No target selected. Scan with I J K L and press Enter to lock a target.", true);
+			return;
+		}
+		send({{"type", message_types::bonus_action}, {"feature", "hands_of_healing"}, {"target_id", current_target_id}});
+		speak("Hands of Healing. Healing the target.", true);
+	}
+	else if (element_opt >= 0 and res == element_opt) {
+		if (current_target_id == 0) {
+			speak("No target selected. Scan with I J K L and press Enter to lock a target.", true);
+			return;
+		}
+		send({{"type", message_types::bonus_action}, {"feature", "elemental_burst"}, {"target_id", current_target_id}});
+		speak("Elemental Burst. Unleashing elemental damage.", true);
+	}
+	else if (heal_light_opt >= 0 and res == heal_light_opt) {
+		if (current_target_id == 0) {
+			speak("No target selected. Scan with I J K L and press Enter to lock a target.", true);
+			return;
+		}
+		send({{"type", message_types::bonus_action}, {"feature", "healing_light"}, {"target_id", current_target_id}});
+		speak("Healing Light. Healing the target.", true);
+	}
+	else if (fey_opt >= 0 and res == fey_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "fey_presence"}});
+		speak("Fey Presence. Charming or frightening nearby creatures.", true);
+	}
+	else if (mantle_opt >= 0 and res == mantle_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "mantle_of_inspiration"}});
+		speak("Mantle of Inspiration. Granting temporary HP to all allies.", true);
 	}
 }
 
@@ -1231,6 +1441,7 @@ void show_combat_help() {
 	m.add_item("Enter. Lock onto scanned target.");
 	m.add_item("F. Open action menu on your turn. Attack, cast spell, dodge, dash, and more.");
 	m.add_item("B. Open bonus action menu on your turn. Class features like Rage, Action Surge, Cunning Action.");
+	m.add_item("Subclass abilities appear in the Bonus Action menu (B key) based on your chosen subclass.");
 	m.add_item("C. Open consumable items menu. Use potions, throwables, or scrolls.");
 	m.add_item("R. Roll one die when prompted. If an action needs multiple dice, you will be prompted once per die.");
 	m.add_item("H. Hear your current status. Health, AC, conditions, position.");

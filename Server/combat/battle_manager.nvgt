@@ -1414,6 +1414,15 @@ class battle_manager {
 			broadcast_announce("Guiding light grants advantage against " + target.name + ".", false);
 		}
 		if (consume_help_advantage(attacker, target)) adv = true;
+		// Assassin: advantage on first round (Assassinate feature)
+		if (attacker.subclass == "Assassin" and attacker.assassinate_available and @combat != null and combat.round_number <= 1) {
+			adv = true;
+		}
+		// Paladin Vow of Enmity: advantage vs sworn target
+		if (attacker.vow_of_enmity_target != 0 and attacker.vow_of_enmity_target == target.id) {
+			adv = true;
+		}
+		// Sacred Weapon: add CHA mod to attack rolls (handled via attack bonus modification)
 	}
 
 	bool has_hostile_within_5_feet(combatant@ attacker) {
@@ -2338,6 +2347,31 @@ class battle_manager {
 			if (healed > 0) broadcast_announce(c.name + " heals " + healed + " HP from Blessed Grounds.", false);
 		}
 
+		// ---- Subclass turn-start effects ----
+
+		// Berserker Frenzy: announce bonus action melee attack available while raging
+		if (c.class_name == "Barbarian" and c.subclass == "Berserker" and c.raging and c.has_frenzy) {
+			broadcast_announce(c.name + " is in a Frenzy! Bonus action melee attack available.", false);
+		}
+
+		// Assassinate: disable after first round
+		if (c.subclass == "Assassin" and c.assassinate_available and combat.round_number > 1) {
+			c.assassinate_available = false;
+		}
+
+		// Reset first hit tracking for subclass on-hit effects
+		c.is_first_hit_this_turn = true;
+
+		// Sacred Weapon glow reminder
+		if (c.sacred_weapon_active) {
+			broadcast_announce(c.name + "'s weapon glows with sacred power. (+" + c.get_ability_mod(ABILITY_CHA) + " to attack rolls)", false);
+		}
+
+		// Arcane Ward status
+		if (c.class_name == "Wizard" and c.subclass == "Abjurer" and c.arcane_ward_hp > 0) {
+			broadcast_announce(c.name + "'s Arcane Ward has " + c.arcane_ward_hp + " of " + c.arcane_ward_max + " HP.", false);
+		}
+
 		if (trigger_readied_actions(c)) return;
 		announce_turn_start(c);
 	}
@@ -3062,6 +3096,67 @@ class battle_manager {
 		return true;
 	}
 
+	// ---- Subclass On-Hit Damage ----
+	// Called after a successful attack hit, returns bonus damage to add to total.
+	int apply_subclass_on_hit_damage(combatant@ attacker, combatant@ target, bool is_weapon_attack) {
+		int bonus = 0;
+		if (@attacker == null or @target == null) return 0;
+
+		// Zealot: +1d6 radiant on first hit while raging
+		if (attacker.class_name == "Barbarian" and attacker.subclass == "Zealot" and attacker.raging and attacker.is_first_hit_this_turn) {
+			int zealot_dmg = random(1, 6);
+			bonus += zealot_dmg;
+			broadcast_announce(attacker.name + "'s Divine Fury deals " + zealot_dmg + " extra radiant damage!", false);
+		}
+
+		// Psi Warrior: +1d6+INT force damage (uses limited)
+		if (attacker.class_name == "Fighter" and attacker.subclass == "Psi Warrior" and attacker.psionic_strike_uses > 0 and is_weapon_attack) {
+			int psi_dmg = random(1, 6) + attacker.get_ability_mod(ABILITY_INT);
+			if (psi_dmg < 1) psi_dmg = 1;
+			attacker.psionic_strike_uses--;
+			bonus += psi_dmg;
+			broadcast_announce(attacker.name + "'s Psionic Strike deals " + psi_dmg + " force damage!", false);
+		}
+
+		// Battle Master: Trip Attack (if pending, apply extra d8 and knock prone)
+		if (attacker.class_name == "Fighter" and attacker.subclass == "Battle Master" and attacker.trip_attack_pending and is_weapon_attack) {
+			int trip_dmg = random(1, 8);
+			bonus += trip_dmg;
+			attacker.trip_attack_pending = false;
+			// Target must make STR save or be knocked prone
+			int save_dc = 8 + attacker.proficiency + attacker.get_ability_mod(ABILITY_STR);
+			int save_roll = random(1, 20) + target.get_save_bonus(ABILITY_STR);
+			if (save_roll < save_dc) {
+				target.add_condition(COND_PRONE);
+				broadcast_announce(attacker.name + "'s Trip Attack deals " + trip_dmg + " extra damage and knocks " + target.name + " prone!", false);
+			} else {
+				broadcast_announce(attacker.name + "'s Trip Attack deals " + trip_dmg + " extra damage, but " + target.name + " stays standing!", false);
+			}
+		}
+
+		// Gloom Stalker: +1d8 on first turn (Dread Ambusher)
+		if (attacker.class_name == "Ranger" and attacker.subclass == "Gloom Stalker" and !attacker.dread_ambusher_used) {
+			int ambush_dmg = random(1, 8);
+			bonus += ambush_dmg;
+			attacker.dread_ambusher_used = true;
+			broadcast_announce(attacker.name + "'s Dread Ambusher deals " + ambush_dmg + " extra damage!", false);
+		}
+
+		// Fey Wanderer: +1d4 psychic on first hit per turn
+		if (attacker.class_name == "Ranger" and attacker.subclass == "Fey Wanderer" and attacker.is_first_hit_this_turn and is_weapon_attack) {
+			int fey_dmg = random(1, 4);
+			bonus += fey_dmg;
+			broadcast_announce(attacker.name + "'s Dreadful Strikes add " + fey_dmg + " psychic damage!", false);
+		}
+
+		// Mark first hit used
+		if (bonus > 0 or is_weapon_attack) {
+			attacker.is_first_hit_this_turn = false;
+		}
+
+		return bonus;
+	}
+
 	void finalize_roll_result(pending_roll@ pr, int natural_roll, int bless_bonus = 0, int bardic_bonus = 0) {
 		if (@pr == null or @combat == null) return;
 		combatant@ c = combat.get_combatant(pr.combatant_id);
@@ -3093,9 +3188,38 @@ class battle_manager {
 			bool hit = false;
 			string outcome = "";
 
+			// Assassin: auto-crit on hit during first round
+			if (!is_fumble and c.subclass == "Assassin" and c.assassinate_available and @combat != null and combat.round_number <= 1) {
+				if (natural_roll >= crit_threshold or total >= target.armor_class) {
+					is_crit = true;
+					hit = true;
+					outcome = "Critical hit! Assassinate!";
+					broadcast_announce(c.name + "'s Assassinate turns the hit into a critical!", false);
+				}
+			}
+
+			// Sacred Weapon: add CHA mod to attack roll for Devotion Paladin
+			if (c.sacred_weapon_active and !is_fumble) {
+				int cha_bonus = c.get_ability_mod(ABILITY_CHA);
+				if (cha_bonus > 0) {
+					total += cha_bonus;
+					reported_modifier += cha_bonus;
+				}
+			}
+
+			// Precision Attack: add superiority die to attack roll
+			if (c.precision_attack_pending and c.superiority_dice > 0) {
+				int precision_bonus = random(1, 8);
+				total += precision_bonus;
+				reported_modifier += precision_bonus;
+				c.superiority_dice--;
+				c.precision_attack_pending = false;
+				broadcast_announce(c.name + "'s Precision Attack adds " + precision_bonus + " to the attack roll! (" + c.superiority_dice + " superiority dice remain)", false);
+			}
+
 			if (is_crit) {
 				hit = true;
-				outcome = "Critical hit!";
+				if (outcome == "") outcome = "Critical hit!";
 			} else if (is_fumble) {
 				hit = false;
 				outcome = "Miss!";
@@ -3259,6 +3383,15 @@ class battle_manager {
 				c.hunter_colossus_used = true;
 				broadcast_announce(c.name + "'s Colossus Slayer deals " + hunter_damage + " extra damage!", false);
 			}
+
+			// Subclass on-hit bonus damage
+			int subclass_damage = apply_subclass_on_hit_damage(c, target, pr.is_weapon_attack);
+			if (subclass_damage > 0) total_damage += subclass_damage;
+
+			// Sacred Weapon: add CHA mod to attack (already applied via attack bonus), no damage bonus here
+			// (Sacred Weapon affects attack rolls, handled in advantage section)
+
+			// Arcane Ward: absorb damage for Abjurer Wizard (applied in apply_damage, but track here)
 
 			string dmg_type_name = "damage";
 			if (pr.damage_type >= 0 and pr.damage_type < int(DAMAGE_TYPE_NAMES.length())) {

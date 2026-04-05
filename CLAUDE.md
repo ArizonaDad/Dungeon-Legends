@@ -83,14 +83,30 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 - Actions that cannot be performed explain why (no target, out of range, no action remaining)
 
 ### Bonus Action Menu (B key)
-- **Barbarian**: Rage (advantage STR, bonus damage, physical resistance)
-- **Fighter**: Action Surge (extra action), Second Wind (1d10+level healing)
-- **Rogue**: Cunning Action (bonus Dash/Disengage/Hide)
-- **Paladin**: Divine Smite (2d8 radiant on hit), Lay on Hands (level x 5 healing)
-- **Monk**: Flurry of Blows (two unarmed strikes)
-- **Bard**: Bardic Inspiration (d6 to ally's next roll)
+- **Barbarian**: Rage + Berserker Frenzy (bonus melee attack while raging)
+- **Fighter**: Action Surge, Second Wind + Battle Master Maneuvers (Trip/Precision/Riposte) + Psi Warrior Strike
+- **Rogue**: Cunning Action + Soulknife Psychic Blades
+- **Paladin**: Divine Smite, Lay on Hands + Channel Divinity (Sacred Weapon, Vow of Enmity, Inspiring Smite, Nature's Wrath)
+- **Cleric**: Channel Divinity (Preserve Life, War Priest Attack)
+- **Monk**: Flurry of Blows + Shadow Step, Hands of Healing, Elemental Burst
+- **Bard**: Bardic Inspiration + Mantle of Inspiration (Glamour)
+- **Warlock**: Healing Light (Celestial), Fey Presence (Archfey)
 - **Druid** (level 2+): Wild Shape
 - **Any class**: Spiritual Weapon (if active)
+
+### Subclass Combat Features (52 subclasses across 13 classes)
+- **Fighter**: Champion (crit 19+), Battle Master (superiority dice maneuvers), Eldritch Knight (spellcasting + War Magic), Psi Warrior (force damage strikes)
+- **Barbarian**: Berserker (Frenzy bonus attacks), Wild Heart (beast bonuses), World Tree (temp HP on rage), Zealot (radiant fury damage)
+- **Rogue**: Assassin (auto-crit first round), Thief (Fast Hands), Arcane Trickster (spellcasting + Magical Ambush), Soulknife (psychic blades)
+- **Paladin**: Devotion (Sacred Weapon), Vengeance (Vow of Enmity advantage), Glory (Inspiring Smite temp HP), Ancients (Nature's Wrath restrain)
+- **Cleric**: Life (healing bonus + Preserve Life), Light (Warding Flare), Trickery (Invoke Duplicity), War (War Priest attacks)
+- **Wizard**: Evoker (Sculpt Spells ally protection), Diviner (Portent forced rolls), Abjurer (Arcane Ward), Illusionist (improved DC)
+- **Bard**: Lore (Cutting Words), Valor (Combat Inspiration + Extra Attack), Dance (Dazzling Footwork AC), Glamour (Mantle of Inspiration)
+- **Monk**: Open Hand (push/prone/no reactions), Shadow (Shadow Step teleport), Mercy (Hands of Healing), Elements (elemental burst)
+- **Ranger**: Hunter (Colossus Slayer + Horde Breaker), Beast Master (Primal Companion), Gloom Stalker (Dread Ambusher), Fey Wanderer (Dreadful Strikes)
+- **Sorcerer**: Draconic (AC/HP + Elemental Affinity), Wild Magic (Surge table), Clockwork (Restore Balance), Aberrant (Psychic Defenses)
+- **Warlock**: Fiend (temp HP on kill + Dark Luck), Archfey (Fey Presence), Celestial (Healing Light), Great Old One (Entropic Ward)
+- **Artificer**: Battle Smith (Steel Defender), Artillerist (Eldritch Cannon), Alchemist (Experimental Elixir), Armorer (Arcane Armor)
 
 ### Audio System
 - **Dual-layer audio**: Synthesized spatial cues (combat_audio.nvgt) + pre-recorded sound files (audio_manager.nvgt)

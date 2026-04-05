@@ -183,6 +183,41 @@ class combatant {
 	bool tavern_brawler_push_used = false;
 	bool hunter_colossus_used = false;
 
+	// Subclass tracking
+	bool has_frenzy = false;
+	string wild_heart_choice = "";
+	int zealot_fury_used = 0;
+	int psionic_strike_uses = 0;
+	int superiority_dice = 0;
+	int superiority_dice_max = 0;
+	bool trip_attack_pending = false;
+	bool precision_attack_pending = false;
+	bool riposte_ready = false;
+	bool assassinate_available = false;
+	bool war_magic_used = false;
+	int warding_flare_uses = 0;
+	int war_priest_uses = 0;
+	bool sacred_weapon_active = false;
+	uint vow_of_enmity_target = 0;
+	bool invoke_duplicity_active = false;
+	int portent_roll_1 = 0;
+	int portent_roll_2 = 0;
+	bool portent_1_used = false;
+	bool portent_2_used = false;
+	int arcane_ward_hp = 0;
+	int arcane_ward_max = 0;
+	bool cutting_words_available = true;
+	int healing_light_dice = 0;
+	bool entropic_ward_active = false;
+	bool dread_ambusher_used = false;
+	int elemental_attunement_points = 0;
+	bool restore_balance_available = true;
+	int dark_luck_used = 0;
+	bool fey_presence_used = false;
+	bool is_first_hit_this_turn = true;
+	int channel_divinity_uses = 0;
+	int preserve_life_pool = 0;
+
 	// Potion buff tracking
 	int potion_damage_bonus = 0;
 	int potion_ac_bonus = 0;
@@ -429,6 +464,10 @@ class battle {
 		c.combat_prowess_used = false;
 		c.tavern_brawler_push_used = false;
 		c.hunter_colossus_used = false;
+		c.is_first_hit_this_turn = true;
+		c.dread_ambusher_used = false;
+		c.trip_attack_pending = false;
+		c.precision_attack_pending = false;
 
 		// Reaction resets at start of YOUR turn
 		c.has_reaction = true;
@@ -487,6 +526,16 @@ class battle {
 
 		if (target.raging and (damage_type == DMG_BLUDGEONING or damage_type == DMG_PIERCING or damage_type == DMG_SLASHING)) {
 			amount = (amount + 1) / 2;
+		}
+
+		// Arcane Ward absorbs damage for Abjurer Wizards
+		if (target.arcane_ward_hp > 0 and target.class_name == "Wizard" and target.subclass == "Abjurer") {
+			if (amount <= target.arcane_ward_hp) {
+				target.arcane_ward_hp -= amount;
+				return;
+			}
+			amount -= target.arcane_ward_hp;
+			target.arcane_ward_hp = 0;
 		}
 
 		// Temp HP absorbs first
@@ -752,6 +801,25 @@ class battle {
 				state["my_luck_points"] = c.luck_points;
 				state["my_luck_points_max"] = c.luck_points_max;
 				state["my_has_heroic_inspiration"] = c.has_heroic_inspiration;
+				// Subclass state
+				state["my_superiority_dice"] = c.superiority_dice;
+				state["my_superiority_dice_max"] = c.superiority_dice_max;
+				state["my_psionic_strike_uses"] = c.psionic_strike_uses;
+				state["my_assassinate_available"] = c.assassinate_available;
+				state["my_warding_flare_uses"] = c.warding_flare_uses;
+				state["my_war_priest_uses"] = c.war_priest_uses;
+				state["my_sacred_weapon_active"] = c.sacred_weapon_active;
+				state["my_vow_of_enmity_target"] = c.vow_of_enmity_target;
+				state["my_healing_light_dice"] = c.healing_light_dice;
+				state["my_channel_divinity_uses"] = c.channel_divinity_uses;
+				state["my_arcane_ward_hp"] = c.arcane_ward_hp;
+				state["my_arcane_ward_max"] = c.arcane_ward_max;
+				state["my_portent_roll_1"] = c.portent_roll_1;
+				state["my_portent_roll_2"] = c.portent_roll_2;
+				state["my_portent_1_used"] = c.portent_1_used;
+				state["my_portent_2_used"] = c.portent_2_used;
+				state["my_fey_presence_used"] = c.fey_presence_used;
+				state["my_dread_ambusher_used"] = c.dread_ambusher_used;
 				break;
 			}
 		}
