@@ -26,6 +26,7 @@ namespace message_types
 	const string friend_decline = "friend_decline";
 	const string friend_remove = "friend_remove";
 	const string friend_list = "friend_list";
+	const string friend_online = "friend_online";
 	const string pending_requests = "pending_requests";
 	const string password_required = "password_required";
 	const string password_submit = "password_submit";

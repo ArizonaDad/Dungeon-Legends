@@ -160,6 +160,10 @@ int my_potion_spell_dc_rounds = 0;
 // Kill tracking
 int my_kill_count = 0;
 
+// Spell slot tracking
+int[] my_spell_slots_current = {0,0,0,0,0,0,0,0,0,0};
+int[] my_spell_slots_max = {0,0,0,0,0,0,0,0,0,0};
+
 // Quick restart state
 string last_scenario = "";
 string last_difficulty = "";
@@ -1064,8 +1068,48 @@ void speak_my_status() {
 		}
 	}
 
-	// Position
-	text += "Position " + me.x + ", " + me.y + ". ";
+	// Position awareness
+	text += " Position: " + (me.x * 5) + " feet east, " + (me.y * 5) + " feet north.";
+
+	// Find nearest enemy and ally
+	int nearest_enemy_dist = 9999;
+	string nearest_enemy_name = "";
+	string nearest_enemy_dir = "";
+	int nearest_ally_dist = 9999;
+	string nearest_ally_name = "";
+
+	for (uint ei = 0; ei < combat_entities.length(); ei++) {
+		if (combat_entities[ei].id == my_combatant_id) continue;
+		if (combat_entities[ei].is_dead) continue;
+		int dist = feet_distance(me.x, me.y, combat_entities[ei].x, combat_entities[ei].y);
+
+		if (!combat_entities[ei].is_player) {
+			// Enemy (monster)
+			if (dist < nearest_enemy_dist) {
+				nearest_enemy_dist = dist;
+				nearest_enemy_name = combat_entities[ei].name;
+				int dx = combat_entities[ei].x - me.x;
+				int dy = combat_entities[ei].y - me.y;
+				if (dx == 0 and dy > 0) nearest_enemy_dir = "north";
+				else if (dx == 0 and dy < 0) nearest_enemy_dir = "south";
+				else if (dx > 0 and dy == 0) nearest_enemy_dir = "east";
+				else if (dx < 0 and dy == 0) nearest_enemy_dir = "west";
+				else if (dx > 0 and dy > 0) nearest_enemy_dir = "northeast";
+				else if (dx < 0 and dy > 0) nearest_enemy_dir = "northwest";
+				else if (dx > 0 and dy < 0) nearest_enemy_dir = "southeast";
+				else if (dx < 0 and dy < 0) nearest_enemy_dir = "southwest";
+			}
+		} else {
+			// Ally (player)
+			if (dist < nearest_ally_dist) {
+				nearest_ally_dist = dist;
+				nearest_ally_name = combat_entities[ei].name;
+			}
+		}
+	}
+
+	if (nearest_enemy_name != "") text += " Nearest enemy: " + nearest_enemy_name + ", " + nearest_enemy_dist + " feet " + nearest_enemy_dir + ".";
+	if (nearest_ally_name != "") text += " Nearest ally: " + nearest_ally_name + ", " + nearest_ally_dist + " feet.";
 
 	// Current target
 	if (current_target_id > 0) {
@@ -1128,6 +1172,18 @@ void speak_my_status() {
 	if (active_modifier_name != "" and active_modifier_name != "No Modifier") {
 		text += " Modifier: " + active_modifier_name + ".";
 	}
+
+	// Spell slots
+	bool has_slots = false;
+	string slot_text = " Spell slots: ";
+	for (int sl = 1; sl <= 9; sl++) {
+		if (my_spell_slots_max[sl] > 0) {
+			if (has_slots) slot_text += " ";
+			slot_text += "Level " + sl + ": " + my_spell_slots_current[sl] + " of " + my_spell_slots_max[sl] + ".";
+			has_slots = true;
+		}
+	}
+	if (has_slots) text += slot_text;
 
 	speak(text, true);
 }
@@ -1350,7 +1406,13 @@ void on_creature_died(string name, bool is_player, string killed_by = "", bool w
 	combat_audio_play_death(name);
 	audio_on_death(name, killed_by, was_from_full_hp, was_overkill, was_stealth);
 	if (killed_by == username) my_kill_count++;
-	speak(text, true);
+	// Check if the dead creature is the player
+	if (name == username or (my_combatant_id > 0 and combat_audio_find_entity_by_name(name) != null and get_entity(my_combatant_id) != null and name == get_entity(my_combatant_id).name)) {
+		speak("You have fallen! Death saves begin on your next turn. Your allies fight on.", true);
+		audio_play_global("lose.mp3", VOL_COMBAT);
+	} else {
+		speak(text, true);
+	}
 }
 
 void on_death_save_result(string name, int roll, string outcome) {
@@ -1496,6 +1558,17 @@ void parse_game_state(json_object@ msg) {
 					e.conditions.insert_last(int(conds[j]));
 				}
 			}
+			// Extract spell slots for our combatant
+			if (e.id == my_combatant_id) {
+				if (cobj.exists("spell_slots_current")) {
+					json_array@ sc = cobj["spell_slots_current"];
+					for (uint si = 0; si < sc.length() and si < 10; si++) my_spell_slots_current[si] = int(sc[si]);
+				}
+				if (cobj.exists("spell_slots_max")) {
+					json_array@ sm = cobj["spell_slots_max"];
+					for (uint si = 0; si < sm.length() and si < 10; si++) my_spell_slots_max[si] = int(sm[si]);
+				}
+			}
 			combat_entities.insert_last(e);
 		}
 	}
@@ -1599,6 +1672,7 @@ void reset_combat_state() {
 	my_kill_count = 0;
 	active_modifier_name = "";
 	active_modifier_desc = "";
+	for (int si = 0; si < 10; si++) { my_spell_slots_current[si] = 0; my_spell_slots_max[si] = 0; }
 }
 
 // ============================================================
@@ -1791,10 +1865,10 @@ void combat_game_loop() {
 		}
 
 		// Volume and TTS speed controls (available any time)
-		if ((keyboard_modifiers & KEYMOD_CTRL) != 0 and key_pressed(KEY_PAGEUP)) tts_speed_up();
-		else if ((keyboard_modifiers & KEYMOD_CTRL) != 0 and key_pressed(KEY_PAGEDOWN)) tts_speed_down();
-		else if (key_pressed(KEY_PAGEUP)) volume_up();
-		else if (key_pressed(KEY_PAGEDOWN)) volume_down();
+		if ((keyboard_modifiers & KEYMOD_CTRL) != 0 and key_pressed(KEY_PAGEUP)) { tts_speed_up(); save_settings(); }
+		else if ((keyboard_modifiers & KEYMOD_CTRL) != 0 and key_pressed(KEY_PAGEDOWN)) { tts_speed_down(); save_settings(); }
+		else if (key_pressed(KEY_PAGEUP)) { volume_up(); save_settings(); }
+		else if (key_pressed(KEY_PAGEDOWN)) { volume_down(); save_settings(); }
 
 		// Info keys (available any time during combat)
 		else if (key_pressed(KEY_F1)) show_combat_help();

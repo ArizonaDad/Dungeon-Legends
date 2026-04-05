@@ -629,6 +629,17 @@ class user
 					this.send(guild_login_info);
 				}
 			}
+			// Notify online friends that this player is now online
+			if (data.exists("friends")) {
+				json_array@ friends = data["friends"];
+				for (uint fi = 0; fi < friends.length(); fi++) {
+					string friend_name = string(friends[fi]);
+					user@ friend_user = users.get_user_by_name(friend_name);
+					if (@friend_user != null) {
+						friend_user.send({{"type", message_types::friend_online}, {"username", this.username}});
+					}
+				}
+			}
 			this.account.commit();
 		}
 	}

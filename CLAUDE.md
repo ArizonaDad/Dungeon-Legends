@@ -35,13 +35,16 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 
 ## Main Menu
 - Menu header displays player level, gold, and glory points
-- **Adventure**: Create an adventure lobby with persistent progression (XP, achievements, level-ups)
-- **Sandbox**: Create a sandbox lobby for free-build characters (level 1-20, no persistence)
-- Adventure characters can be used in sandbox mode as fallback
-- **Shop**: Buy consumable items (potions, throwables, scrolls) with gold for use in combat
-- **Guild**: Create or join a guild (max 20 members), guild chat, invite friends, view members and total glory
+- 7 top-level categories: Play, Character, Social, Shop, Challenges, Settings, Quit
+- **Play**: Adventure (persistent), Sandbox (free-build), Join Game (browse lobbies)
+- **Character**: Create Character, View Character (with proficiency bonus, saving throws, spell save DC), Inventory, My Stats, Prestige (level 20+)
+- **Social**: Friends, Guild (create/join, max 20 members, guild chat, invite, view members/glory), Check Who's Online
+- **Shop**: Item Shop (potions, scrolls, throwables with gold), Glory Shop (titles and exclusive items with glory)
+- **Challenges**: Daily Dungeon (featured dungeon with bonus rewards), Weekly Challenges, Leaderboards
+- **Settings**: Volume Up/Down, TTS Speed Up/Down, About. All settings persisted to disk via `save_settings()`/`load_saved_settings()`
 - First-time login prompts character creation automatically
 - Daily login bonuses: streak-based XP (50-200 XP, resets after day 7)
+- Settings (volume, TTS speed) saved on change and restored on launch
 
 ## Combat System
 
@@ -120,7 +123,8 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 - **Kill streaks**: First Blood, Stealth Kill, Insta Kill (from full HP), Overkill (200%+ max HP), Double Kill (2 in one turn), Triple Kill (3 in one turn), kill_streak1-9 (4+ total)
 - **Healing sounds**: Small heals (random from 3 variants), large heals (15+ HP)
 - **Buff/debuff sounds**: Different sounds for positive vs negative conditions
-- **Announcements**: Low health warning (25% HP), low health heartbeat (synth thumps below 25% HP with increasing tempo), level-up stinger, wave/boss stingers, victory/defeat
+- **Announcements**: Low health warning (25% HP), low health heartbeat (synth thumps below 25% HP with increasing tempo), level-up stinger, wave/boss stingers, victory/defeat, player death dramatic message
+- **Notifications**: Friend online notification (sound + TTS), guild chat notification sound
 - **TTS Speed Control**: Ctrl+PageUp/Down adjusts speech rate (-10 to +10), available in menus and combat
 - **121 sound files**: Weapon impacts, spell effects, music tracks, footsteps, kill announcements, UI sounds
 
@@ -220,7 +224,7 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 - **Caps Lock/Shift+Caps Lock**: Cycle targets from scan results
 - **[/]**: Alternative target cycling
 - **Enter**: Lock target
-- **H**: Enhanced status readout (HP, AC, equipped items, active buffs with rounds remaining, consumables, kill count, modifier)
+- **H**: Enhanced status readout (HP, AC, equipped items, active buffs with rounds remaining, consumables, kill count, modifier, spell slots, position with nearest enemy/ally)
 - **O**: Initiative order (reads top to bottom)
 - **T**: Whose turn it is
 - **Tab**: Switch focus forward (Game -> Chat -> Chat History)

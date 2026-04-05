@@ -364,8 +364,71 @@ void show_shop() {
 	}
 }
 
+// ---- Settings Persistence ----
+void save_settings() {
+	config["master_volume"] = "" + master_volume_offset;
+	config["tts_speed"] = "" + tts_rate;
+}
+
+void load_saved_settings() {
+	string vol = config.read_string("master_volume");
+	if (vol != "") {
+		float parsed_vol = parse_float(vol);
+		if (parsed_vol >= -30.0f and parsed_vol <= 12.0f) {
+			master_volume_offset = parsed_vol;
+			if (@current_music != null) current_music.volume = VOL_MUSIC + master_volume_offset;
+		}
+	}
+	string spd = config.read_string("tts_speed");
+	if (spd != "") {
+		float parsed_spd = parse_float(spd);
+		if (parsed_spd >= -10.0f and parsed_spd <= 10.0f) {
+			tts_rate = parsed_spd;
+			v.rate = int(tts_rate);
+		}
+	}
+}
+
+// ---- Character View Helpers ----
+int get_class_spellcasting_ability(string class_name) {
+	string c = class_name;
+	if (c == "Bard" or c == "Paladin" or c == "Sorcerer" or c == "Warlock") return ABILITY_CHA;
+	if (c == "Cleric" or c == "Druid" or c == "Ranger") return ABILITY_WIS;
+	if (c == "Wizard" or c == "Artificer") return ABILITY_INT;
+	// Subclass casters: Fighter (Eldritch Knight) and Rogue (Arcane Trickster) use INT
+	if (c == "Fighter" or c == "Rogue") return ABILITY_INT;
+	return -1;
+}
+
+bool is_class_caster(string class_name, string subclass_name) {
+	string c = class_name;
+	if (c == "Bard" or c == "Cleric" or c == "Druid" or c == "Paladin" or c == "Ranger" or c == "Sorcerer" or c == "Warlock" or c == "Wizard" or c == "Artificer") return true;
+	if (c == "Fighter" and subclass_name == "Eldritch Knight") return true;
+	if (c == "Rogue" and subclass_name == "Arcane Trickster") return true;
+	return false;
+}
+
+string get_class_saving_throw_profs(string class_name) {
+	string c = class_name;
+	if (c == "Barbarian") return "Strength, Constitution";
+	if (c == "Bard") return "Dexterity, Charisma";
+	if (c == "Cleric") return "Wisdom, Charisma";
+	if (c == "Druid") return "Intelligence, Wisdom";
+	if (c == "Fighter") return "Strength, Constitution";
+	if (c == "Monk") return "Strength, Dexterity";
+	if (c == "Paladin") return "Wisdom, Charisma";
+	if (c == "Ranger") return "Strength, Dexterity";
+	if (c == "Rogue") return "Dexterity, Intelligence";
+	if (c == "Sorcerer") return "Constitution, Charisma";
+	if (c == "Warlock") return "Wisdom, Charisma";
+	if (c == "Wizard") return "Intelligence, Wisdom";
+	if (c == "Artificer") return "Constitution, Intelligence";
+	return "None";
+}
+
 void main_menu()
 {
+	load_saved_settings();
 	music_start("menu");
 	if (is_new_account) {
 		speak("Welcome to Dungeon Legends! Let's create your first character.", true);
@@ -407,6 +470,8 @@ void main_menu()
 			show_trade_screen();
 			continue;
 		}
+		if (room_closed_flag) { room_closed_flag = false; continue; }
+		if (launch_pending_game_if_needed()) continue;
 		string intro = "Main Menu.";
 		if (cached_level > 0) intro += " Level " + cached_level + ".";
 		int menu_gold = @cached_stats != null and cached_stats.exists("gold") ? int(cached_stats["gold"]) : 0;
@@ -414,18 +479,54 @@ void main_menu()
 		if (menu_gold > 0 or menu_glory > 0) intro += " Gold: " + menu_gold + ". Glory: " + menu_glory + ".";
 		menu@ m = setup_menu(intro);
 		@m = main_screen;
-		// Calculate total items dynamically
-		int total = 15; // base: create char, adventure, sandbox, join, weekly, glory shop, daily dungeon, leaderboards, shop, guild, friends, online, about, quit, my stats
+		int play_btn = m.add_item("Play. 1 of 7");
+		int char_btn = m.add_item("Character. 2 of 7");
+		int social_btn = m.add_item("Social. 3 of 7");
+		int shop_btn = m.add_item("Shop. 4 of 7");
+		int challenges_btn = m.add_item("Challenges. 5 of 7");
+		int settings_btn = m.add_item("Settings. 6 of 7");
+		int quit_btn = m.add_item("Quit. 7 of 7");
+		int res = m.run();
+		if (res == play_btn) { show_play_menu(); }
+		else if (res == char_btn) { show_character_menu(); }
+		else if (res == social_btn) { show_social_menu(); }
+		else if (res == shop_btn) { show_shop_menu(); }
+		else if (res == challenges_btn) { show_challenges_menu(); }
+		else if (res == settings_btn) { show_settings_menu(); }
+		else if (res == quit_btn) {
+			m.play("sounds/exit.wav");
+			v.speak_wait("Thanks for playing.");
+			return;
+		}
+	}
+}
+
+// ---- Sub-Menu: Play ----
+void show_play_menu() {
+	menu@ m = setup_sub_menu("Play. Choose a game mode.");
+	m.add_item("Adventure. Create an adventure lobby with persistent progression. 1 of 3.");
+	m.add_item("Sandbox. Create a sandbox lobby for free-build characters. 2 of 3.");
+	m.add_item("Join Game. Browse available lobbies. 3 of 3.");
+	int pick = m.run();
+	if (pick == 0) { create_lobby_for_mode("adventure"); }
+	else if (pick == 1) { create_lobby_for_mode("sandbox"); }
+	else if (pick == 2) { send({{"type", message_types::list_rooms}}); }
+}
+
+// ---- Sub-Menu: Character ----
+void show_character_menu() {
+	while (true) {
 		bool has_char = has_any_character_profile();
-		if (has_char) total++; // view char
-		total++; // inventory
 		bool show_prestige = (cached_level >= 20);
+		int total = 3; // create, inventory, stats
+		if (has_char) total++;
 		if (show_prestige) total++;
 		int n = 1;
+		menu@ m = setup_sub_menu("Character.");
 		int create_char = m.add_item("Create Character. " + n + " of " + total); n++;
 		int view_char = -1;
 		if (has_char) {
-			view_char = m.add_item("View My Character. " + n + " of " + total); n++;
+			view_char = m.add_item("View Character. " + n + " of " + total); n++;
 		}
 		int inventory_btn = m.add_item("Inventory. " + n + " of " + total); n++;
 		int stats_btn = m.add_item("My Stats. " + n + " of " + total); n++;
@@ -433,22 +534,9 @@ void main_menu()
 		if (show_prestige) {
 			prestige_btn = m.add_item("Prestige. Reset to level 1 for permanent bonuses. " + n + " of " + total); n++;
 		}
-		int create_adventure = m.add_item("Adventure. Create or join an adventure lobby. " + n + " of " + total); n++;
-		int create_sandbox = m.add_item("Sandbox. Create or join a sandbox lobby. " + n + " of " + total); n++;
-		int join = m.add_item("Join a game! " + n + " of " + total); n++;
-		int challenges_btn = m.add_item("Weekly Challenges. " + n + " of " + total); n++;
-		int glory_shop_btn = m.add_item("Glory Shop. Spend Glory Points on titles and exclusive items. " + n + " of " + total); n++;
-		int daily_btn = m.add_item("Daily Dungeon. Today's featured dungeon with bonus rewards. " + n + " of " + total); n++;
-		int leaderboard_btn = m.add_item("Leaderboards. See the top players. " + n + " of " + total); n++;
-		int shop_btn = m.add_item("Shop. Buy consumable items for combat. " + n + " of " + total); n++;
-		string guild_label = my_guild_name != "" ? "Guild. " + my_guild_name + "." : "Guild. Create or join a guild.";
-		int guild_btn = m.add_item(guild_label + " " + n + " of " + total); n++;
-		int social = m.add_item("Friends. " + n + " of " + total); n++;
-		int CHECK_ONLINE = m.add_item("Check who is online. " + n + " of " + total); n++;
-		int About = m.add_item("About us. " + n + " of " + total); n++;
-		int quit = m.add_item("Quit. " + n + " of " + total);
-		int res = m.run();
-		if (res == create_char) {
+		int pick = m.run();
+		if (pick < 0) return;
+		if (pick == create_char) {
 			menu@ profile_menu = setup_sub_menu("Choose which character profile to edit.");
 			profile_menu.add_item("Adventure Character. Persistent progression. Uses your current Adventure level.");
 			profile_menu.add_item("Sandbox Character. Free-build from level 1 through 20.");
@@ -459,7 +547,7 @@ void main_menu()
 				character_creation_menu(profile, forced_level);
 			}
 		}
-		else if (view_char >= 0 and res == view_char) {
+		else if (view_char >= 0 and pick == view_char) {
 			string profile = "adventure";
 			if (profile_has_character("adventure") and profile_has_character("sandbox")) {
 				menu@ view_menu = setup_sub_menu("Choose which character to inspect.");
@@ -486,6 +574,19 @@ void main_menu()
 			string summary = prestige_text + room_game_type_label(profile) + " character. " + created_char_name + ". " + created_char_race + " " + created_char_class + subclass_text + ", level " + created_char_level + "." + background_text + " ";
 			summary += "Strength " + created_ability_scores[0] + ". Dexterity " + created_ability_scores[1] + ". Constitution " + created_ability_scores[2] + ". ";
 			summary += "Intelligence " + created_ability_scores[3] + ". Wisdom " + created_ability_scores[4] + ". Charisma " + created_ability_scores[5] + ". ";
+			// Proficiency bonus
+			summary += "Proficiency bonus: +" + proficiency_bonus(created_char_level) + ". ";
+			// Saving throw proficiencies
+			summary += "Saving throw proficiencies: " + get_class_saving_throw_profs(created_char_class) + ". ";
+			// Spell save DC (for casters)
+			if (is_class_caster(created_char_class, created_char_subclass)) {
+				int spell_ability = get_class_spellcasting_ability(created_char_class);
+				if (spell_ability >= 0 and spell_ability < 6) {
+					int ability_mod = ability_modifier(created_ability_scores[spell_ability]);
+					int spell_dc = 8 + proficiency_bonus(created_char_level) + ability_mod;
+					summary += "Spell save DC: " + spell_dc + " (" + ABILITY_SHORT[spell_ability] + "). ";
+				}
+			}
 			summary += "Weapon: " + created_weapon + ".";
 			if (created_char_feats.length() > 0) summary += " Feats: " + join_feat_names(created_char_feats) + ".";
 			if (created_cantrips.length() > 0) {
@@ -502,13 +603,13 @@ void main_menu()
 			}
 			speak(summary, true);
 		}
-		else if (res == inventory_btn) {
+		else if (pick == inventory_btn) {
 			show_inventory();
 		}
-		else if (res == stats_btn) {
+		else if (pick == stats_btn) {
 			show_player_stats();
 		}
-		else if (prestige_btn >= 0 and res == prestige_btn) {
+		else if (prestige_btn >= 0 and pick == prestige_btn) {
 			menu@ prestige_menu = setup_sub_menu("Prestige will reset your level to 1 but you keep your inventory, achievements, and dungeon completions. You gain plus 1 to all ability scores permanently and a unique title. This cannot be undone. Are you sure?");
 			prestige_menu.add_item("Yes, prestige now.");
 			prestige_menu.add_item("No, cancel.");
@@ -520,54 +621,62 @@ void main_menu()
 				speak("Prestige canceled.", false);
 			}
 		}
-		else if (res == create_adventure or res == create_sandbox) {
-			string name, password;
-			if (create_room_form(name, password)) {
-				current_room_game_type = res == create_adventure ? "adventure" : "sandbox";
-				send({{"type", message_types::new_room}, {"name", name}, {"password", password}, {"game_type", current_room_game_type}});
-				host_menu();
-				m.play(m.select_sound);
-			}
-		}
-		else if (res == join) {
-			send({{"type", message_types::list_rooms}});
-			m.play(m.select_sound);
-		}
-		else if (res == challenges_btn) {
-			show_weekly_challenges();
-		}
-		else if (res == glory_shop_btn) {
-			show_glory_shop();
-		}
-		else if (res == daily_btn) {
-			show_daily_dungeon();
-		}
-		else if (res == leaderboard_btn) {
-			show_leaderboards();
-		}
-		else if (res == shop_btn) {
-			show_shop();
-		}
-		else if (res == guild_btn) {
-			show_guild_menu();
-		}
-		else if (res == social) {
-			social_panel();
-		}
-		else if (res == CHECK_ONLINE) {
-			send({{"type", message_types::check_online}});
-			m.play(m.select_sound);
-		}
-		else if (res == About) {
-			m.play(m.select_sound);
+	}
+}
+
+// ---- Sub-Menu: Social ----
+void show_social_menu() {
+	menu@ m = setup_sub_menu("Social.");
+	m.add_item("Friends. 1 of 3.");
+	m.add_item("Guild. 2 of 3.");
+	m.add_item("Check Who's Online. 3 of 3.");
+	int pick = m.run();
+	if (pick == 0) { social_panel(); }
+	else if (pick == 1) { show_guild_menu(); }
+	else if (pick == 2) { send({{"type", message_types::check_online}}); }
+}
+
+// ---- Sub-Menu: Shop ----
+void show_shop_menu() {
+	menu@ m = setup_sub_menu("Shop.");
+	m.add_item("Item Shop. Buy potions, scrolls, and throwables with gold. 1 of 2.");
+	m.add_item("Glory Shop. Buy titles and exclusive items with glory. 2 of 2.");
+	int pick = m.run();
+	if (pick == 0) { show_shop(); }
+	else if (pick == 1) { show_glory_shop(); }
+}
+
+// ---- Sub-Menu: Challenges ----
+void show_challenges_menu() {
+	menu@ m = setup_sub_menu("Challenges.");
+	m.add_item("Daily Dungeon. 1 of 3.");
+	m.add_item("Weekly Challenges. 2 of 3.");
+	m.add_item("Leaderboards. 3 of 3.");
+	int pick = m.run();
+	if (pick == 0) { show_daily_dungeon(); }
+	else if (pick == 1) { show_weekly_challenges(); }
+	else if (pick == 2) { show_leaderboards(); }
+}
+
+// ---- Sub-Menu: Settings ----
+void show_settings_menu() {
+	while (true) {
+		menu@ m = setup_sub_menu("Settings. Volume: " + int(master_volume_offset) + " dB. TTS Speed: " + int(tts_rate) + ".");
+		m.add_item("Volume Up. Current: " + int(master_volume_offset) + " dB. 1 of 5.");
+		m.add_item("Volume Down. 2 of 5.");
+		m.add_item("TTS Speed Up. Current rate: " + int(tts_rate) + ". 3 of 5.");
+		m.add_item("TTS Speed Down. 4 of 5.");
+		m.add_item("About. 5 of 5.");
+		int pick = m.run();
+		if (pick < 0) return;
+		if (pick == 0) { volume_up(); save_settings(); }
+		else if (pick == 1) { volume_down(); save_settings(); }
+		else if (pick == 2) { tts_speed_up(); save_settings(); }
+		else if (pick == 3) { tts_speed_down(); save_settings(); }
+		else if (pick == 4) {
 			info_box_form("About", "Dungeon Legends",
 				"Dungeon Legends. A multiplayer accessible D&D 5e combat arena.\r\nCreate your character from 33 species, 13 classes, and 16 backgrounds.\r\nBattle in PvP Arena, Wave Survival, or Boss Rush modes.\r\nFully accessible with text to speech and 3D spatial audio.\r\nVersion 1.0.\r\n"
 			);
-		}
-		else {
-			m.play("sounds/exit.wav");
-			v.speak_wait("Thanks for playing.");
-			return;
 		}
 	}
 }
@@ -648,10 +757,10 @@ void menu_callback(menu@ m, string user = "")
 	network_loop();
 	main_screen_loop();
 	music_update();
-	if ((keyboard_modifiers & KEYMOD_CTRL) != 0 and key_pressed(KEY_PAGEUP)) tts_speed_up();
-	else if ((keyboard_modifiers & KEYMOD_CTRL) != 0 and key_pressed(KEY_PAGEDOWN)) tts_speed_down();
-	else if (key_pressed(KEY_PAGEUP)) volume_up();
-	else if (key_pressed(KEY_PAGEDOWN)) volume_down();
+	if ((keyboard_modifiers & KEYMOD_CTRL) != 0 and key_pressed(KEY_PAGEUP)) { tts_speed_up(); save_settings(); }
+	else if ((keyboard_modifiers & KEYMOD_CTRL) != 0 and key_pressed(KEY_PAGEDOWN)) { tts_speed_down(); save_settings(); }
+	else if (key_pressed(KEY_PAGEUP)) { volume_up(); save_settings(); }
+	else if (key_pressed(KEY_PAGEDOWN)) { volume_down(); save_settings(); }
 	if (key_pressed(KEY_F3) and has_pending_invite) { handle_game_invite(); }
 	if (key_pressed(KEY_F5) and trade_pending) { handle_trade_request(); }
 }
@@ -659,10 +768,10 @@ void sub_menu_callback(menu@ m, string user = "")
 {
 	network_loop();
 	music_update();
-	if ((keyboard_modifiers & KEYMOD_CTRL) != 0 and key_pressed(KEY_PAGEUP)) tts_speed_up();
-	else if ((keyboard_modifiers & KEYMOD_CTRL) != 0 and key_pressed(KEY_PAGEDOWN)) tts_speed_down();
-	else if (key_pressed(KEY_PAGEUP)) volume_up();
-	else if (key_pressed(KEY_PAGEDOWN)) volume_down();
+	if ((keyboard_modifiers & KEYMOD_CTRL) != 0 and key_pressed(KEY_PAGEUP)) { tts_speed_up(); save_settings(); }
+	else if ((keyboard_modifiers & KEYMOD_CTRL) != 0 and key_pressed(KEY_PAGEDOWN)) { tts_speed_down(); save_settings(); }
+	else if (key_pressed(KEY_PAGEUP)) { volume_up(); save_settings(); }
+	else if (key_pressed(KEY_PAGEDOWN)) { volume_down(); save_settings(); }
 	if (key_pressed(KEY_BACK)) { simulate_key_down(KEY_ESCAPE); }
 	if (key_pressed(KEY_F3) and has_pending_invite) { handle_game_invite(); }
 	if (key_pressed(KEY_F5) and trade_pending) { handle_trade_request(); }

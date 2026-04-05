@@ -189,6 +189,13 @@ void handle_message(json_object@ msg)
 	else if (msg_type == message_types::friend_list and msg.exists("friends")) {
 		@cached_friends = msg["friends"];
 	}
+	else if (msg_type == message_types::friend_online) {
+		string who = msg.exists("username") ? string(msg["username"]) : "";
+		if (who != "") {
+			speak(who + " is now online!", false);
+			audio_play_global("friend_invite.mp3", VOL_ANNOUNCE);
+		}
+	}
 	else if (msg_type == message_types::pending_requests and msg.exists("requests")) {
 		@cached_pending = msg["requests"];
 	}
@@ -584,6 +591,7 @@ void handle_message(json_object@ msg)
 		string guild_msg = msg.exists("message") ? string(msg["message"]) : "";
 		string display = "[Guild] " + from + ": " + guild_msg;
 		speak(display, false);
+		audio_play_global("friend_invite.mp3", -15.0);
 		if (@main_screen != null) {
 			main_screen.form.add_list_item(f_main_history, display + "  ( " + calendar().format(DATE_TIME_FORMAT_RFC822) + ")", guild_msg);
 		}
