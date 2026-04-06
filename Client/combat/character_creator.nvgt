@@ -1601,20 +1601,10 @@ bool choose_gender_step() {
 }
 
 void character_creation_menu(string profile = "adventure", int forced_level = -1) {
+    // Save current active profile so we can restore it if creation is cancelled
+    string saved_profile = active_character_profile;
     init_feat_data();
-    created_char_background = "";
-    created_char_subclass = "";
-    created_char_gender = "";
-    created_char_feats.resize(0);
-    created_char_skill_proficiencies.resize(0);
-    created_char_tool_proficiencies.resize(0);
-    created_bonus_cantrips.resize(0);
-    created_bonus_spells.resize(0);
-    created_spellcasting_override_spells.resize(0);
-    created_spellcasting_override_abilities.resize(0);
-    created_free_cast_spells.resize(0);
-    created_cantrips.resize(0);
-    created_spells.resize(0);
+    clear_character_buffer();
     clear_creation_back_request();
     speak("Character creation. Let's build your champion.", true);
 
@@ -1625,6 +1615,8 @@ void character_creation_menu(string profile = "adventure", int forced_level = -1
             if (choose_name_step()) step = 2;
             else {
                 speak("Character creation cancelled.", true);
+                // Restore previous character state
+                if (saved_profile != "" and profile_has_character(saved_profile)) set_active_character_profile(saved_profile);
                 return;
             }
         } else if (step == 2) {

@@ -771,6 +771,8 @@ void menu_callback(menu@ m, string user = "")
 	network_loop();
 	main_screen_loop();
 	music_update();
+	// Auto-exit menu when a game start is pending so players don't get stuck
+	if (start_game_pending) { simulate_key_down(KEY_ESCAPE); return; }
 	if ((keyboard_modifiers & KEYMOD_ALT) != 0 and key_pressed(KEY_F4)) { exit(); }
 	if ((keyboard_modifiers & KEYMOD_CTRL) != 0 and key_pressed(KEY_PAGEUP)) { tts_speed_up(); save_settings(); }
 	else if ((keyboard_modifiers & KEYMOD_CTRL) != 0 and key_pressed(KEY_PAGEDOWN)) { tts_speed_down(); save_settings(); }
@@ -914,6 +916,11 @@ void host_menu()
 			music_stop();
 			return;
 		}
+		// Check if game started during menu — don't treat auto-escape as leave
+		if (launch_pending_game_if_needed()) {
+			do_intro = false;
+			continue;
+		}
 		if (res < 0) {
 			speak("You have left the room.", false);
 			send({{"type", message_types::leave_room}});
@@ -1053,6 +1060,8 @@ void wait_menu()
 			music_stop();
 			return;
 		}
+		// Check if game started during menu — don't treat the auto-escape as "leave"
+		if (launch_pending_game_if_needed()) continue;
 		if (res < 0 or res == leave) {
 			speak("You have left the room.", false);
 			send({{"type", message_types::leave_room}, {"leave", ""}});
