@@ -322,5 +322,14 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 - Server tracks: total_damage_dealt, total_deaths, pvp_wins/losses, longest_kill_streak per account
 
 ## Development
-- Compile: `C:\Users\16239\Documents\games\nvgt\nvgt.exe -c Server/Server.nvgt` and `C:\Users\16239\Documents\games\nvgt\nvgt.exe -c Client/client.nvgt`
+- Compile client: `C:\Users\16239\Documents\games\nvgt\nvgt.exe -c Client/client.nvgt` (produces Client/client.zip for distribution)
+- Compile server (Linux): `C:\Users\16239\Documents\games\nvgt\nvgt.exe -c -p linux Server/Server.nvgt` (produces Server/Server.zip)
 - Git repo: https://github.com/ArizonaDad/Dungeon-Legends
+
+## Server Deployment
+- **Host**: the-gdn.net, port 2000 (game), SSH port 30001
+- **Deploy script**: `C:\Users\16239\redeploy.py` — stops server, uploads Server.zip via SFTP, extracts to ~/dungeon_legends/, restarts with nohup
+- **Other scripts**: `deploy_server.py` (full deploy with screen session), `fix_server.py` (maintenance/restart), `start_server.py` (restart only)
+- **Server path on host**: ~/dungeon_legends/Server
+- **Logs**: ~/dungeon_legends/server.log
+- Uses paramiko with Ed25519 key auth (key at `~/.ssh/id_ed25519`)
