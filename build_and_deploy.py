@@ -42,6 +42,7 @@ TRACKED_FILES = [
     "sounds.dat",
     "lib/SAAPI64.dll",
     "lib/nvdaControllerClient64.dll",
+    "lib/nvgt_curl.dll",
     "lib/phonon.dll",
 ]
 
@@ -151,16 +152,12 @@ def compile_client():
         size_mb = os.path.getsize(client_zip) / (1024 * 1024)
         print(f"  client.zip: {size_mb:.0f} MB")
 
-    # Extract client.zip to populate client/ output directory
+    # Extract client.zip to populate client/ output directory (overwrites in place)
     if os.path.exists(client_zip):
         print("Extracting client.zip...")
-        import shutil
-
-        if os.path.exists(CLIENT_OUT_DIR):
-            shutil.rmtree(CLIENT_OUT_DIR)
         os.makedirs(CLIENT_OUT_DIR, exist_ok=True)
         with zipfile.ZipFile(client_zip, "r") as zf:
-            zf.extractall(CLIENT_DIR)
+            zf.extractall(CLIENT_OUT_DIR)
 
 
 def generate_manifest(version, release_notes):

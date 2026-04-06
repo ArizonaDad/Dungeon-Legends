@@ -1,9 +1,11 @@
 *.zip
 *.db
 *.dat
+*.exe
 __pycache__/
 *.pyc
 Client/sounds/
 Client/client/
+Client/lib/
 Dungeon Legends/
 .last_deployed_manifest.json

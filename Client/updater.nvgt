@@ -1,5 +1,6 @@
 // updater.nvgt - Incremental auto-update system for Dungeon Legends
 // Compares file hashes in manifest.json to only download changed files.
+#pragma plugin nvgt_curl
 
 const string UPDATE_MANIFEST_URL = "http://the-gdn.net:8080/manifest.json";
 const string UPDATE_FILES_URL = "http://the-gdn.net:8080/files/";
@@ -120,20 +121,10 @@ bool version_is_newer(string a, string b) {
 
 void parse_semver(string ver, int&out major, int&out minor, int&out patch) {
 	major = 0; minor = 0; patch = 0;
-	int part = 0;
-	int value = 0;
-	for (uint i = 0; i <= ver.length(); i++) {
-		if (i == ver.length() or ver[i] == 46) { // 46 == '.'
-			if (part == 0) major = value;
-			else if (part == 1) minor = value;
-			else if (part == 2) patch = value;
-			part++;
-			value = 0;
-		} else {
-			int digit = ver[i] - 48; // 48 == '0'
-			if (digit >= 0 and digit <= 9) value = value * 10 + digit;
-		}
-	}
+	string[]@ parts = ver.split(".");
+	if (parts.length() > 0) major = int(parse_int(parts[0]));
+	if (parts.length() > 1) minor = int(parse_int(parts[1]));
+	if (parts.length() > 2) patch = int(parse_int(parts[2]));
 }
 
 // ---- File download ----
@@ -149,7 +140,7 @@ bool download_update_files(string[]@ files) {
 
 		speak("Downloading " + remote_path + ". File " + (i + 1) + " of " + files.length() + ".", true);
 
-		internet_request dl;
+		internet_request@ dl = internet_request();
 		dl.set_url(url);
 		dl.set_path(local_path);
 		dl.follow_redirects = true;
