@@ -781,7 +781,21 @@ void handle_user_message(user@ u, json_object@ msg)
 	}
 
 	else if (msg_type == message_types::leave_game) {
-		// Placeholder for game-specific leave logic.
+		// Player forfeited mid-battle. Kill their combatant so the battle can end.
+		if (@u.room != null and @u.room.bm != null and u.room.started) {
+			battle@ b = u.room.bm.combat;
+			if (@b != null) {
+				for (uint ci = 0; ci < b.combatants.length(); ci++) {
+					if (b.combatants[ci].is_player and b.combatants[ci].player_username == u.username) {
+						b.combatants[ci].current_hp = 0;
+						b.combatants[ci].is_dead = true;
+						u.room.bm.broadcast_announce(u.username + " has forfeited the battle.", true);
+						u.room.bm.broadcast_state();
+						break;
+					}
+				}
+			}
+		}
 	}
 
 	else if (msg_type == message_types::kick_player and msg.exists("target")) {
@@ -1168,13 +1182,14 @@ void handle_user_message(user@ u, json_object@ msg)
 		u.room.started = true;
 		string mode = msg.exists("mode") ? string(msg["mode"]) : "pvp";
 		string scenario = msg.exists("scenario") ? string(msg["scenario"]) : "";
+		string difficulty = msg.exists("difficulty") ? string(msg["difficulty"]) : "normal";
 		// Send start_game to all players — client will enter combat loop
 		for (uint i = 0; i < u.room.players.length(); i++) {
 			u.room.players[i].send({{"type", message_types::start_game}, {"mode", mode}, {"scenario", scenario}});
 		}
 		// Create battle manager and start combat on server
 		@u.room.bm = battle_manager();
-		u.room.bm.start_game(u, mode, scenario);
+		u.room.bm.start_game(u, mode, scenario, difficulty);
 	}
 
 	// --- Character Creation (save to account) ---

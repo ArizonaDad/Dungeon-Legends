@@ -120,8 +120,18 @@ class server
 			println("[NET] Peer " + event.peer_id + " disconnected.");
 			user@ u = users.get_user_by_peer(event.peer_id);
 			if (@u != null) {
-				println("[NET] Cleaning up user: " + u.username);
-				try { users.remove_user(u); } catch { println("[NET] Exception during user cleanup."); }
+				// If player is in an active battle, mark as disconnected instead of removing.
+				// This preserves their room/battle state for reconnection.
+				if (@u.room != null and u.room.started and @u.room.bm != null) {
+					println("[NET] " + u.username + " disconnected during battle - marking for reconnect.");
+					u.disconnected = true;
+					users.user_dictionary.delete("p/" + u.peer_id);
+					u.peer_id = 0;
+					u.room.bm.broadcast_announce(u.username + " disconnected.", false);
+				} else {
+					println("[NET] Cleaning up user: " + u.username);
+					try { users.remove_user(u); } catch { println("[NET] Exception during user cleanup."); }
+				}
 			}
 		}
 	}
@@ -148,6 +158,25 @@ class server
 				existing.is_bot = false;
 				users.user_dictionary.set("p/" + peer_id, @existing);
 				existing.send({{"type", message_types::login}, {"id", existing.id}});
+				existing.on_login();
+				// If they were in an active battle, resend game state so client can rejoin.
+				if (@existing.room != null and existing.room.started and @existing.room.bm != null) {
+					println("[AUTH] " + existing.username + " rejoining active battle.");
+					// Find their combatant_id
+					uint cid = 0;
+					battle@ b = existing.room.bm.combat;
+					if (@b != null) {
+						for (uint ci = 0; ci < b.combatants.length(); ci++) {
+							if (b.combatants[ci].is_player and b.combatants[ci].player_username == existing.username) {
+								cid = b.combatants[ci].id;
+								break;
+							}
+						}
+					}
+					existing.send({{"type", message_types::game_start_battle}, {"combatant_id", cid}, {"mode", existing.room.bm.combat.mode}, {"scenario", existing.room.bm.scenario_id}});
+					existing.room.bm.broadcast_state();
+					existing.room.bm.broadcast_announce(existing.username + " has reconnected!", true);
+				}
 				return;
 			}
 			// Prevent duplicate logins (not disconnected).

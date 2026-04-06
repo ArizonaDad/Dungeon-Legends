@@ -104,6 +104,9 @@ class battle_manager {
 	bool pending_turn_start_after_interrupt = false;
 	string lobby_game_type = GAME_TYPE_SANDBOX;
 	bool progression_enabled = false;
+	string difficulty = "normal";
+	float difficulty_hp_mult = 1.0;
+	float difficulty_dmg_mult = 1.0;
 	int party_monster_xp = 0;
 	int waves_cleared_this_run = 0;
 	dictionary run_kills;
@@ -2021,7 +2024,7 @@ class battle_manager {
 
 	// ---- Game Start ----
 
-	void start_game(user@ host, string mode = "pvp", string scenario = "") {
+	void start_game(user@ host, string mode = "pvp", string scenario = "", string diff = "normal") {
 		if (@host == null or @host.room == null) {
 			if (@host != null) host.send({{"type", message_types::error}, {"text", "Failed to start game: invalid room."}});
 			return;
@@ -2029,6 +2032,10 @@ class battle_manager {
 		reset_progression_tracking();
 		lobby_game_type = normalize_game_type(host.room.game_type);
 		progression_enabled = is_adventure_game_type(lobby_game_type);
+		difficulty = diff;
+		if (difficulty == "hard") { difficulty_hp_mult = 1.5; difficulty_dmg_mult = 1.25; }
+		else if (difficulty == "nightmare") { difficulty_hp_mult = 2.0; difficulty_dmg_mult = 1.5; }
+		else { difficulty_hp_mult = 1.0; difficulty_dmg_mult = 1.0; }
 
 		// Copy room players into battle manager.
 		players.resize(0);
@@ -2142,9 +2149,10 @@ class battle_manager {
 			if (@ws != null and ws.waves.length() > 0) {
 				combat.mode = "wave";
 				combat.wave_number = 1;
-				spawn_wave(combat, ws.waves[0], combat.map_width);
+				spawn_wave(combat, ws.waves[0], combat.map_width, difficulty_hp_mult, difficulty_dmg_mult);
 				spawn_swarming_extra(ws.waves[0]);
-				broadcast_announce("Wave 1! " + ws.name + ".", false);
+				string diff_label = difficulty == "hard" ? " Hard difficulty." : (difficulty == "nightmare" ? " Nightmare difficulty!" : "");
+				broadcast_announce("Wave 1! " + ws.name + "." + diff_label, false);
 			} else {
 				broadcast_announce("Unknown scenario. Defaulting to PvP arena.", false);
 				combat.mode = "pvp";
@@ -2154,7 +2162,7 @@ class battle_manager {
 			combat.mode = "endless";
 			combat.wave_number = 1;
 			wave_encounter@ first_wave = generate_endless_wave(1);
-			spawn_wave(combat, first_wave, combat.map_width);
+			spawn_wave(combat, first_wave, combat.map_width, difficulty_hp_mult, difficulty_dmg_mult);
 			spawn_swarming_extra(first_wave);
 			broadcast_announce("Endless Survival! Wave 1!", false);
 		} else if (mode == "boss") {
@@ -2166,6 +2174,8 @@ class battle_manager {
 				combatant@ boss = create_monster_combatant(boss_def, combat.map_width / 2, combat.map_height - 2);
 				if (@boss != null) {
 					boss.is_boss = true;
+					if (difficulty_hp_mult != 1.0) { boss.max_hp = int(float(boss.max_hp) * difficulty_hp_mult); boss.current_hp = boss.max_hp; }
+					if (difficulty_dmg_mult != 1.0) { boss.monster_attack_damage_mod = int(float(boss.monster_attack_damage_mod) * difficulty_dmg_mult); }
 					combat.add_combatant(boss);
 					broadcast_announce("Boss Rush! " + boss_def.name + " enters the battlefield.", false);
 				}
@@ -2610,8 +2620,9 @@ class battle_manager {
 
 				// Generate and spawn next wave
 				wave_encounter@ next = generate_endless_wave(combat.wave_number);
-				spawn_wave(combat, next, combat.map_width, hp_mult, 1.0);
-				spawn_swarming_extra(next, hp_mult);
+				float total_hp_mult = hp_mult * difficulty_hp_mult;
+				spawn_wave(combat, next, combat.map_width, total_hp_mult, difficulty_dmg_mult);
+				spawn_swarming_extra(next, total_hp_mult);
 
 				// Apply armored_foes/champions_trial to newly spawned monsters
 				if (active_modifier == "armored_foes" or active_modifier == "champions_trial") {
@@ -2692,7 +2703,7 @@ class battle_manager {
 							if (!combat.combatants[ri].is_player) combat.combatants.remove_at(ri);
 						}
 						// Spawn next wave
-						spawn_wave(combat, ws.waves[combat.wave_number], combat.map_width);
+						spawn_wave(combat, ws.waves[combat.wave_number], combat.map_width, difficulty_hp_mult, difficulty_dmg_mult);
 						spawn_swarming_extra(ws.waves[combat.wave_number]);
 						// Apply modifiers to newly spawned monsters
 						if (active_modifier == "armored_foes" or active_modifier == "champions_trial") {

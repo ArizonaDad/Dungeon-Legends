@@ -895,18 +895,17 @@ void host_menu()
 		menu@ m = setup_menu("You created a lobby. Select an option when you are ready.");
 		m.intro_interrupt = false;
 		m.automatic_intro = do_intro;
-		int total_items = 4 + room_player_names.length();
+		int total_items = 3 + room_player_names.length();
 		int start = m.add_item("Start game 1 of " + total_items);
 		int add_bot = m.add_item("Add AI player 2 of " + total_items);
-		int add_enemy_bot = m.add_item("Add enemy A.I. opponent. Best for PvP; in co-op modes it joins your party. 3 of " + total_items);
-		int close_room = m.add_item("Close room and return to Main Menu 4 of " + total_items);
+		int close_room = m.add_item("Close room and return to Main Menu 3 of " + total_items);
 		int[] player_items;
 		for (uint i = 0; i < room_player_names.length(); i++) {
 			string pname = room_player_names[i];
 			string label = pname;
 			if (pname == room_host_name) label += " (Host)";
 			if (is_room_bot(pname)) label += " (AI)";
-			label += " " + (i + 5) + " of " + total_items;
+			label += " " + (i + 4) + " of " + total_items;
 			player_items.insert_last(m.add_item("Player: " + label));
 		}
 		int res = m.run();
@@ -930,13 +929,6 @@ void host_menu()
 		else if (res == add_bot and add_bot >= 0) {
 			send({{"type", message_types::add_bot}});
 			speak("Adding AI player...", false);
-			wait(200);
-			network_loop();
-			do_intro = false;
-		}
-		else if (res == add_enemy_bot and add_enemy_bot >= 0) {
-			send({{"type", message_types::add_bot}});
-			speak("Adding AI opponent...", false);
 			wait(200);
 			network_loop();
 			do_intro = false;
