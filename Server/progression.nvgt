@@ -253,6 +253,16 @@ json_object@ build_character_data_message(account@ acct, string profile) {
 	if (character.exists("cantrips")) msg["cantrips"] = character["cantrips"];
 	if (character.exists("spells")) msg["spells"] = character["spells"];
 	if (character.exists("equipped")) msg["equipped"] = character["equipped"];
+	if (character.exists("background")) msg["background"] = character["background"];
+	if (character.exists("feats")) msg["feats"] = character["feats"];
+	if (character.exists("skills")) msg["skills"] = character["skills"];
+	if (character.exists("tools")) msg["tools"] = character["tools"];
+	if (character.exists("base_str")) msg["base_str"] = character["base_str"];
+	if (character.exists("base_dex")) msg["base_dex"] = character["base_dex"];
+	if (character.exists("base_con")) msg["base_con"] = character["base_con"];
+	if (character.exists("base_int")) msg["base_int"] = character["base_int"];
+	if (character.exists("base_wis")) msg["base_wis"] = character["base_wis"];
+	if (character.exists("base_cha")) msg["base_cha"] = character["base_cha"];
 
 	// Include prestige info for adventure characters
 	if (is_adventure_game_type(profile)) {

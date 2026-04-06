@@ -1,4 +1,4 @@
-#pragma asset "sounds.dat"
+																	#pragma asset "sounds.dat"
 #include "menu.nvgt"
 #include "instance.nvgt"
 #include "forms.nvgt"
@@ -79,10 +79,6 @@ void main()
 	if (!login()) return;
 	wait(100);
 	network_loop();
-	if (created_char_class == "") {
-		speak("You do not have a saved character yet. Character creation will open now for your first Adventure character.", true);
-		character_creation_menu();
-	}
 	main_menu();
 	config.close();
 }
@@ -430,9 +426,10 @@ void main_menu()
 {
 	load_saved_settings();
 	music_start("menu");
-	if (is_new_account) {
+	if (is_new_account or !profile_has_character("adventure")) {
 		speak("Welcome to Dungeon Legends! Let's create your first character.", true);
-		character_creation_menu("adventure", 1);
+		int starting_level = cached_level > 0 ? cached_level : 1;
+		character_creation_menu("adventure", starting_level);
 		is_new_account = false;
 		menu@ tut_menu = setup_sub_menu("Would you like to play a quick tutorial to learn the combat controls?");
 		tut_menu.add_item("Yes, teach me how to play.");
@@ -504,13 +501,29 @@ void main_menu()
 // ---- Sub-Menu: Play ----
 void show_play_menu() {
 	menu@ m = setup_sub_menu("Play. Choose a game mode.");
-	m.add_item("Adventure. Create an adventure lobby with persistent progression. 1 of 3.");
-	m.add_item("Sandbox. Create a sandbox lobby for free-build characters. 2 of 3.");
-	m.add_item("Join Game. Browse available lobbies. 3 of 3.");
+	m.add_item("Play Adventure. Create or join an adventure game with persistent progression. 1 of 2.");
+	m.add_item("Play Sandbox Mode. Create or join a sandbox game with free-build characters. 2 of 2.");
+	int pick = m.run();
+	if (pick == 0) { show_adventure_play_menu(); }
+	else if (pick == 1) { show_sandbox_play_menu(); }
+}
+
+void show_adventure_play_menu() {
+	menu@ m = setup_sub_menu("Adventure Mode.");
+	m.add_item("Create Game. Start a new adventure lobby. 1 of 2.");
+	m.add_item("Join Game. Browse available lobbies. 2 of 2.");
 	int pick = m.run();
 	if (pick == 0) { create_lobby_for_mode("adventure"); }
-	else if (pick == 1) { create_lobby_for_mode("sandbox"); }
-	else if (pick == 2) { send({{"type", message_types::list_rooms}}); }
+	else if (pick == 1) { send({{"type", message_types::list_rooms}}); }
+}
+
+void show_sandbox_play_menu() {
+	menu@ m = setup_sub_menu("Sandbox Mode.");
+	m.add_item("Create Game. Start a new sandbox lobby. 1 of 2.");
+	m.add_item("Join Game. Browse available lobbies. 2 of 2.");
+	int pick = m.run();
+	if (pick == 0) { create_lobby_for_mode("sandbox"); }
+	else if (pick == 1) { send({{"type", message_types::list_rooms}}); }
 }
 
 // ---- Sub-Menu: Character ----
@@ -757,6 +770,7 @@ void menu_callback(menu@ m, string user = "")
 	network_loop();
 	main_screen_loop();
 	music_update();
+	if ((keyboard_modifiers & KEYMOD_ALT) != 0 and key_pressed(KEY_F4)) { exit(); }
 	if ((keyboard_modifiers & KEYMOD_CTRL) != 0 and key_pressed(KEY_PAGEUP)) { tts_speed_up(); save_settings(); }
 	else if ((keyboard_modifiers & KEYMOD_CTRL) != 0 and key_pressed(KEY_PAGEDOWN)) { tts_speed_down(); save_settings(); }
 	else if (key_pressed(KEY_PAGEUP)) { volume_up(); save_settings(); }
@@ -768,6 +782,7 @@ void sub_menu_callback(menu@ m, string user = "")
 {
 	network_loop();
 	music_update();
+	if ((keyboard_modifiers & KEYMOD_ALT) != 0 and key_pressed(KEY_F4)) { exit(); }
 	if ((keyboard_modifiers & KEYMOD_CTRL) != 0 and key_pressed(KEY_PAGEUP)) { tts_speed_up(); save_settings(); }
 	else if ((keyboard_modifiers & KEYMOD_CTRL) != 0 and key_pressed(KEY_PAGEDOWN)) { tts_speed_down(); save_settings(); }
 	else if (key_pressed(KEY_PAGEUP)) { volume_up(); save_settings(); }
@@ -980,6 +995,13 @@ void host_menu()
 				last_scenario = "";
 				last_difficulty = "";
 				send({{"type", message_types::start_game}, {"mode", game_mode}});
+			}
+			speak("Starting game...", true);
+			timer start_wait;
+			while (start_wait.elapsed < 3000) {
+				wait(50);
+				network_loop();
+				if (start_game_pending) break;
 			}
 			do_intro = false;
 		}

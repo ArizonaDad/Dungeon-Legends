@@ -1864,6 +1864,9 @@ void combat_game_loop() {
 			else if (key_pressed(KEY_C)) show_consumable_menu();
 		}
 
+		// Alt+F4 to close client
+		if ((keyboard_modifiers & KEYMOD_ALT) != 0 and key_pressed(KEY_F4)) { exit(); }
+
 		// Volume and TTS speed controls (available any time)
 		if ((keyboard_modifiers & KEYMOD_CTRL) != 0 and key_pressed(KEY_PAGEUP)) { tts_speed_up(); save_settings(); }
 		else if ((keyboard_modifiers & KEYMOD_CTRL) != 0 and key_pressed(KEY_PAGEDOWN)) { tts_speed_down(); save_settings(); }

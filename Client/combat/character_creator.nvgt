@@ -29,21 +29,25 @@ string sandbox_char_name = "";
 string sandbox_char_race = "";
 string sandbox_char_class = "";
 string sandbox_char_subclass = "";
+string sandbox_char_background = "";
 int sandbox_char_level = 1;
 int[] sandbox_ability_scores = {10,10,10,10,10,10};
 string sandbox_weapon = "Longsword";
 string[] sandbox_cantrips;
 string[] sandbox_spells;
+string[] sandbox_char_feats;
 
 string adventure_char_name = "";
 string adventure_char_race = "";
 string adventure_char_class = "";
 string adventure_char_subclass = "";
+string adventure_char_background = "";
 int adventure_char_level = 1;
 int[] adventure_ability_scores = {10,10,10,10,10,10};
 string adventure_weapon = "Longsword";
 string[] adventure_cantrips;
 string[] adventure_spells;
+string[] adventure_char_feats;
 
 void add_text_pair(string[]@ names, string[]@ descriptions, string name, string description) {
     names.insert_last(name);
@@ -109,22 +113,26 @@ void clear_profile_cache(string profile) {
         adventure_char_race = "";
         adventure_char_class = "";
         adventure_char_subclass = "";
+        adventure_char_background = "";
         adventure_char_level = 1;
         adventure_ability_scores = {10,10,10,10,10,10};
         adventure_weapon = "Longsword";
         adventure_cantrips.resize(0);
         adventure_spells.resize(0);
+        adventure_char_feats.resize(0);
         return;
     }
     sandbox_char_name = "";
     sandbox_char_race = "";
     sandbox_char_class = "";
     sandbox_char_subclass = "";
+    sandbox_char_background = "";
     sandbox_char_level = 1;
     sandbox_ability_scores = {10,10,10,10,10,10};
     sandbox_weapon = "Longsword";
     sandbox_cantrips.resize(0);
     sandbox_spells.resize(0);
+    sandbox_char_feats.resize(0);
 }
 
 bool profile_has_character(string profile) {
@@ -146,11 +154,13 @@ void load_profile_cache_to_buffer(string profile) {
         created_char_race = adventure_char_race;
         created_char_class = adventure_char_class;
         created_char_subclass = adventure_char_subclass;
+        created_char_background = adventure_char_background;
         created_char_level = adventure_char_level;
         created_ability_scores = adventure_ability_scores;
         created_weapon = adventure_weapon;
         copy_string_array(adventure_cantrips, created_cantrips);
         copy_string_array(adventure_spells, created_spells);
+        copy_string_array(adventure_char_feats, created_char_feats);
         return;
     }
 
@@ -158,11 +168,13 @@ void load_profile_cache_to_buffer(string profile) {
     created_char_race = sandbox_char_race;
     created_char_class = sandbox_char_class;
     created_char_subclass = sandbox_char_subclass;
+    created_char_background = sandbox_char_background;
     created_char_level = sandbox_char_level;
     created_ability_scores = sandbox_ability_scores;
     created_weapon = sandbox_weapon;
     copy_string_array(sandbox_cantrips, created_cantrips);
     copy_string_array(sandbox_spells, created_spells);
+    copy_string_array(sandbox_char_feats, created_char_feats);
 }
 
 void store_buffer_to_profile_cache(string profile) {
@@ -175,11 +187,13 @@ void store_buffer_to_profile_cache(string profile) {
         adventure_char_race = created_char_race;
         adventure_char_class = created_char_class;
         adventure_char_subclass = created_char_subclass;
+        adventure_char_background = created_char_background;
         adventure_char_level = created_char_level;
         adventure_ability_scores = created_ability_scores;
         adventure_weapon = created_weapon;
         copy_string_array(created_cantrips, adventure_cantrips);
         copy_string_array(created_spells, adventure_spells);
+        copy_string_array(created_char_feats, adventure_char_feats);
         return;
     }
 
@@ -187,11 +201,13 @@ void store_buffer_to_profile_cache(string profile) {
     sandbox_char_race = created_char_race;
     sandbox_char_class = created_char_class;
     sandbox_char_subclass = created_char_subclass;
+    sandbox_char_background = created_char_background;
     sandbox_char_level = created_char_level;
     sandbox_ability_scores = created_ability_scores;
     sandbox_weapon = created_weapon;
     copy_string_array(created_cantrips, sandbox_cantrips);
     copy_string_array(created_spells, sandbox_spells);
+    copy_string_array(created_char_feats, sandbox_char_feats);
 }
 
 void set_active_character_profile(string profile) {
@@ -216,6 +232,7 @@ void apply_character_message_to_profile(string profile, json_object@ msg) {
     string local_race = msg.exists("race") ? string(msg["race"]) : "";
     string local_class = msg.exists("class") ? string(msg["class"]) : "";
     string local_subclass = msg.exists("subclass") ? string(msg["subclass"]) : "";
+    string local_background = msg.exists("background") ? string(msg["background"]) : "";
     int local_level = msg.exists("level") ? int(msg["level"]) : 1;
     int[] local_scores = {10,10,10,10,10,10};
     if (msg.exists("str")) local_scores[0] = int(msg["str"]);
@@ -227,29 +244,35 @@ void apply_character_message_to_profile(string profile, json_object@ msg) {
     string local_weapon = msg.exists("weapon") ? string(msg["weapon"]) : "Longsword";
     string[] local_cantrips;
     string[] local_spells;
+    string[] local_feats;
     if (msg.exists("cantrips")) parse_spell_csv(string(msg["cantrips"]), local_cantrips);
     if (msg.exists("spells")) parse_spell_csv(string(msg["spells"]), local_spells);
+    if (msg.exists("feats")) parse_spell_csv(string(msg["feats"]), local_feats);
 
     if (profile == "adventure") {
         adventure_char_name = local_name;
         adventure_char_race = local_race;
         adventure_char_class = local_class;
         adventure_char_subclass = local_subclass;
+        adventure_char_background = local_background;
         adventure_char_level = local_level;
         adventure_ability_scores = local_scores;
         adventure_weapon = local_weapon;
         copy_string_array(local_cantrips, adventure_cantrips);
         copy_string_array(local_spells, adventure_spells);
+        copy_string_array(local_feats, adventure_char_feats);
     } else {
         sandbox_char_name = local_name;
         sandbox_char_race = local_race;
         sandbox_char_class = local_class;
         sandbox_char_subclass = local_subclass;
+        sandbox_char_background = local_background;
         sandbox_char_level = local_level;
         sandbox_ability_scores = local_scores;
         sandbox_weapon = local_weapon;
         copy_string_array(local_cantrips, sandbox_cantrips);
         copy_string_array(local_spells, sandbox_spells);
+        copy_string_array(local_feats, sandbox_char_feats);
     }
 
     if (active_character_profile == profile or !profile_has_character(active_character_profile)) {
@@ -1503,7 +1526,20 @@ bool confirm_character_summary_step() {
     return false;
 }
 
-void character_creation_menu(string profile = "sandbox", int forced_level = -1) {
+bool choose_name_step() {
+    bool canceled = false;
+    string default_name = created_char_name != "" ? created_char_name : username;
+    string name_input = input_box_form("Character Name", "Enter a name for your character:", default_name, canceled);
+    if (canceled) return false;
+    string trimmed = name_input.trim_whitespace();
+    if (trimmed.empty()) trimmed = username;
+    if (int(trimmed.length()) > 30) trimmed = trimmed.substr(0, 30);
+    created_char_name = trimmed;
+    speak("Your character will be named " + created_char_name + ".", false);
+    return true;
+}
+
+void character_creation_menu(string profile = "adventure", int forced_level = -1) {
     init_feat_data();
     created_char_background = "";
     created_char_subclass = "";
@@ -1520,32 +1556,49 @@ void character_creation_menu(string profile = "sandbox", int forced_level = -1) 
     clear_creation_back_request();
     speak("Character creation. Let's build your champion.", true);
 
-    created_char_name = username + "'s Character";
-    speak("Your character name is " + created_char_name + ".", false);
-    int step = 2;
+    int step = 1;
     while (step <= 11) {
         clear_creation_back_request();
-        if (step == 2) {
-            if (choose_race_step()) step = 3;
+        if (step == 1) {
+            if (choose_name_step()) step = 2;
             else {
                 speak("Character creation cancelled.", true);
                 return;
             }
+        } else if (step == 2) {
+            if (choose_race_step()) step = 3;
+            else step = 1;
         } else if (step == 3) {
             if (choose_class_step()) step = 4;
             else step = 2;
         } else if (step == 4) {
-            if (choose_level_step(profile, forced_level)) step = 5;
-            else step = 3;
+            if (profile == "adventure") {
+                created_char_level = forced_level > 0 ? forced_level : 1;
+                speak("Adventure characters use your current Adventure level of " + created_char_level + ".", true);
+                step = 5;
+            } else {
+                if (choose_level_step(profile, forced_level)) step = 5;
+                else step = 3;
+            }
         } else if (step == 5) {
-            created_char_subclass = "";
-            choose_subclass_step();
-            if (creation_should_go_back()) step = 4;
-            else step = 6;
+            if (created_char_level < 3) {
+                created_char_subclass = "";
+                speak("Subclass selection unlocks at level 3.", false);
+                step = 6;
+            } else {
+                created_char_subclass = "";
+                choose_subclass_step();
+                if (creation_should_go_back()) {
+                    step = (profile == "adventure") ? 3 : 4;
+                } else step = 6;
+            }
         } else if (step == 6) {
             choose_background_step();
-            if (creation_should_go_back()) step = 5;
-            else step = 7;
+            if (creation_should_go_back()) {
+                if (created_char_level < 3) {
+                    step = (profile == "adventure") ? 3 : 4;
+                } else step = 5;
+            } else step = 7;
         } else if (step == 7) {
             if (assign_ability_scores_step()) step = 8;
             else step = 6;

@@ -36,13 +36,13 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 ## Main Menu
 - Menu header displays player level, gold, and glory points
 - 7 top-level categories: Play, Character, Social, Shop, Challenges, Settings, Quit
-- **Play**: Adventure (persistent), Sandbox (free-build), Join Game (browse lobbies)
+- **Play**: Play Adventure (Create Game / Join Game), Play Sandbox Mode (Create Game / Join Game)
 - **Character**: Create Character, View Character (with proficiency bonus, saving throws, spell save DC), Inventory, My Stats, Prestige (level 20+)
 - **Social**: Friends, Guild (create/join, max 20 members, guild chat, invite, view members/glory), Check Who's Online
 - **Shop**: Item Shop (potions, scrolls, throwables with gold), Glory Shop (titles and exclusive items with glory)
 - **Challenges**: Daily Dungeon (featured dungeon with bonus rewards), Weekly Challenges, Leaderboards
 - **Settings**: Volume Up/Down, TTS Speed Up/Down, About. All settings persisted to disk via `save_settings()`/`load_saved_settings()`
-- First-time login prompts character creation automatically
+- First-time login prompts adventure character creation automatically (no sandbox prompt)
 - Daily login bonuses: streak-based XP (50-200 XP, resets after day 7)
 - Settings (volume, TTS speed) saved on change and restored on launch
 
@@ -150,8 +150,9 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 
 ### Character Persistence
 - Characters saved to SQLite via account JSON data blob on creation
-- Character data sent to client on login (`character_data` message)
-- Client restores `created_char_*` variables from server data
+- Character data sent to client on login (`character_data` message) including background, feats, skills, tools, and base ability scores
+- Client profile cache stores background and feats alongside core character data
+- Client restores `created_char_*` variables from server data (View Character works across sessions)
 - Adventure progress tracked: XP, level, achievements, kills, healing, waves cleared
 
 ### Post-Battle Flow
@@ -206,13 +207,15 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 - Tracked in `adventure_progress["glory"]`; dungeon completions tracked in `adventure_progress["dungeons_completed"]`
 
 ### Character Creation
-- Step-by-step wizard: Name -> Species -> Class -> Level -> Background -> Subclass -> Abilities -> Weapon -> Spells -> Summary
+- Step-by-step wizard: Name (user input) -> Species -> Class -> Level -> Subclass -> Background -> Abilities -> Weapon -> Progression -> Spells -> Summary
+- Players can name their character (defaults to username, max 30 characters)
 - 16 backgrounds: Acolyte, Artisan, Charlatan, Criminal, Entertainer, Farmer, Guard, Guide, Hermit, Merchant, Noble, Sage, Sailor, Scribe, Soldier, Wayfarer
 - Each background grants: 3 ability score bonuses, an Origin feat, 2 skill proficiencies, and a tool proficiency
-- **Backspace/Escape goes back** to the previous step at any point
-- At the first step, Escape cancels the wizard
+- **Backspace/Escape goes back** to the previous step at any point; auto-skip steps (level in adventure, subclass at low level) are transparently skipped during back-navigation
+- At the first step (Name), Escape cancels the wizard
 - Adventure mode forces level from server progression
 - Subclass selection only at level 3+
+- **Alt+F4** closes the client at any time (menus and combat)
 
 ## Controls (Client)
 - **F**: Open action menu (Attack, Cast, Dodge, Dash, Disengage, Help, Hide, Ready, Shove, Grapple, End Turn)
@@ -236,6 +239,7 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 - **F1**: Combat help
 - **F2**: Quick keybind reference (spoken summary of all controls)
 - **Escape x 2**: Forfeit
+- **Alt+F4**: Close the client immediately (works in all menus and combat)
 
 ## Sound System
 - **Encrypted sound pack**: All 121 sound files packed into `sounds.dat` with encryption key
