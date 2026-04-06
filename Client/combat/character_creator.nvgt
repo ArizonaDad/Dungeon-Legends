@@ -1396,6 +1396,7 @@ bool assign_ability_scores_step() {
 }
 
 bool choose_weapon_step() {
+    while (true) {
     menu@ weapon_cat_menu = setup_sub_menu("Choose your weapon. This is what you'll use to attack in combat.");
     weapon_cat_menu.add_item("Simple Melee Weapons.");
     weapon_cat_menu.add_item("Simple Ranged Weapons.");
@@ -1460,10 +1461,15 @@ bool choose_weapon_step() {
     }
 
     int weapon_pick = creation_menu_run(weapon_menu);
-    if (weapon_pick < 0 or weapon_pick >= int(weapon_names.length())) return false;
+    if (weapon_pick < 0 or weapon_pick >= int(weapon_names.length())) {
+        speak("Going back to weapon category.", false);
+        continue;
+    }
     created_weapon = weapon_names[weapon_pick];
     speak("You chose " + created_weapon + ".", true);
     return true;
+    } // end while
+    return false;
 }
 
 void reset_progression_choices() {
@@ -1479,30 +1485,58 @@ void reset_progression_choices() {
 }
 
 bool apply_progression_choices_step() {
-    reset_progression_choices();
-    apply_background_ability_scores_step();
-    if (creation_should_go_back()) { reset_progression_choices(); return false; }
-    apply_background_training_and_feat_step();
-    if (creation_should_go_back()) { reset_progression_choices(); return false; }
-    apply_human_species_step();
-    if (creation_should_go_back()) { reset_progression_choices(); return false; }
-    choose_fighting_style_step();
-    if (creation_should_go_back()) { reset_progression_choices(); return false; }
-    choose_general_feat_steps();
-    if (creation_should_go_back()) { reset_progression_choices(); return false; }
-    return true;
+    while (true) {
+        reset_progression_choices();
+        clear_creation_back_request();
+        apply_background_ability_scores_step();
+        if (creation_should_go_back()) { reset_progression_choices(); return false; }
+
+        clear_creation_back_request();
+        apply_background_training_and_feat_step();
+        if (creation_should_go_back()) { speak("Restarting progression choices.", false); continue; }
+
+        clear_creation_back_request();
+        apply_human_species_step();
+        if (creation_should_go_back()) { speak("Restarting progression choices.", false); continue; }
+
+        clear_creation_back_request();
+        choose_fighting_style_step();
+        if (creation_should_go_back()) { speak("Restarting progression choices.", false); continue; }
+
+        clear_creation_back_request();
+        choose_general_feat_steps();
+        if (creation_should_go_back()) { speak("Restarting progression choices.", false); continue; }
+
+        return true;
+    }
+    return false;
 }
 
 bool choose_spell_selection_step() {
     string[] previous_cantrips = created_cantrips;
     string[] previous_spells = created_spells;
-    spell_selection_step();
-    if (creation_should_go_back()) {
-        created_cantrips = previous_cantrips;
-        created_spells = previous_spells;
-        return false;
+    while (true) {
+        clear_creation_back_request();
+        spell_selection_step();
+        if (creation_should_go_back()) {
+            // Check if we had any spells to pick at all. If not, this step auto-skipped
+            // and back should go to the previous main step.
+            int cantrips_needed = get_cantrips_known(created_char_class, created_char_subclass, created_char_level);
+            int spells_needed = get_prepared_spells(created_char_class, created_char_subclass, created_char_level);
+            if (cantrips_needed == 0 and spells_needed == 0) {
+                created_cantrips = previous_cantrips;
+                created_spells = previous_spells;
+                return false;
+            }
+            // Had spells to pick — restart spell selection instead of going back a whole step
+            speak("Restarting spell selection.", false);
+            created_cantrips = previous_cantrips;
+            created_spells = previous_spells;
+            continue;
+        }
+        return true;
     }
-    return true;
+    return false;
 }
 
 bool confirm_character_summary_step() {
