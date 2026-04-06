@@ -451,6 +451,7 @@ void handle_message(json_object@ msg)
 	}
 	else if (msg_type == message_types::join_room and msg.exists("host")) {
 		if (msg.exists("game_type")) current_room_game_type = normalize_character_profile(string(msg["game_type"]));
+		if (msg.exists("username")) room_host_name = string(msg["username"]);
 	}
 	// Server notifies that the room was closed.
 	else if (msg_type == message_types::room_closed) {

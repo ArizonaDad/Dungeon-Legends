@@ -111,6 +111,21 @@ void create_lobby_for_mode(string game_type) {
 	string name, password;
 	if (!create_room_form(name, password)) return;
 	send({{"type", message_types::new_room}, {"name", name}, {"password", password}, {"game_type", game_type}});
+	// Wait for server confirmation (join_room with host field) before entering host menu.
+	timer room_wait;
+	bool confirmed = false;
+	while (room_wait.elapsed < 3000) {
+		wait(50);
+		network_loop();
+		if (room_host_name == username and room_player_names.length() > 0) {
+			confirmed = true;
+			break;
+		}
+	}
+	if (!confirmed) {
+		speak("Failed to create room. Please try again.", true);
+		return;
+	}
 	host_menu();
 }
 

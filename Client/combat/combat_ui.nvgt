@@ -1789,12 +1789,21 @@ void combat_game_loop() {
 	battle_active = true;
 	is_my_turn = false;
 	combat_focus = 0;
+	// Force form focus to keyboard_area so main_screen doesn't eat combat input.
+	if (@main_screen != null) main_screen.form.focus(f_main_keyboard_area);
 	speak("Entering combat. I J K L to scan for creatures. Enter locks a target. T tells you whose turn it is. F for actions, B for bonus actions on your turn. H for status. O for initiative order. Tab to switch focus.", true);
 
 	while (battle_active) {
 		wait(10);
 		network_loop();
-		if (@main_screen != null) main_screen.form.monitor();
+		if (@main_screen != null) {
+			main_screen.form.monitor();
+			// Keep form focus on keyboard_area during game focus so it doesn't
+			// consume keystrokes meant for combat actions.
+			if (combat_focus == 0 and main_screen.form.get_current_focus() != f_main_keyboard_area) {
+				main_screen.form.focus(f_main_keyboard_area);
+			}
+		}
 		combat_audio_update();
 		audio_manager_update();
 
@@ -1833,7 +1842,8 @@ void combat_game_loop() {
 			check_heroic_prompt_input();
 			continue;
 		}
-		if (@main_screen != null and !main_screen_loop()) continue;
+		// Process chat/history form only when focus is on chat or history.
+		if (@main_screen != null and combat_focus != 0) main_screen_loop();
 
 		if (key_pressed(KEY_TAB)) {
 			if ((keyboard_modifiers & KEYMOD_SHIFT) != 0) combat_switch_focus(-1);

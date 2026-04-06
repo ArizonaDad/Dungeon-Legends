@@ -36,7 +36,7 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 ## Main Menu
 - Menu header displays player level, gold, and glory points
 - 7 top-level categories: Play, Character, Social, Shop, Challenges, Settings, Quit
-- **Play**: Play Adventure (Create Game / Join Game), Play Sandbox Mode (Create Game / Join Game)
+- **Play**: Play Adventure (Create Game / Join Game), Play Sandbox Mode (Create Game / Join Game). Create Game waits for server confirmation before entering host menu.
 - **Character**: Create Character (up to 40 per mode), View Characters (list all, set active, delete), Inventory, My Stats, Prestige (level 20+)
 - **Social**: Friends, Guild (create/join, max 20 members, guild chat, invite, view members/glory), Check Who's Online
 - **Shop**: Item Shop (potions, scrolls, throwables with gold), Glory Shop (titles and exclusive items with glory)
@@ -54,6 +54,7 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 - Combat rounds start at 1 (first turn of each round announces "Round N!")
 - All rolls require the specific prompted player to press R or Enter (other players cannot roll for them)
 - All roll results broadcast to ALL players with full context and audio cues (nat 20/1)
+- Combat game loop forces main_screen form focus to keyboard_area so lobby chat form doesn't consume combat keystrokes
 
 ### Attack Resolution
 - Separate roll to hit (d20 + ability mod + proficiency vs AC), then roll for damage
