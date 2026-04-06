@@ -2320,9 +2320,9 @@ class battle_manager {
 			{"turn_index", combat.current_turn_index}
 		});
 
-		// Start first turn.
+		// Start first turn (round 1).
 		combat.current_turn_index = -1;
-		combat.round_number = 0;
+		combat.round_number = 1;
 		advance_turn();
 	}
 

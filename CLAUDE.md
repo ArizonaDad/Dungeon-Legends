@@ -50,7 +50,8 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 
 ### Turn Structure (D&D 5e 2024)
 - Move + Action + Bonus Action + Reaction per turn
-- Initiative rolled at battle start (d20 + DEX mod), all rolls announced to all players
+- Initiative rolled at battle start (d20 + DEX mod), all rolls announced to all players, then full turn order broadcast
+- Combat rounds start at 1 (first turn of each round announces "Round N!")
 - All rolls require the specific prompted player to press R or Enter (other players cannot roll for them)
 - All roll results broadcast to ALL players with full context and audio cues (nat 20/1)
 
@@ -165,8 +166,9 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 - Glory points awarded: 10 normal, 25 boss; dungeon completions tracked
 - Level-up flow: players choose new spells, cantrips, and subclass (at level 3) interactively
 - Room `started` flag reset so new games can be launched
-- Quick restart option for wave/boss/endless modes: "Play again" re-sends start_game with same scenario/difficulty
-- Client shows 5-second countdown then returns to lobby
+- Quick restart option for wave/boss/endless modes: deferred `start_game` sent after `reset_combat_state()` to prevent state corruption
+- Post-battle order: save loot/level-up data -> `reset_combat_state()` -> send deferred restart -> show loot -> 5-second network-pumping wait -> show level-up
+- 5-second lobby return countdown pumps network via loop (not blocking `wait()`) to prevent server timeouts
 
 ### Loot & Equipment System
 - 35 items across 5 rarity tiers (Common, Uncommon, Rare, Epic, Legendary) and 4 slots (Weapon, Armor, Ring, Amulet)

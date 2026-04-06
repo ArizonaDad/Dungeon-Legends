@@ -1438,6 +1438,12 @@ void on_battle_start(string mode_text) {
 	tutorial_check("battle_start");
 }
 
+// Quick restart state: deferred until after reset_combat_state to avoid race conditions.
+bool quick_restart_requested = false;
+string quick_restart_mode = "";
+string quick_restart_scenario = "";
+string quick_restart_difficulty = "";
+
 void on_battle_end(string result) {
 	combat_audio_play_battle_end(result);
 	audio_on_battle_end(result);
@@ -1454,6 +1460,8 @@ void on_battle_end(string result) {
 	speak(end_text, true);
 	tutorial_check("battle_end");
 
+	quick_restart_requested = false;
+
 	// Quick restart for wave, boss, and endless modes
 	if (battle_mode == "wave" or battle_mode == "boss" or battle_mode == "endless") {
 		wait(1500);
@@ -1462,8 +1470,12 @@ void on_battle_end(string result) {
 		restart_menu.add_item("Return to lobby.");
 		int rp = restart_menu.run();
 		if (rp == 0 and last_scenario != "") {
-			send({{"type", message_types::start_game}, {"mode", battle_mode}, {"scenario", last_scenario}, {"difficulty", last_difficulty}});
-			// combat_game_loop will exit; launch_pending_game_if_needed will restart it
+			// Defer start_game until after reset_combat_state to prevent
+			// server response from being wiped by the reset.
+			quick_restart_requested = true;
+			quick_restart_mode = battle_mode;
+			quick_restart_scenario = last_scenario;
+			quick_restart_difficulty = last_difficulty;
 		}
 	}
 
@@ -1619,6 +1631,7 @@ void show_combat_help() {
 void reset_combat_state() {
 	combat_audio_reset();
 	audio_manager_reset();
+	quick_restart_requested = false;
 	combat_entities.resize(0);
 	initiative_order.resize(0);
 	scan_results.resize(0);
@@ -1906,20 +1919,56 @@ void combat_game_loop() {
 
 	speak("Combat ended.", true);
 
-	// Show loot screen if any items dropped
-	if (@pending_loot != null and pending_loot.length() > 0) {
-		show_loot_screen();
+	// Save post-battle display data before resetting combat state.
+	// This prevents a critical bug where quick-restart messages
+	// (game_start_battle, roll_request) get processed by network_loop
+	// during loot/level-up screens, then wiped by reset_combat_state().
+	json_array@ saved_loot = @pending_loot;
+	bool saved_level_up = pending_level_up;
+	int saved_level_up_new_level = level_up_new_level;
+	string saved_level_up_class = level_up_class;
+	bool saved_level_up_needs_subclass = level_up_needs_subclass;
+	int saved_level_up_new_cantrips = level_up_new_cantrips;
+	int saved_level_up_new_spells = level_up_new_spells;
+	bool saved_level_up_is_caster = level_up_is_caster;
+
+	// Reset combat state FIRST so any new game messages arriving
+	// during post-battle screens won't be wiped.
+	reset_combat_state();
+
+	// Now send the deferred quick-restart start_game AFTER reset.
+	// This ensures the server's response arrives into a clean state.
+	if (quick_restart_requested) {
+		quick_restart_requested = false;
+		send({{"type", message_types::start_game}, {"mode", quick_restart_mode}, {"scenario", quick_restart_scenario}, {"difficulty", quick_restart_difficulty}});
 	}
 
-	// Return to lobby
-	speak("Returning to lobby in 5 seconds.", false);
-	wait(5000);
+	// Show loot screen with saved data
+	if (@saved_loot != null and saved_loot.length() > 0) {
+		@pending_loot = saved_loot;
+		show_loot_screen();
+		@pending_loot = null;
+	}
 
-	if (pending_level_up) {
+	// Network-pumping wait instead of blocking wait(5000)
+	speak("Returning to lobby in 5 seconds.", false);
+	timer lobby_return_timer;
+	while (lobby_return_timer.elapsed < 5000) {
+		wait(50);
+		network_loop();
+	}
+
+	// Show level-up screen with saved data
+	if (saved_level_up) {
+		pending_level_up = true;
+		level_up_new_level = saved_level_up_new_level;
+		level_up_class = saved_level_up_class;
+		level_up_needs_subclass = saved_level_up_needs_subclass;
+		level_up_new_cantrips = saved_level_up_new_cantrips;
+		level_up_new_spells = saved_level_up_new_spells;
+		level_up_is_caster = saved_level_up_is_caster;
 		show_level_up_screen();
 	}
-
-	reset_combat_state();
 }
 
 void show_level_up_screen() {
