@@ -40,7 +40,7 @@ void main()
 		println("[SERVER] FATAL: Failed to start server.");
 		return;
 	}
-	println("[SERVER] Server started successfully. Listening on port 10500.");
+	println("[SERVER] Server started successfully. Listening on port 2000.");
 	init_monster_defs();
 	init_spell_defs();
 	init_wave_scenarios();
@@ -58,7 +58,7 @@ class server
 			return false;
 		}
 		rebuild_guilds_from_accounts();
-		println("[SERVER] Accounts loaded. Binding to port 10500...");
+		println("[SERVER] Accounts loaded. Binding to port 2000...");
 		return net.setup_server(2000, 32, 900);
 		//return net.setup_local_server(10500, 255, 4095);
 	}
