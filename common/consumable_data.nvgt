@@ -199,7 +199,8 @@ modifier_def@ find_modifier(string id) {
 
 string pick_random_modifier() {
 	init_modifiers();
-	int idx = random(0, MODIFIER_LIST.length() - 2);
+	if (MODIFIER_LIST.length() <= 1) return "none";
+	int idx = random(0, int(MODIFIER_LIST.length()) - 2);
 	return MODIFIER_LIST[idx].id;
 }
 

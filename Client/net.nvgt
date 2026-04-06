@@ -17,7 +17,7 @@ uint pending_invite_room_id = 0;
 // If blocking=true, wait until confirmed or timeout expires.
 bool connect(bool blocking = true, int timeout = 3000)
 {
-	net.setup_client(10, 900);
+	net.setup_client(10000, 900);
 	//uint client_id = net.connect("localhost", 10500);
 	uint client_id = net.connect("the-gdn.net", 2000);
 	if (client_id == 0) {

@@ -97,7 +97,8 @@ class battle_manager {
 	pending_lucky_prompt@ current_lucky_prompt;
 	pending_heroic_prompt@ current_heroic_prompt;
 	bool initiative_phase = false;
-	uint initiative_index = 0;  // Which combatant we are rolling initiative for
+	uint initiative_index = 0;
+	uint64 initiative_delay_until = 0;
 	string scenario_id = "";
 	string active_modifier = "none";
 	bool pending_turn_start_after_interrupt = false;
@@ -2220,10 +2221,10 @@ class battle_manager {
 			});
 		}
 
-		// Start initiative phase.
+		// Delay initiative to let clients enter combat loop.
 		initiative_phase = true;
 		initiative_index = 0;
-		request_next_initiative();
+		initiative_delay_until = ticks() + 2000;
 	}
 
 	// ---- Initiative Phase ----
@@ -5203,6 +5204,16 @@ class battle_manager {
 
 	void tick() {
 		if (@combat == null or !combat.battle_active) return;
+
+		// Delayed initiative start - gives clients time to enter combat loop
+		if (initiative_delay_until > 0) {
+			if (ticks() >= initiative_delay_until) {
+				initiative_delay_until = 0;
+				request_next_initiative();
+			}
+			return;
+		}
+
 		if (@current_roll != null) return;
 
 		combatant@ c = combat.current_combatant();

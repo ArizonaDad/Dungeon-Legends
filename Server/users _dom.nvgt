@@ -1263,15 +1263,19 @@ void handle_user_message(user@ u, json_object@ msg)
 
 	// --- Combat Message Routing (forward to battle_manager) ---
 	else if (msg_type == message_types::roll_result) {
-		if (@u.room != null and @u.room.bm != null and @u.room.bm.current_roll != null) {
-			// Player pressed Roll -- server rolls the dice
-			if (u.room.bm.current_roll.player_username != u.username) {
-				u.send({{"type", message_types::announce}, {"text", "It is not your turn to roll."}, {"interrupt", false}});
-				return;
-			}
-			u.room.bm.handle_roll_result(u);
+		if (@u.room == null or @u.room.bm == null) {
+			u.send({{"type", message_types::announce}, {"text", "Not in a battle."}, {"interrupt", false}});
 			return;
 		}
+		if (@u.room.bm.current_roll == null) {
+			u.send({{"type", message_types::announce}, {"text", "Not waiting for your roll right now. Please wait."}, {"interrupt", false}});
+			return;
+		}
+		if (u.room.bm.current_roll.player_username != u.username) {
+			u.send({{"type", message_types::announce}, {"text", "It is not your turn to roll."}, {"interrupt", false}});
+			return;
+		}
+		u.room.bm.handle_roll_result(u);
 	}
 	else if (msg_type == message_types::turn_end) {
 		if (@u.room != null and @u.room.bm != null) {
