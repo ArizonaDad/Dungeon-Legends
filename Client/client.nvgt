@@ -58,7 +58,7 @@ bool is_room_bot(string name) {
 instance single_game("DungeonLegends");
 void main()
 {
-	//chdir(spec::path(SCRIPT_CURRENT_FILE).make_parent());
+	chdir(spec::path(SCRIPT_CURRENT_FILE).make_parent());
 	if (SCRIPT_COMPILED and single_game.is_already_running) {
 		alert("Dungeon Legends", "Sorry, only one instance of the game can be run at a time.");
 		exit();
@@ -574,6 +574,7 @@ void show_character_menu() {
 			}
 			set_active_character_profile(profile);
 			string subclass_text = created_char_subclass != "" ? " " + created_char_subclass : "";
+			string gender_text = created_char_gender != "" ? " " + created_char_gender + "." : "";
 			string background_text = "";
 			if (created_char_background != "") {
 				background_choice_def@ bg = get_background_choice(created_char_background);
@@ -584,7 +585,7 @@ void show_character_menu() {
 			if (@cached_stats != null and cached_stats.exists("prestige_title") and string(cached_stats["prestige_title"]) != "") {
 				prestige_text = string(cached_stats["prestige_title"]) + " ";
 			}
-			string summary = prestige_text + room_game_type_label(profile) + " character. " + created_char_name + ". " + created_char_race + " " + created_char_class + subclass_text + ", level " + created_char_level + "." + background_text + " ";
+			string summary = prestige_text + room_game_type_label(profile) + " character. " + created_char_name + "." + gender_text + " " + created_char_race + " " + created_char_class + subclass_text + ", level " + created_char_level + "." + background_text + " ";
 			summary += "Strength " + created_ability_scores[0] + ". Dexterity " + created_ability_scores[1] + ". Constitution " + created_ability_scores[2] + ". ";
 			summary += "Intelligence " + created_ability_scores[3] + ". Wisdom " + created_ability_scores[4] + ". Charisma " + created_ability_scores[5] + ". ";
 			// Proficiency bonus

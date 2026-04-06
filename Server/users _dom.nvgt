@@ -1186,6 +1186,7 @@ void handle_user_message(user@ u, json_object@ msg)
 			string storage_key = get_character_storage_key(profile);
 			json_object char_data;
 			if (msg.exists("name")) char_data["name"] = msg["name"];
+			if (msg.exists("gender")) char_data["gender"] = msg["gender"];
 			if (msg.exists("race")) char_data["race"] = msg["race"];
 			if (msg.exists("class")) char_data["class"] = msg["class"];
 			if (msg.exists("subclass")) char_data["subclass"] = msg["subclass"];
@@ -1347,7 +1348,7 @@ void handle_user_message(user@ u, json_object@ msg)
 			int effective_heal = u.room.bm.combat.apply_healing(c, heal);
 			u.room.bm.record_effective_healing(c.player_username, effective_heal);
 			u.room.bm.broadcast_roll(c.name, "Second Wind healing", heal, c.level, heal, "");
-			u.room.bm.broadcast_announce(c.name + " uses Second Wind! Healed " + heal + " HP. Now at " + c.current_hp + ".", false);
+			u.room.bm.broadcast_announce(c.name + " uses Second Wind! Healed " + effective_heal + " HP. Now at " + c.current_hp + ".", false);
 		}
 		else if (feature == "divine_smite") {
 			if (c.class_name != "Paladin") { u.send({{"type", message_types::announce}, {"text", "Only paladins can prepare Divine Smite."}, {"interrupt", true}}); return; }

@@ -79,6 +79,13 @@ class server
 				events_this_tick++;
 				@event = net.request();
 			}
+			// Tick all active battles so initiative, monster turns, and timeouts fire.
+			for (uint ri = 0; ri < rooms.rooms.length(); ri++) {
+				if (@rooms.rooms[ri].bm != null and rooms.rooms[ri].started) {
+					try { rooms.rooms[ri].bm.tick(); }
+					catch { println("[SERVER] EXCEPTION in battle tick for room " + rooms.rooms[ri].name); }
+				}
+			}
 		}
 		println("[SERVER] Shutting down  saving accounts...");
 		save_accounts();

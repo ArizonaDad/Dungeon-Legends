@@ -45,6 +45,7 @@ class combat_entity {
 	string health_status() {
 		if (is_dead) return "dead";
 		if (hp <= 0) return "unconscious";
+		if (max_hp <= 0) return "unknown";
 		int pct = (hp * 100) / max_hp;
 		if (pct >= 90) return "full health";
 		if (pct >= 60) return "healthy";

@@ -239,6 +239,7 @@ json_object@ build_character_data_message(account@ acct, string profile) {
 	msg["type"] = message_types::character_data;
 	msg["profile"] = normalize_game_type(profile);
 	if (character.exists("name")) msg["name"] = character["name"];
+	if (character.exists("gender")) msg["gender"] = character["gender"];
 	if (character.exists("race")) msg["race"] = character["race"];
 	if (character.exists("class")) msg["class"] = character["class"];
 	if (character.exists("subclass")) msg["subclass"] = character["subclass"];

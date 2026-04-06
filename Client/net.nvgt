@@ -208,7 +208,8 @@ void handle_message(json_object@ msg)
 	}
 	else if (msg_type == message_types::start_game) {
 		pending_view = "";
-		start_game_pending = true;
+		// Don't set start_game_pending here - wait for game_start_battle which carries combatant_id.
+		speak("Game starting, preparing battle...", true);
 	}
 	// === COMBAT MESSAGE ROUTING ===
 	else if (msg_type == message_types::game_start_battle) {
