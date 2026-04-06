@@ -159,23 +159,31 @@ class server
 				users.user_dictionary.set("p/" + peer_id, @existing);
 				existing.send({{"type", message_types::login}, {"id", existing.id}});
 				existing.on_login();
-				// If they were in an active battle, resend game state so client can rejoin.
+				// If they were in an active battle, check if their combatant is still alive.
 				if (@existing.room != null and existing.room.started and @existing.room.bm != null) {
-					println("[AUTH] " + existing.username + " rejoining active battle.");
-					// Find their combatant_id
+					// Find their combatant and check if still alive
 					uint cid = 0;
+					bool combatant_alive = false;
 					battle@ b = existing.room.bm.combat;
-					if (@b != null) {
+					if (@b != null and b.battle_active) {
 						for (uint ci = 0; ci < b.combatants.length(); ci++) {
 							if (b.combatants[ci].is_player and b.combatants[ci].player_username == existing.username) {
 								cid = b.combatants[ci].id;
+								combatant_alive = !b.combatants[ci].is_dead;
 								break;
 							}
 						}
 					}
-					existing.send({{"type", message_types::game_start_battle}, {"combatant_id", cid}, {"mode", existing.room.bm.combat.mode}, {"scenario", existing.room.bm.scenario_id}});
-					existing.room.bm.broadcast_state();
-					existing.room.bm.broadcast_announce(existing.username + " has reconnected!", true);
+					if (!combatant_alive or cid == 0) {
+						// Battle over or combatant dead — clean up stale room state
+						println("[AUTH] " + existing.username + " battle ended or combatant dead. Cleaning up.");
+						try { existing.leave_room(existing.room); } catch {}
+					} else {
+						println("[AUTH] " + existing.username + " rejoining active battle.");
+						existing.send({{"type", message_types::game_start_battle}, {"combatant_id", cid}, {"mode", existing.room.bm.combat.mode}, {"scenario", existing.room.bm.scenario_id}});
+						existing.room.bm.broadcast_state();
+						existing.room.bm.broadcast_announce(existing.username + " has reconnected!", true);
+					}
 				}
 				return;
 			}

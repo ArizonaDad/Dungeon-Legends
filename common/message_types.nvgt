@@ -94,8 +94,11 @@ namespace message_types
 	const string target_info = "target_info";                 // Server sends target details.
 
 	// Character data
-	const string character_data = "character_data";           // Server sends character sheet.
-	const string character_create = "character_create";       // Client creates/imports a character.
+	const string character_data = "character_data";           // Server sends active character sheet.
+	const string character_create = "character_create";       // Client creates a new character (appended to list).
+	const string character_list = "character_list";           // Server sends list of all characters for a profile.
+	const string character_select = "character_select";       // Client sets active character slot.
+	const string character_delete = "character_delete";       // Client deletes a character by slot.
 	const string level_up = "level_up";                       // Client levels up.
 	const string spell_list = "spell_list";                   // Server sends available spells.
 	const string inventory_update = "inventory_update";       // Server sends inventory changes.

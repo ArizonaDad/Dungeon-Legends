@@ -79,6 +79,10 @@ void main()
 	if (!login()) return;
 	wait(100);
 	network_loop();
+	// Clear any stale game state from a previous session or reconnect
+	start_game_pending = false;
+	battle_active = false;
+	game = false;
 	main_menu();
 	config.close();
 }
@@ -563,59 +567,16 @@ void show_character_menu() {
 		else if (view_char >= 0 and pick == view_char) {
 			string profile = "adventure";
 			if (profile_has_character("adventure") and profile_has_character("sandbox")) {
-				menu@ view_menu = setup_sub_menu("Choose which character to inspect.");
-				view_menu.add_item("Adventure Character.");
-				view_menu.add_item("Sandbox Character.");
-				int view_pick = view_menu.run();
+				menu@ view_mode = setup_sub_menu("Choose which character list to view.");
+				view_mode.add_item("Adventure Characters.");
+				view_mode.add_item("Sandbox Characters.");
+				int view_pick = view_mode.run();
 				if (view_pick < 0) continue;
 				profile = view_pick == 0 ? "adventure" : "sandbox";
 			} else if (profile_has_character("sandbox") and !profile_has_character("adventure")) {
 				profile = "sandbox";
 			}
-			set_active_character_profile(profile);
-			string subclass_text = created_char_subclass != "" ? " " + created_char_subclass : "";
-			string gender_text = created_char_gender != "" ? " " + created_char_gender + "." : "";
-			string background_text = "";
-			if (created_char_background != "") {
-				background_choice_def@ bg = get_background_choice(created_char_background);
-				if (@bg != null) background_text = " Background: " + bg.name + ".";
-			}
-			// Prestige title prefix
-			string prestige_text = "";
-			if (@cached_stats != null and cached_stats.exists("prestige_title") and string(cached_stats["prestige_title"]) != "") {
-				prestige_text = string(cached_stats["prestige_title"]) + " ";
-			}
-			string summary = prestige_text + room_game_type_label(profile) + " character. " + created_char_name + "." + gender_text + " " + created_char_race + " " + created_char_class + subclass_text + ", level " + created_char_level + "." + background_text + " ";
-			summary += "Strength " + created_ability_scores[0] + ". Dexterity " + created_ability_scores[1] + ". Constitution " + created_ability_scores[2] + ". ";
-			summary += "Intelligence " + created_ability_scores[3] + ". Wisdom " + created_ability_scores[4] + ". Charisma " + created_ability_scores[5] + ". ";
-			// Proficiency bonus
-			summary += "Proficiency bonus: +" + proficiency_bonus(created_char_level) + ". ";
-			// Saving throw proficiencies
-			summary += "Saving throw proficiencies: " + get_class_saving_throw_profs(created_char_class) + ". ";
-			// Spell save DC (for casters)
-			if (is_class_caster(created_char_class, created_char_subclass)) {
-				int spell_ability = get_class_spellcasting_ability(created_char_class);
-				if (spell_ability >= 0 and spell_ability < 6) {
-					int ability_mod = ability_modifier(created_ability_scores[spell_ability]);
-					int spell_dc = 8 + proficiency_bonus(created_char_level) + ability_mod;
-					summary += "Spell save DC: " + spell_dc + " (" + ABILITY_SHORT[spell_ability] + "). ";
-				}
-			}
-			summary += "Weapon: " + created_weapon + ".";
-			if (created_char_feats.length() > 0) summary += " Feats: " + join_feat_names(created_char_feats) + ".";
-			if (created_cantrips.length() > 0) {
-				summary += " Cantrips: " + join_spell_names(created_cantrips) + ".";
-			}
-			if (created_spells.length() > 0) {
-				summary += " Spells: " + join_spell_names(created_spells) + ".";
-			}
-			if (profile == "adventure") {
-				int achievement_count = 0;
-				if (@cached_stats != null and cached_stats.exists("achievement_count")) achievement_count = int(cached_stats["achievement_count"]);
-				summary += " Adventure progress: " + cached_xp + " of " + cached_xp_needed + " XP toward level " + cached_level + ". ";
-				summary += achievement_count + " achievement" + (achievement_count == 1 ? "" : "s") + " unlocked.";
-			}
-			speak(summary, true);
+			show_character_list_menu(profile);
 		}
 		else if (pick == inventory_btn) {
 			show_inventory();
@@ -725,7 +686,7 @@ bool main_screen_loop()
 			}
 		}
 	}
-	if (key_pressed(KEY_F4)) {
+	if (key_pressed(KEY_F4) and (keyboard_modifiers & KEYMOD_ALT) == 0) {
 		social_panel();
 	}
 	return main_screen.form.get_current_focus() == f_main_keyboard_area;
@@ -768,12 +729,12 @@ void handle_game_invite() {
 
 void menu_callback(menu@ m, string user = "")
 {
+	if ((keyboard_modifiers & KEYMOD_ALT) != 0 and key_pressed(KEY_F4)) { exit(); }
 	network_loop();
 	main_screen_loop();
 	music_update();
 	// Auto-exit menu when a game start is pending so players don't get stuck
 	if (start_game_pending) { simulate_key_down(KEY_ESCAPE); return; }
-	if ((keyboard_modifiers & KEYMOD_ALT) != 0 and key_pressed(KEY_F4)) { exit(); }
 	if ((keyboard_modifiers & KEYMOD_CTRL) != 0 and key_pressed(KEY_PAGEUP)) { tts_speed_up(); save_settings(); }
 	else if ((keyboard_modifiers & KEYMOD_CTRL) != 0 and key_pressed(KEY_PAGEDOWN)) { tts_speed_down(); save_settings(); }
 	else if (key_pressed(KEY_PAGEUP)) { volume_up(); save_settings(); }
@@ -783,9 +744,9 @@ void menu_callback(menu@ m, string user = "")
 }
 void sub_menu_callback(menu@ m, string user = "")
 {
+	if ((keyboard_modifiers & KEYMOD_ALT) != 0 and key_pressed(KEY_F4)) { exit(); }
 	network_loop();
 	music_update();
-	if ((keyboard_modifiers & KEYMOD_ALT) != 0 and key_pressed(KEY_F4)) { exit(); }
 	if ((keyboard_modifiers & KEYMOD_CTRL) != 0 and key_pressed(KEY_PAGEUP)) { tts_speed_up(); save_settings(); }
 	else if ((keyboard_modifiers & KEYMOD_CTRL) != 0 and key_pressed(KEY_PAGEDOWN)) { tts_speed_down(); save_settings(); }
 	else if (key_pressed(KEY_PAGEUP)) { volume_up(); save_settings(); }
@@ -1089,6 +1050,89 @@ int get_stat_int(json_object@ obj, string key) {
 string get_stat_str(json_object@ obj, string key) {
 	if (@obj == null or !obj.exists(key)) return "";
 	return string(obj[key]);
+}
+
+string build_character_summary_from_json(json_object@ ch, string profile) {
+	if (@ch == null) return "No character data.";
+	string name = ch.exists("name") ? string(ch["name"]) : "Unknown";
+	string gender = ch.exists("gender") ? string(ch["gender"]) : "";
+	string race = ch.exists("race") ? string(ch["race"]) : "Unknown";
+	string cls = ch.exists("class") ? string(ch["class"]) : "Unknown";
+	string subclass = ch.exists("subclass") ? string(ch["subclass"]) : "";
+	int level = ch.exists("level") ? int(ch["level"]) : 1;
+	int str_val = ch.exists("str") ? int(ch["str"]) : 10;
+	int dex_val = ch.exists("dex") ? int(ch["dex"]) : 10;
+	int con_val = ch.exists("con") ? int(ch["con"]) : 10;
+	int int_val = ch.exists("int") ? int(ch["int"]) : 10;
+	int wis_val = ch.exists("wis") ? int(ch["wis"]) : 10;
+	int cha_val = ch.exists("cha") ? int(ch["cha"]) : 10;
+	string weapon = ch.exists("weapon") ? string(ch["weapon"]) : "Longsword";
+	string subclass_text = subclass != "" ? " " + subclass : "";
+	string gender_text = gender != "" ? " " + gender + "." : "";
+	string summary = room_game_type_label(profile) + " character. " + name + "." + gender_text + " " + race + " " + cls + subclass_text + ", level " + level + ". ";
+	summary += "Strength " + str_val + ". Dexterity " + dex_val + ". Constitution " + con_val + ". ";
+	summary += "Intelligence " + int_val + ". Wisdom " + wis_val + ". Charisma " + cha_val + ". ";
+	summary += "Weapon: " + weapon + ".";
+	return summary;
+}
+
+void show_character_list_menu(string profile) {
+	json_array@ chars = profile == "adventure" ? adventure_character_list : sandbox_character_list;
+	if (@chars == null or chars.length() == 0) {
+		speak("No " + room_game_type_label(profile) + " characters found. Create one first.", true);
+		return;
+	}
+	int active_slot = profile == "adventure" ? active_adventure_slot : active_sandbox_slot;
+	while (true) {
+		@chars = profile == "adventure" ? adventure_character_list : sandbox_character_list;
+		if (@chars == null or chars.length() == 0) return;
+		active_slot = profile == "adventure" ? active_adventure_slot : active_sandbox_slot;
+		menu@ m = setup_sub_menu("View " + room_game_type_label(profile) + " Characters. " + chars.length() + " of 40 slots used.");
+		for (uint i = 0; i < chars.length(); i++) {
+			json_object@ ch = chars[i];
+			string label = (i + 1) + ". ";
+			if (@ch != null) {
+				label += (ch.exists("name") ? string(ch["name"]) : "Unknown") + ", ";
+				label += (ch.exists("race") ? string(ch["race"]) : "") + " ";
+				label += (ch.exists("class") ? string(ch["class"]) : "Unknown");
+				if (ch.exists("level")) label += " level " + int(ch["level"]);
+			} else {
+				label += "Empty slot";
+			}
+			if (int(i) == active_slot) label += ". Active.";
+			m.add_item(label);
+		}
+		int pick = m.run();
+		if (pick < 0 or pick >= int(chars.length())) return;
+		// Show details and options for selected character
+		json_object@ selected = chars[pick];
+		string detail = build_character_summary_from_json(selected, profile);
+		menu@ opt = setup_sub_menu(detail);
+		bool is_active = (pick == active_slot);
+		int set_active_btn = -1;
+		if (!is_active) set_active_btn = opt.add_item("Set as active character.");
+		int delete_btn = opt.add_item("Delete this character.");
+		int back_btn = opt.add_item("Back to list.");
+		int opt_pick = opt.run();
+		if (opt_pick < 0 or opt_pick == back_btn) continue;
+		if (set_active_btn >= 0 and opt_pick == set_active_btn) {
+			send({{"type", message_types::character_select}, {"profile", profile}, {"slot", pick}});
+			speak("Switching to character slot " + (pick + 1) + ".", false);
+			wait(300);
+			network_loop();
+		}
+		else if (opt_pick == delete_btn) {
+			menu@ confirm = setup_sub_menu("Are you sure you want to permanently delete this character? This cannot be undone.");
+			confirm.add_item("Yes, delete.");
+			confirm.add_item("No, keep.");
+			if (confirm.run() == 0) {
+				send({{"type", message_types::character_delete}, {"profile", profile}, {"slot", pick}});
+				speak("Character deleted.", false);
+				wait(300);
+				network_loop();
+			}
+		}
+	}
 }
 
 void show_player_stats() {

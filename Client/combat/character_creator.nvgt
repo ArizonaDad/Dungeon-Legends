@@ -25,6 +25,10 @@ bool creation_back_requested = false;
 int[] created_pre_progression_ability_scores = {10,10,10,10,10,10};
 
 string active_character_profile = "sandbox";
+json_array@ adventure_character_list = null;
+json_array@ sandbox_character_list = null;
+int active_adventure_slot = 0;
+int active_sandbox_slot = 0;
 
 string sandbox_char_name = "";
 string sandbox_char_race = "";
@@ -143,7 +147,18 @@ void clear_profile_cache(string profile) {
 
 bool profile_has_character(string profile) {
     profile = normalize_character_profile(profile);
-    return profile == "adventure" ? adventure_char_class != "" : sandbox_char_class != "";
+    if (profile == "adventure") {
+        if (adventure_char_class != "") return true;
+        return @adventure_character_list != null and adventure_character_list.length() > 0;
+    }
+    if (sandbox_char_class != "") return true;
+    return @sandbox_character_list != null and sandbox_character_list.length() > 0;
+}
+
+int profile_character_count(string profile) {
+    profile = normalize_character_profile(profile);
+    json_array@ list = profile == "adventure" ? adventure_character_list : sandbox_character_list;
+    return @list != null ? int(list.length()) : (profile_has_character(profile) ? 1 : 0);
 }
 
 bool has_any_character_profile() {

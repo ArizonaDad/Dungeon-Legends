@@ -37,7 +37,7 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 - Menu header displays player level, gold, and glory points
 - 7 top-level categories: Play, Character, Social, Shop, Challenges, Settings, Quit
 - **Play**: Play Adventure (Create Game / Join Game), Play Sandbox Mode (Create Game / Join Game)
-- **Character**: Create Character, View Character (with proficiency bonus, saving throws, spell save DC), Inventory, My Stats, Prestige (level 20+)
+- **Character**: Create Character (up to 40 per mode), View Characters (list all, set active, delete), Inventory, My Stats, Prestige (level 20+)
 - **Social**: Friends, Guild (create/join, max 20 members, guild chat, invite, view members/glory), Check Who's Online
 - **Shop**: Item Shop (potions, scrolls, throwables with gold), Glory Shop (titles and exclusive items with glory)
 - **Challenges**: Daily Dungeon (featured dungeon with bonus rewards), Weekly Challenges, Leaderboards
@@ -149,10 +149,13 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 
 
 ### Character Persistence
-- Characters saved to SQLite via account JSON data blob on creation
-- Character data sent to client on login (`character_data` message) including background, feats, skills, tools, and base ability scores
-- Client profile cache stores background and feats alongside core character data
-- Client restores `created_char_*` variables from server data (View Character works across sessions)
+- Multiple characters per mode: up to 40 adventure + 40 sandbox characters per account
+- Server stores characters in `adventure_characters`/`sandbox_characters` JSON arrays with `active_*_slot` index
+- Auto-migration: old single-character accounts are converted to array format on first access
+- `character_list` message sends full array to client on login; `character_select`/`character_delete` manage slots
+- `character_data` message sends the active character's full data including background, feats, skills, tools, base scores
+- Client profile cache stores background, feats, and gender alongside core character data
+- View Characters shows a browsable list with Set Active and Delete options
 - Adventure progress tracked: XP, level, achievements, kills, healing, waves cleared
 
 ### Post-Battle Flow

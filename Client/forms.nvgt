@@ -4,6 +4,7 @@ bool pop_text(const string&in message, int timeout = 0) {
 	uint64 t = ticks();
 	while (true) {
 		wait(5);
+		if ((keyboard_modifiers & KEYMOD_ALT) != 0 and key_pressed(KEY_F4)) { exit(); }
 		if (timeout > 0 and ticks() - t > timeout) return true;
 		network_loop();
 		if (key_pressed(KEY_LEFT) or key_pressed(KEY_RIGHT) or key_pressed(KEY_UP) or key_pressed(KEY_DOWN))
@@ -22,6 +23,7 @@ string input_box_form(string title, string prompt, string default_value = "", bo
 	f.focus(text);
 	while (true) {
 		wait(5);
+		if ((keyboard_modifiers & KEYMOD_ALT) != 0 and key_pressed(KEY_F4)) { exit(); }
 		network_loop();
 		f.monitor();
 		if (f.is_pressed(cancel)) {

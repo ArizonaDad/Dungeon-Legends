@@ -403,6 +403,19 @@ void handle_message(json_object@ msg)
 		if (xp_reward > 0) text += " +" + xp_reward + " XP.";
 		speak(text, true);
 	}
+	else if (msg_type == message_types::character_list) {
+		string profile = msg.exists("profile") ? normalize_character_profile(string(msg["profile"])) : "adventure";
+		int active_slot = msg.exists("active_slot") ? int(msg["active_slot"]) : 0;
+		if (msg.exists("characters")) {
+			if (profile == "adventure") {
+				@adventure_character_list = msg["characters"];
+				active_adventure_slot = active_slot;
+			} else {
+				@sandbox_character_list = msg["characters"];
+				active_sandbox_slot = active_slot;
+			}
+		}
+	}
 	else if (msg_type == message_types::character_data) {
 		init_feat_data();
 		string profile = msg.exists("profile") ? normalize_character_profile(string(msg["profile"])) : "sandbox";

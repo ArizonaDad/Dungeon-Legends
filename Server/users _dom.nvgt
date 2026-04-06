@@ -599,6 +599,8 @@ class user
 			process_daily_bonus(this);
 			send_character_profile_to_user(this, GAME_TYPE_SANDBOX);
 			send_character_profile_to_user(this, GAME_TYPE_ADVENTURE);
+			send_character_list_to_user(this, GAME_TYPE_ADVENTURE);
+			send_character_list_to_user(this, GAME_TYPE_SANDBOX);
 			send_adventure_progress_to_user(this);
 			// Send daily dungeon info on login
 			string daily_id = get_daily_dungeon_id();
@@ -1234,13 +1236,79 @@ void handle_user_message(user@ u, json_object@ msg)
 			if (msg.exists("free_cast_spells")) char_data["free_cast_spells"] = msg["free_cast_spells"];
 			if (msg.exists("cantrips")) char_data["cantrips"] = msg["cantrips"];
 			if (msg.exists("spells")) char_data["spells"] = msg["spells"];
+			// Append to character array (multi-character support, up to 40 per mode)
+			ensure_character_array_format(u.account, profile);
+			json_array@ chars = get_character_list(u.account, profile);
+			if (@chars != null and int(chars.length()) >= MAX_CHARACTERS_PER_MODE) {
+				u.send({{"type", message_types::error}, {"text", "Maximum " + MAX_CHARACTERS_PER_MODE + " characters per mode. Delete one first."}});
+				return;
+			}
+			if (@chars == null) { json_array new_arr; data[get_character_list_key(profile)] = new_arr; @chars = get_character_list(u.account, profile); }
+			chars.add(char_data);
+			int new_slot = int(chars.length()) - 1;
+			set_active_slot(u.account, profile, new_slot);
+			// Also update legacy single-char key for backward compatibility
 			data[storage_key] = char_data;
 			if (!data.exists("first_login_done")) data["first_login_done"] = true;
 			u.account.commit();
 			send_character_profile_to_user(u, profile);
+			send_character_list_to_user(u, profile);
 			if (profile == GAME_TYPE_ADVENTURE) send_adventure_progress_to_user(u);
-			u.send({{"type", message_types::announce}, {"text", display_game_type(profile) + " character saved."}, {"interrupt", false}});
-			println("[CHAR] " + u.username + " saved " + profile + " character: " + string(msg["name"]));
+			u.send({{"type", message_types::announce}, {"text", display_game_type(profile) + " character saved. Slot " + (new_slot + 1) + " of " + chars.length() + "."}, {"interrupt", false}});
+			println("[CHAR] " + u.username + " saved " + profile + " character slot " + new_slot + ": " + string(msg["name"]));
+		}
+	}
+
+	// --- Character Select (change active slot) ---
+	else if (msg_type == message_types::character_select) {
+		if (@u.account != null) {
+			string profile = msg.exists("profile") ? normalize_game_type(string(msg["profile"])) : GAME_TYPE_ADVENTURE;
+			int slot = msg.exists("slot") ? int(msg["slot"]) : 0;
+			ensure_character_array_format(u.account, profile);
+			json_array@ chars = get_character_list(u.account, profile);
+			if (@chars == null or slot < 0 or slot >= int(chars.length())) {
+				u.send({{"type", message_types::error}, {"text", "Invalid character slot."}});
+				return;
+			}
+			set_active_slot(u.account, profile, slot);
+			u.account.commit();
+			send_character_profile_to_user(u, profile);
+			u.send({{"type", message_types::announce}, {"text", "Switched to character slot " + (slot + 1) + "."}, {"interrupt", false}});
+		}
+	}
+
+	// --- Character Delete ---
+	else if (msg_type == message_types::character_delete) {
+		if (@u.account != null) {
+			string profile = msg.exists("profile") ? normalize_game_type(string(msg["profile"])) : GAME_TYPE_ADVENTURE;
+			int slot = msg.exists("slot") ? int(msg["slot"]) : -1;
+			ensure_character_array_format(u.account, profile);
+			json_array@ chars = get_character_list(u.account, profile);
+			if (@chars == null or slot < 0 or slot >= int(chars.length())) {
+				u.send({{"type", message_types::error}, {"text", "Invalid character slot."}});
+				return;
+			}
+			string deleted_name = "Unknown";
+			json_object@ del_char = chars[slot];
+			if (@del_char != null and del_char.exists("name")) deleted_name = string(del_char["name"]);
+			// Rebuild array without the deleted slot
+			json_array new_chars;
+			for (uint di = 0; di < chars.length(); di++) {
+				if (int(di) != slot) new_chars.add(chars[di]);
+			}
+			u.account.data[get_character_list_key(profile)] = new_chars;
+			@chars = get_character_list(u.account, profile);
+			// Adjust active slot if needed
+			int active = get_active_slot(u.account, profile);
+			if (active >= int(new_chars.length())) set_active_slot(u.account, profile, int(new_chars.length()) > 0 ? int(new_chars.length()) - 1 : 0);
+			else if (active > slot) set_active_slot(u.account, profile, active - 1);
+			// Update legacy key
+			json_object@ new_active = get_character_profile(u.account, profile);
+			if (@new_active != null) u.account.data[get_character_storage_key(profile)] = new_active;
+			u.account.commit();
+			send_character_list_to_user(u, profile);
+			if (chars.length() > 0) send_character_profile_to_user(u, profile);
+			u.send({{"type", message_types::announce}, {"text", "Deleted " + deleted_name + "."}, {"interrupt", false}});
 		}
 	}
 

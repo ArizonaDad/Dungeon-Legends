@@ -4,6 +4,11 @@ const string ACCOUNT_KEY_LEGACY_CHARACTER = "character";
 const string ACCOUNT_KEY_SANDBOX_CHARACTER = "sandbox_character";
 const string ACCOUNT_KEY_ADVENTURE_CHARACTER = "adventure_character";
 const string ACCOUNT_KEY_ADVENTURE_PROGRESS = "adventure_progress";
+const string ACCOUNT_KEY_ADVENTURE_CHARACTERS = "adventure_characters";
+const string ACCOUNT_KEY_SANDBOX_CHARACTERS = "sandbox_characters";
+const string ACCOUNT_KEY_ACTIVE_ADVENTURE_SLOT = "active_adventure_slot";
+const string ACCOUNT_KEY_ACTIVE_SANDBOX_SLOT = "active_sandbox_slot";
+const int MAX_CHARACTERS_PER_MODE = 40;
 
 string normalize_game_type(string game_type) {
 	string lc = game_type.lower();
@@ -21,6 +26,47 @@ string display_game_type(string game_type) {
 
 string get_character_storage_key(string profile) {
 	return is_adventure_game_type(profile) ? ACCOUNT_KEY_ADVENTURE_CHARACTER : ACCOUNT_KEY_SANDBOX_CHARACTER;
+}
+
+string get_character_list_key(string profile) {
+	return is_adventure_game_type(profile) ? ACCOUNT_KEY_ADVENTURE_CHARACTERS : ACCOUNT_KEY_SANDBOX_CHARACTERS;
+}
+
+string get_active_slot_key(string profile) {
+	return is_adventure_game_type(profile) ? ACCOUNT_KEY_ACTIVE_ADVENTURE_SLOT : ACCOUNT_KEY_ACTIVE_SANDBOX_SLOT;
+}
+
+// Migrate old single-character storage to new array format.
+void ensure_character_array_format(account@ acct, string profile) {
+	if (@acct == null or @acct.data == null) return;
+	string list_key = get_character_list_key(profile);
+	if (acct.data.exists(list_key)) return;
+	string old_key = get_character_storage_key(profile);
+	json_array chars;
+	if (acct.data.exists(old_key)) {
+		chars.add(acct.data[old_key]);
+	}
+	acct.data[list_key] = chars;
+	acct.data[get_active_slot_key(profile)] = 0;
+}
+
+json_array@ get_character_list(account@ acct, string profile) {
+	if (@acct == null or @acct.data == null) return null;
+	ensure_character_array_format(acct, profile);
+	string list_key = get_character_list_key(profile);
+	if (!acct.data.exists(list_key)) return null;
+	return acct.data[list_key];
+}
+
+int get_active_slot(account@ acct, string profile) {
+	if (@acct == null or @acct.data == null) return 0;
+	string slot_key = get_active_slot_key(profile);
+	return acct.data.exists(slot_key) ? int(acct.data[slot_key]) : 0;
+}
+
+void set_active_slot(account@ acct, string profile, int slot) {
+	if (@acct == null or @acct.data == null) return;
+	acct.data[get_active_slot_key(profile)] = slot;
 }
 
 int get_json_int(json_object@ obj, string key, int fallback = 0) {
@@ -159,13 +205,35 @@ void ensure_account_progression(account@ acct) {
 json_object@ get_character_profile(account@ acct, string profile) {
 	if (@acct == null or @acct.data == null) return null;
 	ensure_account_progression(acct);
-	string key = get_character_storage_key(profile);
-	if (!acct.data.exists(key)) return null;
-	return acct.data[key];
+	ensure_character_array_format(acct, profile);
+	json_array@ chars = get_character_list(acct, profile);
+	if (@chars == null or chars.length() == 0) return null;
+	int slot = get_active_slot(acct, profile);
+	if (slot < 0 or slot >= int(chars.length())) slot = 0;
+	return chars[slot];
 }
 
 bool account_has_character_profile(account@ acct, string profile) {
-	return @get_character_profile(acct, profile) != null;
+	if (@acct == null or @acct.data == null) return false;
+	ensure_character_array_format(acct, profile);
+	json_array@ chars = get_character_list(acct, profile);
+	return @chars != null and chars.length() > 0;
+}
+
+json_object@ build_character_list_message(account@ acct, string profile) {
+	ensure_character_array_format(acct, profile);
+	json_array@ chars = get_character_list(acct, profile);
+	json_object msg;
+	msg["type"] = message_types::character_list;
+	msg["profile"] = normalize_game_type(profile);
+	msg["characters"] = @chars != null ? chars : json_array();
+	msg["active_slot"] = get_active_slot(acct, profile);
+	return msg;
+}
+
+void send_character_list_to_user(user@ u, string profile) {
+	if (@u == null or @u.account == null) return;
+	u.send(build_character_list_message(u.account, profile));
 }
 
 json_object@ get_adventure_progress(account@ acct) {
