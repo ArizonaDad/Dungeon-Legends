@@ -11,7 +11,12 @@ void check_for_update() {
 
 	// Fetch remote manifest (small JSON file)
 	string remote_body = url_get(UPDATE_MANIFEST_URL);
-	if (remote_body.empty()) return; // No internet or server down
+	if (remote_body.empty()) {
+		// Can't reach update server -- server will reject outdated clients at login anyway.
+		speak("Could not reach the update server. Connecting to game server.", true);
+		wait(1500);
+		return;
+	}
 
 	json_object@ remote = parse_json(remote_body);
 	if (@remote == null) return;

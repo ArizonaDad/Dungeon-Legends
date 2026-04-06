@@ -329,21 +329,26 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 - Server tracks: total_damage_dealt, total_deaths, pvp_wins/losses, longest_kill_streak per account
 
 ## Auto-Update System
-- **Mandatory updates**: Outdated clients cannot skip past the update screen; must update or quit
+- **Two-layer version gate**: Client-side updater blocks at launch + server rejects outdated clients at login (bulletproof: even if update server is down, game server enforces version)
+- **Server-side validation**: `REQUIRED_CLIENT_VERSION` in `Server.nvgt` checked against `client_version` field in login message; clients without version field or with older version are rejected with error
+- **Mandatory client updates**: Outdated clients cannot skip past the update screen; must update or quit
+- **Unreachable update server**: Client warns player but proceeds to game server, which will reject if version is outdated
 - **Incremental downloads**: Only downloads files whose SHA-256 hash changed (code-only update = 14MB instead of 900MB)
-- **Version tracking**: `CLIENT_VERSION` constant in `client.nvgt`, semantic versioning (MAJOR.MINOR.PATCH)
+- **Version tracking**: `CLIENT_VERSION` constant in `client.nvgt`, semantic versioning (MAJOR.MINOR.PATCH). Client sends version in login messages.
 - **Manifest-based**: Server hosts `manifest.json` listing each file + hash + size; client compares local vs remote manifest
 - **Update flow**: `check_for_update()` runs at launch before sounds.dat loads (no files locked) -> fetches manifest -> compares hashes -> downloads only changed files via `internet_request` with TTS progress (10% increments) -> writes `update.bat` to swap files -> relaunches
 - **Download retry**: If download fails, player can retry or quit (no bypassing)
 - **First-time install**: `manifest.json` ships inside `client.zip` so new installs have it
 - **Key files**: `Client/updater.nvgt` (auto-updater), `build_and_deploy.py` (build + deploy script)
 - **Server files**: `web/manifest.json`, `web/files/` (individual files for incremental updates), `web/DungeonLegends.zip` (full zip for new players)
+- **Smart deploy**: `build_and_deploy.py` uses hash comparison (not size) to skip uploading unchanged files; caches last deployed manifest in `.last_deployed_manifest.json`; sounds.dat (919 MB) only re-uploaded when audio actually changes
 
 ## Development
 - **Build & deploy** (one command): `python build_and_deploy.py` — bumps version, packs sounds, compiles, generates manifest, uploads everything
   - `--minor` / `--major` / `--version X.Y.Z` for version control
   - `--skip-sounds` to skip sound packing, `--skip-upload` for local build only
   - `--notes "Fixed X"` for release notes (announced via TTS to players)
+  - After deploying, update `REQUIRED_CLIENT_VERSION` in `Server/Server.nvgt` to match the new version and redeploy server
 - Compile client: `C:\Users\16239\Documents\games\nvgt\nvgt.exe -c Client/client.nvgt` (produces Client/client.zip for distribution)
 - Compile server (Linux): `C:\Users\16239\Documents\games\nvgt\nvgt.exe -c -p linux Server/Server.nvgt` (produces Server/Server.zip)
 - Git repo: https://github.com/ArizonaDad/Dungeon-Legends

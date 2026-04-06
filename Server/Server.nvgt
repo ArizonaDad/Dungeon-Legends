@@ -12,6 +12,8 @@
 #include "combat/wave_system.nvgt"
 #include "combat/spell_data.nvgt"
 #include "../common/glory_shop_data.nvgt"
+const string REQUIRED_CLIENT_VERSION = "1.0.1";
+
 network net;           // Low-level network object.
 server svr;            // Our server wrapper.
 room_manager rooms;    // Manages all open rooms.
@@ -32,6 +34,35 @@ user@ create_bot_user(string bot_name) {
 	bot.status = "in_game";
 	return bot;
 }
+// ---- Version comparison helpers ----
+bool version_is_older(string client_ver, string required_ver) {
+	int c_major = 0, c_minor = 0, c_patch = 0;
+	int r_major = 0, r_minor = 0, r_patch = 0;
+	parse_semver(client_ver, c_major, c_minor, c_patch);
+	parse_semver(required_ver, r_major, r_minor, r_patch);
+	if (c_major != r_major) return c_major < r_major;
+	if (c_minor != r_minor) return c_minor < r_minor;
+	return c_patch < r_patch;
+}
+
+void parse_semver(string ver, int&out major, int&out minor, int&out patch) {
+	major = 0; minor = 0; patch = 0;
+	int part = 0;
+	int value = 0;
+	for (uint i = 0; i <= ver.length(); i++) {
+		if (i == ver.length() or ver[i] == 46) { // 46 == '.'
+			if (part == 0) major = value;
+			else if (part == 1) minor = value;
+			else if (part == 2) patch = value;
+			part++;
+			value = 0;
+		} else {
+			int digit = ver[i] - 48; // 48 == '0'
+			if (digit >= 0 and digit <= 9) value = value * 10 + digit;
+		}
+	}
+}
+
 user_manager users;    // Manages all connected users.
 void main()
 {
@@ -141,6 +172,16 @@ class server
 		if (@msg == null or !msg.exists("type")) return;
 		string msg_type = msg["type"];
 		if (msg_type == message_types::login and msg.exists("username") and msg.exists("password")) {
+			// Reject outdated or missing client versions.
+			if (!msg.exists("client_version") or string(msg["client_version"]).empty()) {
+				send(peer_id, {{"type", message_types::error}, {"text", "Your client is outdated. Please download the latest version from the-gdn.net:8080 and try again."}});
+				return;
+			}
+			string client_ver = string(msg["client_version"]);
+			if (version_is_older(client_ver, REQUIRED_CLIENT_VERSION)) {
+				send(peer_id, {{"type", message_types::error}, {"text", "Your client version " + client_ver + " is outdated. Version " + REQUIRED_CLIENT_VERSION + " or newer is required. Please update and try again."}});
+				return;
+			}
 			// Check if this user is disconnected and trying to reconnect.
 			user@ existing = users.get_user_by_name(msg["username"]);
 			if (@existing != null and existing.disconnected) {

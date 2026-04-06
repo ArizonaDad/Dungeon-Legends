@@ -4,4 +4,6 @@
 __pycache__/
 *.pyc
 Client/sounds/
+Client/client/
 Dungeon Legends/
+.last_deployed_manifest.json

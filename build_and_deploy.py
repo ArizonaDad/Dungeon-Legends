@@ -204,8 +204,27 @@ def generate_manifest(version, release_notes):
     return manifest
 
 
+def load_deployed_manifest():
+    """Load the previously deployed manifest for hash comparison."""
+    cache_path = os.path.join(PROJECT_DIR, ".last_deployed_manifest.json")
+    if os.path.exists(cache_path):
+        with open(cache_path, "r", encoding="utf-8") as f:
+            try:
+                return json.load(f)
+            except json.JSONDecodeError:
+                return None
+    return None
+
+
+def save_deployed_manifest(manifest):
+    """Cache the deployed manifest so future deploys can compare hashes."""
+    cache_path = os.path.join(PROJECT_DIR, ".last_deployed_manifest.json")
+    with open(cache_path, "w", encoding="utf-8") as f:
+        json.dump(manifest, f, indent=2)
+
+
 def upload_to_server(manifest):
-    """Upload files to the-gdn.net via SFTP."""
+    """Upload files to the-gdn.net via SFTP. Uses hash comparison to skip unchanged files."""
     import paramiko
 
     key_pass = os.environ.get("DL_SSH_KEY_PASS", "snowball")
@@ -224,50 +243,54 @@ def upload_to_server(manifest):
         except IOError:
             pass  # Already exists
 
-    # Upload individual files for incremental updates
+    # Build hash lookup from last deployed manifest for smart skipping
+    prev_manifest = load_deployed_manifest()
+    prev_hashes = {}
+    if prev_manifest and "files" in prev_manifest:
+        for entry in prev_manifest["files"]:
+            prev_hashes[entry["path"]] = entry["hash"]
+
+    # Upload individual files for incremental updates (hash-based skip)
     print("\nUploading individual files for incremental updates...")
+    uploaded_count = 0
+    skipped_count = 0
     for file_entry in manifest["files"]:
         relpath = file_entry["path"]
         local_path = os.path.join(CLIENT_OUT_DIR, relpath)
+        new_hash = file_entry["hash"]
+
+        # Skip if hash matches last deploy (no bytes changed)
+        if relpath in prev_hashes and prev_hashes[relpath] == new_hash:
+            size_mb = file_entry["size"] / (1024 * 1024)
+            print(f"  {relpath}: hash unchanged, skipping ({size_mb:.0f} MB saved)")
+            skipped_count += 1
+            continue
+
         remote_path = f"{REMOTE_WEB_DIR}/files/{relpath}"
-        local_size = os.path.getsize(local_path)
+        size_mb = file_entry["size"] / (1024 * 1024)
+        print(f"  {relpath}: uploading ({size_mb:.0f} MB)...")
+        sftp.put(local_path, remote_path)
+        print(f"  {relpath}: done")
+        uploaded_count += 1
 
-        # Skip if remote file has same size (quick check)
-        try:
-            remote_size = sftp.stat(remote_path).st_size
-        except IOError:
-            remote_size = 0
+    print(f"  [{uploaded_count} uploaded, {skipped_count} skipped]")
 
-        if local_size == remote_size:
-            print(f"  {relpath}: unchanged, skipping")
-        else:
-            size_mb = local_size / (1024 * 1024)
-            print(f"  {relpath}: uploading ({size_mb:.0f} MB)...")
-            sftp.put(local_path, remote_path)
-            print(f"  {relpath}: done")
-
-    # Upload manifest.json
+    # Upload manifest.json (always, it's tiny)
     manifest_local = os.path.join(CLIENT_OUT_DIR, "manifest.json")
     manifest_remote = f"{REMOTE_WEB_DIR}/manifest.json"
     print("Uploading manifest.json...")
     sftp.put(manifest_local, manifest_remote)
 
-    # Upload full zip for new player downloads
+    # Upload full zip for new player downloads only if any tracked file changed
     client_zip = os.path.join(CLIENT_DIR, "client.zip")
     remote_zip = f"{REMOTE_WEB_DIR}/DungeonLegends.zip"
-    local_zip_size = os.path.getsize(client_zip)
-    try:
-        remote_zip_size = sftp.stat(remote_zip).st_size
-    except IOError:
-        remote_zip_size = 0
-
-    if local_zip_size == remote_zip_size:
-        print("DungeonLegends.zip: unchanged, skipping")
-    else:
-        size_mb = local_zip_size / (1024 * 1024)
+    if uploaded_count > 0:
+        size_mb = os.path.getsize(client_zip) / (1024 * 1024)
         print(f"Uploading DungeonLegends.zip ({size_mb:.0f} MB)...")
         sftp.put(client_zip, remote_zip)
         print("DungeonLegends.zip: done")
+    else:
+        print("DungeonLegends.zip: no file changes, skipping")
 
     # Upload index.html
     html_local = os.path.join(WEB_DIR_LOCAL, "index.html")
@@ -286,6 +309,9 @@ def upload_to_server(manifest):
     )
 
     ssh.close()
+
+    # Cache this manifest for next deploy comparison
+    save_deployed_manifest(manifest)
 
 
 def main():
