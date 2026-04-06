@@ -1,0 +1,215 @@
+// updater.nvgt - Incremental auto-update system for Dungeon Legends
+// Compares file hashes in manifest.json to only download changed files.
+
+const string UPDATE_MANIFEST_URL = "http://the-gdn.net:8080/manifest.json";
+const string UPDATE_FILES_URL = "http://the-gdn.net:8080/files/";
+
+// ---- Public entry point ----
+// Call before loading any game assets so no files are locked.
+void check_for_update() {
+	if (!SCRIPT_COMPILED) return;
+
+	// Fetch remote manifest (small JSON file)
+	string remote_body = url_get(UPDATE_MANIFEST_URL);
+	if (remote_body.empty()) return; // No internet or server down
+
+	json_object@ remote = parse_json(remote_body);
+	if (@remote == null) return;
+
+	string remote_version = string(remote["version"]);
+	if (remote_version.empty() or remote_version == CLIENT_VERSION) return;
+	if (!version_is_newer(remote_version, CLIENT_VERSION)) return;
+
+	// Load local manifest for hash comparison
+	json_array@ local_files = null;
+	if (file_exists("manifest.json")) {
+		string local_body = file_get_contents("manifest.json");
+		if (!local_body.empty()) {
+			json_object@ local_obj = parse_json(local_body);
+			if (@local_obj != null) @local_files = local_obj["files"];
+		}
+	}
+
+	json_array@ remote_files = remote["files"];
+	if (@remote_files == null or remote_files.length() == 0) return;
+
+	// Find which files have changed
+	string[] changed_paths;
+	double total_size = 0;
+	for (uint i = 0; i < remote_files.length(); i++) {
+		json_object@ rf = remote_files[i];
+		string fpath = string(rf["path"]);
+		string remote_hash = string(rf["hash"]);
+		double fsize = double(rf["size"]);
+		bool needs_update = true;
+		if (@local_files != null) {
+			for (uint j = 0; j < local_files.length(); j++) {
+				json_object@ lf = local_files[j];
+				if (string(lf["path"]) == fpath) {
+					if (string(lf["hash"]) == remote_hash) needs_update = false;
+					break;
+				}
+			}
+		}
+		if (needs_update) {
+			changed_paths.insert_last(fpath);
+			total_size += fsize;
+		}
+	}
+
+	if (changed_paths.length() == 0) {
+		// Hashes match but version string changed; save remote manifest and continue.
+		file_put_contents("manifest.json", remote_body);
+		return;
+	}
+
+	// Build announcement
+	string notes = string(remote["release_notes"]);
+	string notes_part = notes.empty() ? "" : " " + notes + ".";
+	int size_mb = int(total_size / 1048576.0);
+	string size_str = size_mb > 0 ? "" + size_mb + " megabytes" : "less than 1 megabyte";
+	speak("A required update is available, version " + remote_version + "." + notes_part + " " + changed_paths.length() + " files to download, " + size_str + ". Press enter to download the update now.", true);
+
+	// Wait for user to acknowledge -- update is mandatory, only option is update or quit
+	while (true) {
+		wait(5);
+		if ((keyboard_modifiers & KEYMOD_ALT) != 0 and key_pressed(KEY_F4)) exit();
+		if (key_pressed(KEY_ESCAPE) or key_pressed(KEY_AC_BACK)) {
+			speak("This update is required to play. Press enter to update, or alt+F4 to quit.", true);
+		}
+		if (key_pressed(KEY_LEFT) or key_pressed(KEY_RIGHT) or key_pressed(KEY_UP) or key_pressed(KEY_DOWN))
+			speak("Press enter to download the update now.");
+		if (key_pressed(KEY_RETURN)) break;
+	}
+
+	// Download changed files -- retry loop since update is mandatory
+	while (true) {
+		if (download_update_files(changed_paths)) break;
+		// Download failed -- clean up and let player retry or quit
+		if (directory_exists("update_temp")) directory_delete("update_temp");
+		speak("Update download failed. Press enter to retry, or alt+F4 to quit.", true);
+		while (true) {
+			wait(5);
+			if ((keyboard_modifiers & KEYMOD_ALT) != 0 and key_pressed(KEY_F4)) exit();
+			if (key_pressed(KEY_RETURN)) break;
+		}
+	}
+
+	// Save new manifest into temp folder so the batch copies it
+	file_put_contents("update_temp/manifest.json", remote_body);
+
+	// Apply update (writes batch, launches it, exits game)
+	apply_update(changed_paths);
+}
+
+// ---- Version comparison ----
+bool version_is_newer(string a, string b) {
+	int a_major = 0, a_minor = 0, a_patch = 0;
+	int b_major = 0, b_minor = 0, b_patch = 0;
+	parse_semver(a, a_major, a_minor, a_patch);
+	parse_semver(b, b_major, b_minor, b_patch);
+	if (a_major != b_major) return a_major > b_major;
+	if (a_minor != b_minor) return a_minor > b_minor;
+	return a_patch > b_patch;
+}
+
+void parse_semver(string ver, int&out major, int&out minor, int&out patch) {
+	major = 0; minor = 0; patch = 0;
+	int part = 0;
+	int value = 0;
+	for (uint i = 0; i <= ver.length(); i++) {
+		if (i == ver.length() or ver[i] == 46) { // 46 == '.'
+			if (part == 0) major = value;
+			else if (part == 1) minor = value;
+			else if (part == 2) patch = value;
+			part++;
+			value = 0;
+		} else {
+			int digit = ver[i] - 48; // 48 == '0'
+			if (digit >= 0 and digit <= 9) value = value * 10 + digit;
+		}
+	}
+}
+
+// ---- File download ----
+bool download_update_files(string[]@ files) {
+	// Create temp directory structure
+	if (!directory_exists("update_temp")) directory_create("update_temp");
+	if (!directory_exists("update_temp/lib")) directory_create("update_temp/lib");
+
+	for (uint i = 0; i < files.length(); i++) {
+		string remote_path = files[i];
+		string local_path = "update_temp/" + remote_path;
+		string url = UPDATE_FILES_URL + remote_path;
+
+		speak("Downloading " + remote_path + ". File " + (i + 1) + " of " + files.length() + ".", true);
+
+		internet_request dl;
+		dl.set_url(url);
+		dl.set_path(local_path);
+		dl.follow_redirects = true;
+		dl.perform();
+
+		int last_pct = -1;
+		while (dl.in_progress) {
+			wait(50);
+			if ((keyboard_modifiers & KEYMOD_ALT) != 0 and key_pressed(KEY_F4)) exit();
+			int pct = int(dl.download_percent);
+			if (pct >= last_pct + 10 and pct <= 100) {
+				last_pct = pct - (pct % 10);
+				speak("" + last_pct + " percent.");
+			}
+		}
+
+		if (!dl.complete or dl.status_code != 200) {
+			speak("Failed to download " + remote_path + ".", true);
+			return false;
+		}
+	}
+
+	speak("Download complete!", true);
+	wait(500);
+	return true;
+}
+
+// ---- Apply update via batch script ----
+void apply_update(string[]@ changed_files) {
+	string bat = "@echo off\r\n";
+	bat += "echo Dungeon Legends Updater\r\n";
+	bat += "echo Waiting for game to close...\r\n";
+	bat += "timeout /t 3 /nobreak >nul\r\n";
+	bat += "echo Applying update...\r\n";
+
+	for (uint i = 0; i < changed_files.length(); i++) {
+		string f = to_win_path(changed_files[i]);
+		bat += "if exist \"update_temp\\" + f + "\" copy /Y \"update_temp\\" + f + "\" \"" + f + "\"\r\n";
+	}
+
+	// Copy new manifest
+	bat += "copy /Y \"update_temp\\manifest.json\" \"manifest.json\" >nul\r\n";
+	// Clean up temp folder
+	bat += "rd /s /q \"update_temp\" 2>nul\r\n";
+	// Relaunch game
+	bat += "echo Starting game...\r\n";
+	bat += "start \"\" \"client.exe\"\r\n";
+	// Self-delete
+	bat += "del \"%~f0\"\r\n";
+
+	file_put_contents("update.bat", bat);
+
+	speak("Applying update. The game will restart.", true);
+	wait(1500);
+
+	run("update.bat", "", false, true);
+	exit();
+}
+
+// ---- Helper: convert forward slashes to backslashes for batch paths ----
+string to_win_path(string path) {
+	string result = "";
+	for (uint i = 0; i < path.length(); i++) {
+		if (path[i] == 47) result += "\\"; // 47 == '/'
+		else result += path.substr(i, 1);
+	}
+	return result;
+}

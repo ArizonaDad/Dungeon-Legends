@@ -1,4 +1,5 @@
 																	#pragma asset "sounds.dat"
+const string CLIENT_VERSION = "1.0.0";
 #include "menu.nvgt"
 #include "instance.nvgt"
 #include "forms.nvgt"
@@ -7,6 +8,7 @@
 #include "combat/combat_ui.nvgt"
 #include "combat/character_creator.nvgt"
 #include "../common/utils.nvgt"
+#include "updater.nvgt"
 bool game = false;
 bool start_game_pending = false;
 bool is_new_account = false;
@@ -65,6 +67,7 @@ void main()
 	}
 	show_window("Dungeon Legends");
 	install_keyhook();
+	check_for_update();
 	set_sound_global_hrtf(true);
 	pack_file@ sound_pack = pack_file();
 	if (sound_pack.open("sounds.dat", "DL_aud10_k3y_2026!")) {

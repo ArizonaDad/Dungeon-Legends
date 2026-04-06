@@ -26,6 +26,7 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 | `common/loot_data.nvgt` | Item catalog (35 items), loot generation, rarity tiers, inventory helpers |
 | `common/consumable_data.nvgt` | Consumable catalog (16 items), modifier system, inventory helpers |
 | `Client/client.nvgt` | Main client entry, login, lobby menus, character viewing, first-time login flow |
+| `Client/updater.nvgt` | Mandatory incremental auto-updater (manifest-based, downloads only changed files) |
 | `Client/net.nvgt` | Network message dispatcher + connection, character_data restore, daily bonus handler |
 | `Client/combat/combat_ui.nvgt` | Combat game loop, action/bonus action menus, scanning, targeting, roll prompts, tab focus, level-up screen |
 | `Client/combat/character_creator.nvgt` | Character creation with back-navigation (race->class->level->abilities->weapon->spells) |
@@ -327,15 +328,33 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 - **Player Inspect**: View another player's public stats from context menu (right-click in lobby/friends)
 - Server tracks: total_damage_dealt, total_deaths, pvp_wins/losses, longest_kill_streak per account
 
+## Auto-Update System
+- **Mandatory updates**: Outdated clients cannot skip past the update screen; must update or quit
+- **Incremental downloads**: Only downloads files whose SHA-256 hash changed (code-only update = 14MB instead of 900MB)
+- **Version tracking**: `CLIENT_VERSION` constant in `client.nvgt`, semantic versioning (MAJOR.MINOR.PATCH)
+- **Manifest-based**: Server hosts `manifest.json` listing each file + hash + size; client compares local vs remote manifest
+- **Update flow**: `check_for_update()` runs at launch before sounds.dat loads (no files locked) -> fetches manifest -> compares hashes -> downloads only changed files via `internet_request` with TTS progress (10% increments) -> writes `update.bat` to swap files -> relaunches
+- **Download retry**: If download fails, player can retry or quit (no bypassing)
+- **First-time install**: `manifest.json` ships inside `client.zip` so new installs have it
+- **Key files**: `Client/updater.nvgt` (auto-updater), `build_and_deploy.py` (build + deploy script)
+- **Server files**: `web/manifest.json`, `web/files/` (individual files for incremental updates), `web/DungeonLegends.zip` (full zip for new players)
+
 ## Development
+- **Build & deploy** (one command): `python build_and_deploy.py` — bumps version, packs sounds, compiles, generates manifest, uploads everything
+  - `--minor` / `--major` / `--version X.Y.Z` for version control
+  - `--skip-sounds` to skip sound packing, `--skip-upload` for local build only
+  - `--notes "Fixed X"` for release notes (announced via TTS to players)
 - Compile client: `C:\Users\16239\Documents\games\nvgt\nvgt.exe -c Client/client.nvgt` (produces Client/client.zip for distribution)
 - Compile server (Linux): `C:\Users\16239\Documents\games\nvgt\nvgt.exe -c -p linux Server/Server.nvgt` (produces Server/Server.zip)
 - Git repo: https://github.com/ArizonaDad/Dungeon-Legends
 
 ## Server Deployment
 - **Host**: the-gdn.net, port 2000 (game), SSH port 30001
-- **Deploy script**: `C:\Users\16239\redeploy.py` — stops server, uploads Server.zip via SFTP, extracts to ~/dungeon_legends/, restarts with nohup
+- **Game server deploy**: `C:\Users\16239\redeploy.py` — stops server, uploads Server.zip via SFTP, extracts to ~/dungeon_legends/, restarts with nohup
+- **Client deploy**: `python build_and_deploy.py` — uploads individual files to `web/files/`, manifest to `web/manifest.json`, full zip to `web/DungeonLegends.zip`
+- **Download page**: http://the-gdn.net:8080/ (index.html), **Direct download**: http://the-gdn.net:8080/DungeonLegends.zip
 - **Other scripts**: `deploy_server.py` (full deploy with screen session), `fix_server.py` (maintenance/restart), `start_server.py` (restart only)
 - **Server path on host**: ~/dungeon_legends/Server
+- **Web path on host**: ~/dungeon_legends/web (served by Python HTTP server on port 8080)
 - **Logs**: ~/dungeon_legends/server.log
 - Uses paramiko with Ed25519 key auth (key at `~/.ssh/id_ed25519`)
