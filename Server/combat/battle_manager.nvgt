@@ -2298,14 +2298,27 @@ class battle_manager {
 			}
 		}
 
-		// Broadcast initiative order.
-		string order_text = "Initiative order: ";
+		// Announce all initiative rolls to all players in one message,
+		// then the turn order. Individual broadcast_roll calls during
+		// initiative chain too fast for TTS to speak.
+		string rolls_text = "Initiative rolls: ";
+		for (uint i = 0; i < combat.combatants.length(); i++) {
+			if (!combat.combatants[i].is_alive()) continue;
+			if (i > 0) rolls_text += ". ";
+			rolls_text += combat.combatants[i].name + " rolled " + combat.combatants[i].initiative_roll;
+		}
+		rolls_text += ".";
+		broadcast_announce(rolls_text, true);
+
+		// Announce turn order (highest to lowest).
+		string order_text = "Turn order: ";
 		for (uint i = 0; i < combat.initiative_order.length(); i++) {
 			combatant@ c = combat.combatants[combat.initiative_order[i]];
 			if (i > 0) order_text += ", ";
-			order_text += c.name + " (" + c.initiative_roll + ")";
+			order_text += (i + 1) + " " + c.name;
 		}
-		broadcast_announce(order_text, true);
+		order_text += ".";
+		broadcast_announce(order_text, false);
 
 		// Send initiative_order message.
 		json_array init_arr;
@@ -3239,7 +3252,10 @@ class battle_manager {
 
 		if (pr.roll_type == ROLL_INITIATIVE) {
 			c.initiative_roll = total;
-			broadcast_roll(pr.player_username, "initiative", natural_roll, reported_modifier, total, "");
+			// Don't broadcast individual rolls here - they chain too fast
+			// for TTS when monsters auto-roll. finish_initiative() announces
+			// all rolls and turn order in a single clear summary.
+			broadcast_to_battle({{"type", message_types::roll_result}, {"natural", natural_roll}, {"total", total}, {"outcome", ""}});
 			initiative_index++;
 			request_next_initiative();
 		}

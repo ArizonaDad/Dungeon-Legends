@@ -1194,13 +1194,14 @@ void speak_initiative_order() {
 		speak("No initiative order yet.", true);
 		return;
 	}
-	string text = "Initiative order, round " + current_round + ". ";
+	string text = "Turn order, round " + current_round + ". ";
 	for (uint i = 0; i < initiative_order.length(); i++) {
 		int idx = initiative_order[i];
 		combat_entity@ e = get_entity_by_index(idx);
 		if (@e != null) {
 			if (int(i) == current_turn_index) text += "Current: ";
 			text += (i + 1) + ": " + e.name;
+			if (e.initiative > 0) text += ", " + e.initiative;
 			if (e.is_dead) text += ", dead";
 			else if (e.hp <= 0) text += ", unconscious";
 			text += ". ";
@@ -1797,10 +1798,12 @@ void combat_game_loop() {
 		wait(10);
 		network_loop();
 		if (@main_screen != null) {
-			main_screen.form.monitor();
-			// Keep form focus on keyboard_area during game focus so it doesn't
-			// consume keystrokes meant for combat actions.
-			if (combat_focus == 0 and main_screen.form.get_current_focus() != f_main_keyboard_area) {
+			// Only let the form process events during chat/history focus.
+			// During game focus, the form's monitor() consumes arrow keys
+			// for its list component, hijacking combat controls.
+			if (combat_focus != 0) {
+				main_screen.form.monitor();
+			} else if (main_screen.form.get_current_focus() != f_main_keyboard_area) {
 				main_screen.form.focus(f_main_keyboard_area);
 			}
 		}
