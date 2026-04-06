@@ -323,4 +323,4 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 
 ## Development
 - Compile: `C:\Users\16239\Documents\games\nvgt\nvgt.exe -c Server/Server.nvgt` and `C:\Users\16239\Documents\games\nvgt\nvgt.exe -c Client/client.nvgt`
-- Git repo: https://github.com/ArizonaDad/souls-mmo
+- Git repo: https://github.com/ArizonaDad/Dungeon-Legends

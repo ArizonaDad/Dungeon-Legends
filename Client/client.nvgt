@@ -58,7 +58,7 @@ bool is_room_bot(string name) {
 instance single_game("DungeonLegends");
 void main()
 {
-	chdir(spec::path(SCRIPT_CURRENT_FILE).make_parent());
+	//chdir(spec::path(SCRIPT_CURRENT_FILE).make_parent());
 	if (SCRIPT_COMPILED and single_game.is_already_running) {
 		alert("Dungeon Legends", "Sorry, only one instance of the game can be run at a time.");
 		exit();
