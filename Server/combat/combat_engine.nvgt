@@ -407,19 +407,22 @@ class battle {
 		return total;
 	}
 
-	// Start initiative phase - roll for all combatants
+	// Start initiative phase - reset state for new initiative rolling.
+	// Does NOT auto-roll; battle_manager.request_next_initiative() handles rolling.
 	void start_initiative() {
 		battle_active = true;
 		round_number = 0;
-		// For each combatant, roll initiative
-		// Players get a "Press Roll" prompt, monsters auto-roll
+		current_turn_index = 0;
 		initiative_order.resize(0);
+		// Reset initiative rolls to 0 so they can be set by battle_manager
 		for (uint i = 0; i < combatants.length(); i++) {
-			if (!combatants[i].is_alive()) continue;
-			int roll = roll_d20();
-			int bonus = combatants[i].get_ability_mod(ABILITY_DEX);
-			combatants[i].initiative_roll = roll + bonus;
+			combatants[i].initiative_roll = 0;
 		}
+	}
+
+	// Build and sort initiative order from stored rolls (called after all rolls are collected).
+	void build_initiative_order() {
+		initiative_order.resize(0);
 		// Collect alive combatant indices
 		for (uint i = 0; i < combatants.length(); i++) {
 			if (!combatants[i].is_alive()) continue;

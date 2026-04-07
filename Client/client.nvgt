@@ -1030,42 +1030,41 @@ void wait_menu()
 			music_stop();
 			return;
 		}
-		menu@ m = setup_menu("You joined the room. Waiting for the host to start the game...");
-		int total_items = 1 + room_player_names.length();
-		int leave = m.add_item("Leave room 1 of " + total_items);
-		int[] player_items;
+		// Build player list text for announcement
+		string player_list_text = "Players: ";
 		for (uint i = 0; i < room_player_names.length(); i++) {
-			string pname = room_player_names[i];
-			string label = pname;
-			if (pname == room_host_name) label += " (Host)";
-			if (is_room_bot(pname)) label += " (AI)";
-			label += " " + (i + 2) + " of " + total_items;
-			player_items.insert_last(m.add_item("Player: " + label));
+			if (i > 0) player_list_text += ", ";
+			player_list_text += room_player_names[i];
+			if (room_player_names[i] == room_host_name) player_list_text += " (Host)";
+			if (is_room_bot(room_player_names[i])) player_list_text += " (AI)";
 		}
-		int res = m.run();
+		speak("Waiting for host to start. " + player_list_text + ". Press Escape to leave room.", false);
+
+		// Non-blocking wait loop: pump network continuously so we catch game_start_battle.
+		// This replaces m.run() which blocks and misses network messages.
+		timer wait_refresh;
+		while (true) {
+			wait(50);
+			network_loop();
+			if (start_game_pending or room_closed_flag) break;
+			if (key_pressed(KEY_ESCAPE)) {
+				speak("You have left the room.", false);
+				send({{"type", message_types::leave_room}, {"leave", ""}});
+				music_stop();
+				return;
+			}
+			// Refresh player list every 3 seconds
+			if (wait_refresh.elapsed >= 3000) {
+				wait_refresh.restart();
+				send({{"type", message_types::room_players}});
+			}
+		}
 		if (room_closed_flag) {
 			room_closed_flag = false;
 			music_stop();
 			return;
 		}
-		// Check if game started during menu — don't treat the auto-escape as "leave"
 		if (launch_pending_game_if_needed()) continue;
-		if (res < 0 or res == leave) {
-			speak("You have left the room.", false);
-			send({{"type", message_types::leave_room}, {"leave", ""}});
-			music_stop();
-			return;
-		}
-		else {
-			for (uint pi = 0; pi < player_items.length(); pi++) {
-				if (res == player_items[pi] and pi < room_player_names.length()) {
-					string selected_player = string(room_player_names[pi]);
-					wait(50);
-					show_player_context_menu(selected_player, false);
-					break;
-				}
-			}
-		}
 	}
 }
 // ---- Player Stats helpers ----

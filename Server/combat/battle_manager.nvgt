@@ -934,12 +934,14 @@ class battle_manager {
 	user@ find_user_for_combatant(combatant@ c) {
 		if (@c == null) return null;
 		if (!c.is_player) {
-			// Monsters use the first player as proxy (auto-rolled anyway).
-			if (players.length() > 0) return players[0];
+			// Monsters use the first connected player as proxy (auto-rolled anyway).
+			for (uint i = 0; i < players.length(); i++) {
+				if (@players[i] != null and !players[i].disconnected and players[i].peer_id != 0) return players[i];
+			}
 			return null;
 		}
 		for (uint i = 0; i < players.length(); i++) {
-			if (@players[i] != null and players[i].username == c.player_username) return players[i];
+			if (@players[i] != null and !players[i].disconnected and players[i].username == c.player_username) return players[i];
 		}
 		return null;
 	}
@@ -2293,23 +2295,8 @@ class battle_manager {
 		if (@combat == null) return;
 		initiative_phase = false;
 
-		// Build initiative order from stored rolls.
-		combat.initiative_order.resize(0);
-		for (uint i = 0; i < combat.combatants.length(); i++) {
-			if (combat.combatants[i].is_alive()) {
-				combat.initiative_order.insert_last(int(i));
-			}
-		}
-		// Sort descending by initiative_roll.
-		for (uint i = 0; i < combat.initiative_order.length(); i++) {
-			for (uint j = i + 1; j < combat.initiative_order.length(); j++) {
-				if (combat.combatants[combat.initiative_order[j]].initiative_roll > combat.combatants[combat.initiative_order[i]].initiative_roll) {
-					int temp = combat.initiative_order[i];
-					combat.initiative_order[i] = combat.initiative_order[j];
-					combat.initiative_order[j] = temp;
-				}
-			}
-		}
+		// Build and sort initiative order from stored rolls.
+		combat.build_initiative_order();
 
 		// Announce all initiative rolls to all players in one message,
 		// then the turn order. Individual broadcast_roll calls during
@@ -5245,6 +5232,7 @@ class battle_manager {
 
 	void tick() {
 		if (@combat == null or !combat.battle_active) return;
+		if (players.length() == 0) return; // No players left, don't tick
 
 		// Delayed initiative start - gives clients time to enter combat loop
 		if (initiative_delay_until > 0) {
@@ -5254,6 +5242,9 @@ class battle_manager {
 			}
 			return;
 		}
+
+		// Don't advance turns while initiative rolls are in progress
+		if (initiative_phase) return;
 
 		if (@current_roll != null) return;
 

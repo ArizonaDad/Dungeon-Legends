@@ -160,7 +160,7 @@ class server
 		if (msg_type == message_types::login and msg.exists("username") and msg.exists("password")) {
 			// Reject outdated or missing client versions.
 			if (!msg.exists("client_version") or string(msg["client_version"]).empty()) {
-				send(peer_id, {{"type", message_types::error}, {"text", "Your client is outdated. Please download the latest version from the-gdn.net:8080 and try again."}});
+				send(peer_id, {{"type", message_types::error}, {"text", "Your client is outdated. Please download the latest version and try again."}});
 				return;
 			}
 			string client_ver = string(msg["client_version"]);
