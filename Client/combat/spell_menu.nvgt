@@ -271,7 +271,7 @@ string show_spell_selection_menu() {
         string level_text = available_spells[i].level == 0 ? "Cantrip" : "Level " + available_spells[i].level;
         bool is_conc = available_spells[i].description.lower().find("concentration") >= 0;
         string conc_text = is_conc ? ". Concentration" : "";
-        m.add_item(available_spells[i].name + ". " + level_text + conc_text + ". " + available_spells[i].description);
+        m.add_item(available_spells[i].name + ". " + level_text + conc_text + ". " + available_spells[i].description + " " + (i + 1) + " of " + available_spells.length());
     }
     int res = m.run();
     if (res < 0 or res >= int(available_spells.length())) {

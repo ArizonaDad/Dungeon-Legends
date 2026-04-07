@@ -1599,7 +1599,7 @@ void show_combat_help() {
 	menu@ m = setup_sub_menu("Combat Help.");
 	m.add_item("W A S D. Move your character on your turn. Each step is 5 feet.");
 	m.add_item("I J K L. Scan for creatures. I north, K south, J west, L east.");
-	m.add_item("Left and right bracket keys, or Caps Lock. Cycle through scan targets. Shift plus Caps Lock cycles backward.");
+	m.add_item("Caps Lock. Cycle through scan targets. Shift plus Caps Lock cycles backward.");
 	m.add_item("Enter. Lock onto scanned target.");
 	m.add_item("F. Open action menu on your turn. Attack, cast spell, dodge, dash, and more.");
 	m.add_item("B. Open bonus action menu on your turn. Class features like Rage, Action Surge, Cunning Action.");
@@ -1612,7 +1612,7 @@ void show_combat_help() {
 	m.add_item("Tab. Switch focus between Game, Chat, and History. Shift plus Tab switches backward.");
 	m.add_item("Page Up. Increase volume.");
 	m.add_item("Page Down. Decrease volume.");
-	m.add_item("Escape. Forfeit the battle. Press twice to confirm. In Chat or History mode, returns to Game.");
+	m.add_item("Escape. Opens menu to Leave Game, Close Client, or Cancel.");
 	m.add_item("Turn structure. Move up to your speed, then take an action. You can move before or after your action.");
 	m.add_item("Actions. Attack, Cast a Spell, Dodge, Dash, Disengage, Help, Hide, Ready attack, Shove, Grapple.");
 	m.add_item("Dodge. Attacks against you have disadvantage until your next turn.");
@@ -1697,23 +1697,18 @@ void combat_switch_focus(int dir) {
 }
 
 void combat_enter_chat() {
-	bool canceled = false;
-	string msg = input_box_form("Combat Chat", "Type a message to send:", "", canceled);
-	if (canceled or msg == "") {
-		combat_focus = 0;
-		speak("Game mode.", true);
+	string msg = input_box("Combat Chat", "Type a message and press Enter to send, or Escape to cancel.");
+	if (msg == "") {
+		speak("Canceled.", false);
 		return;
 	}
 	send({{"type", message_types::chat_message}, {"message", msg}});
-	combat_focus = 0;
-	speak("Message sent. Game mode.", true);
+	speak("Message sent.", false);
 }
 
 void combat_browse_history() {
 	if (combat_history.length() == 0) {
 		speak("No combat history.", true);
-		combat_focus = 0;
-		speak("Game mode.", true);
 		return;
 	}
 	menu@ m = setup_sub_menu("Combat History. " + combat_history.length() + " messages. Select a message for options.");
@@ -1733,7 +1728,6 @@ void combat_browse_history() {
 			speak(selected_msg, true);
 		}
 	}
-	combat_focus = 0;
 }
 
 string extract_username_from_combat_history(string msg) {
@@ -1844,8 +1838,18 @@ void combat_game_loop() {
 		if (key_pressed(KEY_TAB)) {
 			if ((keyboard_modifiers & KEYMOD_SHIFT) != 0) combat_switch_focus(-1);
 			else combat_switch_focus(1);
-			if (combat_focus == 1) combat_enter_chat();
-			else if (combat_focus == 2) combat_browse_history();
+			if (combat_focus == 1) speak("Press Enter to type a message, or Tab to continue.", false);
+			else if (combat_focus == 2) speak("Press Enter to browse history, or Tab to continue.", false);
+			continue;
+		}
+
+		// Handle Enter in Chat/History modes
+		if (combat_focus == 1 and key_pressed(KEY_RETURN)) {
+			combat_enter_chat();
+			continue;
+		}
+		if (combat_focus == 2 and key_pressed(KEY_RETURN)) {
+			combat_browse_history();
 			continue;
 		}
 
@@ -1858,9 +1862,7 @@ void combat_game_loop() {
 		else if (key_pressed(KEY_L)) scan_direction("east");
 		else if (key_pressed(KEY_CAPSLOCK)) cycle_scan((keyboard_modifiers & KEYMOD_SHIFT) != 0 ? -1 : 1);
 
-		// Target cycling with bracket keys, Enter to lock
-		else if (key_pressed(KEY_LEFTBRACKET)) cycle_scan(-1);
-		else if (key_pressed(KEY_RIGHTBRACKET)) cycle_scan(1);
+		// Enter to lock target
 		else if (key_pressed(KEY_RETURN) and scan_results.length() > 0) lock_target();
 
 		// Movement (WASD) - only on your turn
@@ -1900,23 +1902,17 @@ void combat_game_loop() {
 		else if (key_pressed(KEY_O)) speak_initiative_order();
 		else if (key_pressed(KEY_T)) speak_current_turn_status();
 		else if (key_pressed(KEY_ESCAPE)) {
-			speak("Press escape again to forfeit, or any other key to continue.", true);
-			bool confirmed = false;
-			timer esc_timer;
-			while (esc_timer.elapsed < 3000) {
-				wait(10);
-				if (key_pressed(KEY_ESCAPE)) {
-					confirmed = true;
-					break;
-				}
-				if (key_pressed(KEY_RETURN) or key_pressed(KEY_SPACE) or key_pressed(KEY_A) or key_pressed(KEY_W) or key_pressed(KEY_S) or key_pressed(KEY_D)) {
-					break;
-				}
-			}
-			if (confirmed) {
+			menu@ esc_menu = setup_sub_menu("Are you sure?");
+			int leave_opt = esc_menu.add_item("Leave Game. 1 of 3");
+			int close_opt = esc_menu.add_item("Close Client. 2 of 3");
+			int cancel_opt = esc_menu.add_item("Cancel. 3 of 3");
+			int esc_pick = esc_menu.run();
+			if (esc_pick == leave_opt) {
 				send({{"type", message_types::leave_game}});
-				speak("Forfeiting battle.", true);
+				speak("Leaving battle.", true);
 				battle_active = false;
+			} else if (esc_pick == close_opt) {
+				exit();
 			} else {
 				speak("Continuing.", false);
 			}

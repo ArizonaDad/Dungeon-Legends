@@ -141,18 +141,14 @@ class server
 			println("[NET] Peer " + event.peer_id + " disconnected.");
 			user@ u = users.get_user_by_peer(event.peer_id);
 			if (@u != null) {
-				// If player is in an active battle, mark as disconnected instead of removing.
-				// This preserves their room/battle state for reconnection.
+				// If player is in an active battle, remove from battle first to prevent crashes.
 				if (@u.room != null and u.room.started and @u.room.bm != null) {
-					println("[NET] " + u.username + " disconnected during battle - marking for reconnect.");
-					u.disconnected = true;
-					users.user_dictionary.delete("p/" + u.peer_id);
-					u.peer_id = 0;
-					u.room.bm.broadcast_announce(u.username + " disconnected.", false);
-				} else {
-					println("[NET] Cleaning up user: " + u.username);
-					try { users.remove_user(u); } catch { println("[NET] Exception during user cleanup."); }
+					println("[NET] " + u.username + " disconnected during battle - removing from battle.");
+					try { u.room.bm.remove_player_from_battle(u); } catch { println("[NET] Exception removing player from battle."); }
 				}
+				// Full cleanup: remove from room, dictionaries, etc.
+				println("[NET] Cleaning up user: " + u.username);
+				try { users.remove_user(u); } catch { println("[NET] Exception during user cleanup."); }
 			}
 		}
 	}

@@ -476,6 +476,7 @@ void run_tutorial() {
 void main_menu()
 {
 	load_saved_settings();
+	speak("Tip: Use Page Up and Page Down to adjust volume. Use Control plus Page Up and Control plus Page Down to adjust speech rate.", false);
 	music_start("menu");
 	if (is_new_account or !profile_has_character("adventure")) {
 		speak("Welcome to Dungeon Legends! Let's create your first character.", true);

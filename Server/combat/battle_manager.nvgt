@@ -132,10 +132,20 @@ class battle_manager {
 	void broadcast_to_battle(json_object@ msg) {
 		if (@msg == null) return;
 		for (uint i = 0; i < players.length(); i++) {
-			if (@players[i] != null) {
+			if (@players[i] != null and !players[i].disconnected and players[i].peer_id != 0) {
 				try { players[i].send(msg); } catch {}
 			}
 		}
+	}
+
+	// Remove a player from the battle cleanly. Handles turn advancement if needed.
+	void remove_player_from_battle(user@ u) {
+		if (@u == null) return;
+		int idx = players.find_by_ref(u);
+		if (idx < 0) return;
+		println("[BATTLE] Removing player " + u.username + " from battle (index " + idx + ")");
+		broadcast_announce(u.username + " has left the battle.", false);
+		players.remove_at(idx);
 	}
 
 	void broadcast_announce(string text, bool interrupt = false) {
@@ -2243,7 +2253,7 @@ class battle_manager {
 	// ---- Initiative Phase ----
 
 	void request_next_initiative() {
-		if (@combat == null) return;
+		if (@combat == null or !initiative_phase) return;
 
 		// Skip dead combatants.
 		while (initiative_index < combat.combatants.length() and !combat.combatants[initiative_index].is_alive()) {
@@ -3254,6 +3264,7 @@ class battle_manager {
 		}
 
 		if (pr.roll_type == ROLL_INITIATIVE) {
+			if (!initiative_phase) return; // Guard against stale/duplicate initiative rolls
 			c.initiative_roll = total;
 			// Don't broadcast individual rolls here - they chain too fast
 			// for TTS when monsters auto-roll. finish_initiative() announces

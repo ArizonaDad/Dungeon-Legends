@@ -1160,6 +1160,8 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.send({{"type", message_types::announce}, {"text", "Only the host can start the game."}, {"interrupt", true}});
 			return;
 		}
+		// Set started flag early to prevent concurrent start messages
+		u.room.started = true;
 		string room_game_type = normalize_game_type(u.room.game_type);
 		string required_profile = room_game_type;
 		string[] missing_players;
@@ -1173,6 +1175,7 @@ void handle_user_message(user@ u, json_object@ msg)
 			}
 		}
 		if (missing_players.length() > 0) {
+			u.room.started = false; // Reset if validation failed
 			string missing_text = "";
 			for (uint i = 0; i < missing_players.length(); i++) {
 				if (i > 0) missing_text += i == missing_players.length() - 1 ? " and " : ", ";
@@ -1181,7 +1184,6 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.send({{"type", message_types::announce}, {"text", "Cannot start the " + display_game_type(room_game_type) + " lobby yet. Missing characters: " + missing_text + "."}, {"interrupt", true}});
 			return;
 		}
-		u.room.started = true;
 		string mode = msg.exists("mode") ? string(msg["mode"]) : "pvp";
 		string scenario = msg.exists("scenario") ? string(msg["scenario"]) : "";
 		string difficulty = msg.exists("difficulty") ? string(msg["difficulty"]) : "normal";
@@ -2211,11 +2213,10 @@ void handle_user_message(user@ u, json_object@ msg)
 	}
 
 	// ---- EQUIP ITEM ----
-	else if (msg_type == message_types::equip_item and msg.exists("item_id") and msg.exists("slot")) {
+	else if (msg_type == message_types::equip_item and msg.exists("item_id")) {
 		if (@u.account == null) return;
 		init_item_catalog();
 		string item_id = string(msg["item_id"]);
-		string slot_name = string(msg["slot"]);
 
 		// Validate the item exists in catalog
 		item_def@ item = find_item(item_id);
@@ -2224,17 +2225,13 @@ void handle_user_message(user@ u, json_object@ msg)
 			return;
 		}
 
-		// Map item slot to the JSON key used in equipped object
+		// Derive slot from the item definition (no need for client to send it)
 		string[] slot_key_map = {"weapon", "armor", "ring", "amulet"};
 		if (item.slot < 0 or item.slot >= int(slot_key_map.length())) {
 			u.send({{"type", message_types::error}, {"text", "Invalid item slot."}});
 			return;
 		}
 		string expected_slot = slot_key_map[item.slot];
-		if (slot_name.lower() != expected_slot and slot_name != SLOT_NAMES[item.slot]) {
-			u.send({{"type", message_types::error}, {"text", "That item cannot be equipped in that slot."}});
-			return;
-		}
 
 		// Validate item exists in player's inventory
 		json_array@ inv = ensure_json_array_field(u.account.data, "adventure_inventory");
@@ -2243,18 +2240,26 @@ void handle_user_message(user@ u, json_object@ msg)
 			return;
 		}
 
-		// Equip the item on the character
+		// Get character and equipped data
 		json_object@ character = get_character_profile(u.account, GAME_TYPE_ADVENTURE);
 		if (@character == null) {
 			u.send({{"type", message_types::error}, {"text", "No adventure character found."}});
 			return;
 		}
 		json_object@ equipped = ensure_json_object_field(character, "equipped");
-		equipped[expected_slot] = item_id;
 
-		u.account.commit();
-		send_character_profile_to_user(u, GAME_TYPE_ADVENTURE);
-		u.send({{"type", message_types::announce}, {"text", "Equipped " + item.name + " in " + SLOT_NAMES[item.slot] + " slot."}, {"interrupt", false}});
+		// Toggle: if item is already equipped in this slot, unequip it
+		if (equipped.exists(expected_slot) and string(equipped[expected_slot]) == item_id) {
+			equipped[expected_slot] = "";
+			u.account.commit();
+			send_character_profile_to_user(u, GAME_TYPE_ADVENTURE);
+			u.send({{"type", message_types::announce}, {"text", "Unequipped " + item.name + " from " + SLOT_NAMES[item.slot] + " slot."}, {"interrupt", false}});
+		} else {
+			equipped[expected_slot] = item_id;
+			u.account.commit();
+			send_character_profile_to_user(u, GAME_TYPE_ADVENTURE);
+			u.send({{"type", message_types::announce}, {"text", "Equipped " + item.name + " in " + SLOT_NAMES[item.slot] + " slot."}, {"interrupt", false}});
+		}
 	}
 
 	// ---- DISCARD ITEM ----

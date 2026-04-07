@@ -149,7 +149,7 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 - **Endless Survival**: Fight infinite escalating waves until the party falls. Waves 1-3: CR 0-1 (rats/kobolds/goblins), 4-6: CR 1-3 (skeletons/wolves/ogres), 7-9: CR 3-5 (owlbear/basilisk/troll), 10-12: CR 5-8 (wight/fire_elemental/frost_giant), 13-15: CR 8-12 (aboleth/remorhaz/archmage), 16+: CR 13+ bosses (pit_fiend/lich/dragon) with HP scaling. Players heal 25% between waves and earn wave_number*15 XP per wave. Best wave tracked per player. Glory earned = 5 + waves_cleared * 3.
 
 ### Targeting & Scanning
-- IJKL to scan directions, Caps Lock or brackets to cycle results
+- IJKL to scan directions, Caps Lock to cycle results
 - Scan results show distance, direction, health status, and conditions
 - Target lock (Enter) shows HP, AC, distance, direction, and conditions
 
@@ -235,7 +235,7 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 - **WASD**: Movement (5ft per tile)
 - **IJKL**: Scan directions (north/south/west/east)
 - **Caps Lock/Shift+Caps Lock**: Cycle targets from scan results
-- **[/]**: Alternative target cycling
+- **Escape**: Opens menu to Leave Game, Close Client, or Cancel
 - **Enter**: Lock target
 - **H**: Enhanced status readout (HP, AC, equipped items, active buffs with rounds remaining, consumables, kill count, modifier, spell slots, position with nearest enemy/ally)
 - **O**: Initiative order (reads top to bottom)
@@ -248,7 +248,7 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 - **Ctrl+Page Down**: TTS speed down
 - **F1**: Combat help
 - **F2**: Quick keybind reference (spoken summary of all controls)
-- **Escape x 2**: Forfeit
+- **Escape**: Menu (Leave Game / Close Client / Cancel)
 - **Alt+F4**: Close the client immediately (works in all menus and combat)
 
 ## Sound System

@@ -73,7 +73,11 @@ class room
 	}
 	void on_player_leave(user@ u)
 	{
-		// Reserved for future hooks.
+		// Clean up battle state when a player leaves.
+		if (@u == null) return;
+		if (started and @bm != null) {
+			try { bm.remove_player_from_battle(u); } catch { println("[ROOM] Exception removing player from battle on leave."); }
+		}
 	}
 	// Speak to all players in the room.
 	void speak(string text, bool interrupt = true)

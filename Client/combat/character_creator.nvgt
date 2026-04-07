@@ -753,7 +753,7 @@ void choose_background_step() {
             if (k > 0) ability_display += ", ";
             ability_display += ability_name_from_key(ability_keys[k]);
         }
-        string label = bg.name + ". Ability bonuses: " + ability_display + ". Feat: " + get_feat_brief(bg.feat_id) + ".";
+        string label = bg.name + ". Ability bonuses: " + ability_display + ". Feat: " + get_feat_brief(bg.feat_id) + ". " + (i + 1) + " of " + BACKGROUND_CHOICES.length();
         background_menu.add_item(label);
         background_ids.insert_last(bg.id);
     }
@@ -1119,7 +1119,7 @@ void choose_subclass_step() {
     if (subclass_names.length() == 0) return;
 
     menu@ subclass_menu = setup_sub_menu("Choose your subclass.");
-    for (uint i = 0; i < subclass_descriptions.length(); i++) subclass_menu.add_item(subclass_descriptions[i]);
+    for (uint i = 0; i < subclass_descriptions.length(); i++) subclass_menu.add_item(subclass_descriptions[i] + " " + (i + 1) + " of " + subclass_descriptions.length());
     int pick = creation_menu_run(subclass_menu);
     if (pick < 0 or pick >= int(subclass_names.length())) return;
     created_char_subclass = subclass_names[pick];
@@ -1145,7 +1145,7 @@ int choose_subclass_step_profile() {
     if (subclass_names.length() == 0) return 0;
 
     menu@ subclass_menu = setup_sub_menu("Choose your subclass.");
-    for (uint i = 0; i < subclass_descriptions.length(); i++) subclass_menu.add_item(subclass_descriptions[i]);
+    for (uint i = 0; i < subclass_descriptions.length(); i++) subclass_menu.add_item(subclass_descriptions[i] + " " + (i + 1) + " of " + subclass_descriptions.length());
     int pick = subclass_menu.run();
     if (pick < 0) return -1;
     created_char_subclass = subclass_names[pick];
@@ -1171,10 +1171,10 @@ const int STEP_SUMMARY = 8;
 
 int run_weapon_step() {
     menu@ weapon_cat_menu = setup_sub_menu("Choose a weapon category.");
-    weapon_cat_menu.add_item("Simple Melee Weapons.");
-    weapon_cat_menu.add_item("Simple Ranged Weapons.");
-    weapon_cat_menu.add_item("Martial Melee Weapons.");
-    weapon_cat_menu.add_item("Martial Ranged Weapons.");
+    weapon_cat_menu.add_item("Simple Melee Weapons. 1 of 4");
+    weapon_cat_menu.add_item("Simple Ranged Weapons. 2 of 4");
+    weapon_cat_menu.add_item("Martial Melee Weapons. 3 of 4");
+    weapon_cat_menu.add_item("Martial Ranged Weapons. 4 of 4");
     int cat_pick = weapon_cat_menu.run();
     if (cat_pick < 0) return -1;
 
@@ -1184,53 +1184,53 @@ int run_weapon_step() {
     if (cat_pick == 0) {
         @weapon_menu = setup_sub_menu("Choose a simple melee weapon.");
         weapon_names = {"Club", "Dagger", "Greatclub", "Handaxe", "Javelin", "Light Hammer", "Mace", "Quarterstaff", "Sickle", "Spear"};
-        weapon_menu.add_item("Club. 1 d 4 bludgeoning. Light. Slow mastery.");
-        weapon_menu.add_item("Dagger. 1 d 4 piercing. Finesse. Light. Thrown 20 / 60. Nick mastery.");
-        weapon_menu.add_item("Greatclub. 1 d 8 bludgeoning. Two-handed. Push mastery.");
-        weapon_menu.add_item("Handaxe. 1 d 6 slashing. Light. Thrown 20 / 60. Vex mastery.");
-        weapon_menu.add_item("Javelin. 1 d 6 piercing. Thrown 30 / 120. Slow mastery.");
-        weapon_menu.add_item("Light Hammer. 1 d 4 bludgeoning. Light. Thrown 20 / 60. Nick mastery.");
-        weapon_menu.add_item("Mace. 1 d 6 bludgeoning. Sap mastery.");
-        weapon_menu.add_item("Quarterstaff. 1 d 6 bludgeoning. Versatile 1 d 8. Topple mastery.");
-        weapon_menu.add_item("Sickle. 1 d 4 slashing. Light. Nick mastery.");
-        weapon_menu.add_item("Spear. 1 d 6 piercing. Versatile 1 d 8. Thrown 20 / 60. Sap mastery.");
+        weapon_menu.add_item("Club. 1 d 4 bludgeoning. Light. Slow mastery. 1 of 10");
+        weapon_menu.add_item("Dagger. 1 d 4 piercing. Finesse. Light. Thrown 20 / 60. Nick mastery. 2 of 10");
+        weapon_menu.add_item("Greatclub. 1 d 8 bludgeoning. Two-handed. Push mastery. 3 of 10");
+        weapon_menu.add_item("Handaxe. 1 d 6 slashing. Light. Thrown 20 / 60. Vex mastery. 4 of 10");
+        weapon_menu.add_item("Javelin. 1 d 6 piercing. Thrown 30 / 120. Slow mastery. 5 of 10");
+        weapon_menu.add_item("Light Hammer. 1 d 4 bludgeoning. Light. Thrown 20 / 60. Nick mastery. 6 of 10");
+        weapon_menu.add_item("Mace. 1 d 6 bludgeoning. Sap mastery. 7 of 10");
+        weapon_menu.add_item("Quarterstaff. 1 d 6 bludgeoning. Versatile 1 d 8. Topple mastery. 8 of 10");
+        weapon_menu.add_item("Sickle. 1 d 4 slashing. Light. Nick mastery. 9 of 10");
+        weapon_menu.add_item("Spear. 1 d 6 piercing. Versatile 1 d 8. Thrown 20 / 60. Sap mastery. 10 of 10");
     } else if (cat_pick == 1) {
         @weapon_menu = setup_sub_menu("Choose a simple ranged weapon.");
         weapon_names = {"Dart", "Light Crossbow", "Shortbow", "Sling"};
-        weapon_menu.add_item("Dart. 1 d 4 piercing. Finesse. Thrown 20 / 60. Vex mastery.");
-        weapon_menu.add_item("Light Crossbow. 1 d 8 piercing. Range 80 / 320. Loading. Two-handed. Slow mastery.");
-        weapon_menu.add_item("Shortbow. 1 d 6 piercing. Range 80 / 320. Two-handed. Vex mastery.");
-        weapon_menu.add_item("Sling. 1 d 4 bludgeoning. Range 30 / 120. Slow mastery.");
+        weapon_menu.add_item("Dart. 1 d 4 piercing. Finesse. Thrown 20 / 60. Vex mastery. 1 of 4");
+        weapon_menu.add_item("Light Crossbow. 1 d 8 piercing. Range 80 / 320. Loading. Two-handed. Slow mastery. 2 of 4");
+        weapon_menu.add_item("Shortbow. 1 d 6 piercing. Range 80 / 320. Two-handed. Vex mastery. 3 of 4");
+        weapon_menu.add_item("Sling. 1 d 4 bludgeoning. Range 30 / 120. Slow mastery. 4 of 4");
     } else if (cat_pick == 2) {
         @weapon_menu = setup_sub_menu("Choose a martial melee weapon.");
         weapon_names = {"Battleaxe", "Flail", "Glaive", "Greataxe", "Greatsword", "Halberd", "Lance", "Longsword", "Maul", "Morningstar", "Pike", "Rapier", "Scimitar", "Shortsword", "Trident", "War Pick", "Warhammer", "Whip"};
-        weapon_menu.add_item("Battleaxe. 1 d 8 slashing. Versatile 1 d 10. Topple mastery.");
-        weapon_menu.add_item("Flail. 1 d 8 bludgeoning. Sap mastery.");
-        weapon_menu.add_item("Glaive. 1 d 10 slashing. Heavy. Reach. Two-handed. Graze mastery.");
-        weapon_menu.add_item("Greataxe. 1 d 12 slashing. Heavy. Two-handed. Cleave mastery.");
-        weapon_menu.add_item("Greatsword. 2 d 6 slashing. Heavy. Two-handed. Graze mastery.");
-        weapon_menu.add_item("Halberd. 1 d 10 slashing. Heavy. Reach. Two-handed. Cleave mastery.");
-        weapon_menu.add_item("Lance. 1 d 10 piercing. Reach. Topple mastery.");
-        weapon_menu.add_item("Longsword. 1 d 8 slashing. Versatile 1 d 10. Sap mastery.");
-        weapon_menu.add_item("Maul. 2 d 6 bludgeoning. Heavy. Two-handed. Topple mastery.");
-        weapon_menu.add_item("Morningstar. 1 d 8 piercing. Sap mastery.");
-        weapon_menu.add_item("Pike. 1 d 10 piercing. Heavy. Reach. Two-handed. Push mastery.");
-        weapon_menu.add_item("Rapier. 1 d 8 piercing. Finesse. Vex mastery.");
-        weapon_menu.add_item("Scimitar. 1 d 6 slashing. Finesse. Light. Nick mastery.");
-        weapon_menu.add_item("Shortsword. 1 d 6 piercing. Finesse. Light. Vex mastery.");
-        weapon_menu.add_item("Trident. 1 d 8 piercing. Versatile 1 d 10. Thrown 20 / 60. Topple mastery.");
-        weapon_menu.add_item("War Pick. 1 d 8 piercing. Versatile 1 d 10. Sap mastery.");
-        weapon_menu.add_item("Warhammer. 1 d 8 bludgeoning. Versatile 1 d 10. Push mastery.");
-        weapon_menu.add_item("Whip. 1 d 4 slashing. Finesse. Reach. Slow mastery.");
+        weapon_menu.add_item("Battleaxe. 1 d 8 slashing. Versatile 1 d 10. Topple mastery. 1 of 18");
+        weapon_menu.add_item("Flail. 1 d 8 bludgeoning. Sap mastery. 2 of 18");
+        weapon_menu.add_item("Glaive. 1 d 10 slashing. Heavy. Reach. Two-handed. Graze mastery. 3 of 18");
+        weapon_menu.add_item("Greataxe. 1 d 12 slashing. Heavy. Two-handed. Cleave mastery. 4 of 18");
+        weapon_menu.add_item("Greatsword. 2 d 6 slashing. Heavy. Two-handed. Graze mastery. 5 of 18");
+        weapon_menu.add_item("Halberd. 1 d 10 slashing. Heavy. Reach. Two-handed. Cleave mastery. 6 of 18");
+        weapon_menu.add_item("Lance. 1 d 10 piercing. Reach. Topple mastery. 7 of 18");
+        weapon_menu.add_item("Longsword. 1 d 8 slashing. Versatile 1 d 10. Sap mastery. 8 of 18");
+        weapon_menu.add_item("Maul. 2 d 6 bludgeoning. Heavy. Two-handed. Topple mastery. 9 of 18");
+        weapon_menu.add_item("Morningstar. 1 d 8 piercing. Sap mastery. 10 of 18");
+        weapon_menu.add_item("Pike. 1 d 10 piercing. Heavy. Reach. Two-handed. Push mastery. 11 of 18");
+        weapon_menu.add_item("Rapier. 1 d 8 piercing. Finesse. Vex mastery. 12 of 18");
+        weapon_menu.add_item("Scimitar. 1 d 6 slashing. Finesse. Light. Nick mastery. 13 of 18");
+        weapon_menu.add_item("Shortsword. 1 d 6 piercing. Finesse. Light. Vex mastery. 14 of 18");
+        weapon_menu.add_item("Trident. 1 d 8 piercing. Versatile 1 d 10. Thrown 20 / 60. Topple mastery. 15 of 18");
+        weapon_menu.add_item("War Pick. 1 d 8 piercing. Versatile 1 d 10. Sap mastery. 16 of 18");
+        weapon_menu.add_item("Warhammer. 1 d 8 bludgeoning. Versatile 1 d 10. Push mastery. 17 of 18");
+        weapon_menu.add_item("Whip. 1 d 4 slashing. Finesse. Reach. Slow mastery. 18 of 18");
     } else {
         @weapon_menu = setup_sub_menu("Choose a martial ranged weapon.");
         weapon_names = {"Blowgun", "Hand Crossbow", "Heavy Crossbow", "Longbow", "Musket", "Pistol"};
-        weapon_menu.add_item("Blowgun. 1 piercing. Range 25 / 100. Loading. Vex mastery.");
-        weapon_menu.add_item("Hand Crossbow. 1 d 6 piercing. Range 30 / 120. Light. Loading. Vex mastery.");
-        weapon_menu.add_item("Heavy Crossbow. 1 d 10 piercing. Range 100 / 400. Heavy. Loading. Two-handed. Push mastery.");
-        weapon_menu.add_item("Longbow. 1 d 8 piercing. Range 150 / 600. Heavy. Two-handed. Slow mastery.");
-        weapon_menu.add_item("Musket. 1 d 12 piercing. Range 40 / 120. Loading. Two-handed. Slow mastery.");
-        weapon_menu.add_item("Pistol. 1 d 10 piercing. Range 30 / 90. Loading. Vex mastery.");
+        weapon_menu.add_item("Blowgun. 1 piercing. Range 25 / 100. Loading. Vex mastery. 1 of 6");
+        weapon_menu.add_item("Hand Crossbow. 1 d 6 piercing. Range 30 / 120. Light. Loading. Vex mastery. 2 of 6");
+        weapon_menu.add_item("Heavy Crossbow. 1 d 10 piercing. Range 100 / 400. Heavy. Loading. Two-handed. Push mastery. 3 of 6");
+        weapon_menu.add_item("Longbow. 1 d 8 piercing. Range 150 / 600. Heavy. Two-handed. Slow mastery. 4 of 6");
+        weapon_menu.add_item("Musket. 1 d 12 piercing. Range 40 / 120. Loading. Two-handed. Slow mastery. 5 of 6");
+        weapon_menu.add_item("Pistol. 1 d 10 piercing. Range 30 / 90. Loading. Vex mastery. 6 of 6");
     }
 
     int weapon_pick = weapon_menu.run();
@@ -1287,7 +1287,7 @@ bool choose_race_step() {
         "Tortle. Turtle folk. Natural AC 17. Shell defense.",
         "Warforged. Living constructs. Plus 1 AC. Disease immunity."
     };
-    for (uint i = 0; i < races.length(); i++) race_menu.add_item(race_desc[i]);
+    for (uint i = 0; i < races.length(); i++) race_menu.add_item(race_desc[i] + " " + (i + 1) + " of " + races.length());
     int race_pick = creation_menu_run(race_menu);
     if (race_pick < 0 or race_pick >= int(races.length())) return false;
     created_char_race = races[race_pick];
@@ -1313,7 +1313,7 @@ bool choose_class_step() {
         "Wizard. D 6 hit die. Intelligence caster. Largest spell list. Arcane mastery.",
         "Artificer. D 8 hit die. Intelligence caster. Magical inventor with infusions."
     };
-    for (uint i = 0; i < classes.length(); i++) class_menu.add_item(class_desc[i]);
+    for (uint i = 0; i < classes.length(); i++) class_menu.add_item(class_desc[i] + " " + (i + 1) + " of " + classes.length());
     int class_pick = creation_menu_run(class_menu);
     if (class_pick < 0 or class_pick >= int(classes.length())) return false;
     created_char_class = classes[class_pick];
@@ -1328,7 +1328,7 @@ bool choose_level_step(string profile = "sandbox", int forced_level = -1) {
         return true;
     }
     menu@ level_menu = setup_sub_menu("Choose your level. 1 through 20.");
-    for (int lv = 1; lv <= 20; lv++) level_menu.add_item("Level " + lv);
+    for (int lv = 1; lv <= 20; lv++) level_menu.add_item("Level " + lv + ". " + lv + " of 20");
     int level_pick = creation_menu_run(level_menu);
     if (level_pick < 0 or level_pick >= 20) return false;
     created_char_level = level_pick + 1;
@@ -1368,11 +1368,14 @@ bool assign_ability_scores_step() {
         menu@ score_menu = setup_sub_menu("Assign a score to " + ability_name + ".");
         int[] remaining_scores;
         int[] remaining_indices;
+        // Count remaining scores first for numbering
+        uint total_remaining = 0;
+        for (uint sc = 0; sc < 6; sc++) { if (!used[sc]) total_remaining++; }
         for (uint s = 0; s < 6; s++) {
             if (used[s]) continue;
             if (available != "") available += ", ";
             available += standard[s];
-            score_menu.add_item("" + standard[s]);
+            score_menu.add_item("" + standard[s] + ". " + (remaining_scores.length() + 1) + " of " + total_remaining);
             remaining_scores.insert_last(standard[s]);
             remaining_indices.insert_last(s);
         }
@@ -1413,10 +1416,10 @@ bool assign_ability_scores_step() {
 bool choose_weapon_step() {
     while (true) {
     menu@ weapon_cat_menu = setup_sub_menu("Choose your weapon. This is what you'll use to attack in combat.");
-    weapon_cat_menu.add_item("Simple Melee Weapons.");
-    weapon_cat_menu.add_item("Simple Ranged Weapons.");
-    weapon_cat_menu.add_item("Martial Melee Weapons.");
-    weapon_cat_menu.add_item("Martial Ranged Weapons.");
+    weapon_cat_menu.add_item("Simple Melee Weapons. 1 of 4");
+    weapon_cat_menu.add_item("Simple Ranged Weapons. 2 of 4");
+    weapon_cat_menu.add_item("Martial Melee Weapons. 3 of 4");
+    weapon_cat_menu.add_item("Martial Ranged Weapons. 4 of 4");
     int cat_pick = creation_menu_run(weapon_cat_menu);
     if (cat_pick < 0 or cat_pick > 3) return false;
 
@@ -1425,54 +1428,54 @@ bool choose_weapon_step() {
     if (cat_pick == 0) {
         @weapon_menu = setup_sub_menu("Choose a simple melee weapon.");
         weapon_names = {"Unarmed", "Club", "Dagger", "Greatclub", "Handaxe", "Javelin", "Light Hammer", "Mace", "Quarterstaff", "Sickle", "Spear"};
-        weapon_menu.add_item("Unarmed. 1 bludgeoning by default. Range 5 feet.");
-        weapon_menu.add_item("Club. 1 d 4 bludgeoning. Range 5 feet. Light. Slow mastery.");
-        weapon_menu.add_item("Dagger. 1 d 4 piercing. Range 5 feet, thrown 20 / 60. Finesse. Light. Nick mastery.");
-        weapon_menu.add_item("Greatclub. 1 d 8 bludgeoning. Range 5 feet. Two-handed. Push mastery.");
-        weapon_menu.add_item("Handaxe. 1 d 6 slashing. Range 5 feet, thrown 20 / 60. Light. Vex mastery.");
-        weapon_menu.add_item("Javelin. 1 d 6 piercing. Range 5 feet, thrown 30 / 120. Slow mastery.");
-        weapon_menu.add_item("Light Hammer. 1 d 4 bludgeoning. Range 5 feet, thrown 20 / 60. Light. Nick mastery.");
-        weapon_menu.add_item("Mace. 1 d 6 bludgeoning. Range 5 feet. Sap mastery.");
-        weapon_menu.add_item("Quarterstaff. 1 d 6 bludgeoning. Range 5 feet. Versatile 1 d 8. Topple mastery.");
-        weapon_menu.add_item("Sickle. 1 d 4 slashing. Range 5 feet. Light. Nick mastery.");
-        weapon_menu.add_item("Spear. 1 d 6 piercing. Range 5 feet, thrown 20 / 60. Versatile 1 d 8. Sap mastery.");
+        weapon_menu.add_item("Unarmed. 1 bludgeoning by default. Range 5 feet. 1 of 11");
+        weapon_menu.add_item("Club. 1 d 4 bludgeoning. Range 5 feet. Light. Slow mastery. 2 of 11");
+        weapon_menu.add_item("Dagger. 1 d 4 piercing. Range 5 feet, thrown 20 / 60. Finesse. Light. Nick mastery. 3 of 11");
+        weapon_menu.add_item("Greatclub. 1 d 8 bludgeoning. Range 5 feet. Two-handed. Push mastery. 4 of 11");
+        weapon_menu.add_item("Handaxe. 1 d 6 slashing. Range 5 feet, thrown 20 / 60. Light. Vex mastery. 5 of 11");
+        weapon_menu.add_item("Javelin. 1 d 6 piercing. Range 5 feet, thrown 30 / 120. Slow mastery. 6 of 11");
+        weapon_menu.add_item("Light Hammer. 1 d 4 bludgeoning. Range 5 feet, thrown 20 / 60. Light. Nick mastery. 7 of 11");
+        weapon_menu.add_item("Mace. 1 d 6 bludgeoning. Range 5 feet. Sap mastery. 8 of 11");
+        weapon_menu.add_item("Quarterstaff. 1 d 6 bludgeoning. Range 5 feet. Versatile 1 d 8. Topple mastery. 9 of 11");
+        weapon_menu.add_item("Sickle. 1 d 4 slashing. Range 5 feet. Light. Nick mastery. 10 of 11");
+        weapon_menu.add_item("Spear. 1 d 6 piercing. Range 5 feet, thrown 20 / 60. Versatile 1 d 8. Sap mastery. 11 of 11");
     } else if (cat_pick == 1) {
         @weapon_menu = setup_sub_menu("Choose a simple ranged weapon.");
         weapon_names = {"Dart", "Light Crossbow", "Shortbow", "Sling"};
-        weapon_menu.add_item("Dart. 1 d 4 piercing. Range 20 / 60. Finesse. Vex mastery.");
-        weapon_menu.add_item("Light Crossbow. 1 d 8 piercing. Range 80 / 320. Loading. Two-handed. Slow mastery.");
-        weapon_menu.add_item("Shortbow. 1 d 6 piercing. Range 80 / 320. Two-handed. Vex mastery.");
-        weapon_menu.add_item("Sling. 1 d 4 bludgeoning. Range 30 / 120. Slow mastery.");
+        weapon_menu.add_item("Dart. 1 d 4 piercing. Range 20 / 60. Finesse. Vex mastery. 1 of 4");
+        weapon_menu.add_item("Light Crossbow. 1 d 8 piercing. Range 80 / 320. Loading. Two-handed. Slow mastery. 2 of 4");
+        weapon_menu.add_item("Shortbow. 1 d 6 piercing. Range 80 / 320. Two-handed. Vex mastery. 3 of 4");
+        weapon_menu.add_item("Sling. 1 d 4 bludgeoning. Range 30 / 120. Slow mastery. 4 of 4");
     } else if (cat_pick == 2) {
         @weapon_menu = setup_sub_menu("Choose a martial melee weapon.");
         weapon_names = {"Battleaxe", "Flail", "Glaive", "Greataxe", "Greatsword", "Halberd", "Lance", "Longsword", "Maul", "Morningstar", "Pike", "Rapier", "Scimitar", "Shortsword", "Trident", "War Pick", "Warhammer", "Whip"};
-        weapon_menu.add_item("Battleaxe. 1 d 8 slashing. Range 5 feet. Versatile 1 d 10. Topple mastery.");
-        weapon_menu.add_item("Flail. 1 d 8 bludgeoning. Range 5 feet. Sap mastery.");
-        weapon_menu.add_item("Glaive. 1 d 10 slashing. Range 10 feet. Heavy. Reach. Two-handed. Graze mastery.");
-        weapon_menu.add_item("Greataxe. 1 d 12 slashing. Range 5 feet. Heavy. Two-handed. Cleave mastery.");
-        weapon_menu.add_item("Greatsword. 2 d 6 slashing. Range 5 feet. Heavy. Two-handed. Graze mastery.");
-        weapon_menu.add_item("Halberd. 1 d 10 slashing. Range 10 feet. Heavy. Reach. Two-handed. Cleave mastery.");
-        weapon_menu.add_item("Lance. 1 d 10 piercing. Range 10 feet. Reach. Topple mastery.");
-        weapon_menu.add_item("Longsword. 1 d 8 slashing. Range 5 feet. Versatile 1 d 10. Sap mastery.");
-        weapon_menu.add_item("Maul. 2 d 6 bludgeoning. Range 5 feet. Heavy. Two-handed. Topple mastery.");
-        weapon_menu.add_item("Morningstar. 1 d 8 piercing. Range 5 feet. Sap mastery.");
-        weapon_menu.add_item("Pike. 1 d 10 piercing. Range 10 feet. Heavy. Reach. Two-handed. Push mastery.");
-        weapon_menu.add_item("Rapier. 1 d 8 piercing. Range 5 feet. Finesse. Vex mastery.");
-        weapon_menu.add_item("Scimitar. 1 d 6 slashing. Range 5 feet. Finesse. Light. Nick mastery.");
-        weapon_menu.add_item("Shortsword. 1 d 6 piercing. Range 5 feet. Finesse. Light. Vex mastery.");
-        weapon_menu.add_item("Trident. 1 d 8 piercing. Range 5 feet, thrown 20 / 60. Versatile 1 d 10. Topple mastery.");
-        weapon_menu.add_item("War Pick. 1 d 8 piercing. Range 5 feet. Versatile 1 d 10. Sap mastery.");
-        weapon_menu.add_item("Warhammer. 1 d 8 bludgeoning. Range 5 feet. Versatile 1 d 10. Push mastery.");
-        weapon_menu.add_item("Whip. 1 d 4 slashing. Range 10 feet. Finesse. Reach. Slow mastery.");
+        weapon_menu.add_item("Battleaxe. 1 d 8 slashing. Range 5 feet. Versatile 1 d 10. Topple mastery. 1 of 18");
+        weapon_menu.add_item("Flail. 1 d 8 bludgeoning. Range 5 feet. Sap mastery. 2 of 18");
+        weapon_menu.add_item("Glaive. 1 d 10 slashing. Range 10 feet. Heavy. Reach. Two-handed. Graze mastery. 3 of 18");
+        weapon_menu.add_item("Greataxe. 1 d 12 slashing. Range 5 feet. Heavy. Two-handed. Cleave mastery. 4 of 18");
+        weapon_menu.add_item("Greatsword. 2 d 6 slashing. Range 5 feet. Heavy. Two-handed. Graze mastery. 5 of 18");
+        weapon_menu.add_item("Halberd. 1 d 10 slashing. Range 10 feet. Heavy. Reach. Two-handed. Cleave mastery. 6 of 18");
+        weapon_menu.add_item("Lance. 1 d 10 piercing. Range 10 feet. Reach. Topple mastery. 7 of 18");
+        weapon_menu.add_item("Longsword. 1 d 8 slashing. Range 5 feet. Versatile 1 d 10. Sap mastery. 8 of 18");
+        weapon_menu.add_item("Maul. 2 d 6 bludgeoning. Range 5 feet. Heavy. Two-handed. Topple mastery. 9 of 18");
+        weapon_menu.add_item("Morningstar. 1 d 8 piercing. Range 5 feet. Sap mastery. 10 of 18");
+        weapon_menu.add_item("Pike. 1 d 10 piercing. Range 10 feet. Heavy. Reach. Two-handed. Push mastery. 11 of 18");
+        weapon_menu.add_item("Rapier. 1 d 8 piercing. Range 5 feet. Finesse. Vex mastery. 12 of 18");
+        weapon_menu.add_item("Scimitar. 1 d 6 slashing. Range 5 feet. Finesse. Light. Nick mastery. 13 of 18");
+        weapon_menu.add_item("Shortsword. 1 d 6 piercing. Range 5 feet. Finesse. Light. Vex mastery. 14 of 18");
+        weapon_menu.add_item("Trident. 1 d 8 piercing. Range 5 feet, thrown 20 / 60. Versatile 1 d 10. Topple mastery. 15 of 18");
+        weapon_menu.add_item("War Pick. 1 d 8 piercing. Range 5 feet. Versatile 1 d 10. Sap mastery. 16 of 18");
+        weapon_menu.add_item("Warhammer. 1 d 8 bludgeoning. Range 5 feet. Versatile 1 d 10. Push mastery. 17 of 18");
+        weapon_menu.add_item("Whip. 1 d 4 slashing. Range 10 feet. Finesse. Reach. Slow mastery. 18 of 18");
     } else {
         @weapon_menu = setup_sub_menu("Choose a martial ranged weapon.");
         weapon_names = {"Blowgun", "Hand Crossbow", "Heavy Crossbow", "Longbow", "Musket", "Pistol"};
-        weapon_menu.add_item("Blowgun. 1 piercing. Range 25 / 100. Loading. Vex mastery.");
-        weapon_menu.add_item("Hand Crossbow. 1 d 6 piercing. Range 30 / 120. Light. Loading. Vex mastery.");
-        weapon_menu.add_item("Heavy Crossbow. 1 d 10 piercing. Range 100 / 400. Heavy. Loading. Two-handed. Push mastery.");
-        weapon_menu.add_item("Longbow. 1 d 8 piercing. Range 150 / 600. Heavy. Two-handed. Slow mastery.");
-        weapon_menu.add_item("Musket. 1 d 12 piercing. Range 40 / 120. Loading. Two-handed. Slow mastery.");
-        weapon_menu.add_item("Pistol. 1 d 10 piercing. Range 30 / 90. Loading. Vex mastery.");
+        weapon_menu.add_item("Blowgun. 1 piercing. Range 25 / 100. Loading. Vex mastery. 1 of 6");
+        weapon_menu.add_item("Hand Crossbow. 1 d 6 piercing. Range 30 / 120. Light. Loading. Vex mastery. 2 of 6");
+        weapon_menu.add_item("Heavy Crossbow. 1 d 10 piercing. Range 100 / 400. Heavy. Loading. Two-handed. Push mastery. 3 of 6");
+        weapon_menu.add_item("Longbow. 1 d 8 piercing. Range 150 / 600. Heavy. Two-handed. Slow mastery. 4 of 6");
+        weapon_menu.add_item("Musket. 1 d 12 piercing. Range 40 / 120. Loading. Two-handed. Slow mastery. 5 of 6");
+        weapon_menu.add_item("Pistol. 1 d 10 piercing. Range 30 / 90. Loading. Vex mastery. 6 of 6");
     }
 
     int weapon_pick = creation_menu_run(weapon_menu);
