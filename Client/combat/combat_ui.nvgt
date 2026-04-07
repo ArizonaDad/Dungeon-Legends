@@ -1784,6 +1784,18 @@ void combat_game_loop() {
 	while (battle_active) {
 		wait(10);
 		network_loop();
+
+		// Check Tab FIRST before form.monitor() consumes the key event.
+		if (key_pressed(KEY_TAB)) {
+			if ((keyboard_modifiers & KEYMOD_SHIFT) != 0) combat_switch_focus(-1);
+			else combat_switch_focus(1);
+			if (combat_focus == 1) speak("Press Enter to type a message, or Tab to continue.", false);
+			else if (combat_focus == 2) speak("Press Enter to browse history, or Tab to continue.", false);
+			// Ensure keyboard area has focus when returning to Game mode
+			if (combat_focus == 0 and @main_screen != null) main_screen.form.focus(f_main_keyboard_area);
+			continue;
+		}
+
 		if (@main_screen != null) {
 			// Only let the form process events during chat/history focus.
 			// During game focus, the form's monitor() consumes arrow keys
@@ -1834,14 +1846,6 @@ void combat_game_loop() {
 		}
 		// Process chat/history form only when focus is on chat or history.
 		if (@main_screen != null and combat_focus != 0) main_screen_loop();
-
-		if (key_pressed(KEY_TAB)) {
-			if ((keyboard_modifiers & KEYMOD_SHIFT) != 0) combat_switch_focus(-1);
-			else combat_switch_focus(1);
-			if (combat_focus == 1) speak("Press Enter to type a message, or Tab to continue.", false);
-			else if (combat_focus == 2) speak("Press Enter to browse history, or Tab to continue.", false);
-			continue;
-		}
 
 		// Handle Enter in Chat/History modes
 		if (combat_focus == 1 and key_pressed(KEY_RETURN)) {
