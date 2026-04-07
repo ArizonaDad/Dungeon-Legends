@@ -220,7 +220,7 @@ def save_deployed_manifest(manifest):
         json.dump(manifest, f, indent=2)
 
 
-def upload_to_server(manifest):
+def upload_to_server(manifest, skip_zip=False):
     """Upload files to the-gdn.net via SFTP. Uses hash comparison to skip unchanged files."""
     import paramiko
 
@@ -281,7 +281,9 @@ def upload_to_server(manifest):
     # Upload full zip for new player downloads only if any tracked file changed
     client_zip = os.path.join(CLIENT_DIR, "client.zip")
     remote_zip = f"{REMOTE_WEB_DIR}/DungeonLegends.zip"
-    if uploaded_count > 0:
+    if skip_zip:
+        print("DungeonLegends.zip: skipped (--skip-zip)")
+    elif uploaded_count > 0:
         size_mb = os.path.getsize(client_zip) / (1024 * 1024)
         print(f"Uploading DungeonLegends.zip ({size_mb:.0f} MB)...")
         sftp.put(client_zip, remote_zip)
@@ -323,6 +325,7 @@ def main():
     parser.add_argument("--skip-sounds", action="store_true", help="Skip sound packing")
     parser.add_argument("--skip-upload", action="store_true", help="Build only, no upload")
     parser.add_argument("--skip-compile", action="store_true", help="Skip compilation (manifest + upload only)")
+    parser.add_argument("--skip-zip", action="store_true", help="Skip re-uploading full DungeonLegends.zip (only upload changed individual files)")
     parser.add_argument(
         "--notes",
         type=str,
@@ -372,7 +375,7 @@ def main():
     if args.skip_upload:
         print("\nSkipping upload (--skip-upload)")
     else:
-        upload_to_server(manifest)
+        upload_to_server(manifest, skip_zip=args.skip_zip)
 
     # Summary
     print("\n" + "=" * 50)

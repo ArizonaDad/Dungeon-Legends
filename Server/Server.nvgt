@@ -12,7 +12,7 @@
 #include "combat/wave_system.nvgt"
 #include "combat/spell_data.nvgt"
 #include "../common/glory_shop_data.nvgt"
-const string REQUIRED_CLIENT_VERSION = "1.0.1";
+const string REQUIRED_CLIENT_VERSION = "1.0.2";
 
 network net;           // Low-level network object.
 server svr;            // Our server wrapper.
