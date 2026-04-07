@@ -230,7 +230,10 @@ class battle_manager {
 	void resume_current_turn_after_interrupt() {
 		if (@combat == null or !combat.battle_active or @current_roll != null) return;
 		combatant@ active = combat.current_combatant();
-		if (@active == null or active.is_dead) return;
+		if (@active == null or active.is_dead) {
+			advance_turn();
+			return;
+		}
 		if (!active.is_player) {
 			execute_monster_turn(active);
 			return;
@@ -5244,7 +5247,11 @@ class battle_manager {
 		if (@current_roll != null) return;
 
 		combatant@ c = combat.current_combatant();
-		if (@c == null or c.is_dead) return;
+		if (@c == null or c.is_dead) {
+			monster_turn_start_time = 0;
+			advance_turn();
+			return;
+		}
 		if (c.is_player) {
 			if (combatant_is_controlled_by_bot(c)) execute_player_bot_turn(c);
 			return;

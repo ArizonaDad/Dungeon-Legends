@@ -444,6 +444,35 @@ string get_class_saving_throw_profs(string class_name) {
 	return "None";
 }
 
+void run_tutorial() {
+	if (!profile_has_character("adventure") and !profile_has_character("sandbox")) {
+		speak("You need to create a character before playing the tutorial.", true);
+		return;
+	}
+	tutorial_mode = true;
+	tutorial_step = 0;
+	send({{"type", message_types::new_room}, {"name", "Tutorial"}, {"password", ""}, {"game_type", "sandbox"}});
+	wait(500);
+	network_loop();
+	send({{"type", message_types::start_game}, {"mode", "wave"}, {"scenario", "tutorial"}, {"difficulty", "normal"}});
+	timer tut_timer;
+	while (!start_game_pending and tut_timer.elapsed < 5000) {
+		wait(50);
+		network_loop();
+	}
+	if (start_game_pending) {
+		start_game_pending = false;
+		string profile = profile_has_character("adventure") ? "adventure" : "sandbox";
+		set_active_character_profile(profile);
+		music_stop();
+		combat_game_loop();
+	}
+	tutorial_mode = false;
+	send({{"type", message_types::leave_room}});
+	wait(200);
+	network_loop();
+}
+
 void main_menu()
 {
 	load_saved_settings();
@@ -457,31 +486,7 @@ void main_menu()
 		tut_menu.add_item("Yes, teach me how to play.");
 		tut_menu.add_item("No, I already know how to play.");
 		int tut_pick = tut_menu.run();
-		if (tut_pick == 0) {
-			tutorial_mode = true;
-			tutorial_step = 0;
-			// Create a tutorial room and start the game
-			send({{"type", message_types::new_room}, {"name", "Tutorial"}, {"password", ""}, {"game_type", "sandbox"}});
-			wait(500);
-			network_loop();
-			send({{"type", message_types::start_game}, {"mode", "wave"}, {"scenario", "tutorial"}, {"difficulty", "normal"}});
-			// Wait for game to start
-			timer tut_timer;
-			while (!start_game_pending and tut_timer.elapsed < 5000) {
-				wait(50);
-				network_loop();
-			}
-			if (start_game_pending) {
-				start_game_pending = false;
-				set_active_character_profile("adventure");
-				combat_game_loop();
-			}
-			tutorial_mode = false;
-			// Leave the tutorial room
-			send({{"type", message_types::leave_room}});
-			wait(200);
-			network_loop();
-		}
+		if (tut_pick == 0) run_tutorial();
 	}
 	while (true) {
 		// Check if a trade was accepted and we need to open trade screen
@@ -491,6 +496,7 @@ void main_menu()
 		}
 		if (room_closed_flag) { room_closed_flag = false; continue; }
 		if (launch_pending_game_if_needed()) continue;
+		music_start("menu");
 		string intro = "Main Menu.";
 		if (cached_level > 0) intro += " Level " + cached_level + ".";
 		int menu_gold = @cached_stats != null and cached_stats.exists("gold") ? int(cached_stats["gold"]) : 0;
@@ -498,13 +504,14 @@ void main_menu()
 		if (menu_gold > 0 or menu_glory > 0) intro += " Gold: " + menu_gold + ". Glory: " + menu_glory + ".";
 		menu@ m = setup_menu(intro);
 		@m = main_screen;
-		int play_btn = m.add_item("Play. 1 of 7");
-		int char_btn = m.add_item("Character. 2 of 7");
-		int social_btn = m.add_item("Social. 3 of 7");
-		int shop_btn = m.add_item("Shop. 4 of 7");
-		int challenges_btn = m.add_item("Challenges. 5 of 7");
-		int settings_btn = m.add_item("Settings. 6 of 7");
-		int quit_btn = m.add_item("Quit. 7 of 7");
+		int play_btn = m.add_item("Play. 1 of 8");
+		int char_btn = m.add_item("Character. 2 of 8");
+		int social_btn = m.add_item("Social. 3 of 8");
+		int shop_btn = m.add_item("Shop. 4 of 8");
+		int challenges_btn = m.add_item("Challenges. 5 of 8");
+		int settings_btn = m.add_item("Settings. 6 of 8");
+		int tutorial_btn = m.add_item("Tutorial. 7 of 8");
+		int quit_btn = m.add_item("Quit. 8 of 8");
 		int res = m.run();
 		if (res == play_btn) { show_play_menu(); }
 		else if (res == char_btn) { show_character_menu(); }
@@ -512,6 +519,7 @@ void main_menu()
 		else if (res == shop_btn) { show_shop_menu(); }
 		else if (res == challenges_btn) { show_challenges_menu(); }
 		else if (res == settings_btn) { show_settings_menu(); }
+		else if (res == tutorial_btn) { run_tutorial(); }
 		else if (res == quit_btn) {
 			m.play("sounds/exit.wav");
 			v.speak_wait("Thanks for playing.");
@@ -834,7 +842,7 @@ void on_list_rooms(json_array@ rooms_list)
 		// Fix 11/18: If room is locked, ask for password.
 		if (room_obj.exists("locked") and bool(room_obj["locked"])) {
 			bool canceled = false;
-			string pw = input_box_form("Room Password", "Enter the password for this room:", "", canceled);
+			string pw = password_input_form("Room Password", "Enter the password for this room:", canceled);
 			if (canceled or pw.empty()) {
 				speak("Canceled.", false);
 				return;

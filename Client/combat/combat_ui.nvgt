@@ -595,9 +595,7 @@ void show_bonus_action_menu() {
 			precision_opt = m.add_item("Precision Attack. Add a d8 to your next attack roll.");
 			riposte_opt = m.add_item("Riposte. Ready a reaction attack when an enemy misses you.");
 		}
-		if (subclass == "Psi Warrior") {
-			psi_opt = m.add_item("Psionic Strike. Your next hit deals bonus 1d6 plus Intelligence force damage.");
-		}
+		// Psi Warrior Strike auto-triggers on hit; no menu option needed.
 	}
 	if (lc == "barbarian") {
 		if (subclass == "Berserker" and my_is_raging) {
@@ -668,7 +666,6 @@ void show_bonus_action_menu() {
 	if (trip_opt >= 0) options++;
 	if (precision_opt >= 0) options++;
 	if (riposte_opt >= 0) options++;
-	if (psi_opt >= 0) options++;
 	if (frenzy_opt >= 0) options++;
 	if (psychic_blade_opt >= 0) options++;
 	if (sacred_opt >= 0) options++;
@@ -740,10 +737,6 @@ void show_bonus_action_menu() {
 		send({{"type", message_types::bonus_action}, {"feature", "riposte"}});
 		speak("Riposte readied. You will counterattack when an enemy misses you.", true);
 	}
-	else if (psi_opt >= 0 and res == psi_opt) {
-		send({{"type", message_types::bonus_action}, {"feature", "psionic_strike"}});
-		speak("Psionic Strike prepared. Your next hit deals bonus force damage.", true);
-	}
 	else if (frenzy_opt >= 0 and res == frenzy_opt) {
 		if (current_target_id == 0) {
 			speak("No target selected. Scan with I J K L and press Enter to lock a target.", true);
@@ -761,7 +754,7 @@ void show_bonus_action_menu() {
 		speak("Psychic Blades. Striking with a psychic blade.", true);
 	}
 	else if (sacred_opt >= 0 and res == sacred_opt) {
-		send({{"type", message_types::bonus_action}, {"feature", "sacred_weapon"}});
+		send({{"type", message_types::bonus_action}, {"feature", "channel_sacred_weapon"}});
 		speak("Sacred Weapon. Charisma added to your attack rolls.", true);
 	}
 	else if (vow_opt >= 0 and res == vow_opt) {
@@ -769,7 +762,7 @@ void show_bonus_action_menu() {
 			speak("No target selected. Scan with I J K L and press Enter to lock a target.", true);
 			return;
 		}
-		send({{"type", message_types::bonus_action}, {"feature", "vow_of_enmity"}, {"target_id", current_target_id}});
+		send({{"type", message_types::bonus_action}, {"feature", "channel_vow_of_enmity"}, {"target_id", current_target_id}});
 		speak("Vow of Enmity. You have advantage on attacks against that target.", true);
 	}
 	else if (inspire_opt >= 0 and res == inspire_opt) {
@@ -781,11 +774,11 @@ void show_bonus_action_menu() {
 			speak("No target selected. Scan with I J K L and press Enter to lock a target.", true);
 			return;
 		}
-		send({{"type", message_types::bonus_action}, {"feature", "natures_wrath"}, {"target_id", current_target_id}});
+		send({{"type", message_types::bonus_action}, {"feature", "channel_natures_wrath"}, {"target_id", current_target_id}});
 		speak("Nature's Wrath. Restraining the target.", true);
 	}
 	else if (preserve_opt >= 0 and res == preserve_opt) {
-		send({{"type", message_types::bonus_action}, {"feature", "preserve_life"}});
+		send({{"type", message_types::bonus_action}, {"feature", "channel_preserve_life"}});
 		speak("Preserve Life. Healing allies below half health.", true);
 	}
 	else if (war_priest_opt >= 0 and res == war_priest_opt) {
@@ -793,7 +786,7 @@ void show_bonus_action_menu() {
 			speak("No target selected. Scan with I J K L and press Enter to lock a target.", true);
 			return;
 		}
-		send({{"type", message_types::bonus_action}, {"feature", "war_priest"}, {"target_id", current_target_id}});
+		send({{"type", message_types::bonus_action}, {"feature", "war_priest_attack"}, {"target_id", current_target_id}});
 		speak("War Priest. Bonus action weapon attack.", true);
 	}
 	else if (shadow_opt >= 0 and res == shadow_opt) {

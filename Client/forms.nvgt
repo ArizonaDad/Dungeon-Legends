@@ -47,12 +47,42 @@ void info_box_form(string title, string prompt, string text, bool multiline = tr
 	}
 }
 
+string password_input_form(string title, string prompt, bool&out canceled) {
+	canceled = false;
+	audio_form f;
+	f.create_window(title, false, true);
+	int f_password = f.create_input_box(prompt, "", "*");
+	bool show_pw = false;
+	int f_show_pw = f.create_checkbox("Show &password", false);
+	int ok = f.create_button("ok", primary = true);
+	int cancel = f.create_button("cancel", cancel = true);
+	f.focus(f_password);
+	while (true) {
+		wait(5);
+		if ((keyboard_modifiers & KEYMOD_ALT) != 0 and key_pressed(KEY_F4)) { exit(); }
+		network_loop();
+		f.monitor();
+		if (f.is_checked(f_show_pw) != show_pw) {
+			show_pw = f.is_checked(f_show_pw);
+			string cur = f.get_text(f_password);
+			f.delete_control(f_password);
+			f_password = f.create_input_box(prompt, cur, show_pw ? "" : "*");
+			f.focus(f_password);
+		}
+		if (f.is_pressed(cancel)) { canceled = true; return ""; }
+		else if (f.is_pressed(ok)) return f.get_text(f_password);
+	}
+	return "";
+}
+
 enum connection_form_state { CONNECT_SUCCESS, CONNECT_RETRY, CONNECT_ABORT }
 connection_form_state login_form(string& username, string&out password) {
 	audio_form f;
 	f.create_window("login", false, true);
 	int f_username = f.create_input_box("enter username", username);
 	int f_password = f.create_input_box("enter password", config.read_string("password"), "*");
+	bool show_pw = false;
+	int f_show_pw = f.create_checkbox("Show &password", false);
 	int f_remember = f.create_checkbox("&Remember me", config.read_bool("remember_login", false));
 	int f_signup = f.create_button("create new account...");
 	int ok = f.create_button("login", primary = true);
@@ -62,6 +92,13 @@ connection_form_state login_form(string& username, string&out password) {
 		wait(5);
 		network_loop();
 		f.monitor();
+		if (f.is_checked(f_show_pw) != show_pw) {
+			show_pw = f.is_checked(f_show_pw);
+			string cur = f.get_text(f_password);
+			f.delete_control(f_password);
+			f_password = f.create_input_box("enter password", cur, show_pw ? "" : "*");
+			f.focus(f_password);
+		}
 		if (f.is_pressed(cancel)) return CONNECT_ABORT;
 		else if (f.is_pressed(f_signup)) {
 			connection_form_state signup_state = CONNECT_RETRY;
@@ -86,6 +123,8 @@ connection_form_state signup_form(string& username, string&out password) {
 	f.create_window("signup", false, true);
 	int f_username = f.create_input_box("enter username", username);
 	int f_password = f.create_input_box("enter password", "", "*");
+	bool show_pw = false;
+	int f_show_pw = f.create_checkbox("Show &password", false);
 	int f_remember = f.create_checkbox("Remember me if account is created successfully", config.read_bool("remember_login"));
 	int f_accept = f.create_checkbox("all information is correct / agree to terms of service.", false);
 	int ok = f.create_button("signup", primary = true);
@@ -95,6 +134,13 @@ connection_form_state signup_form(string& username, string&out password) {
 		wait(5);
 		network_loop();
 		f.monitor();
+		if (f.is_checked(f_show_pw) != show_pw) {
+			show_pw = f.is_checked(f_show_pw);
+			string cur = f.get_text(f_password);
+			f.delete_control(f_password);
+			f_password = f.create_input_box("enter password", cur, show_pw ? "" : "*");
+			f.focus(f_password);
+		}
 		if (f.is_pressed(cancel)) return CONNECT_ABORT;
 		else if (f.is_pressed(ok)) {
 			if (!f.is_checked(f_accept)) f.focus(f_accept);
@@ -118,6 +164,8 @@ bool create_room_form(string&out name, string&out password) {
 	f.create_window("create a room", false, true);
 	int f_name = f.create_input_box("enter a &name for this room", "", maximum_length = 40);
 	int f_password = f.create_input_box("enter a &password to prevent unknown players from joining (leave blank to allow everyone to join)", "", "*", maximum_length = 100);
+	bool show_pw = false;
+	int f_show_pw = f.create_checkbox("Show &password", false);
 	int ok = f.create_button("ok", primary = true);
 	int cancel = f.create_button("cancel", cancel = true);
 	f.focus(f_name);
@@ -125,6 +173,13 @@ bool create_room_form(string&out name, string&out password) {
 		wait(5);
 		network_loop();
 		f.monitor();
+		if (f.is_checked(f_show_pw) != show_pw) {
+			show_pw = f.is_checked(f_show_pw);
+			string cur = f.get_text(f_password);
+			f.delete_control(f_password);
+			f_password = f.create_input_box("enter a &password to prevent unknown players from joining (leave blank to allow everyone to join)", cur, show_pw ? "" : "*", maximum_length = 100);
+			f.focus(f_password);
+		}
 		if (f.is_pressed(cancel)) break;
 		else if (f.is_pressed(ok)) {
 			name = f.get_text(f_name);

@@ -36,13 +36,15 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 
 ## Main Menu
 - Menu header displays player level, gold, and glory points
-- 7 top-level categories: Play, Character, Social, Shop, Challenges, Settings, Quit
+- 8 top-level categories: Play, Character, Social, Shop, Challenges, Settings, Tutorial, Quit
+- **Tutorial**: Launches guided combat tutorial (reusable `run_tutorial()` function, also offered on first login)
 - **Play**: Play Adventure (Create Game / Join Game), Play Sandbox Mode (Create Game / Join Game). Create Game waits for server confirmation before entering host menu.
 - **Character**: Create Character (up to 40 per mode), View Characters (list all, set active, delete), Inventory, My Stats, Prestige (level 20+)
 - **Social**: Friends, Guild (create/join, max 20 members, guild chat, invite, view members/glory), Check Who's Online
 - **Shop**: Item Shop (potions, scrolls, throwables with gold), Glory Shop (titles and exclusive items with glory)
 - **Challenges**: Daily Dungeon (featured dungeon with bonus rewards), Weekly Challenges, Leaderboards
 - **Settings**: Volume Up/Down, TTS Speed Up/Down, About. All settings persisted to disk via `save_settings()`/`load_saved_settings()`
+- All password fields (login, signup, create room, join room) have a "Show password" checkbox that toggles masking
 - First-time login prompts adventure character creation automatically (no sandbox prompt)
 - Daily login bonuses: streak-based XP (50-200 XP, resets after day 7)
 - Settings (volume, TTS speed) saved on change and restored on launch
@@ -138,6 +140,7 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 - Opportunity attacks on movement
 - Auto-resolved rolls (no player input needed)
 - 10-second safety timeout forces turn end if AI stalls
+- Dead combatant detection: if current combatant dies mid-turn (e.g., from opportunity attack), turn auto-advances
 
 ### Battle Modes
 - **PvP**: Last player standing wins

@@ -1780,6 +1780,33 @@ void handle_user_message(user@ u, json_object@ msg)
 			}
 		}
 
+		else if (feature == "inspiring_smite") {
+			// Glory Paladin: Channel Divinity - Inspiring Smite (temp HP to nearby allies)
+			if (c.class_name != "Paladin" or c.subclass != "Oath of Glory") { u.send({{"type", message_types::announce}, {"text", "Only Oath of Glory paladins can use Inspiring Smite."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
+			if (c.channel_divinity_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Channel Divinity uses remaining."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.channel_divinity_uses--;
+			int total_temp_hp = random(1, 8) + random(1, 8) + c.level;
+			int distributed = 0;
+			for (uint pi = 0; pi < u.room.bm.combat.combatants.length(); pi++) {
+				combatant@ ally = u.room.bm.combat.combatants[pi];
+				if (@ally == null or ally.is_dead or ally.id == c.id) continue;
+				if (ally.is_player != c.is_player) continue;
+				int dist = feet_distance(c.x, c.y, ally.x, ally.y);
+				if (dist > 30) continue;
+				int share = total_temp_hp / 2;
+				if (share < 1) share = 1;
+				if (share > ally.temp_hp) {
+					ally.temp_hp = share;
+					distributed++;
+					u.room.bm.broadcast_announce(ally.name + " receives " + share + " temporary HP from Inspiring Smite!", false);
+				}
+			}
+			u.room.bm.broadcast_announce(c.name + " channels Inspiring Smite! " + distributed + " ally" + (distributed == 1 ? "" : "ies") + " empowered.", true);
+		}
+
 		else if (feature == "trip_attack") {
 			// Battle Master: Trip Attack maneuver
 			if (c.class_name != "Fighter" or c.subclass != "Battle Master") { u.send({{"type", message_types::announce}, {"text", "Only Battle Masters can use Trip Attack."}, {"interrupt", true}}); return; }
@@ -1878,7 +1905,7 @@ void handle_user_message(user@ u, json_object@ msg)
 
 		else if (feature == "healing_light") {
 			// Celestial Warlock: Healing Light
-			if (c.class_name != "Warlock" or c.subclass != "Celestial") { u.send({{"type", message_types::announce}, {"text", "Only Celestial warlocks can use Healing Light."}, {"interrupt", true}}); return; }
+			if (c.class_name != "Warlock" or c.subclass != "Celestial Patron") { u.send({{"type", message_types::announce}, {"text", "Only Celestial warlocks can use Healing Light."}, {"interrupt", true}}); return; }
 			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
 			if (c.healing_light_dice <= 0) { u.send({{"type", message_types::announce}, {"text", "No Healing Light dice remaining."}, {"interrupt", true}}); return; }
 			combatant@ target = target_id != 0 ? u.room.bm.combat.get_combatant(target_id) : c;
@@ -1903,11 +1930,11 @@ void handle_user_message(user@ u, json_object@ msg)
 
 		else if (feature == "fey_presence") {
 			// Archfey Warlock: Fey Presence (charm/frighten enemies in 10ft)
-			if (c.class_name != "Warlock" or c.subclass != "Archfey") { u.send({{"type", message_types::announce}, {"text", "Only Archfey warlocks can use Fey Presence."}, {"interrupt", true}}); return; }
+			if (c.class_name != "Warlock" or c.subclass != "Archfey Patron") { u.send({{"type", message_types::announce}, {"text", "Only Archfey warlocks can use Fey Presence."}, {"interrupt", true}}); return; }
 			if (c.fey_presence_used) { u.send({{"type", message_types::announce}, {"text", "You have already used Fey Presence this battle."}, {"interrupt", true}}); return; }
-			if (!c.has_action) { u.send({{"type", message_types::announce}, {"text", "No action remaining."}, {"interrupt", true}}); return; }
-			c.has_action = false;
-			c.used_action = true;
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
 			c.fey_presence_used = true;
 			int save_dc = 8 + c.proficiency + c.get_ability_mod(ABILITY_CHA);
 			int affected = 0;

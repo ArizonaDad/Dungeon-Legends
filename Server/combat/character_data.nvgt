@@ -619,7 +619,7 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
 
     // Warlock subclasses
     if (cs.class_name == "Warlock") {
-        if (cs.subclass == "Celestial") {
+        if (cs.subclass == "Celestial Patron") {
             c.healing_light_dice = 1 + cs.level;
         }
     }
