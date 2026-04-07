@@ -622,6 +622,7 @@ void handle_message(json_object@ msg)
 		string guild_name = msg.exists("guild_name") ? string(msg["guild_name"]) : "Unknown";
 		// Prompt user to accept or decline.
 		menu@ invite_menu = setup_sub_menu(from + " has invited you to join the guild: " + guild_name + ".");
+		if (@invite_menu == null) return;
 		invite_menu.add_item("Accept the invite.");
 		invite_menu.add_item("Decline.");
 		int invite_pick = invite_menu.run();

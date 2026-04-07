@@ -1487,7 +1487,7 @@ bool choose_weapon_step() {
     speak("You chose " + created_weapon + ".", true);
     return true;
     } // end while
-    return false;
+    return false; // Unreachable, satisfies compiler
 }
 
 void reset_progression_choices() {

@@ -104,7 +104,15 @@ class server
 			for (uint ri = 0; ri < rooms.rooms.length(); ri++) {
 				if (@rooms.rooms[ri].bm != null and rooms.rooms[ri].started) {
 					try { rooms.rooms[ri].bm.tick(); }
-					catch { println("[SERVER] EXCEPTION in battle tick for room " + rooms.rooms[ri].name); }
+					catch {
+						string room_name = rooms.rooms[ri].name;
+						int player_count = rooms.rooms[ri].bm.players.length();
+						bool has_combat = @rooms.rooms[ri].bm.combat != null;
+						string mode_str = has_combat ? rooms.rooms[ri].bm.combat.mode : "null";
+						int wave_num = has_combat ? rooms.rooms[ri].bm.combat.wave_number : -1;
+						bool init_phase = rooms.rooms[ri].bm.initiative_phase;
+						println("[SERVER] EXCEPTION in battle tick for room '" + room_name + "' mode=" + mode_str + " wave=" + wave_num + " players=" + player_count + " initiative_phase=" + init_phase);
+					}
 				}
 			}
 		}

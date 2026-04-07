@@ -188,6 +188,19 @@ class guild {
 }
 
 guild@[] guilds;
+dictionary guild_user_cache; // username -> guild@ for O(1) lookup
+
+void guild_cache_add(string username, guild@ g) { guild_user_cache.set(username, @g); }
+void guild_cache_remove(string username) { guild_user_cache.delete(username); }
+void guild_cache_rebuild() {
+	string[]@ keys = guild_user_cache.get_keys();
+	for (uint i = 0; i < keys.length(); i++) guild_user_cache.delete(keys[i]);
+	for (uint i = 0; i < guilds.length(); i++) {
+		for (uint j = 0; j < guilds[i].members.length(); j++) {
+			guild_user_cache.set(guilds[i].members[j], @guilds[i]);
+		}
+	}
+}
 
 guild@ find_guild(string name) {
 	for (uint i = 0; i < guilds.length(); i++) {
@@ -197,9 +210,7 @@ guild@ find_guild(string name) {
 }
 
 guild@ find_guild_for_user(string username) {
-	for (uint i = 0; i < guilds.length(); i++) {
-		if (guilds[i].is_member(username)) return guilds[i];
-	}
+	if (guild_user_cache.exists(username)) return cast<guild@>(guild_user_cache[username]);
 	return null;
 }
 
@@ -237,6 +248,7 @@ void rebuild_guilds_from_accounts() {
 		}
 	}
 	println("[GUILDS] Rebuilt " + guilds.length() + " guild(s) from account data.");
+	guild_cache_rebuild();
 }
 
 monster_def@ get_wild_shape_form_for_combatant(combatant@ c, string form_id)
@@ -463,6 +475,7 @@ class user
 	bool disconnected = false;         // True if player disconnected (awaiting reconnect).
 	bool is_bot = false;               // True if this is an AI-controlled player.
 	string[] saved_messages;
+	uint64 last_friend_request_time = 0; // Rate limiting for friend requests
 
 	int id;
 	string status = "online";   // "online", "in_room", "in_game"
@@ -912,6 +925,14 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.speak("You cannot add yourself as a friend.");
 			return;
 		}
+
+		// Rate limit: max 1 friend request per 5 seconds
+		uint64 now = ticks();
+		if (now - u.last_friend_request_time < 5000) {
+			u.speak("Please wait a moment before sending another friend request.");
+			return;
+		}
+		u.last_friend_request_time = now;
 
 		// Get both accounts.
 		account@ my_acct = u.account;
@@ -2991,6 +3012,7 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.speak("Could not join the guild.");
 			return;
 		}
+		guild_cache_add(u.username, g);
 		// Persist to account.
 		ensure_account_progression(u.account);
 		json_object@ progress = get_adventure_progress(u.account);
@@ -3020,6 +3042,7 @@ void handle_user_message(user@ u, json_object@ msg)
 		string old_guild_name = g.name;
 		bool was_leader = (g.leader == u.username);
 		g.remove_member(u.username);
+		guild_cache_remove(u.username);
 		// Clear from account.
 		ensure_account_progression(u.account);
 		json_object@ progress = get_adventure_progress(u.account);
@@ -3151,6 +3174,7 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.speak("Could not join the guild.");
 			return;
 		}
+		guild_cache_add(u.username, g);
 		// Persist to account.
 		ensure_account_progression(u.account);
 		json_object@ progress = get_adventure_progress(u.account);
