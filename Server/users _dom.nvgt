@@ -42,6 +42,20 @@ void complete_trade(trade_session@ t) {
 		return;
 	}
 
+	// Re-validate that all offered items still exist in each player's inventory
+	for (uint i = 0; i < t.offer_a.length(); i++) {
+		if (!inventory_has_item(inv_a, t.offer_a[i])) {
+			cancel_trade(t, t.player_a.username + " no longer has all offered items.");
+			return;
+		}
+	}
+	for (uint i = 0; i < t.offer_b.length(); i++) {
+		if (!inventory_has_item(inv_b, t.offer_b[i])) {
+			cancel_trade(t, t.player_b.username + " no longer has all offered items.");
+			return;
+		}
+	}
+
 	// Remove offered items from each player's inventory
 	for (uint i = 0; i < t.offer_a.length(); i++) {
 		inventory_remove_item(inv_a, t.offer_a[i]);
@@ -340,6 +354,7 @@ void process_daily_bonus(user@ u)
 	uint64 ms_48h = 172800000;
 	if (last_login > 0 and elapsed < ms_24h) {
 		data["last_login_timestamp"] = int(now);
+		u.account.commit(); // Persist timestamp immediately to prevent double-claim
 		return;
 	}
 	if (last_login > 0 and elapsed < ms_48h) {
@@ -351,6 +366,7 @@ void process_daily_bonus(user@ u)
 	int bonus_xp = get_daily_bonus_xp(streak);
 	data["last_login_timestamp"] = int(now);
 	data["login_streak"] = streak;
+	u.account.commit(); // Persist immediately to prevent double-claim on rapid re-login
 	int levels_gained = 0;
 	if (account_has_character_profile(u.account, GAME_TYPE_ADVENTURE)) {
 		apply_adventure_xp(u.account, bonus_xp, levels_gained);
@@ -1217,6 +1233,9 @@ void handle_user_message(user@ u, json_object@ msg)
 				if (stored_level < 1) stored_level = 1;
 				if (stored_level < 3) char_data["subclass"] = "";
 			}
+			// Clamp level to valid D&D range regardless of profile
+			if (stored_level < 1) stored_level = 1;
+			if (stored_level > 20) stored_level = 20;
 			char_data["level"] = stored_level;
 			if (msg.exists("str")) char_data["str"] = msg["str"];
 			if (msg.exists("dex")) char_data["dex"] = msg["dex"];
