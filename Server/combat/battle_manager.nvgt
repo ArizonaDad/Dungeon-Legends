@@ -5222,7 +5222,8 @@ class battle_manager {
 
 		json_array cond_arr;
 		for (uint i = 0; i < target.conditions.length(); i++) {
-			cond_arr.add(CONDITION_NAMES[target.conditions[i]]);
+			if (target.conditions[i] >= 0 and target.conditions[i] < int(CONDITION_NAMES.length()))
+				cond_arr.add(CONDITION_NAMES[target.conditions[i]]);
 		}
 		info["conditions"] = cond_arr;
 		u.send(info);

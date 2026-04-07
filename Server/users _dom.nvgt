@@ -73,8 +73,8 @@ void complete_trade(trade_session@ t) {
 	t.player_a.account.commit();
 	t.player_b.account.commit();
 
-	t.player_a.send({{"type", message_types::trade_complete}, {"items", received_a}});
-	t.player_b.send({{"type", message_types::trade_complete}, {"items", received_b}});
+	try { t.player_a.send({{"type", message_types::trade_complete}, {"items", received_a}}); } catch {}
+	try { t.player_b.send({{"type", message_types::trade_complete}, {"items", received_b}}); } catch {}
 
 	int idx = active_trades.find_by_ref(t);
 	if (idx >= 0) active_trades.remove_at(idx);

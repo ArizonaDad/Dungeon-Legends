@@ -1147,7 +1147,7 @@ int choose_subclass_step_profile() {
     menu@ subclass_menu = setup_sub_menu("Choose your subclass.");
     for (uint i = 0; i < subclass_descriptions.length(); i++) subclass_menu.add_item(subclass_descriptions[i] + " " + (i + 1) + " of " + subclass_descriptions.length());
     int pick = subclass_menu.run();
-    if (pick < 0) return -1;
+    if (pick < 0 or pick >= int(subclass_names.length())) return -1;
     created_char_subclass = subclass_names[pick];
     speak("You chose " + created_char_subclass + ".", true);
 
@@ -1234,7 +1234,7 @@ int run_weapon_step() {
     }
 
     int weapon_pick = weapon_menu.run();
-    if (weapon_pick < 0) return -1;
+    if (weapon_pick < 0 or weapon_pick >= int(weapon_names.length())) return -1;
     created_weapon = weapon_names[weapon_pick];
     speak("You chose " + created_weapon + ".", true);
     return 0;
