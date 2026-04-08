@@ -457,6 +457,7 @@ bool check_reaction_prompt_input() {
 			if (choice_name == "shield") choice_name = "Shield";
 			else if (choice_name == "cutting_words") choice_name = "Cutting Words";
 			else if (choice_name == "warding_flare") choice_name = "Warding Flare";
+			else if (choice_name == "defensive_duelist") choice_name = "Defensive Duelist";
 			speak("Using " + choice_name + "!", true);
 			return true;
 		}
@@ -665,6 +666,10 @@ void show_bonus_action_menu() {
 	int heal_light_opt = -1;
 	int fey_opt = -1;
 	int mantle_opt = -1;
+	int planar_warrior_opt = -1;
+	int path_to_grave_opt = -1;
+	int hexblades_curse_opt = -1;
+	int fighting_spirit_opt = -1;
 
 	if (lc == "barbarian" and !my_is_raging and my_rage_uses_remaining > 0) rage_opt = m.add_item("Rage. Bonus action. Uses left: " + my_rage_uses_remaining + ". Damage bonus: " + my_rage_damage_bonus + ".");
 	if (lc == "fighter" and my_second_wind_available) second_wind_opt = m.add_item("Second Wind. Bonus action. Heal 1d10 plus fighter level.");
@@ -742,6 +747,19 @@ void show_bonus_action_menu() {
 		if (subclass == "College of Glamour") {
 			mantle_opt = m.add_item("Mantle of Inspiration. Grant temporary HP to all allies.");
 		}
+	}
+	// New Xanathar's/Tasha's subclass bonus actions
+	if (lc == "ranger" and subclass == "Horizon Walker") {
+		planar_warrior_opt = m.add_item("Planar Warrior. Bonus action. Next weapon attack deals bonus force damage.");
+	}
+	if (lc == "cleric" and subclass == "Grave Domain") {
+		path_to_grave_opt = m.add_item("Path to the Grave. Channel Divinity. Curse a target for bonus damage on next hit.");
+	}
+	if (lc == "warlock" and subclass == "The Hexblade") {
+		hexblades_curse_opt = m.add_item("Hexblade's Curse. Bonus action. Mark a target for +Prof damage and expanded crits.");
+	}
+	if (lc == "fighter" and subclass == "Samurai") {
+		fighting_spirit_opt = m.add_item("Fighting Spirit. Bonus action. Advantage on attacks + temp HP.");
 	}
 
 	int options = 1;
@@ -914,6 +932,30 @@ void show_bonus_action_menu() {
 	else if (mantle_opt >= 0 and res == mantle_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "mantle_of_inspiration"}});
 		speak("Mantle of Inspiration. Granting temporary HP to all allies.", true);
+	}
+	else if (planar_warrior_opt >= 0 and res == planar_warrior_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "planar_warrior"}});
+		speak("Planar Warrior. Your next weapon attack deals force damage.", true);
+	}
+	else if (path_to_grave_opt >= 0 and res == path_to_grave_opt) {
+		if (current_target_id == 0) {
+			speak("No target selected. Scan with I J K L and press Enter to lock a target.", true);
+			return;
+		}
+		send({{"type", message_types::bonus_action}, {"feature", "path_to_grave"}, {"target_id", current_target_id}});
+		speak("Path to the Grave. Cursing your target.", true);
+	}
+	else if (hexblades_curse_opt >= 0 and res == hexblades_curse_opt) {
+		if (current_target_id == 0) {
+			speak("No target selected. Scan with I J K L and press Enter to lock a target.", true);
+			return;
+		}
+		send({{"type", message_types::bonus_action}, {"feature", "hexblades_curse"}, {"target_id", current_target_id}});
+		speak("Hexblade's Curse. Marking your target.", true);
+	}
+	else if (fighting_spirit_opt >= 0 and res == fighting_spirit_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "fighting_spirit"}});
+		speak("Fighting Spirit. Advantage on attacks and temporary HP.", true);
 	}
 }
 

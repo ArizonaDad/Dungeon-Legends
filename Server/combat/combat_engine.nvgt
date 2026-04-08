@@ -114,6 +114,18 @@ class combatant {
 	bool crusher_used_this_turn = false;
 	bool slasher_used_this_turn = false;
 	bool piercer_reroll_used_this_turn = false;
+	int temp_ac_bonus_this_attack = 0; // Defensive Duelist reaction
+	// Subclass feature tracking (Xanathar's/Tasha's)
+	bool planar_warrior_active = false; // Horizon Walker Ranger
+	uint path_to_grave_target = 0; // Grave Domain Cleric
+	uint hexblade_curse_target = 0; // Hexblade Warlock
+	bool fighting_spirit_active = false; // Samurai Fighter
+	int fighting_spirit_uses = 0; // Samurai
+	bool cavalier_mark_active = false; // Cavalier Fighter
+	uint cavalier_mark_target = 0;
+	int superiority_maneuvers_known = 0; // Battle Master
+	int drunken_master_advantage = 0; // Drunken Master Monk
+	int divine_soul_magic_used = 0; // Divine Soul sorcerer
 	int rage_turns_remaining = 0;
 	int action_surge_uses_remaining = 0;
 	bool second_wind_available = false;
@@ -500,6 +512,8 @@ class battle {
 		c.crusher_used_this_turn = false;
 		c.slasher_used_this_turn = false;
 		c.piercer_reroll_used_this_turn = false;
+		c.fighting_spirit_active = false;
+		c.planar_warrior_active = false;
 		c.trip_attack_pending = false;
 		c.precision_attack_pending = false;
 

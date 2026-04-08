@@ -2085,6 +2085,55 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.room.bm.broadcast_announce(c.name + " readies Warding Flare! The next attack against them or an ally within 30 feet has disadvantage. " + c.warding_flare_uses + " use" + (c.warding_flare_uses == 1 ? "" : "s") + " remain.", false);
 		}
 
+		// === New Subclass Bonus Actions ===
+		else if (feature == "planar_warrior") {
+			// Horizon Walker Ranger: next weapon attack deals force damage + 1d8
+			if (c.class_name != "Ranger" or c.subclass != "Horizon Walker") { u.send({{"type", message_types::announce}, {"text", "Only Horizon Walkers can use Planar Warrior."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.planar_warrior_active = true;
+			u.room.bm.broadcast_announce(c.name + " marks a target for Planar Warrior! Next weapon attack deals bonus force damage.", false);
+		}
+
+		else if (feature == "path_to_grave") {
+			// Grave Domain Cleric: mark a target with Channel Divinity
+			if (c.class_name != "Cleric" or c.subclass != "Grave Domain") { u.send({{"type", message_types::announce}, {"text", "Only Grave Domain clerics can use Path to the Grave."}, {"interrupt", true}}); return; }
+			if (c.channel_divinity_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Channel Divinity uses remaining."}, {"interrupt", true}}); return; }
+			if (!c.has_action) { u.send({{"type", message_types::announce}, {"text", "No action remaining."}, {"interrupt", true}}); return; }
+			c.has_action = false;
+			c.used_action = true;
+			c.channel_divinity_uses--;
+			c.path_to_grave_target = target_id;
+			u.room.bm.broadcast_announce(c.name + " curses a target with Path to the Grave! Next hit will deal bonus damage.", false);
+		}
+
+		else if (feature == "hexblades_curse") {
+			// Hexblade Warlock: curse a target, +Prof damage and crit on 19-20
+			if (c.class_name != "Warlock" or c.subclass != "The Hexblade") { u.send({{"type", message_types::announce}, {"text", "Only Hexblade warlocks can use Hexblade's Curse."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.hexblade_curse_target = target_id;
+			u.room.bm.broadcast_announce(c.name + " marks a target with Hexblade's Curse! +" + c.proficiency + " damage and crit on 19-20 against that target.", false);
+		}
+
+		else if (feature == "fighting_spirit") {
+			// Samurai Fighter: bonus action gives advantage on attacks + temp HP
+			if (c.class_name != "Fighter" or c.subclass != "Samurai") { u.send({{"type", message_types::announce}, {"text", "Only Samurai can use Fighting Spirit."}, {"interrupt", true}}); return; }
+			if (c.fighting_spirit_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Fighting Spirit uses remaining."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.fighting_spirit_uses--;
+			c.fighting_spirit_active = true;
+			int temp_hp = 5;
+			if (c.level >= 10) temp_hp = 10;
+			if (c.level >= 15) temp_hp = 15;
+			if (c.temp_hp < temp_hp) c.temp_hp = temp_hp;
+			u.room.bm.broadcast_announce(c.name + " invokes Fighting Spirit! Advantage on attacks this turn and " + temp_hp + " temp HP.", true);
+		}
+
 		else {
 			u.send({{"type", message_types::announce}, {"text", "That bonus action is not available to your character."}, {"interrupt", true}});
 			return;

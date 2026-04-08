@@ -343,6 +343,15 @@ void calculate_ac(character_sheet@ cs) {
     if (cs.has_shield) cs.armor_class += 2;
     if (cs.race == "Warforged") cs.armor_class += 1;
     if (character_sheet_has_feat(cs, "defense")) cs.armor_class += 1;
+    // Subclass: Forge Domain Cleric — +1 AC at level 1
+    if (cs.class_name == "Cleric" and cs.subclass == "Forge Domain") cs.armor_class += 1;
+    // Subclass: Bladesinging Wizard — +INT to AC while Bladesinging (passive representation)
+    if (cs.class_name == "Wizard" and cs.subclass == "Bladesinging") {
+        int int_mod = ability_modifier(cs.intelligence);
+        if (int_mod > 0) cs.armor_class += int_mod;
+    }
+    // Feat: Dual Wielder — +1 AC while wielding two weapons
+    if (character_sheet_has_feat(cs, "dual_wielder")) cs.armor_class += 1;
 }
 
 void apply_racial_bonuses(character_sheet@ cs) {
@@ -754,6 +763,11 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
             c.war_priest_uses = ability_modifier(cs.wisdom);
             if (c.war_priest_uses < 1) c.war_priest_uses = 1;
         }
+    }
+
+    // Samurai Fighter: Fighting Spirit uses per battle (Prof times per day; we use Prof per battle)
+    if (cs.class_name == "Fighter" and cs.subclass == "Samurai" and cs.level >= 3) {
+        c.fighting_spirit_uses = proficiency_bonus(cs.level);
     }
 
     // Wizard subclasses

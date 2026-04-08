@@ -1127,6 +1127,10 @@ class battle_manager {
 		if (attacker.class_name == "Fighter" and attacker.subclass == "Champion" and weapon_attack and attacker.level >= 3) {
 			return 19;
 		}
+		// Hexblade Warlock: crit on 19-20 against cursed target
+		if (attacker.class_name == "Warlock" and attacker.subclass == "The Hexblade" and @pr != null and attacker.hexblade_curse_target == pr.target_id) {
+			return 19;
+		}
 		return 20;
 	}
 
@@ -1515,6 +1519,13 @@ class battle_manager {
 		if (attacker.vow_of_enmity_target != 0 and attacker.vow_of_enmity_target == target.id) {
 			adv = true;
 		}
+		// Samurai Fighter: Fighting Spirit — advantage on attacks when active
+		if (attacker.class_name == "Fighter" and attacker.subclass == "Samurai" and attacker.fighting_spirit_active) {
+			adv = true;
+		}
+		// Hexblade Warlock: Hexblade's Curse — crit on 19-20 vs cursed target (handled in crit threshold)
+		// Cavalier: marked target gets advantage if attacking Cavalier's ally
+		// (simplified implementation: no marker bonus for now)
 		// Sacred Weapon: add CHA mod to attack rolls (handled via attack bonus modification)
 	}
 
@@ -2965,6 +2976,11 @@ class battle_manager {
 						broadcast_roll(enemy.name, "opportunity attack damage", dmg_natural, dmg_mod, total_damage, total_damage + " " + dmg_type_name + " to " + mover.name + ".");
 						bool opp_target_was_full = (mover.current_hp == mover.max_hp);
 						combat.apply_damage(mover, total_damage, enemy.main_hand_damage_type, enemy);
+						// Feat: Sentinel — opportunity attacks reduce target speed to 0
+						if (enemy.has_feat("sentinel")) {
+							mover.movement_remaining = 0;
+							broadcast_announce(enemy.name + "'s Sentinel stops " + mover.name + " in their tracks!", false);
+						}
 						maybe_apply_on_kill_features(enemy, mover);
 						check_concentration(mover, total_damage);
 
@@ -3362,6 +3378,33 @@ class battle_manager {
 			broadcast_announce(attacker.name + "'s Dreadful Strikes add " + fey_dmg + " psychic damage!", false);
 		}
 
+		// Horizon Walker: Planar Warrior — +1d8 force damage (changes damage type)
+		if (attacker.class_name == "Ranger" and attacker.subclass == "Horizon Walker" and is_weapon_attack and attacker.planar_warrior_active) {
+			int planar_dmg = random(1, 8);
+			if (attacker.level >= 11) planar_dmg += random(1, 8);
+			bonus += planar_dmg;
+			attacker.planar_warrior_active = false;
+			broadcast_announce(attacker.name + "'s Planar Warrior deals " + planar_dmg + " force damage!", false);
+		}
+
+		// Grave Domain Cleric: Path to the Grave — vulnerability on marked target
+		// (simplified: +1d8 damage vs marked target)
+		if (attacker.class_name == "Cleric" and attacker.subclass == "Grave Domain" and attacker.path_to_grave_target == target.id) {
+			int grave_dmg = random(1, 8);
+			bonus += grave_dmg;
+			attacker.path_to_grave_target = 0;
+			broadcast_announce(attacker.name + "'s Path to the Grave adds " + grave_dmg + " damage!", false);
+		}
+
+		// Hexblade: Hexblade's Curse — +Prof damage to cursed target
+		if (attacker.class_name == "Warlock" and attacker.subclass == "The Hexblade" and attacker.hexblade_curse_target == target.id) {
+			bonus += attacker.proficiency;
+			broadcast_announce(attacker.name + "'s Hexblade's Curse adds " + attacker.proficiency + " damage!", false);
+		}
+
+		// Samurai: Fighting Spirit (advantage handled in advantage check; temp HP gained on activation)
+		// Handled via bonus action
+
 		// Mark first hit used
 		if (bonus > 0 or is_weapon_attack) {
 			attacker.is_first_hit_this_turn = false;
@@ -3475,6 +3518,10 @@ class battle_manager {
 				if (target.subclass == "Light Domain" and target.warding_flare_uses > 0) {
 					reaction_options.insert_last("warding_flare");
 				}
+				// Feat: Defensive Duelist — when wielding a Finesse weapon, reaction gives +Prof to AC
+				if (target.has_feat("defensive_duelist") and target.main_hand_finesse and !target.main_hand_is_ranged) {
+					reaction_options.insert_last("defensive_duelist");
+				}
 
 				if (reaction_options.length() > 0) {
 					user@ def_user = find_user_for_combatant(target);
@@ -3500,6 +3547,7 @@ class battle_manager {
 							if (reaction_options[oi] == "shield") opts += "Shield (+5 AC)";
 							else if (reaction_options[oi] == "cutting_words") opts += "Cutting Words (-1d" + target.bardic_inspiration_die + ")";
 							else if (reaction_options[oi] == "warding_flare") opts += "Warding Flare (reroll attack)";
+							else if (reaction_options[oi] == "defensive_duelist") opts += "Defensive Duelist (+" + target.proficiency + " AC)";
 						}
 						def_user.send({{"type", message_types::reaction_prompt}, {"attacker", c.name}, {"options", opts}, {"options_csv", opts_csv}});
 						return; // Pause — wait for reaction_response
@@ -3692,6 +3740,12 @@ class battle_manager {
 				total_damage += boon_damage;
 				broadcast_announce(c.name + "'s Boon of Irresistible Offense adds " + boon_damage + " extra damage!", false);
 			}
+			// Feat: Great Weapon Master — bonus action attack on crit with Heavy melee weapon
+			if (pr.is_crit and !pr.is_spell_effect and c.has_feat("great_weapon_master") and !c.main_hand_is_ranged and c.has_bonus_action and weapon_qualifies_great_weapon_fighting(c.main_hand)) {
+				c.has_bonus_action = false;
+				c.used_bonus_action = true;
+				broadcast_announce(c.name + "'s Great Weapon Master grants a bonus attack on the crit!", true);
+			}
 			// Feat: Piercer — extra damage die on crits with piercing damage
 			if (pr.is_crit and c.has_feat("piercer") and pr.damage_type == DMG_PIERCING) {
 				int extra = random(1, pr.damage_dice_sides);
@@ -3773,6 +3827,12 @@ class battle_manager {
 			if (target.is_dead) {
 				broadcast_announce(target.name + " has been slain!", true);
 				broadcast_to_battle({{"type", message_types::creature_died}, {"name", target.name}, {"id", target.id}, {"killed_by", c.name}, {"was_full_hp", target_was_full_hp}, {"was_overkill", total_damage >= target.max_hp * 2}, {"was_stealth", attacker_was_hidden}});
+				// Feat: Great Weapon Master — bonus action attack on kill with Heavy melee weapon
+				if (!pr.is_spell_effect and c.has_feat("great_weapon_master") and !c.main_hand_is_ranged and c.has_bonus_action and weapon_qualifies_great_weapon_fighting(c.main_hand)) {
+					c.has_bonus_action = false;
+					c.used_bonus_action = true;
+					broadcast_announce(c.name + "'s Great Weapon Master grants a bonus attack after the kill!", true);
+				}
 			} else if (target.current_hp == 0 and target.has_condition(COND_UNCONSCIOUS)) {
 				broadcast_announce(target.name + " falls unconscious!", true);
 			} else {
@@ -4331,6 +4391,19 @@ class battle_manager {
 				broadcast_announce(defender.name + " uses Warding Flare! Attacker rerolls: " + rp.natural_roll + ".", true);
 			}
 		}
+		else if (choice == "defensive_duelist" and defender.is_player) {
+			// Feat: Defensive Duelist — add Proficiency Bonus to AC for this attack
+			if (defender.has_feat("defensive_duelist")) {
+				defender.has_reaction = false;
+				// Apply AC bonus by increasing the threshold the attack must beat
+				int temp_ac_bonus = defender.proficiency;
+				defender.armor_class += temp_ac_bonus;
+				broadcast_announce(defender.name + " uses Defensive Duelist! +" + temp_ac_bonus + " AC against this attack.", true);
+				// Revert the AC bonus after resolving this attack (done in resume_attack_after_reaction)
+				// We'll track this with a temporary field
+				defender.temp_ac_bonus_this_attack = temp_ac_bonus;
+			}
+		}
 
 		// Resume attack resolution with potentially modified attack total
 		// Re-check hit with updated values
@@ -4356,6 +4429,12 @@ class battle_manager {
 			hit = false;
 		} else {
 			hit = total >= target.armor_class;
+		}
+
+		// Revert Defensive Duelist temporary AC bonus after this attack resolves
+		if (target.temp_ac_bonus_this_attack > 0) {
+			target.armor_class -= target.temp_ac_bonus_this_attack;
+			target.temp_ac_bonus_this_attack = 0;
 		}
 
 		string outcome = "";
