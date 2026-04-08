@@ -1476,6 +1476,14 @@ class battle_manager {
 					break;
 				}
 			}
+			// Mage Slayer feat: advantage on saves vs spells from creatures within 5ft
+			if (t.has_feat("mage_slayer") and feet_distance(t.x, t.y, caster.x, caster.y) <= 5) {
+				int reroll = random(1, 20);
+				if (reroll > save_roll) {
+					broadcast_announce(t.name + "'s Mage Slayer grants advantage on the save (rerolled " + save_roll + " to " + reroll + ").", false);
+					save_roll = reroll;
+				}
+			}
 			int save_total = save_roll + save_bonus + bless_bonus - unsettling_penalty;
 			bool saved = save_total >= pr.spell_save_dc;
 			string save_name = pr.spell_save_type >= 0 and pr.spell_save_type < int(ABILITY_SHORT.length()) ? ABILITY_SHORT[pr.spell_save_type] : "save";

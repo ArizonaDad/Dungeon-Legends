@@ -2731,6 +2731,48 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.room.bm.broadcast_announce(c.name + " uses Skirmisher to move half their speed as a reaction!", false);
 		}
 
+		else if (feature == "polearm_master_attack") {
+			// Polearm Master: bonus action attack with the opposite end of the weapon (1d4)
+			if (!c.has_feat("polearm_master")) { u.send({{"type", message_types::announce}, {"text", "You don't have the Polearm Master feat."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			if (target_id == 0) { u.send({{"type", message_types::announce}, {"text", "No target selected."}, {"interrupt", true}}); return; }
+			combatant@ tgt = u.room.bm.combat.get_combatant(target_id);
+			if (@tgt == null or tgt.is_dead) { u.send({{"type", message_types::announce}, {"text", "Invalid target."}, {"interrupt", true}}); return; }
+			int dist_pa = feet_distance(c.x, c.y, tgt.x, tgt.y);
+			if (dist_pa > 10) { u.send({{"type", message_types::announce}, {"text", "Target out of polearm reach."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			int pa_atk = random(1, 20) + c.get_ability_mod(ABILITY_STR) + c.proficiency;
+			if (pa_atk >= tgt.armor_class) {
+				int pa_dmg = random(1, 4) + c.get_ability_mod(ABILITY_STR);
+				if (pa_dmg < 1) pa_dmg = 1;
+				u.room.bm.combat.apply_damage(tgt, pa_dmg, DMG_BLUDGEONING, c);
+				u.room.bm.broadcast_announce(c.name + "'s polearm butt hits " + tgt.name + " for " + pa_dmg + " bludgeoning damage!", true);
+			} else {
+				u.room.bm.broadcast_announce(c.name + "'s polearm butt swing misses " + tgt.name + ".", true);
+			}
+		}
+		else if (feature == "shield_master_shove") {
+			// Shield Master: bonus action shove (5ft push or knock prone)
+			if (!c.has_feat("shield_master")) { u.send({{"type", message_types::announce}, {"text", "You don't have the Shield Master feat."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			if (!c.has_shield) { u.send({{"type", message_types::announce}, {"text", "You need a shield equipped."}, {"interrupt", true}}); return; }
+			if (target_id == 0) { u.send({{"type", message_types::announce}, {"text", "No target selected."}, {"interrupt", true}}); return; }
+			combatant@ tgt = u.room.bm.combat.get_combatant(target_id);
+			if (@tgt == null or tgt.is_dead) { u.send({{"type", message_types::announce}, {"text", "Invalid target."}, {"interrupt", true}}); return; }
+			int dist_sm = feet_distance(c.x, c.y, tgt.x, tgt.y);
+			if (dist_sm > 5) { u.send({{"type", message_types::announce}, {"text", "Target out of melee reach for shove."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			int dc = 8 + c.get_ability_mod(ABILITY_STR) + c.proficiency;
+			int save = random(1, 20) + tgt.get_save_bonus(ABILITY_STR);
+			if (save < dc) {
+				tgt.add_condition(COND_PRONE);
+				u.room.bm.broadcast_announce(c.name + " shield-shoves " + tgt.name + " to the ground! (save " + save + " vs DC " + dc + ")", true);
+			} else {
+				u.room.bm.broadcast_announce(tgt.name + " resists " + c.name + "'s shield shove (save " + save + " vs DC " + dc + ").", true);
+			}
+		}
 		else if (feature == "jinx_target") {
 			// Misfortune Bringer Rogue: jinx target for bonus damage
 			if (c.class_name != "Rogue" or c.subclass != "Misfortune Bringer") { u.send({{"type", message_types::announce}, {"text", "Only Misfortune Bringer Rogues can jinx targets."}, {"interrupt", true}}); return; }
