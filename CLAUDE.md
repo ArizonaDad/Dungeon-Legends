@@ -1,7 +1,9 @@
 # Dungeon Legends - D&D 5e Battle Simulator
 
 ## Project Overview
-Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (NonVisual Gaming Toolkit, AngelScript-like). Players create characters (33 species, 13 classes, 16 backgrounds, 38 weapons, 86 spells) and fight in turn-based combat with full TTS and HRTF spatial audio. Supports PvP Arena, Wave Survival, Boss Rush, and Endless Survival modes. Features 40+ achievements, glory shop, daily dungeons, leaderboards, loot system, trading, prestige, guilds, and multi-phase boss fights.
+Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (NonVisual Gaming Toolkit, AngelScript-like). Players create characters (67 species, 14 classes, 48 backgrounds, 138 subclasses, 77 feats, 38 weapons, 367 spells) and fight in turn-based combat with full TTS and HRTF spatial audio. Supports PvP Arena, Wave Survival, Boss Rush, and Endless Survival modes. Features 40+ achievements, glory shop, daily dungeons, leaderboards, loot system, trading, prestige, guilds, and multi-phase boss fights.
+
+**Vision:** Evolving into a complete D&D simulator with AI Dungeon Master (Claude API), campaign play from real adventure books, cooperative party play, and persistent shared universes.
 
 ## Architecture
 - **Client-server** model using ENet networking with JSON message passing
