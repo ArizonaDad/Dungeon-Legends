@@ -7351,6 +7351,39 @@ class battle_manager {
 				check_battle_end();
 				return;
 			}
+			else if (spell.id == "ray_of_sickness" and @target != null) {
+				// Basic Rules para 14732: "You shoot a greenish ray at a creature within
+				// range. Make a ranged spell attack against the target. On a hit, the
+				// target takes 2d8 Poison damage and has the Poisoned condition until the
+				// end of your next turn."
+				int dice_count = 2 + upcast_levels;
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 8);
+				int atk_roll = random(1, 20);
+				int atk_total = atk_roll + spell_atk;
+				bool hit = atk_total >= target.armor_class;
+				broadcast_roll(c.name, "Ray of Sickness attack roll", atk_roll, spell_atk, atk_total, hit ? "Hit!" : "Missed!");
+				if (hit) {
+					combat.apply_damage(target, total_damage, DMG_POISON, c);
+					target.add_condition(COND_POISONED);
+					broadcast_announce(c.name + "'s Ray of Sickness deals " + total_damage + " poison damage to " + target.name + " and poisons them!", true);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "gaseous_form" and @target != null) {
+				// Basic Rules paras 13440-13441: "A willing creature you touch shape-shifts,
+				// along with everything it's wearing and carrying, into a misty cloud for
+				// the duration... While in this form, the target's only method of movement
+				// is a Fly Speed of 10 feet, and it can hover... The target has Resistance
+				// to Bludgeoning, Piercing, and Slashing damage from nonmagical attacks."
+				target.bludgeoning_resistance = true;
+				target.piercing_resistance = true;
+				target.slashing_resistance = true;
+				target.flying_speed = 10;
+				broadcast_announce(c.name + " transforms " + target.name + " into Gaseous Form! 10 ft fly speed and resistance to nonmagical B/P/S damage.", true);
+			}
 			else if (spell.id == "gust_of_wind") {
 				// Basic Rules para 13659: "A Line of strong wind 60 feet long and 10 feet
 				// wide blasts from you in a direction you choose for the duration. Each
