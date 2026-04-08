@@ -297,6 +297,16 @@ void init_item_catalog() {
 	add_item("dmg_ring_xray_vision", "Ring of X-ray Vision", SLOT_RING, RARITY_RARE, "While wearing this ring, you can take a Magic action to gain X-ray vision with a range of 30 feet for 1 minute.", 0, 0, 0, 0, 1, 0, 0, 0);
 	add_item("dmg_ring_feather_falling", "Ring of Feather Falling", SLOT_RING, RARITY_RARE, "When you fall while wearing this ring, you descend 60 feet per round and take no damage from falling.", 0, 0, 5, 0, 0, 0, 0, 0);
 	add_item("dmg_ring_jumping", "Ring of Jumping", SLOT_RING, RARITY_UNCOMMON, "While wearing this ring, you can cast Jump from it, but can target only yourself when you do so.", 0, 0, 0, 0, 0, 5, 0, 0);
+
+	// DMG 2024 More Wondrous (paras 8287-10032)
+	add_item("dmg_iron_bands_bilarro", "Iron Bands of Bilarro", SLOT_AMULET, RARITY_RARE, "This rusty iron sphere measures 3 inches in diameter. You can take a Magic action to throw the sphere at a Huge or smaller creature you can see within 60 feet, ensnaring them in iron bands.", 0, 1, 0, 0, 0, 0, 0, 0);
+	add_item("dmg_sphere_annihilation", "Sphere of Annihilation", SLOT_AMULET, RARITY_LEGENDARY, "This 2-foot-diameter black sphere is a hole in the multiverse. It is unsupported and motionless unless you are within 60 feet of it. Anything that touches the sphere is destroyed.", 0, 5, 0, 3, 0, 0, 1, 0);
+	add_item("dmg_goggles_of_night", "Goggles of Night", SLOT_ARMOR, RARITY_UNCOMMON, "While wearing these dark lenses, you have Darkvision out to 60 feet. If you already have Darkvision, wearing the goggles increases its range by 60 feet.", 0, 0, 0, 0, 1, 0, 0, 0);
+	add_item("dmg_lantern_revealing", "Lantern of Revealing", SLOT_AMULET, RARITY_UNCOMMON, "While lit, this hooded lantern burns for 6 hours on 1 pint of oil, shedding Bright Light in a 30-foot radius. Invisible creatures and objects are visible as long as they are in the lantern's Bright Light.", 0, 0, 0, 0, 1, 0, 0, 0);
+	add_item("dmg_driftglobe", "Driftglobe", SLOT_AMULET, RARITY_UNCOMMON, "This small sphere of thick glass weighs 1 pound. You can command it to emanate light equivalent to that of the Light or Daylight spell. The globe can also hover and follow you up to 60 feet away.", 0, 0, 0, 0, 0, 0, 0, 0);
+	add_item("dmg_folding_boat", "Folding Boat", SLOT_AMULET, RARITY_RARE, "This object appears as a wooden box that measures 12 inches long, 6 inches wide, and 6 inches deep. You can take a Bonus Action to speak one of three command words to cause it to unfold into a rowboat, sailing ship, or longship.", 0, 0, 0, 0, 0, 0, 0, 0);
+	add_item("dmg_handy_haversack", "Handy Haversack", SLOT_AMULET, RARITY_RARE, "This backpack has a central pouch and two side pouches, each of which is an extradimensional space.", 0, 0, 0, 0, 0, 0, 0, 0);
+	add_item("dmg_apparatus_kwalish", "Apparatus of Kwalish", SLOT_ARMOR, RARITY_LEGENDARY, "A sealed iron barrel weighing 500 pounds that becomes a Large submersible vehicle when activated. AC 20, HP 200, Speed 30 ft (Swim 30 ft), Immunity to Poison and Psychic damage.", 6, 0, 50, 0, 0, 0, 2, 0);
 }
 
 // ---- LOOT GENERATION ----
