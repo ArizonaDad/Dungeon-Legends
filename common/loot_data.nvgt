@@ -188,6 +188,22 @@ void init_item_catalog() {
 	add_item("dmg_ring_resistance", "Ring of Resistance", SLOT_RING, RARITY_RARE, "You have Resistance to one type of damage while wearing this ring.", 0, 0, 5, 0, 0, 0, 1, 0);
 	add_item("dmg_ring_spell_storing", "Ring of Spell Storing", SLOT_RING, RARITY_RARE, "This ring stores spells cast into it, holding them until the attuned wearer uses them. The ring can store up to 5 levels worth of spells at a time.", 0, 0, 0, 2, 0, 0, 0, 0);
 	add_item("dmg_ring_three_wishes", "Ring of Three Wishes", SLOT_RING, RARITY_LEGENDARY, "While wearing this ring, you can take a Magic action to expend 1 of its 3 charges to cast Wish from it.", 1, 2, 15, 2, 3, 5, 2, 0);
+
+	// DMG 2024 Bracers, Gauntlets, Eyes, Hats, Helms, Periapts, Robes (paras 7700-9750)
+	add_item("dmg_bracers_archery", "Bracers of Archery", SLOT_ARMOR, RARITY_UNCOMMON, "While wearing these bracers, you have proficiency with the Longbow and Shortbow, and you gain a +2 bonus to damage rolls made with such weapons.", 0, 2, 0, 0, 1, 0, 0, 0);
+	add_item("dmg_bracers_defense", "Bracers of Defense", SLOT_ARMOR, RARITY_RARE, "While wearing these bracers, you gain a +2 bonus to Armor Class if you are wearing no armor and using no Shield.", 2, 0, 0, 0, 0, 0, 0, 0);
+	add_item("dmg_eyes_charming", "Eyes of Charming", SLOT_AMULET, RARITY_UNCOMMON, "These crystal lenses fit over the eyes. They have 3 charges. While wearing them, you can expend 1 or more charges to cast Charm Person.", 0, 0, 0, 1, 0, 0, 0, 0);
+	add_item("dmg_eyes_eagle", "Eyes of the Eagle", SLOT_AMULET, RARITY_UNCOMMON, "These crystal lenses fit over the eyes. While wearing them, you have Advantage on Wisdom (Perception) checks that rely on sight.", 0, 0, 0, 0, 1, 0, 0, 0);
+	add_item("dmg_gauntlets_ogre", "Gauntlets of Ogre Power", SLOT_ARMOR, RARITY_UNCOMMON, "Your Strength is 19 while you wear these gauntlets. They have no effect on you if your Strength is 19 or higher without them.", 0, 3, 0, 0, 0, 0, 0, 0);
+	add_item("dmg_hat_disguise", "Hat of Disguise", SLOT_AMULET, RARITY_UNCOMMON, "While wearing this hat, you can cast the Disguise Self spell. The spell ends if the hat is removed.", 0, 0, 0, 1, 0, 0, 0, 0);
+	add_item("dmg_helm_brilliance", "Helm of Brilliance", SLOT_ARMOR, RARITY_EPIC, "This helm is set with 1d10 diamonds, 2d10 rubies, 3d10 fire opals, and 4d10 opals. The wearer can cast spells from the gems and channel radiant energy through the helm.", 1, 0, 10, 2, 0, 0, 1, 0);
+	add_item("dmg_helm_telepathy", "Helm of Telepathy", SLOT_ARMOR, RARITY_UNCOMMON, "While wearing this helm, you have telepathy with a range of 30 feet, and you can cast Detect Thoughts or Suggestion from the helm.", 0, 0, 0, 1, 0, 0, 0, 0);
+	add_item("dmg_helm_teleportation", "Helm of Teleportation", SLOT_ARMOR, RARITY_RARE, "This helm has 3 charges. While wearing it, you can expend 1 charge to cast Teleport from it. The helm regains 1d3 expended charges daily at dawn.", 0, 0, 0, 1, 1, 0, 0, 0);
+	add_item("dmg_periapt_health", "Periapt of Health", SLOT_AMULET, RARITY_UNCOMMON, "While wearing this pendant, you can take a Magic action to regain 2d4 + 2 Hit Points. Once used, this property can't be used again until the next dawn.", 0, 0, 10, 0, 0, 0, 0, 0);
+	add_item("dmg_periapt_proof_poison", "Periapt of Proof against Poison", SLOT_AMULET, RARITY_RARE, "This delicate silver chain has a brilliant-cut black gem pendant. While you wear it, you have Immunity to the Poisoned condition and Poison damage.", 0, 0, 0, 0, 0, 0, 1, 0);
+	add_item("dmg_periapt_wound_closure", "Periapt of Wound Closure", SLOT_AMULET, RARITY_UNCOMMON, "While wearing this pendant, you stabilize automatically when dying. In addition, when you roll a Hit Die to regain hit points, double the number of HP it restores.", 0, 0, 15, 0, 0, 0, 0, 0);
+	add_item("dmg_robe_eyes", "Robe of Eyes", SLOT_ARMOR, RARITY_RARE, "This robe is adorned with eyelike patterns. While you wear the robe, you gain Advantage on Wisdom (Perception) checks, can see in all directions, and have Darkvision out to 120 feet.", 1, 0, 0, 0, 2, 0, 1, 0);
+	add_item("dmg_robe_archmagi", "Robe of the Archmagi", SLOT_ARMOR, RARITY_LEGENDARY, "This elegant garment is made from exquisite cloth and adorned with runes. Your base AC becomes 15 + your Dexterity modifier (no shield), you gain Advantage on saves against spells, and your spell save DC and spell attack bonus increase by 2.", 4, 0, 15, 4, 0, 0, 2, 0);
 }
 
 // ---- LOOT GENERATION ----
