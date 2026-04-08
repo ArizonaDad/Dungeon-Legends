@@ -2340,6 +2340,92 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.room.bm.broadcast_announce(c.name + " uses Fast Hands to quickly manipulate an object.", false);
 		}
 
+		else if (feature == "radiant_sun_bolt") {
+			// Way of the Sun Soul Monk: bonus action ranged attack using martial arts die
+			if (c.class_name != "Monk" or c.subclass != "Way of the Sun Soul") { u.send({{"type", message_types::announce}, {"text", "Only Way of the Sun Soul monks can use Radiant Sun Bolt."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			combatant@ tgt = target_id != 0 ? u.room.bm.combat.get_combatant(target_id) : null;
+			if (@tgt == null or tgt.is_dead) { u.send({{"type", message_types::announce}, {"text", "Invalid target."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			int dex_mod = c.get_ability_mod(ABILITY_DEX);
+			int die_size = 4;
+			if (c.level >= 5) die_size = 6;
+			if (c.level >= 11) die_size = 8;
+			if (c.level >= 17) die_size = 10;
+			int atk_bonus = dex_mod + c.proficiency;
+			int roll = random(1, 20);
+			int total = roll + atk_bonus;
+			if (total >= tgt.armor_class) {
+				int dmg = random(1, die_size) + dex_mod;
+				u.room.bm.combat.apply_damage(tgt, dmg, DMG_RADIANT, c);
+				u.room.bm.broadcast_announce(c.name + "'s Radiant Sun Bolt hits for " + dmg + " radiant damage! (Rolled " + roll + ")", true);
+			} else {
+				u.room.bm.broadcast_announce(c.name + "'s Radiant Sun Bolt misses. (Rolled " + roll + " needed " + tgt.armor_class + ")", false);
+			}
+		}
+
+		else if (feature == "kensei_weapon") {
+			// Way of the Kensei Monk: choose kensei weapon (deflect missiles + accuracy)
+			if (c.class_name != "Monk" or c.subclass != "Way of the Kensei") { u.send({{"type", message_types::announce}, {"text", "Only Way of the Kensei monks can use this."}, {"interrupt", true}}); return; }
+			c.kensei_weapon_active = true;
+			u.room.bm.broadcast_announce(c.name + " declares their Kensei weapon!", false);
+		}
+
+		else if (feature == "drunken_master_redirect") {
+			// Way of the Drunken Master: Redirect Attack reaction (forces attacker to redirect)
+			if (c.class_name != "Monk" or c.subclass != "Way of the Drunken Master") { u.send({{"type", message_types::announce}, {"text", "Only Drunken Master monks can Redirect Attack."}, {"interrupt", true}}); return; }
+			if (!c.has_reaction) { u.send({{"type", message_types::announce}, {"text", "No reaction available."}, {"interrupt", true}}); return; }
+			if (c.focus_points <= 0) { u.send({{"type", message_types::announce}, {"text", "No Focus Points remaining."}, {"interrupt", true}}); return; }
+			c.focus_points--;
+			c.has_reaction = false;
+			c.drunken_master_opportunity = true;
+			u.room.bm.broadcast_announce(c.name + " uses Redirect Attack!", false);
+		}
+
+		else if (feature == "breath_of_dragon") {
+			// Way of the Ascendant Dragon Monk: breath weapon
+			if (c.class_name != "Monk" or c.subclass != "Way of the Ascendant Dragon") { u.send({{"type", message_types::announce}, {"text", "Only Way of the Ascendant Dragon monks can use this."}, {"interrupt", true}}); return; }
+			if (c.focus_points <= 0) { u.send({{"type", message_types::announce}, {"text", "No Focus Points remaining."}, {"interrupt", true}}); return; }
+			if (!c.has_action) { u.send({{"type", message_types::announce}, {"text", "No action remaining."}, {"interrupt", true}}); return; }
+			c.focus_points--;
+			c.has_action = false;
+			c.used_action = true;
+			// 20ft line or 15ft cone — deal martial arts die damage to all in area
+			int die_size = 4;
+			if (c.level >= 5) die_size = 6;
+			if (c.level >= 11) die_size = 8;
+			if (c.level >= 17) die_size = 10;
+			int damage = random(1, die_size) * 2;
+			u.room.bm.broadcast_announce(c.name + " unleashes a 15-foot cone of draconic breath for " + damage + " fire damage!", true);
+			// Apply to enemies in range
+			for (uint bi = 0; bi < u.room.bm.combat.combatants.length(); bi++) {
+				combatant@ t = u.room.bm.combat.combatants[bi];
+				if (@t == null or t.is_dead or t.id == c.id) continue;
+				if (t.is_player == c.is_player and u.room.bm.combat.mode != "pvp") continue;
+				int dist = feet_distance(c.x, c.y, t.x, t.y);
+				if (dist <= 15) {
+					// DEX save for half
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_DEX);
+					int dc = 8 + c.proficiency + c.get_ability_mod(ABILITY_WIS);
+					int dmg = (save_roll + save_bonus >= dc) ? damage / 2 : damage;
+					u.room.bm.combat.apply_damage(t, dmg, DMG_FIRE, c);
+				}
+			}
+		}
+
+		else if (feature == "astral_arms") {
+			// Way of the Astral Self Monk: manifest astral arms (bonus action, spend 1 Focus)
+			if (c.class_name != "Monk" or c.subclass != "Way of the Astral Self") { u.send({{"type", message_types::announce}, {"text", "Only Astral Self monks can manifest astral arms."}, {"interrupt", true}}); return; }
+			if (c.focus_points <= 0) { u.send({{"type", message_types::announce}, {"text", "No Focus Points remaining."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.focus_points--;
+			u.room.bm.broadcast_announce(c.name + " manifests Astral Arms! Reach extended to 10ft, unarmed strikes deal force damage.", true);
+		}
+
 		else {
 			u.send({{"type", message_types::announce}, {"text", "That bonus action is not available to your character."}, {"interrupt", true}});
 			return;

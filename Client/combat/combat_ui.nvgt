@@ -689,6 +689,10 @@ void show_bonus_action_menu() {
 	int insightful_fighting_opt = -1;
 	int mastermind_help_opt = -1;
 	int fast_hands_opt = -1;
+	int sun_bolt_opt = -1;
+	int kensei_weapon_opt = -1;
+	int breath_dragon_opt = -1;
+	int astral_arms_opt = -1;
 
 	if (lc == "barbarian" and !my_is_raging and my_rage_uses_remaining > 0) rage_opt = m.add_item("Rage. Bonus action. Uses left: " + my_rage_uses_remaining + ". Damage bonus: " + my_rage_damage_bonus + ".");
 	if (lc == "fighter" and my_second_wind_available) second_wind_opt = m.add_item("Second Wind. Bonus action. Heal 1d10 plus fighter level.");
@@ -824,6 +828,18 @@ void show_bonus_action_menu() {
 	}
 	if (lc == "rogue" and subclass == "Thief" and level >= 3) {
 		fast_hands_opt = m.add_item("Fast Hands. Bonus action to use an object.");
+	}
+	if (lc == "monk" and subclass == "Way of the Sun Soul") {
+		sun_bolt_opt = m.add_item("Radiant Sun Bolt. Bonus action ranged attack for radiant damage.");
+	}
+	if (lc == "monk" and subclass == "Way of the Kensei") {
+		kensei_weapon_opt = m.add_item("Kensei Weapon. Choose your kensei weapon for this battle.");
+	}
+	if (lc == "monk" and subclass == "Way of the Ascendant Dragon") {
+		breath_dragon_opt = m.add_item("Breath of the Dragon. Action + 1 Focus Point. 15ft cone of fire damage.");
+	}
+	if (lc == "monk" and subclass == "Way of the Astral Self") {
+		astral_arms_opt = m.add_item("Astral Arms. Bonus action + 1 Focus Point. Extended reach unarmed strikes.");
 	}
 
 	int options = 1;
@@ -1092,6 +1108,26 @@ void show_bonus_action_menu() {
 	else if (fast_hands_opt >= 0 and res == fast_hands_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "fast_hands"}});
 		speak("Fast Hands. Using an object as a bonus action.", true);
+	}
+	else if (sun_bolt_opt >= 0 and res == sun_bolt_opt) {
+		if (current_target_id == 0) {
+			speak("No target selected. Scan with I J K L and press Enter to lock a target.", true);
+			return;
+		}
+		send({{"type", message_types::bonus_action}, {"feature", "radiant_sun_bolt"}, {"target_id", current_target_id}});
+		speak("Radiant Sun Bolt. Firing radiant energy at target.", true);
+	}
+	else if (kensei_weapon_opt >= 0 and res == kensei_weapon_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "kensei_weapon"}});
+		speak("Kensei weapon declared.", true);
+	}
+	else if (breath_dragon_opt >= 0 and res == breath_dragon_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "breath_of_dragon"}});
+		speak("Breath of the Dragon! Unleashing draconic fire!", true);
+	}
+	else if (astral_arms_opt >= 0 and res == astral_arms_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "astral_arms"}});
+		speak("Astral Arms manifested.", true);
 	}
 }
 
