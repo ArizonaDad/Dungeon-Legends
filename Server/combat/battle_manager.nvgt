@@ -7034,6 +7034,154 @@ class battle_manager {
 				check_battle_end();
 				return;
 			}
+			else if (spell.id == "death_ward" and @target != null) {
+				// Basic Rules para 12784: "You touch a creature and grant it a measure of
+				// protection from death. The first time the target would drop to 0 Hit
+				// Points before the spell ends, the target instead drops to 1 Hit Point,
+				// and the spell ends."
+				target.death_ward_active = true;
+				broadcast_announce(c.name + " grants " + target.name + " Death Ward. The first time they would drop to 0 hit points, they drop to 1 instead.", true);
+			}
+			else if (spell.id == "spike_growth") {
+				// Basic Rules para 15114: "The ground in a 20-foot-radius Sphere centered
+				// on a point within range sprouts hard spikes and thorns. The area becomes
+				// Difficult Terrain for the duration. When a creature moves into or within
+				// the area, it takes 2d4 Piercing damage for every 5 feet it travels."
+				// Approximation: deal immediate 2d4 to all creatures in the area as a
+				// per-cast effect (the per-foot tracking would need a movement hook).
+				int center_x = @target != null ? target.x : c.x;
+				int center_y = @target != null ? target.y : c.y;
+				broadcast_announce(c.name + " conjures Spike Growth in a 20-foot sphere of difficult terrain.", true);
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (feet_distance(center_x, center_y, t.x, t.y) > 20) continue;
+					int sg_dmg = random(1, 4) + random(1, 4);
+					combat.apply_damage(t, sg_dmg, DMG_PIERCING, c);
+					broadcast_announce(t.name + " takes " + sg_dmg + " piercing damage from the spikes.", false);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "wind_wall") {
+				// Basic Rules para 15658: "When the wall appears, each creature in its area
+				// makes a Strength saving throw, taking 4d8 Bludgeoning damage on a failed
+				// save or half as much damage on a successful one."
+				int dice_count = 4;
+				int center_x = @target != null ? target.x : c.x;
+				int center_y = @target != null ? target.y : c.y;
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 8);
+				broadcast_announce(c.name + " summons a 50-foot Wind Wall!", true);
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (feet_distance(center_x, center_y, t.x, t.y) > 25) continue;
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_STR);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					int dmg = saved ? total_damage / 2 : total_damage;
+					if (dmg < 1) dmg = 1;
+					broadcast_roll(t.name, "STR save vs Wind Wall", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+					combat.apply_damage(t, dmg, DMG_BLUDGEONING, c);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "wall_of_thorns") {
+				// Basic Rules para 15591: "When the wall appears, each creature in its area
+				// makes a Dexterity saving throw, taking 7d8 Piercing damage on a failed
+				// save or half as much damage on a successful one."
+				int dice_count = 7 + upcast_levels;
+				int center_x = @target != null ? target.x : c.x;
+				int center_y = @target != null ? target.y : c.y;
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 8);
+				broadcast_announce(c.name + " conjures a Wall of Thorns up to 60 feet long!", true);
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (feet_distance(center_x, center_y, t.x, t.y) > 30) continue;
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_DEX);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					int dmg = saved ? total_damage / 2 : total_damage;
+					if (dmg < 1) dmg = 1;
+					broadcast_roll(t.name, "DEX save vs Wall of Thorns", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+					combat.apply_damage(t, dmg, DMG_PIERCING, c);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "sunbeam") {
+				// Basic Rules para 15257: "You launch a sunbeam in a 5-foot-wide, 60-foot-
+				// long Line. Each creature in the Line makes a Constitution saving throw.
+				// On a failed save, a creature takes 6d8 Radiant damage and has the Blinded
+				// condition until the start of your next turn."
+				int dice_count = 6;
+				int center_x = @target != null ? target.x : c.x;
+				int center_y = @target != null ? target.y : c.y;
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 8);
+				broadcast_announce(c.name + " launches a 60-foot Sunbeam!", true);
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (feet_distance(c.x, c.y, t.x, t.y) > 60) continue;
+					// Approximate the line by hitting any visible target within 60 ft
+					if (!combat.can_see(c, t)) continue;
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_CON);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					int dmg = saved ? total_damage / 2 : total_damage;
+					if (dmg < 1) dmg = 1;
+					broadcast_roll(t.name, "CON save vs Sunbeam", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Blinded!");
+					combat.apply_damage(t, dmg, DMG_RADIANT, c);
+					if (!saved) {
+						t.add_condition(COND_BLINDED);
+					}
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "reverse_gravity") {
+				// Basic Rules para 14807: "This spell reverses gravity in a 50-foot-radius,
+				// 100-foot high Cylinder centered on a point within range. All creatures
+				// and objects in that area that aren't anchored to the ground fall upward."
+				// Combat approximation: each affected creature takes 6d6 falling damage on
+				// the way back down at the end of the spell, with a STR save to resist.
+				int center_x = @target != null ? target.x : c.x;
+				int center_y = @target != null ? target.y : c.y;
+				broadcast_announce(c.name + " casts Reverse Gravity! Creatures in a 50-foot cylinder fall upward.", true);
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (feet_distance(center_x, center_y, t.x, t.y) > 50) continue;
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_DEX);
+					int save_total = save_roll + save_bonus;
+					bool saved = save_total >= save_dc;
+					int fall_dmg = 0;
+					for (int d = 0; d < 6; d++) fall_dmg += random(1, 6);
+					if (saved) fall_dmg /= 2;
+					if (fall_dmg < 1) fall_dmg = 1;
+					broadcast_roll(t.name, "DEX save vs Reverse Gravity", save_roll, save_bonus, save_total, saved ? "Half fall damage" : "Full fall damage");
+					combat.apply_damage(t, fall_dmg, DMG_BLUDGEONING, c);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
 			else if (spell.id == "wall_of_stone") {
 				// Basic Rules para 15577-15578: "A nonmagical wall of solid stone springs
 				// into existence at a point you choose within range... If the wall cuts

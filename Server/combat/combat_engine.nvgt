@@ -90,6 +90,7 @@ class combatant {
 	int blindsight_range = 0;   // PHB Blind Fighting feat (10 ft) and various species/subclass effects
 	bool unarmed_fighting_active = false; // PHB Unarmed Fighting feat: 1d6+STR unarmed damage
 	bool beacon_of_hope_active = false; // Beacon of Hope spell: max healing + adv on WIS/death saves
+	bool death_ward_active = false; // Death Ward spell: first 0 HP becomes 1 HP and ends spell
 	int lay_on_hands_pool = 0;
 	int bardic_inspiration_uses = 0;
 	int bardic_inspiration_grant_die = 0;
@@ -944,6 +945,16 @@ class battle {
 		bool skip_poison_immunity = source_poison_soul; // Poisoner does NOT bypass immunity
 		if (damage_type == DMG_POISON and target.poison_resistance and !target.poison_immunity and !skip_poison_resistance) amount = (amount + 1) / 2;
 		if (damage_type == DMG_POISON and target.poison_immunity and !skip_poison_immunity) amount = 0;
+
+		// Death Ward (Basic Rules para 12784): "The first time the target would drop to
+		// 0 Hit Points before the spell ends, the target instead drops to 1 Hit Point,
+		// and the spell ends."
+		if (target.death_ward_active and amount >= target.current_hp + target.temp_hp) {
+			target.current_hp = 1;
+			target.temp_hp = 0;
+			target.death_ward_active = false;
+			return;
+		}
 
 		// Arcane Ward absorbs damage for Abjurer Wizards
 		if (target.arcane_ward_hp > 0 and target.class_name == "Wizard" and target.subclass == "Abjurer") {
