@@ -228,8 +228,18 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 
 
 
-### Source Audit Status (2026-04-08)
-All batches 15-21 implementations were audited against actual source docx files in `C:\Users\16239\Downloads\Sources_clean\Source Books and rules\`. Significant discrepancies were found and corrected. See commit log for details.
+### Source Audit Status (2026-04-08) — Post-Audit Additions
+All batches 15-21 implementations were audited against actual source docx files in `C:\Users\16239\Downloads\Sources_clean\Source Books and rules\`. Additionally batches 22-25 added new subclasses extracted directly from the source files.
+
+**Batch 22-25 additions (extracted from actual source files):**
+- **Wildemount (Explorer's Guide)**: Echo Knight (Manifest Echo + Unleash Incarnation), Chronurgy Magic (Chronal Shift, Temporal Awareness, Momentary Stasis), Graviturgy Magic (Adjust Density, Gravity Well, Violent Attraction, Event Horizon)
+- **Eberron (Forge of the Artificer)**: Cartographer (Adventurer's Atlas +1d4 initiative, Illuminated Cartography, Guided Precision)
+- **Exploring Eberron**: College of the Dirge Singer, Mind Domain (Gestalt Anchor +2 INT/WIS/CHA saves aura), Circle of the Forged (poison resist + B/P/S resist at L10 + poison immunity at L14)
+- **Griffon's Saddlebag (proper features)**: Couatl Herald Mercy Dice (3d6→5d10 scaling), Path of the Glacier (Frostbite 1d6→3d6, Cold Fortress, Frosted Flesh), College of Choreography (Fast Movement +10/+15/+20ft), College of Mercantile (Magic Coin 1d12→3d12 thunder), Astral Domain (Create Void Channel Divinity 15ft sphere)
+- **Fizban's Treasury**: Way of the Ascendant Dragon (Breath of the Dragon 2→3 Martial Arts dice, Aspect of the Wyrm aura), Drakewarden (proper Drake Companion stats HP/AC/damage type)
+- **Grim Hollow**: Feral Celerity (Carrion Raven free attack on rage entry), Mark of the Heretic (Oath of Zeal CD crit 19+ vs marked target), Pluck the Heartstrings (Requiems BI die on weapon hit), Witch Hunter's Strike (Inquisition 1d8/2d8 force with WIS uses)
+
+**Note:** Ravenloft source file does NOT contain subclass mechanics (only chapter intros). College of Spirits and The Undead cannot be fully implemented from the provided source file.
 
 **Corrected wrong implementations:**
 - PHB 2024 feats (Mage Slayer, Shield Master, Polearm Master) — had 2014 mechanics
