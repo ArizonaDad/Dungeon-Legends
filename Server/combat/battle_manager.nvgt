@@ -5654,6 +5654,10 @@ class battle_manager {
 
 	void request_hide_check(user@ u, combatant@ c) {
 		if (@combat == null or @u == null or @c == null) return;
+		// PHB 2024 para 388: "Hide. Make a Dexterity (Stealth) check." DC = highest visible
+		// hostile passive Perception. Pulls Stealth advantage from skill_check_advantage
+		// flags (Blessing of the Trickster, future Skulker feat, etc.) and Pass Without
+		// Trace +10 stack via the standard request_skill_check helper.
 		int highest_passive = 1;
 		for (uint i = 0; i < combat.combatants.length(); i++) {
 			combatant@ enemy = combat.combatants[i];
@@ -5662,10 +5666,10 @@ class battle_manager {
 			int passive = get_passive_perception(enemy);
 			if (passive > highest_passive) highest_passive = passive;
 		}
-
-		int stealth_mod = c.get_skill_bonus("Stealth", ABILITY_DEX) + c.pass_without_trace_bonus;
-		request_roll(u, c, ROLL_ABILITY_CHECK, 20, stealth_mod, "Hide (beat passive Perception " + highest_passive + ")", 0, highest_passive, "hide");
-		broadcast_announce(c.name + " attempts to hide.", false);
+		// Use the skill check helper but with the legacy "hide" resolution tag so the
+		// existing finalize_roll_result hide branch still applies the COND_HIDDEN state.
+		request_skill_check(u, c, "Stealth", highest_passive, "hide", false, false);
+		broadcast_announce(c.name + " attempts to hide (DC " + highest_passive + ").", false);
 	}
 
 	void handle_hide(user@ u) {
