@@ -2731,6 +2731,41 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.room.bm.broadcast_announce(c.name + " uses Skirmisher to move half their speed as a reaction!", false);
 		}
 
+		else if (feature == "unsettling_words") {
+			// College of Eloquence Bard: spend Bardic Inspiration to subtract from a creature's next save
+			if (c.class_name != "Bard" or c.subclass != "College of Eloquence") { u.send({{"type", message_types::announce}, {"text", "Only Eloquence Bards can use Unsettling Words."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			if (c.bardic_inspiration_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Bardic Inspiration remaining."}, {"interrupt", true}}); return; }
+			if (target_id == 0) { u.send({{"type", message_types::announce}, {"text", "No target selected."}, {"interrupt", true}}); return; }
+			combatant@ tgt = u.room.bm.combat.get_combatant(target_id);
+			if (@tgt == null or tgt.is_dead) { u.send({{"type", message_types::announce}, {"text", "Invalid target."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.bardic_inspiration_uses--;
+			c.unsettling_words_pending = true;
+			c.unsettling_words_target = tgt.id;
+			u.room.bm.broadcast_announce(c.name + " speaks Unsettling Words to " + tgt.name + ", undermining their resolve!", true);
+		}
+		else if (feature == "orders_demand") {
+			// Order Domain Cleric: Channel Divinity - charm target until end of next turn
+			if (c.class_name != "Cleric" or c.subclass != "Order Domain") { u.send({{"type", message_types::announce}, {"text", "Only Order Domain Clerics can use Order's Demand."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			if (c.channel_divinity_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Channel Divinity remaining."}, {"interrupt", true}}); return; }
+			if (target_id == 0) { u.send({{"type", message_types::announce}, {"text", "No target selected."}, {"interrupt", true}}); return; }
+			combatant@ tgt = u.room.bm.combat.get_combatant(target_id);
+			if (@tgt == null or tgt.is_dead) { u.send({{"type", message_types::announce}, {"text", "Invalid target."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.channel_divinity_uses--;
+			int dc = 8 + c.proficiency + c.get_ability_mod(ABILITY_WIS);
+			int save = random(1, 20) + tgt.get_save_bonus(ABILITY_WIS);
+			if (save < dc) {
+				tgt.add_condition(COND_CHARMED);
+				u.room.bm.broadcast_announce(c.name + " issues an Order's Demand! " + tgt.name + " is charmed (save " + save + " vs DC " + dc + ").", true);
+			} else {
+				u.room.bm.broadcast_announce(tgt.name + " resists " + c.name + "'s Order's Demand (save " + save + " vs DC " + dc + ").", true);
+			}
+		}
 		else if (feature == "experimental_elixir") {
 			// Alchemist Artificer: create an experimental elixir (random effect)
 			if (c.class_name != "Artificer" or c.subclass != "Alchemist") { u.send({{"type", message_types::announce}, {"text", "Only Alchemists can create Experimental Elixirs."}, {"interrupt", true}}); return; }

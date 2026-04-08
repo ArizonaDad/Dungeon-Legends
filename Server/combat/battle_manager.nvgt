@@ -1462,7 +1462,21 @@ class battle_manager {
 			int save_roll = random(1, 20);
 			int save_bonus = t.get_save_bonus(pr.spell_save_type);
 			int bless_bonus = roll_bless_bonus(t);
-			int save_total = save_roll + save_bonus + bless_bonus;
+			int unsettling_penalty = 0;
+			// College of Eloquence - Unsettling Words: subtract Bardic Inspiration die from save
+			for (uint ub = 0; ub < combat.combatants.length(); ub++) {
+				combatant@ ub_c = combat.combatants[ub];
+				if (@ub_c == null or ub_c.is_dead) continue;
+				if (ub_c.unsettling_words_pending and ub_c.unsettling_words_target == t.id) {
+					int bardic_die = ub_c.bardic_inspiration_die > 0 ? ub_c.bardic_inspiration_die : 6;
+					unsettling_penalty = random(1, bardic_die);
+					ub_c.unsettling_words_pending = false;
+					ub_c.unsettling_words_target = 0;
+					broadcast_announce(t.name + "'s save reduced by " + unsettling_penalty + " from " + ub_c.name + "'s Unsettling Words!", true);
+					break;
+				}
+			}
+			int save_total = save_roll + save_bonus + bless_bonus - unsettling_penalty;
 			bool saved = save_total >= pr.spell_save_dc;
 			string save_name = pr.spell_save_type >= 0 and pr.spell_save_type < int(ABILITY_SHORT.length()) ? ABILITY_SHORT[pr.spell_save_type] : "save";
 			if (bless_bonus > 0) broadcast_announce(t.name + "'s Bless adds " + bless_bonus + " to the save.", false);
@@ -5359,6 +5373,39 @@ class battle_manager {
 		if (spell.casting_time == 0) { c.has_action = false; c.used_action = true; }
 		else if (spell.casting_time == 1) { c.has_bonus_action = false; c.used_bonus_action = true; }
 		else if (spell.casting_time == 2) { c.has_reaction = false; }
+
+		// Order Domain Cleric: Voice of Authority - if targeting an ally with a 1st+ level spell, that ally can make a weapon attack as a reaction
+		if (c.class_name == "Cleric" and c.subclass == "Order Domain" and spell.level >= 1 and @target != null and target.id != c.id and target.is_player == c.is_player and !target.is_dead and target.has_reaction) {
+			// Find a hostile target the ally can reach
+			combatant@ enemy = null;
+			int best_dist = 999;
+			for (uint vai = 0; vai < combat.combatants.length(); vai++) {
+				combatant@ vt = combat.combatants[vai];
+				if (@vt == null or vt.is_dead or vt.is_player == target.is_player) continue;
+				int d = feet_distance(target.x, target.y, vt.x, vt.y);
+				int weapon_range = target.main_hand_range > 0 ? target.main_hand_range : 5;
+				if (d <= weapon_range and d < best_dist) {
+					@enemy = vt;
+					best_dist = d;
+				}
+			}
+			if (@enemy != null) {
+				int va_atk_bonus = get_attack_bonus_for_roll(target, false);
+				int va_roll = random(1, 20);
+				int va_total = va_roll + va_atk_bonus;
+				broadcast_announce(c.name + "'s Voice of Authority compels " + target.name + " to strike " + enemy.name + "!", true);
+				broadcast_roll(target.name, "Voice of Authority attack vs " + enemy.name, va_roll, va_atk_bonus, va_total, va_total >= enemy.armor_class ? "Hit!" : "Miss!");
+				if (va_total >= enemy.armor_class or va_roll == 20) {
+					int va_dmg = random(1, target.main_hand_damage_dice) * target.main_hand_damage_count;
+					va_dmg += target.get_ability_mod(target.main_hand_finesse and target.get_ability_mod(ABILITY_DEX) > target.get_ability_mod(ABILITY_STR) ? ABILITY_DEX : ABILITY_STR);
+					if (va_roll == 20) va_dmg *= 2;
+					if (va_dmg < 1) va_dmg = 1;
+					combat.apply_damage(enemy, va_dmg, target.main_hand_damage_type, target);
+					broadcast_announce(target.name + " hits " + enemy.name + " for " + va_dmg + " damage!", true);
+				}
+				target.has_reaction = false;
+			}
+		}
 
 		// Handle concentration: drop old concentration if starting new
 		if (spell.concentration and c.is_concentrating) {

@@ -716,6 +716,8 @@ void show_bonus_action_menu() {
 	int open_hand_opt = -1;
 	int mage_hand_legerdemain_opt = -1;
 	int scout_skirmish_opt = -1;
+	int unsettling_words_opt = -1;
+	int orders_demand_opt = -1;
 
 	if (lc == "barbarian" and !my_is_raging and my_rage_uses_remaining > 0) rage_opt = m.add_item("Rage. Bonus action. Uses left: " + my_rage_uses_remaining + ". Damage bonus: " + my_rage_damage_bonus + ".");
 	if (lc == "fighter" and my_second_wind_available) second_wind_opt = m.add_item("Second Wind. Bonus action. Heal 1d10 plus fighter level.");
@@ -918,6 +920,12 @@ void show_bonus_action_menu() {
 	}
 	if (lc == "rogue" and subclass == "Scout") {
 		scout_skirmish_opt = m.add_item("Skirmisher. Reaction. Move half speed when enemy ends turn near you.");
+	}
+	if (lc == "bard" and subclass == "College of Eloquence" and level >= 3) {
+		unsettling_words_opt = m.add_item("Unsettling Words. Bonus action. Spend Bardic Inspiration to subtract die roll from target's next save.");
+	}
+	if (lc == "cleric" and subclass == "Order Domain") {
+		orders_demand_opt = m.add_item("Order's Demand. Bonus action. Channel Divinity to charm a target.");
 	}
 	// Gunslinger class features
 	if (lc == "gunslinger") {
@@ -1353,6 +1361,22 @@ void show_bonus_action_menu() {
 	else if (scout_skirmish_opt >= 0 and res == scout_skirmish_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "scout_skirmish"}});
 		speak("Skirmisher movement.", true);
+	}
+	else if (unsettling_words_opt >= 0 and res == unsettling_words_opt) {
+		if (current_target_id == 0) {
+			speak("No target selected.", true);
+			return;
+		}
+		send({{"type", message_types::bonus_action}, {"feature", "unsettling_words"}, {"target_id", current_target_id}});
+		speak("Unsettling Words spoken.", true);
+	}
+	else if (orders_demand_opt >= 0 and res == orders_demand_opt) {
+		if (current_target_id == 0) {
+			speak("No target selected.", true);
+			return;
+		}
+		send({{"type", message_types::bonus_action}, {"feature", "orders_demand"}, {"target_id", current_target_id}});
+		speak("Order's Demand issued.", true);
 	}
 }
 

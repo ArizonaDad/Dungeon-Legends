@@ -197,6 +197,15 @@ class combatant {
 	int chronal_shift_uses = 0; // Chronurgy Wizard
 	bool adjust_density_active = false; // Graviturgy Wizard
 	bool scribes_spellbook_active = false; // Order of Scribes Wizard
+	// Batch 15: Tasha remaining
+	bool silver_tongue_active = false; // College of Eloquence Bard - min 10 on persuade/deceive
+	bool unsettling_words_pending = false; // College of Eloquence - subtract bardic die from save
+	uint unsettling_words_target = 0;
+	bool voice_of_authority_active = false; // Order Domain Cleric - ally bonus attack on spell target
+	uint voice_of_authority_ally = 0;
+	bool orders_demand_used = false; // Order Domain Cleric Channel Divinity
+	bool wizardly_quill_active = false; // Order of Scribes Wizard
+	int awakened_spellbook_changes = 0; // Order of Scribes - replace damage type
 	// Gunslinger class
 	int risk_dice_current = 0;
 	int risk_dice_max = 0;

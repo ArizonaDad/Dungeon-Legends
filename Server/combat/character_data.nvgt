@@ -913,6 +913,14 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
             c.arcane_ward_max = cs.level * 2;
             c.arcane_ward_hp = c.arcane_ward_max;
         }
+        // Order of Scribes Wizard - Wizardly Quill, Awakened Spellbook
+        if (cs.subclass == "Order of Scribes" and cs.level >= 2) {
+            c.wizardly_quill_active = true;
+            c.scribes_spellbook_active = true;
+            // Awakened Spellbook: limited damage type swaps per long rest
+            int prof_lvl = proficiency_bonus(cs.level);
+            c.awakened_spellbook_changes = prof_lvl > 1 ? prof_lvl : 1;
+        }
     }
 
     // Bard subclasses
@@ -923,6 +931,16 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         if (cs.subclass == "College of Swords" and cs.level >= 6) {
             c.extra_attacks = 1;
         }
+        // College of Eloquence Bard - Silver Tongue, Unsettling Words
+        if (cs.subclass == "College of Eloquence" and cs.level >= 3) {
+            c.silver_tongue_active = true;
+        }
+    }
+
+    // Order Domain Cleric - Voice of Authority, Order's Demand
+    if (cs.class_name == "Cleric" and cs.subclass == "Order Domain" and cs.level >= 1) {
+        c.voice_of_authority_active = true;
+        c.orders_demand_used = false;
     }
 
     // Warlock subclasses
