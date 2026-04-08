@@ -2746,21 +2746,32 @@ void handle_user_message(user@ u, json_object@ msg)
 			ally.hide_dc += 5;
 			u.room.bm.broadcast_announce(c.name + " grants Blessing of the Trickster to " + ally.name + ", granting advantage on Stealth checks.", true);
 		}
-		else if (feature == "spirit_totem_bear") {
-			// Circle of the Shepherd Druid: Bear Totem - temp HP and damage resistance for nearby allies
+		else if (feature == "spirit_totem_bear" or feature == "spirit_totem_hawk" or feature == "spirit_totem_unicorn") {
+			// Circle of the Shepherd Druid: Spirit Totem (Bear/Hawk/Unicorn)
+			// Bonus action, 30ft aura (simplified to around druid; source has it around a summoned point within 60ft)
+			// 1 minute duration, recharges on short/long rest
 			if (c.class_name != "Druid" or c.subclass != "Circle of the Shepherd") { u.send({{"type", message_types::announce}, {"text", "Only Shepherd Druids can summon spirit totems."}, {"interrupt", true}}); return; }
 			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
 			c.has_bonus_action = false;
 			c.used_bonus_action = true;
-			c.shepherd_totem_type = 0;
-			int bear_temp = 5 + c.level;
-			for (uint sti = 0; sti < u.room.bm.combat.combatants.length(); sti++) {
-				combatant@ ally = u.room.bm.combat.combatants[sti];
-				if (@ally == null or ally.is_dead or ally.is_player != c.is_player) continue;
-				if (feet_distance(c.x, c.y, ally.x, ally.y) > 30) continue;
-				if (ally.temp_hp < bear_temp) ally.temp_hp = bear_temp;
+			c.shepherd_circle_active = true;
+			if (feature == "spirit_totem_bear") {
+				c.shepherd_totem_type = 0;
+				int bear_temp = 5 + c.level;
+				for (uint sti = 0; sti < u.room.bm.combat.combatants.length(); sti++) {
+					combatant@ ally = u.room.bm.combat.combatants[sti];
+					if (@ally == null or ally.is_dead or ally.is_player != c.is_player) continue;
+					if (feet_distance(c.x, c.y, ally.x, ally.y) > 30) continue;
+					if (ally.temp_hp < bear_temp) ally.temp_hp = bear_temp;
+				}
+				u.room.bm.broadcast_announce(c.name + " summons the Bear Spirit Totem! Allies within 30ft gain " + bear_temp + " temp HP and advantage on STR checks.", true);
+			} else if (feature == "spirit_totem_hawk") {
+				c.shepherd_totem_type = 1;
+				u.room.bm.broadcast_announce(c.name + " summons the Hawk Spirit Totem! You can use a reaction to grant advantage on attacks against targets in the aura.", true);
+			} else {
+				c.shepherd_totem_type = 2;
+				u.room.bm.broadcast_announce(c.name + " summons the Unicorn Spirit Totem! Healing spells also heal chosen creatures in the aura.", true);
 			}
-			u.room.bm.broadcast_announce(c.name + " summons the Bear Spirit Totem! Allies within 30ft gain " + bear_temp + " temp HP.", true);
 		}
 		else if (feature == "polearm_master_attack") {
 			// Polearm Master: bonus action attack with opposite end (1d4 bludgeoning) immediately after Attack action

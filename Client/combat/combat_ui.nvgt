@@ -731,6 +731,8 @@ void show_bonus_action_menu() {
 	int shield_master_shove_opt = -1;
 	int blessing_of_trickery_opt = -1;
 	int spirit_totem_bear_opt = -1;
+	int spirit_totem_hawk_opt = -1;
+	int spirit_totem_unicorn_opt = -1;
 
 	if (lc == "barbarian" and !my_is_raging and my_rage_uses_remaining > 0) rage_opt = m.add_item("Rage. Bonus action. Uses left: " + my_rage_uses_remaining + ". Damage bonus: " + my_rage_damage_bonus + ".");
 	if (lc == "fighter" and my_second_wind_available) second_wind_opt = m.add_item("Second Wind. Bonus action. Heal 1d10 plus fighter level.");
@@ -963,6 +965,8 @@ void show_bonus_action_menu() {
 	}
 	if (lc == "druid" and subclass == "Circle of the Shepherd" and level >= 2) {
 		spirit_totem_bear_opt = m.add_item("Bear Spirit Totem. Bonus action. Grant temp HP to nearby allies.");
+		spirit_totem_hawk_opt = m.add_item("Hawk Spirit Totem. Bonus action. Enables reaction to grant attack advantage.");
+		spirit_totem_unicorn_opt = m.add_item("Unicorn Spirit Totem. Bonus action. Healing spells also heal chosen creatures in aura.");
 	}
 	// Feat-based bonus actions (server validates feat ownership)
 	polearm_master_attack_opt = m.add_item("Polearm Master Attack. Bonus action. Strike with the polearm butt for 1d4. (Requires Polearm Master feat)");
@@ -1466,6 +1470,14 @@ void show_bonus_action_menu() {
 	else if (spirit_totem_bear_opt >= 0 and res == spirit_totem_bear_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "spirit_totem_bear"}});
 		speak("Bear Spirit Totem summoned.", true);
+	}
+	else if (spirit_totem_hawk_opt >= 0 and res == spirit_totem_hawk_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "spirit_totem_hawk"}});
+		speak("Hawk Spirit Totem summoned.", true);
+	}
+	else if (spirit_totem_unicorn_opt >= 0 and res == spirit_totem_unicorn_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "spirit_totem_unicorn"}});
+		speak("Unicorn Spirit Totem summoned.", true);
 	}
 }
 
