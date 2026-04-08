@@ -91,6 +91,7 @@ class combatant {
 	bool unarmed_fighting_active = false; // PHB Unarmed Fighting feat: 1d6+STR unarmed damage
 	bool beacon_of_hope_active = false; // Beacon of Hope spell: max healing + adv on WIS/death saves
 	bool death_ward_active = false; // Death Ward spell: first 0 HP becomes 1 HP and ends spell
+	bool holy_weapon_active = false; // Xanathar's Holy Weapon: +2d8 radiant on weapon hits
 	int lay_on_hands_pool = 0;
 	int bardic_inspiration_uses = 0;
 	int bardic_inspiration_grant_die = 0;

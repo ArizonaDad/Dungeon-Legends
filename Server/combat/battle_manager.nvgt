@@ -4433,6 +4433,13 @@ class battle_manager {
 				total_damage += hex_damage;
 				broadcast_announce(c.name + "'s Hex deals " + hex_damage + " extra necrotic damage to " + target.name + ".", false);
 			}
+			// Xanathar's Holy Weapon (para 4936): "weapon attacks made with it deal an
+			// extra 2d8 radiant damage on a hit." Triggers on weapon attacks only.
+			if (c.holy_weapon_active and !pr.is_spell_effect and pr.is_weapon_attack) {
+				int hw_dmg = random(1, 8) + random(1, 8);
+				total_damage += hw_dmg;
+				broadcast_announce(c.name + "'s Holy Weapon adds " + hw_dmg + " radiant damage.", false);
+			}
 			// Mother of Sorrows Venomous Mark (Book of Ebon Tides para 1137):
 			// "Until the curse ends, you deal an extra 1d6 poison damage to the target
 			// whenever you hit it with a spell attack."
@@ -7028,6 +7035,74 @@ class battle_manager {
 					if (!saved) {
 						t.add_condition(COND_POISONED);
 						broadcast_to_battle({{"type", message_types::condition_applied}, {"target", t.name}, {"condition", "Poisoned"}});
+					}
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "holy_weapon") {
+				// Xanathar's para 4936: "You imbue a weapon you touch with holy power...
+				// weapon attacks made with it deal an extra 2d8 radiant damage on a hit."
+				// Bonus action cast on self.
+				c.holy_weapon_active = true;
+				broadcast_announce(c.name + " imbues their weapon with Holy Weapon. +2d8 radiant damage on weapon hits until concentration ends.", true);
+			}
+			else if (spell.id == "sickening_radiance") {
+				// Xanathar's paras 5226-5227: "Dim, greenish light spreads within a 30-foot-
+				// radius sphere centered on a point you choose within range... When a
+				// creature moves into the spell's area for the first time on a turn or
+				// starts its turn there, that creature must succeed on a Constitution
+				// saving throw or take 4d10 radiant damage, suffer one level of exhaustion."
+				int dice_count = 4;
+				int center_x = @target != null ? target.x : c.x;
+				int center_y = @target != null ? target.y : c.y;
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 10);
+				broadcast_announce(c.name + " conjures a 30-foot Sickening Radiance!", true);
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (feet_distance(center_x, center_y, t.x, t.y) > 30) continue;
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_CON);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					broadcast_roll(t.name, "CON save vs Sickening Radiance", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Damage + exhaustion!");
+					if (!saved) {
+						combat.apply_damage(t, total_damage, DMG_RADIANT, c);
+						t.exhaustion_level += 1;
+						broadcast_announce(t.name + " takes " + total_damage + " radiant damage and gains 1 level of exhaustion.", false);
+					}
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "storm_sphere") {
+				// Xanathar's para 5288: "A 20-foot-radius sphere of whirling air springs
+				// into existence, centered on a point you choose within range... Each
+				// creature in the sphere when it appears or that ends its turn there must
+				// succeed on a Strength saving throw or take 2d6 bludgeoning damage."
+				int dice_count = 2 + upcast_levels;
+				int center_x = @target != null ? target.x : c.x;
+				int center_y = @target != null ? target.y : c.y;
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 6);
+				broadcast_announce(c.name + " summons a 20-foot Storm Sphere of whirling air!", true);
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (feet_distance(center_x, center_y, t.x, t.y) > 20) continue;
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_STR);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					broadcast_roll(t.name, "STR save vs Storm Sphere", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Damaged!");
+					if (!saved) {
+						combat.apply_damage(t, total_damage, DMG_BLUDGEONING, c);
 					}
 				}
 				broadcast_state();
