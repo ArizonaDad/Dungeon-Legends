@@ -7364,6 +7364,30 @@ class battle_manager {
 				check_battle_end();
 				return;
 			}
+			else if (spell.id == "investiture_of_flame") {
+				// Xanathar's paras 4992-4993: "You are immune to fire damage and have
+				// resistance to cold damage. Any creature that moves within 5 feet of you
+				// for the first time on a turn or ends its turn there takes 1d10 fire damage."
+				c.fire_resistance = true; // Game doesn't have immunity tier - approximated as resistance
+				c.cold_resistance = true;
+				c.investiture_flame_active = true;
+				broadcast_announce(c.name + " is wreathed in flame from Investiture of Flame! Fire immunity and cold resistance. Adjacent creatures take 1d10 fire damage.", true);
+			}
+			else if (spell.id == "cause_fear" and @target != null) {
+				// Xanathar's para 4655: "The target must succeed on a Wisdom saving throw
+				// or become frightened of you until the spell ends. A construct or an
+				// undead is immune to this effect."
+				int save_roll = random(1, 20);
+				int save_bonus = target.get_save_bonus(ABILITY_WIS);
+				int bless_bonus = roll_bless_bonus(target);
+				int save_total = save_roll + save_bonus + bless_bonus;
+				bool saved = save_total >= save_dc;
+				broadcast_roll(target.name, "WIS save vs Cause Fear", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Frightened!");
+				if (!saved) {
+					target.add_condition(COND_FRIGHTENED);
+					broadcast_announce(target.name + " awakens to their own mortality and is Frightened of " + c.name + "!", true);
+				}
+			}
 			else if (spell.id == "forcecage" and @target != null) {
 				// Basic Rules paras 13410-13411: "An immobile, Invisible, Cube-shaped prison
 				// composed of magical force springs into existence around an area you choose

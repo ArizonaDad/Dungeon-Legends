@@ -89,6 +89,7 @@ class combatant {
 	bool counterspell_pending = false;   // Counterspell readied as a reaction (intercept the next enemy spell)
 	bool searing_smite_pending = false;  // Searing Smite rider on next weapon hit
 	int searing_smite_dice = 0;          // Number of d6 to roll for Searing Smite damage
+	bool investiture_flame_active = false; // Investiture of Flame: 1d10 fire to adjacent creatures
 	uint bless_source_id = 0;
 	bool guiding_bolt_advantage = false;
 	uint guiding_bolt_source_id = 0;
