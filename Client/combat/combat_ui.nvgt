@@ -700,6 +700,10 @@ void show_bonus_action_menu() {
 	int wildfire_opt = -1;
 	int echo_manifest_opt = -1;
 	int rebuke_violent_opt = -1;
+	int eldritch_cannon_opt = -1;
+	int cannon_fire_opt = -1;
+	int steel_defender_opt = -1;
+	int experimental_elixir_opt = -1;
 
 	if (lc == "barbarian" and !my_is_raging and my_rage_uses_remaining > 0) rage_opt = m.add_item("Rage. Bonus action. Uses left: " + my_rage_uses_remaining + ". Damage bonus: " + my_rage_damage_bonus + ".");
 	if (lc == "fighter" and my_second_wind_available) second_wind_opt = m.add_item("Second Wind. Bonus action. Heal 1d10 plus fighter level.");
@@ -868,6 +872,16 @@ void show_bonus_action_menu() {
 	}
 	if (lc == "paladin" and subclass == "Oath of Redemption") {
 		rebuke_violent_opt = m.add_item("Rebuke the Violent. Channel Divinity. Reaction damage reflection.");
+	}
+	if (lc == "artificer" and subclass == "Artillerist") {
+		eldritch_cannon_opt = m.add_item("Eldritch Cannon. Action. Create an arcane cannon.");
+		cannon_fire_opt = m.add_item("Command Cannon to Fire. Bonus action. Flamethrower attack.");
+	}
+	if (lc == "artificer" and subclass == "Battle Smith") {
+		steel_defender_opt = m.add_item("Steel Defender Attack. Bonus action. Command your defender to strike.");
+	}
+	if (lc == "artificer" and subclass == "Alchemist") {
+		experimental_elixir_opt = m.add_item("Experimental Elixir. Bonus action. Create a random elixir effect.");
 	}
 
 	int options = 1;
@@ -1196,6 +1210,30 @@ void show_bonus_action_menu() {
 	else if (rebuke_violent_opt >= 0 and res == rebuke_violent_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "rebuke_violent"}});
 		speak("Rebuke the Violent readied.", true);
+	}
+	else if (eldritch_cannon_opt >= 0 and res == eldritch_cannon_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "eldritch_cannon"}});
+		speak("Creating Eldritch Cannon.", true);
+	}
+	else if (cannon_fire_opt >= 0 and res == cannon_fire_opt) {
+		if (current_target_id == 0) {
+			speak("No target selected. Scan with I J K L and press Enter to lock a target.", true);
+			return;
+		}
+		send({{"type", message_types::bonus_action}, {"feature", "cannon_fire"}, {"target_id", current_target_id}});
+		speak("Cannon firing at target.", true);
+	}
+	else if (steel_defender_opt >= 0 and res == steel_defender_opt) {
+		if (current_target_id == 0) {
+			speak("No target selected. Scan with I J K L and press Enter to lock a target.", true);
+			return;
+		}
+		send({{"type", message_types::bonus_action}, {"feature", "steel_defender_attack"}, {"target_id", current_target_id}});
+		speak("Steel Defender attacking.", true);
+	}
+	else if (experimental_elixir_opt >= 0 and res == experimental_elixir_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "experimental_elixir"}});
+		speak("Experimental Elixir!", true);
 	}
 }
 

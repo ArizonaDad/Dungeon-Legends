@@ -2526,6 +2526,82 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.room.bm.broadcast_announce(c.name + " readies Rebuke the Violent! Next time an enemy damages an ally within 30ft, they take equal damage.", false);
 		}
 
+		else if (feature == "eldritch_cannon") {
+			// Artillerist Artificer: summon Eldritch Cannon
+			if (c.class_name != "Artificer" or c.subclass != "Artillerist") { u.send({{"type", message_types::announce}, {"text", "Only Artillerists can summon Eldritch Cannons."}, {"interrupt", true}}); return; }
+			if (!c.has_action) { u.send({{"type", message_types::announce}, {"text", "No action remaining."}, {"interrupt", true}}); return; }
+			c.has_action = false;
+			c.used_action = true;
+			c.eldritch_cannon_active = true;
+			c.eldritch_cannon_hp = 5 * c.level;
+			u.room.bm.broadcast_announce(c.name + " creates an Eldritch Cannon with " + c.eldritch_cannon_hp + " HP!", true);
+		}
+
+		else if (feature == "cannon_fire") {
+			// Artillerist: bonus action to command the cannon to fire
+			if (c.class_name != "Artificer" or c.subclass != "Artillerist") { u.send({{"type", message_types::announce}, {"text", "Only Artillerists can fire cannons."}, {"interrupt", true}}); return; }
+			if (!c.eldritch_cannon_active) { u.send({{"type", message_types::announce}, {"text", "No active cannon to fire."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			combatant@ tgt = target_id != 0 ? u.room.bm.combat.get_combatant(target_id) : null;
+			if (@tgt == null or tgt.is_dead) { u.send({{"type", message_types::announce}, {"text", "Invalid target."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			// Flamethrower: 2d8 fire, DEX save for half
+			int dmg = random(1, 8) + random(1, 8);
+			int save = random(1, 20) + tgt.get_save_bonus(ABILITY_DEX);
+			int dc = 8 + c.proficiency + c.get_ability_mod(ABILITY_INT);
+			if (save >= dc) dmg /= 2;
+			u.room.bm.combat.apply_damage(tgt, dmg, DMG_FIRE, c);
+			u.room.bm.broadcast_announce(c.name + "'s Eldritch Cannon flamethrower fires at " + tgt.name + " for " + dmg + " fire damage!", true);
+		}
+
+		else if (feature == "steel_defender_attack") {
+			// Battle Smith Artificer: command Steel Defender to attack
+			if (c.class_name != "Artificer" or c.subclass != "Battle Smith") { u.send({{"type", message_types::announce}, {"text", "Only Battle Smiths have a Steel Defender."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			combatant@ tgt = target_id != 0 ? u.room.bm.combat.get_combatant(target_id) : null;
+			if (@tgt == null or tgt.is_dead) { u.send({{"type", message_types::announce}, {"text", "Invalid target."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			int atk_bonus = c.proficiency + c.get_ability_mod(ABILITY_INT);
+			int roll = random(1, 20) + atk_bonus;
+			if (roll >= tgt.armor_class) {
+				int dmg = random(1, 8) + c.proficiency;
+				u.room.bm.combat.apply_damage(tgt, dmg, DMG_FORCE, c);
+				u.room.bm.broadcast_announce(c.name + "'s Steel Defender attacks " + tgt.name + " for " + dmg + " force damage!", true);
+			} else {
+				u.room.bm.broadcast_announce(c.name + "'s Steel Defender attacks " + tgt.name + " but misses.", false);
+			}
+			c.steel_defender_active = true;
+		}
+
+		else if (feature == "experimental_elixir") {
+			// Alchemist Artificer: create an experimental elixir (random effect)
+			if (c.class_name != "Artificer" or c.subclass != "Alchemist") { u.send({{"type", message_types::announce}, {"text", "Only Alchemists can create Experimental Elixirs."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			int elixir = random(1, 6);
+			int heal = random(1, 4) + 2 + c.get_ability_mod(ABILITY_INT);
+			if (elixir == 1) {
+				u.room.bm.combat.apply_healing(c, heal);
+				u.room.bm.broadcast_announce(c.name + "'s Healing Elixir restores " + heal + " HP!", true);
+			} else if (elixir == 2) {
+				c.speed += 10;
+				u.room.bm.broadcast_announce(c.name + "'s Swiftness Elixir grants +10 ft speed!", true);
+			} else if (elixir == 3) {
+				c.temp_hp += 2 + c.level;
+				u.room.bm.broadcast_announce(c.name + "'s Resilience Elixir grants " + (2 + c.level) + " temp HP!", true);
+			} else if (elixir == 4) {
+				u.room.bm.broadcast_announce(c.name + "'s Boldness Elixir grants +1d4 to next attack!", true);
+				c.emboldening_bond_active = true; // reuse bond field
+			} else {
+				u.room.bm.combat.apply_healing(c, heal);
+				u.room.bm.broadcast_announce(c.name + "'s Flight of Fancy Elixir! (+heal " + heal + ")", true);
+			}
+			c.experimental_elixir_available = true;
+		}
+
 		else {
 			u.send({{"type", message_types::announce}, {"text", "That bonus action is not available to your character."}, {"interrupt", true}});
 			return;
