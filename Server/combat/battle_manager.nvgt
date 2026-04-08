@@ -7306,6 +7306,75 @@ class battle_manager {
 				check_battle_end();
 				return;
 			}
+			else if (spell.id == "bestow_curse" and @target != null) {
+				// Basic Rules paras 12219-12222: "You touch a creature, which must succeed
+				// on a Wisdom saving throw or become cursed for the duration. Until the
+				// curse ends, the target suffers one of the following effects of your
+				// choice." Defaults to "Disadvantage on attack rolls against you" since
+				// the alternatives need a per-spell choice prompt.
+				int save_roll = random(1, 20);
+				int save_bonus = target.get_save_bonus(ABILITY_WIS);
+				int bless_bonus = roll_bless_bonus(target);
+				int save_total = save_roll + save_bonus + bless_bonus;
+				bool saved = save_total >= save_dc;
+				broadcast_roll(target.name, "WIS save vs Bestow Curse", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Cursed!");
+				if (!saved) {
+					// Use the existing baned flag as the closest approximation
+					target.baned = true;
+					broadcast_announce(c.name + " bestows a curse on " + target.name + "! They have disadvantage on attack rolls (-1d4 approximation).", true);
+				}
+			}
+			else if (spell.id == "vampiric_touch") {
+				// Basic Rules para 15517: "Make a melee spell attack against one creature
+				// within reach. On a hit, the target takes 3d6 Necrotic damage, and you
+				// regain Hit Points equal to half the necrotic damage dealt."
+				if (@target == null or target.is_dead) {
+					u.send({{"type", message_types::announce}, {"text", "No valid target."}, {"interrupt", true}});
+					return;
+				}
+				int dist = feet_distance(c.x, c.y, target.x, target.y);
+				if (dist > 5) {
+					u.send({{"type", message_types::announce}, {"text", "Vampiric Touch requires a target within 5 feet."}, {"interrupt", true}});
+					return;
+				}
+				// Roll spell attack
+				int atk_roll = random(1, 20);
+				int atk_total = atk_roll + spell_atk;
+				bool hit = atk_total >= target.armor_class;
+				broadcast_roll(c.name, "Vampiric Touch attack roll", atk_roll, spell_atk, atk_total, hit ? "Hit!" : "Missed!");
+				if (hit) {
+					int dice_count = 3 + upcast_levels;
+					int total_damage = 0;
+					for (int d = 0; d < dice_count; d++) total_damage += random(1, 6);
+					combat.apply_damage(target, total_damage, DMG_NECROTIC, c);
+					int heal = total_damage / 2;
+					int effective = combat.apply_healing(c, heal);
+					record_effective_healing(c.player_username, effective);
+					broadcast_announce(c.name + "'s Vampiric Touch drains " + total_damage + " HP from " + target.name + " and heals " + c.name + " for " + heal + ".", true);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "plant_growth") {
+				// Basic Rules para 14499: "Choose a point within range. All normal plants
+				// in a 100-foot-radius Sphere centered on that point become thick and
+				// overgrown. A creature moving through that area must spend 4 feet of
+				// movement for every 1 foot it moves." Approximation: cuts movement of
+				// all hostiles in the area to 1/4 for the next round.
+				int center_x = @target != null ? target.x : c.x;
+				int center_y = @target != null ? target.y : c.y;
+				int affected = 0;
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (feet_distance(center_x, center_y, t.x, t.y) > 100) continue;
+					if (!combat.are_hostile(c, t)) continue;
+					t.movement_remaining = t.movement_remaining / 4;
+					affected++;
+				}
+				broadcast_announce(c.name + " channels Plant Growth — overgrowth covers a 100-foot area, slowing " + affected + " hostile" + (affected == 1 ? "" : "s") + " to 1/4 movement.", true);
+			}
 			else if (spell.id == "disintegrate" and @target != null) {
 				// Basic Rules para 12875: "A creature targeted by this spell makes a
 				// Dexterity saving throw. On a failed save, the target takes 10d6 + 40
