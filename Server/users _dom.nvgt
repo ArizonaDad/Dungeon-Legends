@@ -2731,19 +2731,20 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.room.bm.broadcast_announce(c.name + " uses Skirmisher to move half their speed as a reaction!", false);
 		}
 
-		else if (feature == "blessing_of_trickery") {
-			// Trickery Domain Cleric: bless ally with advantage on stealth (uses Channel Divinity)
+		else if (feature == "blessing_of_the_trickster") {
+			// Trickery Domain Cleric (PHB 2024): Magic action, no CD cost, self or willing creature within 30ft,
+			// target gains advantage on Dex (Stealth) checks until long rest or recast.
 			if (c.class_name != "Cleric" or c.subclass != "Trickery Domain") { u.send({{"type", message_types::announce}, {"text", "Only Trickery Clerics can grant this blessing."}, {"interrupt", true}}); return; }
-			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
-			if (c.channel_divinity_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Channel Divinity remaining."}, {"interrupt", true}}); return; }
+			if (!c.has_action) { u.send({{"type", message_types::announce}, {"text", "You've already used your action this turn."}, {"interrupt", true}}); return; }
 			combatant@ ally = target_id != 0 ? u.room.bm.combat.get_combatant(target_id) : c;
 			if (@ally == null or ally.is_dead) { u.send({{"type", message_types::announce}, {"text", "Invalid target."}, {"interrupt", true}}); return; }
 			if (ally.is_player != c.is_player and ally.id != c.id) { u.send({{"type", message_types::announce}, {"text", "Target an ally or yourself."}, {"interrupt", true}}); return; }
-			c.has_bonus_action = false;
-			c.used_bonus_action = true;
-			c.channel_divinity_uses--;
-			ally.is_hidden = true;
-			u.room.bm.broadcast_announce(c.name + " grants Blessing of Trickery to " + ally.name + ", who becomes hidden!", true);
+			if (feet_distance(c.x, c.y, ally.x, ally.y) > 30) { u.send({{"type", message_types::announce}, {"text", "Target must be within 30ft."}, {"interrupt", true}}); return; }
+			c.has_action = false;
+			c.used_action = true;
+			// Effect: advantage on Stealth checks; approximated as hide DC boost since combat has no Persuasion/Stealth rolls
+			ally.hide_dc += 5;
+			u.room.bm.broadcast_announce(c.name + " grants Blessing of the Trickster to " + ally.name + ", granting advantage on Stealth checks.", true);
 		}
 		else if (feature == "spirit_totem_bear") {
 			// Circle of the Shepherd Druid: Bear Totem - temp HP and damage resistance for nearby allies
@@ -2762,14 +2763,20 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.room.bm.broadcast_announce(c.name + " summons the Bear Spirit Totem! Allies within 30ft gain " + bear_temp + " temp HP.", true);
 		}
 		else if (feature == "polearm_master_attack") {
-			// Polearm Master: bonus action attack with the opposite end of the weapon (1d4)
+			// Polearm Master: bonus action attack with opposite end (1d4 bludgeoning) immediately after Attack action
 			if (!c.has_feat("polearm_master")) { u.send({{"type", message_types::announce}, {"text", "You don't have the Polearm Master feat."}, {"interrupt", true}}); return; }
 			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			if (!c.used_action) { u.send({{"type", message_types::announce}, {"text", "You must first take the Attack action with a polearm."}, {"interrupt", true}}); return; }
+			// Verify weapon is qualifying (quarterstaff, spear, or Heavy+Reach)
+			string wname = c.main_hand.lower();
+			bool qualifies = (wname.find("quarterstaff") >= 0 or wname.find("spear") >= 0 or wname.find("glaive") >= 0 or wname.find("halberd") >= 0 or wname.find("pike") >= 0);
+			if (!qualifies) { u.send({{"type", message_types::announce}, {"text", "Polearm Master requires a quarterstaff, spear, glaive, halberd, or pike."}, {"interrupt", true}}); return; }
 			if (target_id == 0) { u.send({{"type", message_types::announce}, {"text", "No target selected."}, {"interrupt", true}}); return; }
 			combatant@ tgt = u.room.bm.combat.get_combatant(target_id);
 			if (@tgt == null or tgt.is_dead) { u.send({{"type", message_types::announce}, {"text", "Invalid target."}, {"interrupt", true}}); return; }
 			int dist_pa = feet_distance(c.x, c.y, tgt.x, tgt.y);
-			if (dist_pa > 10) { u.send({{"type", message_types::announce}, {"text", "Target out of polearm reach."}, {"interrupt", true}}); return; }
+			int pa_reach = c.main_hand_range > 0 ? c.main_hand_range : 5;
+			if (dist_pa > pa_reach) { u.send({{"type", message_types::announce}, {"text", "Target out of weapon reach."}, {"interrupt", true}}); return; }
 			c.has_bonus_action = false;
 			c.used_bonus_action = true;
 			int pa_atk = random(1, 20) + c.get_ability_mod(ABILITY_STR) + c.proficiency;
@@ -2782,27 +2789,8 @@ void handle_user_message(user@ u, json_object@ msg)
 				u.room.bm.broadcast_announce(c.name + "'s polearm butt swing misses " + tgt.name + ".", true);
 			}
 		}
-		else if (feature == "shield_master_shove") {
-			// Shield Master: bonus action shove (5ft push or knock prone)
-			if (!c.has_feat("shield_master")) { u.send({{"type", message_types::announce}, {"text", "You don't have the Shield Master feat."}, {"interrupt", true}}); return; }
-			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
-			if (!c.has_shield) { u.send({{"type", message_types::announce}, {"text", "You need a shield equipped."}, {"interrupt", true}}); return; }
-			if (target_id == 0) { u.send({{"type", message_types::announce}, {"text", "No target selected."}, {"interrupt", true}}); return; }
-			combatant@ tgt = u.room.bm.combat.get_combatant(target_id);
-			if (@tgt == null or tgt.is_dead) { u.send({{"type", message_types::announce}, {"text", "Invalid target."}, {"interrupt", true}}); return; }
-			int dist_sm = feet_distance(c.x, c.y, tgt.x, tgt.y);
-			if (dist_sm > 5) { u.send({{"type", message_types::announce}, {"text", "Target out of melee reach for shove."}, {"interrupt", true}}); return; }
-			c.has_bonus_action = false;
-			c.used_bonus_action = true;
-			int dc = 8 + c.get_ability_mod(ABILITY_STR) + c.proficiency;
-			int save = random(1, 20) + tgt.get_save_bonus(ABILITY_STR);
-			if (save < dc) {
-				tgt.add_condition(COND_PRONE);
-				u.room.bm.broadcast_announce(c.name + " shield-shoves " + tgt.name + " to the ground! (save " + save + " vs DC " + dc + ")", true);
-			} else {
-				u.room.bm.broadcast_announce(tgt.name + " resists " + c.name + "'s shield shove (save " + save + " vs DC " + dc + ").", true);
-			}
-		}
+		// Shield Master 2024: Shield Bash is no longer a bonus action — it's an automatic rider
+		// triggered by melee hit during the Attack action, applied in battle_manager attack resolution.
 		else if (feature == "jinx_target") {
 			// Misfortune Bringer Rogue: jinx target for bonus damage
 			if (c.class_name != "Rogue" or c.subclass != "Misfortune Bringer") { u.send({{"type", message_types::announce}, {"text", "Only Misfortune Bringer Rogues can jinx targets."}, {"interrupt", true}}); return; }
@@ -2858,72 +2846,26 @@ void handle_user_message(user@ u, json_object@ msg)
 			}
 			u.room.bm.broadcast_announce(c.name + " grants the Festus Blessing! All nearby allies are healed.", true);
 		}
-		else if (feature == "deadeye_stance") {
-			// Deadeye Gunslinger: enter Sharpshooter's Stance - ignore long range disadvantage, +PROF damage
-			if (c.class_name != "Gunslinger" or c.subclass != "Deadeye") { u.send({{"type", message_types::announce}, {"text", "Only Deadeye Gunslingers can use Sharpshooter's Stance."}, {"interrupt", true}}); return; }
+		// Gunslinger subclass maneuvers (Valda's). Most are triggered from attack/miss events,
+		// not standalone bonus actions. Lay Down the Law is the one bonus action here.
+		else if (feature == "lay_down_the_law") {
+			// White Hat Gunslinger L3: Bonus action, expend 1 Risk Die. Choose an ally within 60ft.
+			// Ally gains Temp HP = Risk Die roll. Until start of next turn, if ally is hit, reaction ranged attack on attacker.
+			if (c.class_name != "Gunslinger" or c.subclass != "White Hat") { u.send({{"type", message_types::announce}, {"text", "Only White Hat Gunslingers can use Lay Down the Law."}, {"interrupt", true}}); return; }
 			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
-			c.has_bonus_action = false;
-			c.used_bonus_action = true;
-			c.deadeye_stance_active = !c.deadeye_stance_active;
-			u.room.bm.broadcast_announce(c.name + (c.deadeye_stance_active ? " enters Sharpshooter's Stance!" : " leaves Sharpshooter's Stance."), true);
-		}
-		else if (feature == "liars_dice") {
-			// High Roller Gunslinger: gamble - on success gain temp HP and damage bonus, on failure take psychic damage
-			if (c.class_name != "Gunslinger" or c.subclass != "High Roller") { u.send({{"type", message_types::announce}, {"text", "Only High Roller Gunslingers can play Liar's Dice."}, {"interrupt", true}}); return; }
-			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
-			if (c.high_roller_dice <= 0) { u.send({{"type", message_types::announce}, {"text", "No Liar's Dice remaining."}, {"interrupt", true}}); return; }
-			c.has_bonus_action = false;
-			c.used_bonus_action = true;
-			c.high_roller_dice--;
-			int gamble = random(1, 6);
-			if (gamble >= 4) {
-				c.high_roller_gamble = true;
-				c.emboldening_bond_active = true; // reuse for damage bonus
-				int temp = random(1, 8) + c.proficiency;
-				if (c.temp_hp < temp) c.temp_hp = temp;
-				u.room.bm.broadcast_announce(c.name + " rolls Liar's Dice and wins! Gains " + temp + " temp HP and bonus damage on next attack.", true);
-			} else {
-				int psychic = random(1, 8);
-				u.room.bm.combat.apply_damage(c, psychic, DMG_PSYCHIC, c);
-				u.room.bm.broadcast_announce(c.name + " rolls Liar's Dice and loses, taking " + psychic + " psychic damage from the gamble.", true);
-			}
-		}
-		else if (feature == "license_to_kill") {
-			// Secret Agent Gunslinger: mark target for license to kill - first hit deals extra PROF damage
-			if (c.class_name != "Gunslinger" or c.subclass != "Secret Agent") { u.send({{"type", message_types::announce}, {"text", "Only Secret Agent Gunslingers have a License to Kill."}, {"interrupt", true}}); return; }
-			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
-			if (target_id == 0) { u.send({{"type", message_types::announce}, {"text", "No target selected."}, {"interrupt", true}}); return; }
-			combatant@ tgt = u.room.bm.combat.get_combatant(target_id);
-			if (@tgt == null or tgt.is_dead) { u.send({{"type", message_types::announce}, {"text", "Invalid target."}, {"interrupt", true}}); return; }
-			c.has_bonus_action = false;
-			c.used_bonus_action = true;
-			c.secret_agent_license = true;
-			c.secret_agent_target = tgt.id;
-			u.room.bm.broadcast_announce(c.name + " marks " + tgt.name + " with a License to Kill.", true);
-		}
-		else if (feature == "trick_shot_ricochet") {
-			// Trick Shot Gunslinger: prepare a ricochet bullet (next attack hits a second target)
-			if (c.class_name != "Gunslinger" or c.subclass != "Trick Shot") { u.send({{"type", message_types::announce}, {"text", "Only Trick Shot Gunslingers can ricochet bullets."}, {"interrupt", true}}); return; }
-			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
-			if (c.trick_shot_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Trick Shot uses remaining."}, {"interrupt", true}}); return; }
-			c.has_bonus_action = false;
-			c.used_bonus_action = true;
-			c.trick_shot_uses--;
-			c.trick_shot_ricochet_pending = true;
-			u.room.bm.broadcast_announce(c.name + " prepares a ricochet bullet!", true);
-		}
-		else if (feature == "white_hat_protect") {
-			// White Hat Gunslinger: mark an ally for protection - next attack against them, the gunslinger takes the hit
-			if (c.class_name != "Gunslinger" or c.subclass != "White Hat") { u.send({{"type", message_types::announce}, {"text", "Only White Hat Gunslingers can protect allies."}, {"interrupt", true}}); return; }
-			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
-			if (target_id == 0) { u.send({{"type", message_types::announce}, {"text", "Select an ally to protect."}, {"interrupt", true}}); return; }
+			if (c.risk_dice_current <= 0) { u.send({{"type", message_types::announce}, {"text", "No Risk Dice remaining."}, {"interrupt", true}}); return; }
+			if (target_id == 0) { u.send({{"type", message_types::announce}, {"text", "Select an ally to mark."}, {"interrupt", true}}); return; }
 			combatant@ ally = u.room.bm.combat.get_combatant(target_id);
-			if (@ally == null or ally.is_dead or ally.is_player != c.is_player) { u.send({{"type", message_types::announce}, {"text", "That is not an ally."}, {"interrupt", true}}); return; }
+			if (@ally == null or ally.is_dead or ally.is_player != c.is_player) { u.send({{"type", message_types::announce}, {"text", "Select a living ally."}, {"interrupt", true}}); return; }
+			if (feet_distance(c.x, c.y, ally.x, ally.y) > 60) { u.send({{"type", message_types::announce}, {"text", "Target must be within 60ft."}, {"interrupt", true}}); return; }
 			c.has_bonus_action = false;
 			c.used_bonus_action = true;
+			c.risk_dice_current--;
+			int temp = random(1, c.risk_die_size);
+			if (ally.temp_hp < temp) ally.temp_hp = temp;
 			c.white_hat_protection_active = true;
 			c.white_hat_ally = ally.id;
-			u.room.bm.broadcast_announce(c.name + " stands ready to protect " + ally.name + "!", true);
+			u.room.bm.broadcast_announce(c.name + " Lays Down the Law — " + ally.name + " gains " + temp + " temp HP; retaliation ready!", true);
 		}
 		else if (feature == "unsettling_words") {
 			// College of Eloquence Bard: spend Bardic Inspiration to subtract from a creature's next save
@@ -2941,23 +2883,34 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.room.bm.broadcast_announce(c.name + " speaks Unsettling Words to " + tgt.name + ", undermining their resolve!", true);
 		}
 		else if (feature == "orders_demand") {
-			// Order Domain Cleric: Channel Divinity - charm target until end of next turn
+			// Order Domain Cleric (Tasha's): Channel Divinity as an action — each creature of choice within 30ft
+			// makes a WIS save vs cleric spell DC. Failed save: charmed until end of next turn or until they take damage.
 			if (c.class_name != "Cleric" or c.subclass != "Order Domain") { u.send({{"type", message_types::announce}, {"text", "Only Order Domain Clerics can use Order's Demand."}, {"interrupt", true}}); return; }
-			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			if (!c.has_action) { u.send({{"type", message_types::announce}, {"text", "You've already used your action this turn."}, {"interrupt", true}}); return; }
 			if (c.channel_divinity_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Channel Divinity remaining."}, {"interrupt", true}}); return; }
-			if (target_id == 0) { u.send({{"type", message_types::announce}, {"text", "No target selected."}, {"interrupt", true}}); return; }
-			combatant@ tgt = u.room.bm.combat.get_combatant(target_id);
-			if (@tgt == null or tgt.is_dead) { u.send({{"type", message_types::announce}, {"text", "Invalid target."}, {"interrupt", true}}); return; }
-			c.has_bonus_action = false;
-			c.used_bonus_action = true;
+			c.has_action = false;
+			c.used_action = true;
 			c.channel_divinity_uses--;
 			int dc = 8 + c.proficiency + c.get_ability_mod(ABILITY_WIS);
-			int save = random(1, 20) + tgt.get_save_bonus(ABILITY_WIS);
-			if (save < dc) {
-				tgt.add_condition(COND_CHARMED);
-				u.room.bm.broadcast_announce(c.name + " issues an Order's Demand! " + tgt.name + " is charmed (save " + save + " vs DC " + dc + ").", true);
-			} else {
-				u.room.bm.broadcast_announce(tgt.name + " resists " + c.name + "'s Order's Demand (save " + save + " vs DC " + dc + ").", true);
+			int affected = 0;
+			for (uint odi = 0; odi < u.room.bm.combat.combatants.length(); odi++) {
+				combatant@ tgt = u.room.bm.combat.combatants[odi];
+				if (@tgt == null or tgt.is_dead or tgt.id == c.id) continue;
+				if (tgt.is_player == c.is_player) continue; // only enemies
+				if (feet_distance(c.x, c.y, tgt.x, tgt.y) > 30) continue;
+				int save = random(1, 20) + tgt.get_save_bonus(ABILITY_WIS);
+				if (save < dc) {
+					tgt.add_condition(COND_CHARMED);
+					// Note: Charmed condition will end automatically on damage via normal condition handling,
+					// and at the end of the cleric's next turn (duration tracking TODO)
+					u.room.bm.broadcast_announce(c.name + " issues an Order's Demand! " + tgt.name + " is charmed (save " + save + " vs DC " + dc + ").", true);
+					affected++;
+				} else {
+					u.room.bm.broadcast_announce(tgt.name + " resists Order's Demand (save " + save + " vs DC " + dc + ").", false);
+				}
+			}
+			if (affected == 0) {
+				u.room.bm.broadcast_announce(c.name + "'s Order's Demand echoes, but no enemies are charmed.", false);
 			}
 		}
 		else if (feature == "experimental_elixir") {

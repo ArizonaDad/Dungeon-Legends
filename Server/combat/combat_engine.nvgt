@@ -99,6 +99,8 @@ class combatant {
 	bool acid_resistance = false;
 	bool lightning_resistance = false;
 	bool piercing_resistance = false;
+	bool bludgeoning_resistance = false;
+	bool slashing_resistance = false;
 	bool poison_resistance = false;
 	bool poison_immunity = false;
 	bool magic_resistance = false;
@@ -219,8 +221,16 @@ class combatant {
 	// Spell tracking (Batch 19)
 	bool spirit_guardians_active = false;
 	int spirit_guardians_slot_level = 0;
+	bool spirit_guardians_necrotic = false; // true if caster is evil-aligned
 	bool fog_cloud_active = false;
 	bool darkness_active = false;
+	// Fire Shield variant
+	bool fire_shield_active = false;
+	bool fire_shield_warm = true; // true=warm (cold resist, reflects fire), false=chill (fire resist, reflects cold)
+	// Shield Master 2024: once per turn, Shield Bash rider on melee hit
+	bool shield_bash_used_this_turn = false;
+	// Concentration Breaker tracking (Mage Slayer 2024)
+	bool guarded_mind_used = false; // 1/rest auto-succeed on failed INT/WIS/CHA save
 	// Setting subclasses (Batch 17)
 	bool sea_circle_active = false; // Circle of the Sea Druid - Wrath of the Sea
 	int sea_wrath_dice = 0;
@@ -749,6 +759,8 @@ class battle {
 		if (damage_type == DMG_ACID and target.acid_resistance) amount = (amount + 1) / 2;
 		if (damage_type == DMG_LIGHTNING and target.lightning_resistance) amount = (amount + 1) / 2;
 		if (damage_type == DMG_PIERCING and target.piercing_resistance) amount = (amount + 1) / 2;
+		if (damage_type == DMG_BLUDGEONING and target.bludgeoning_resistance) amount = (amount + 1) / 2;
+		if (damage_type == DMG_SLASHING and target.slashing_resistance) amount = (amount + 1) / 2;
 		if (damage_type == DMG_FIRE and target.fire_resistance) amount = (amount + 1) / 2;
 		if (damage_type == DMG_POISON and target.poison_resistance and !target.poison_immunity) amount = (amount + 1) / 2;
 		if (damage_type == DMG_POISON and target.poison_immunity) amount = 0;

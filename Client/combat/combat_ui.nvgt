@@ -938,23 +938,12 @@ void show_bonus_action_menu() {
 		unsettling_words_opt = m.add_item("Unsettling Words. Bonus action. Spend Bardic Inspiration to subtract die roll from target's next save.");
 	}
 	if (lc == "cleric" and subclass == "Order Domain") {
-		orders_demand_opt = m.add_item("Order's Demand. Bonus action. Channel Divinity to charm a target.");
+		orders_demand_opt = m.add_item("Order's Demand. Action. Channel Divinity to charm enemies within 30ft (WIS save).");
 	}
-	// Gunslinger subclass features
-	if (lc == "gunslinger" and subclass == "Deadeye" and level >= 3) {
-		deadeye_stance_opt = m.add_item("Sharpshooter's Stance. Bonus action. Toggle precise stance.");
-	}
-	if (lc == "gunslinger" and subclass == "High Roller" and level >= 3) {
-		liars_dice_opt = m.add_item("Liar's Dice. Bonus action. Gamble for temp HP and damage bonus.");
-	}
-	if (lc == "gunslinger" and subclass == "Secret Agent" and level >= 3) {
-		license_to_kill_opt = m.add_item("License to Kill. Bonus action. Mark a target for bonus damage on first hit.");
-	}
-	if (lc == "gunslinger" and subclass == "Trick Shot" and level >= 3) {
-		trick_shot_ricochet_opt = m.add_item("Ricochet. Bonus action. Prepare a bullet that bounces to a second target.");
-	}
+	// Gunslinger subclass bonus actions. Most Gunslinger subclass features are triggered maneuvers,
+	// not standalone bonus actions, so only Lay Down the Law appears here.
 	if (lc == "gunslinger" and subclass == "White Hat" and level >= 3) {
-		white_hat_protect_opt = m.add_item("Protect Ally. Bonus action. Stand ready to take a hit for an ally.");
+		white_hat_protect_opt = m.add_item("Lay Down the Law. Bonus action. Spend a Risk Die to grant an ally temp HP and retaliation.");
 	}
 	// Setting subclass bonus actions
 	if (lc == "rogue" and subclass == "Misfortune Bringer" and level >= 3) {
@@ -969,15 +958,15 @@ void show_bonus_action_menu() {
 	if (lc == "cleric" and subclass == "Festus Domain" and level >= 1) {
 		festus_blessing_opt = m.add_item("Festus Blessing. Bonus action. Channel Divinity to heal nearby allies.");
 	}
-	if (lc == "cleric" and subclass == "Trickery Domain" and level >= 1) {
-		blessing_of_trickery_opt = m.add_item("Blessing of Trickery. Bonus action. Channel Divinity to grant an ally Hidden status.");
+	if (lc == "cleric" and subclass == "Trickery Domain" and level >= 3) {
+		blessing_of_trickery_opt = m.add_item("Blessing of the Trickster. Action. Grant ally advantage on Stealth checks until long rest.");
 	}
 	if (lc == "druid" and subclass == "Circle of the Shepherd" and level >= 2) {
 		spirit_totem_bear_opt = m.add_item("Bear Spirit Totem. Bonus action. Grant temp HP to nearby allies.");
 	}
 	// Feat-based bonus actions (server validates feat ownership)
 	polearm_master_attack_opt = m.add_item("Polearm Master Attack. Bonus action. Strike with the polearm butt for 1d4. (Requires Polearm Master feat)");
-	shield_master_shove_opt = m.add_item("Shield Master Shove. Bonus action. Shove a target prone with your shield. (Requires Shield Master feat)");
+	// Shield Master Shove is automatic now (2024 rules: rider on melee hit with shield, not a bonus action)
 	// Gunslinger class features
 	if (lc == "gunslinger") {
 		if (level >= 2) {
@@ -1429,33 +1418,13 @@ void show_bonus_action_menu() {
 		send({{"type", message_types::bonus_action}, {"feature", "orders_demand"}, {"target_id", current_target_id}});
 		speak("Order's Demand issued.", true);
 	}
-	else if (deadeye_stance_opt >= 0 and res == deadeye_stance_opt) {
-		send({{"type", message_types::bonus_action}, {"feature", "deadeye_stance"}});
-		speak("Sharpshooter's Stance toggled.", true);
-	}
-	else if (liars_dice_opt >= 0 and res == liars_dice_opt) {
-		send({{"type", message_types::bonus_action}, {"feature", "liars_dice"}});
-		speak("Liar's Dice rolled.", true);
-	}
-	else if (license_to_kill_opt >= 0 and res == license_to_kill_opt) {
-		if (current_target_id == 0) {
-			speak("No target selected.", true);
-			return;
-		}
-		send({{"type", message_types::bonus_action}, {"feature", "license_to_kill"}, {"target_id", current_target_id}});
-		speak("License to Kill issued.", true);
-	}
-	else if (trick_shot_ricochet_opt >= 0 and res == trick_shot_ricochet_opt) {
-		send({{"type", message_types::bonus_action}, {"feature", "trick_shot_ricochet"}});
-		speak("Ricochet bullet prepared.", true);
-	}
 	else if (white_hat_protect_opt >= 0 and res == white_hat_protect_opt) {
 		if (current_target_id == 0) {
-			speak("Select an ally to protect.", true);
+			speak("Select an ally.", true);
 			return;
 		}
-		send({{"type", message_types::bonus_action}, {"feature", "white_hat_protect"}, {"target_id", current_target_id}});
-		speak("Standing ready to protect.", true);
+		send({{"type", message_types::bonus_action}, {"feature", "lay_down_the_law"}, {"target_id", current_target_id}});
+		speak("Lay Down the Law.", true);
 	}
 	else if (jinx_target_opt >= 0 and res == jinx_target_opt) {
 		if (current_target_id == 0) {
@@ -1489,14 +1458,7 @@ void show_bonus_action_menu() {
 		send({{"type", message_types::bonus_action}, {"feature", "polearm_master_attack"}, {"target_id", current_target_id}});
 		speak("Polearm butt strike.", true);
 	}
-	else if (shield_master_shove_opt >= 0 and res == shield_master_shove_opt) {
-		if (current_target_id == 0) {
-			speak("No target selected.", true);
-			return;
-		}
-		send({{"type", message_types::bonus_action}, {"feature", "shield_master_shove"}, {"target_id", current_target_id}});
-		speak("Shield shove.", true);
-	}
+	// Shield Master shove is automatic now (2024 rules)
 	else if (blessing_of_trickery_opt >= 0 and res == blessing_of_trickery_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "blessing_of_trickery"}, {"target_id", current_target_id}});
 		speak("Blessing of Trickery granted.", true);

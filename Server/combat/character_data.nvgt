@@ -896,11 +896,12 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
     if (cs.class_name == "Sorcerer") {
         if (cs.subclass == "Frost Sorcerer") {
             c.frost_sorcerer_aura = true;
-            c.cold_resistance = true;
+            // Source: cold resistance at L6, immunity at L18; no flat weapon bonus
+            if (cs.level >= 6) c.cold_resistance = true;
         }
         if (cs.subclass == "Desert Soul") {
             c.desert_soul_heat = true;
-            c.fire_resistance = true;
+            // Source: no flat weapon bonus; Sandstorm is bonus action AoE push
         }
     }
     if (cs.class_name == "Fighter") {
@@ -1002,20 +1003,27 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
     if (cs.class_name == "Ranger") {
         if (cs.subclass == "Winter Trapper" and cs.level >= 3) {
             c.winter_trapper_traps = true;
-            c.cold_resistance = true;
+            // Source: Pin Down adds 1d6 weapon-type damage + 10ft speed reduction; no cold resistance
         }
         if (cs.subclass == "Rocborne" and cs.level >= 3) {
             c.rocborne_mount = true;
-            c.flying_speed = 40;
+            // Source: Soar is conditional (after running jump, 1 turn), not permanent flight
+        }
+        if (cs.class_name == "Ranger" and cs.subclass == "Rocborne" and cs.level >= 7) {
+            c.cold_resistance = true;
         }
     }
     if (cs.class_name == "Warlock") {
         if (cs.subclass == "Pact of the Astral Griffon" and cs.level >= 1) {
             c.astral_griffon_bond = true;
-            c.flying_speed = 30;
+            // Source: Magic Missile free casts + pocket dimension; no flying speed
+            if (cs.level >= 10) {
+                // Resistance to Force damage at level 10
+            }
         }
         if (cs.subclass == "Pact of the Many" and cs.level >= 1) {
             c.pact_of_many_active = true;
+            // Source: Eldritch Heads = prof bonus pool
         }
     }
     if (cs.class_name == "Wizard") {
@@ -1032,26 +1040,28 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         }
     }
 
-    // Gunslinger subclasses (Valda's)
+    // Gunslinger subclasses (Valda's Spire of Secrets)
+    // All subclasses unlock at level 3. These mostly use Risk Dice (class resource), not separate pools.
     if (cs.class_name == "Gunslinger" and cs.level >= 3) {
         if (cs.subclass == "Deadeye") {
-            // Sharpshooter's Stance: ignore long range disadvantage
-            c.deadeye_stance_active = false; // toggled in combat
+            // L3: Eagle Eye (turn miss into hit using Risk Die) + Sharpshooter's Stance (prone benefits)
+            c.deadeye_stance_active = false;
         }
         if (cs.subclass == "High Roller") {
-            // Liar's Dice: bonus dice pool used for risk taking
-            c.high_roller_dice = proficiency_bonus(cs.level);
+            // L3: Poker Face + Liar's Dice (hidden damage roll, bluff mechanic)
+            c.high_roller_dice = 0; // Uses Risk Dice, not a separate pool
         }
         if (cs.subclass == "Secret Agent") {
-            // License to Kill: extra damage on first hit each turn vs marked target
+            // L3: Operative Training + Parting Shot (bonus action ranged attack after Dash/Disengage/Dodge)
+            // License to Kill is L14, NOT L3
             c.secret_agent_license = false;
         }
         if (cs.subclass == "Trick Shot") {
-            // Ricochet: bullet bounces to extra target
-            c.trick_shot_uses = proficiency_bonus(cs.level);
+            // L3: Creative Trajectory (ignore cover) + Ricochet (reroll miss using Risk Die)
+            c.trick_shot_uses = 0; // uses Risk Dice, not a separate pool
         }
         if (cs.subclass == "White Hat") {
-            // Protect: redirect attack to self
+            // L3: Lay Down the Law (temp HP + reaction attack) + Steely-Eyed Aura (frightened save advantage 10ft)
             c.white_hat_protection_active = false;
         }
     }
@@ -1095,9 +1105,9 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         if (cs.subclass == "Order of Scribes" and cs.level >= 2) {
             c.wizardly_quill_active = true;
             c.scribes_spellbook_active = true;
-            // Awakened Spellbook: limited damage type swaps per long rest
-            int prof_lvl = proficiency_bonus(cs.level);
-            c.awakened_spellbook_changes = prof_lvl > 1 ? prof_lvl : 1;
+            // Awakened Spellbook (Tasha's): at-will damage type swap (no daily limit),
+            // and ritual fast-cast 1/long rest. The change counter is unused for swap but tracks ritual uses.
+            c.awakened_spellbook_changes = 1; // 1 ritual fast-cast per long rest
         }
     }
 
