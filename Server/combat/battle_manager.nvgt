@@ -7282,6 +7282,71 @@ class battle_manager {
 				check_battle_end();
 				return;
 			}
+			else if (spell.id == "power_word_heal" and @target != null) {
+				// Basic Rules para 14528: "A wave of healing energy washes over one creature
+				// you can see within range. The target regains all its Hit Points. If the
+				// creature has the Charmed, Frightened, Paralyzed, Poisoned, or Stunned
+				// condition, the condition ends."
+				int needed = target.max_hp - target.current_hp;
+				int effective = combat.apply_healing(target, needed);
+				record_effective_healing(c.player_username, effective);
+				target.remove_condition(COND_CHARMED);
+				target.remove_condition(COND_FRIGHTENED);
+				target.remove_condition(COND_PARALYZED);
+				target.remove_condition(COND_POISONED);
+				target.remove_condition(COND_STUNNED);
+				broadcast_announce(c.name + "'s Power Word Heal restores " + target.name + " to full health and ends Charmed/Frightened/Paralyzed/Poisoned/Stunned!", true);
+			}
+			else if (spell.id == "sunburst") {
+				// Basic Rules para 15267: "Brilliant sunlight flashes in a 60-foot-radius
+				// Sphere centered on a point you choose within range. Each creature in the
+				// Sphere makes a Constitution saving throw. On a failed save, a creature
+				// takes 12d6 Radiant damage and has the Blinded condition for 1 minute."
+				int dice_count = 12;
+				int center_x = @target != null ? target.x : c.x;
+				int center_y = @target != null ? target.y : c.y;
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 6);
+				broadcast_announce(c.name + " unleashes a Sunburst — brilliant sunlight in a 60-foot sphere!", true);
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (feet_distance(center_x, center_y, t.x, t.y) > 60) continue;
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_CON);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					int dmg = saved ? total_damage / 2 : total_damage;
+					if (dmg < 1) dmg = 1;
+					broadcast_roll(t.name, "CON save vs Sunburst", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Blinded!");
+					combat.apply_damage(t, dmg, DMG_RADIANT, c);
+					if (!saved) {
+						t.add_condition(COND_BLINDED);
+					}
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "greater_restoration" and @target != null) {
+				// Basic Rules paras 13601-13604: "You touch a creature and magically remove
+				// one of the following effects from it: 1 Exhaustion level; the Charmed or
+				// Petrified condition; a curse, including the target's Attunement to a
+				// cursed magic item." Removes the most serious condition first.
+				if (target.has_condition(COND_PETRIFIED)) {
+					target.remove_condition(COND_PETRIFIED);
+					broadcast_announce(c.name + "'s Greater Restoration cures " + target.name + "'s petrification!", true);
+				} else if (target.has_condition(COND_CHARMED)) {
+					target.remove_condition(COND_CHARMED);
+					broadcast_announce(c.name + "'s Greater Restoration cures " + target.name + "'s charm!", true);
+				} else if (target.exhaustion_level > 0) {
+					target.exhaustion_level--;
+					broadcast_announce(c.name + "'s Greater Restoration removes 1 exhaustion level from " + target.name + ".", true);
+				} else {
+					broadcast_announce(c.name + " casts Greater Restoration on " + target.name + ", but no eligible condition to cure.", false);
+				}
+			}
 			else if (spell.id == "bane") {
 				// Basic Rules para 12174: "Up to three creatures of your choice that you
 				// can see within range must each make a Charisma saving throw. Whenever a
