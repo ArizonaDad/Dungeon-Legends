@@ -65,11 +65,11 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 
 | `Server/combat/wave_system.nvgt` | 9 wave scenarios, `spawn_wave()` with difficulty multipliers |
 
-| `Server/combat/spell_data.nvgt` | 68 spell definitions (34 cantrips + 34 leveled), spell helpers |
+| `Server/combat/spell_data.nvgt` | 367 spell definitions, ~121 with custom handlers in battle_manager.nvgt |
 
 | `Server/progression.nvgt` | XP tracking, achievement system, character level progression, prestige system, glory points |
 
-| `common/loot_data.nvgt` | Item catalog (35 items), loot generation, rarity tiers, inventory helpers |
+| `common/loot_data.nvgt` | Item catalog (142 items), loot generation, rarity tiers, inventory helpers |
 
 | `common/consumable_data.nvgt` | Consumable catalog (16 items), modifier system, inventory helpers |
 
