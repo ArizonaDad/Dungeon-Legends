@@ -7351,6 +7351,71 @@ class battle_manager {
 				check_battle_end();
 				return;
 			}
+			else if (spell.id == "gust_of_wind") {
+				// Basic Rules para 13659: "A Line of strong wind 60 feet long and 10 feet
+				// wide blasts from you in a direction you choose for the duration. Each
+				// creature in the Line must succeed on a Strength saving throw or be
+				// pushed 15 feet away from you in a direction following the line."
+				broadcast_announce(c.name + " conjures a Gust of Wind — a 60-foot line of strong wind!", true);
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (feet_distance(c.x, c.y, t.x, t.y) > 60) continue;
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_STR);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					broadcast_roll(t.name, "STR save vs Gust of Wind", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Pushed!");
+					if (!saved) {
+						// Push 15 ft (3 tiles) directly away from caster
+						int dx = 0;
+						int dy = 0;
+						if (t.x > c.x) dx = 3;
+						else if (t.x < c.x) dx = -3;
+						if (t.y > c.y) dy = 3;
+						else if (t.y < c.y) dy = -3;
+						int new_x = t.x + dx;
+						int new_y = t.y + dy;
+						if (new_x >= 0 and new_x < combat.map_width and new_y >= 0 and new_y < combat.map_height) {
+							t.x = new_x;
+							t.y = new_y;
+						}
+					}
+				}
+				broadcast_state();
+				return;
+			}
+			else if (spell.id == "dragons_breath" and @target != null) {
+				// Basic Rules para 12991: "You touch one willing creature, and choose Acid,
+				// Cold, Fire, Lightning, or Poison. Until the spell ends, the target can
+				// take a Magic action to exhale a 15-foot Cone. Each creature in that area
+				// makes a Dexterity saving throw, taking 3d6 damage on a failed save or
+				// half as much damage on a successful one."
+				// Approximation: applies the breath weapon immediately as a one-shot AoE
+				// since the game doesn't currently track multi-turn cast-on-ally toggles.
+				int dice_count = 3 + upcast_levels;
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 6);
+				broadcast_announce(target.name + " is empowered with Dragon's Breath — exhales a 15-foot cone of fire!", true);
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == target.id or t.id == c.id) continue;
+					if (feet_distance(target.x, target.y, t.x, t.y) > 15) continue;
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_DEX);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					int dmg = saved ? total_damage / 2 : total_damage;
+					if (dmg < 1) dmg = 1;
+					broadcast_roll(t.name, "DEX save vs Dragon's Breath", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+					combat.apply_damage(t, dmg, DMG_FIRE, c);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
 			else if (spell.id == "searing_smite") {
 				// Basic Rules para 14887: "As you hit the target, it takes an extra 1d6
 				// Fire damage from the attack. At the start of each of its turns until
