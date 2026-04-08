@@ -326,6 +326,13 @@ void init_item_catalog() {
 	add_item("tasha_demon_armor", "Demon Armor", SLOT_ARMOR, RARITY_EPIC, "While wearing this armor, you gain a +1 bonus to AC, and you can speak Abyssal. The armor's clawed gauntlets turn unarmed strikes with your hands into magic weapons that deal 1d8 slashing damage on a hit, plus an extra 1d8 slashing damage if the target is wearing armor.", 1, 3, 0, 0, 0, 0, 0, 0);
 	add_item("tasha_giant_slayer", "Giant Slayer", SLOT_WEAPON, RARITY_RARE, "You gain a +1 bonus to attack and damage rolls made with this magic weapon. When you hit a creature of the Giant type with it, that creature takes an extra 2d6 damage of the weapon's type.", 0, 3, 0, 0, 0, 0, 0, 0);
 	add_item("tasha_helm_brilliance", "Helm of Brilliance (Variant)", SLOT_ARMOR, RARITY_EPIC, "Set with diamonds, rubies, fire opals, and opals. Cast Daylight, Detect Magic, Fireball, and Prismatic Spray from the helm.", 1, 0, 5, 2, 0, 0, 0, 0);
+
+	// Tasha's Spellcaster Items
+	add_item("tasha_moonbow", "Moon-Touched Sword", SLOT_WEAPON, RARITY_COMMON, "In darkness, the unsheathed blade of this sword sheds Bright Light in a 15-foot radius and Dim Light for an additional 15 feet.", 0, 1, 0, 0, 0, 0, 0, 0);
+	add_item("tasha_robe_winter", "Robe of Winter", SLOT_ARMOR, RARITY_RARE, "While wearing this robe, you have Resistance to Cold damage and you can pass through nonmagical, sub-zero terrain at normal Speed without leaving a trail.", 1, 0, 0, 0, 0, 0, 1, 0);
+	add_item("tasha_armor_psychic", "Mind Lash Whip", SLOT_WEAPON, RARITY_RARE, "Psionic whip dealing 1d4 psychic damage on hit. While wielding it, you can use a bonus action to lash a creature within 10 feet, dealing 2d4 psychic damage on a hit.", 0, 3, 0, 1, 0, 0, 0, 0);
+	add_item("tasha_psicrystal", "Psicrystal", SLOT_AMULET, RARITY_RARE, "This crystal contains a sliver of psionic energy. It grants the wearer +2 to spell save DC and an additional Wisdom save vs psychic damage.", 0, 0, 0, 2, 0, 0, 1, 0);
+	add_item("tasha_amulet_protection", "Amulet of Spell Resistance", SLOT_AMULET, RARITY_EPIC, "While wearing this amulet, you have Advantage on saving throws against spells and other magical effects.", 0, 0, 5, 0, 0, 0, 2, 0);
 }
 
 // ---- LOOT GENERATION ----
