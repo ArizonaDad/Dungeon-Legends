@@ -4740,6 +4740,29 @@ class battle_manager {
 			bool attacker_was_hidden = c.is_hidden;
 			combat.apply_damage(target, total_damage, pr.damage_type, c);
 
+			// Mirror Image (Basic Rules para 14260): "Each time a creature hits you with
+			// an attack roll during the spell's duration, roll a d6 for each of your
+			// remaining duplicates. If any of the d6s rolls a 3 or higher, one of the
+			// duplicates is hit instead of you, and the duplicate is destroyed."
+			if (target.mirror_images > 0 and !target.has_condition(COND_BLINDED)) {
+				bool image_hit = false;
+				for (int mi = 0; mi < target.mirror_images; mi++) {
+					if (random(1, 6) >= 3) { image_hit = true; break; }
+				}
+				if (image_hit) {
+					target.mirror_images--;
+					broadcast_announce("One of " + target.name + "'s mirror images is destroyed instead! (" + target.mirror_images + " remaining)", false);
+					broadcast_state();
+					return; // Skip damage application
+				}
+			}
+			// Blink spell (Basic Rules para 12284): caster has 50% chance to be on the
+			// Ethereal Plane between turns; attacks targeting them auto-miss.
+			if (target.blink_active and random(1, 6) >= 4) {
+				broadcast_announce(target.name + " is on the Ethereal Plane from Blink — the attack passes through them!", true);
+				broadcast_state();
+				return;
+			}
 			// Fire Shield: melee attacker within 5ft takes 2d8 of opposing element
 			if (target.fire_shield_active and !c.main_hand_is_ranged and !pr.is_spell_effect and feet_distance(c.x, c.y, target.x, target.y) <= 5) {
 				int fs_dmg = random(1, 8) + random(1, 8);
@@ -7316,6 +7339,57 @@ class battle_manager {
 				broadcast_state();
 				check_battle_end();
 				return;
+			}
+			else if (spell.id == "mirror_image") {
+				// Basic Rules paras 14259-14260: "Three illusory duplicates of yourself
+				// appear in your space. Until the spell ends, the duplicates move with you
+				// and mimic your actions... Each time a creature hits you with an attack
+				// roll during the spell's duration, roll a d6 for each of your remaining
+				// duplicates. If any of the d6s rolls a 3 or higher, one of the duplicates
+				// is hit instead of you."
+				c.mirror_images = 3;
+				broadcast_announce(c.name + " casts Mirror Image — three illusory duplicates appear and shift around them!", true);
+			}
+			else if (spell.id == "blink") {
+				// Basic Rules paras 12284-12285: "Roll 1d6 at the end of each of your turns
+				// for the duration. On a roll of 4-6, you vanish from your current plane of
+				// existence and appear in the Ethereal Plane."
+				// Approximation: 50% chance of being untouchable each round.
+				c.blink_active = true;
+				broadcast_announce(c.name + " casts Blink — they may vanish into the Ethereal Plane between turns.", true);
+			}
+			else if (spell.id == "dimension_door" and @target != null) {
+				// Basic Rules para 12854: "You teleport to a location within range. You
+				// arrive at exactly the spot desired."
+				int dist = feet_distance(c.x, c.y, target.x, target.y);
+				if (dist > 500) {
+					u.send({{"type", message_types::announce}, {"text", "Target out of Dimension Door range (500 feet)."}, {"interrupt", true}});
+					return;
+				}
+				// Teleport to a tile adjacent to the target
+				int new_x = target.x;
+				int new_y = target.y - 1;
+				if (new_y < 0) new_y = target.y + 1;
+				c.x = new_x;
+				c.y = new_y;
+				broadcast_announce(c.name + " casts Dimension Door, teleporting next to " + target.name + "!", true);
+			}
+			else if (spell.id == "globe_of_invulnerability") {
+				// Basic Rules paras 13549-13550: "An immobile, shimmering barrier appears
+				// in a 10-foot Emanation around you and remains for the duration. Any
+				// spell of level 5 or lower cast from outside the barrier can't affect
+				// anything within it."
+				c.globe_of_invulnerability_active = true;
+				c.globe_of_invulnerability_level = 5 + upcast_levels;
+				broadcast_announce(c.name + " summons a Globe of Invulnerability — spells of level " + c.globe_of_invulnerability_level + " or lower from outside cannot affect anything inside!", true);
+			}
+			else if (spell.id == "holy_aura") {
+				// Basic Rules para 13799: "For the duration, you emit an aura in a 30-foot
+				// Emanation. While in the aura, creatures of your choice have Advantage on
+				// all saving throws, and other creatures have Disadvantage on attack rolls
+				// against them."
+				c.holy_aura_active = true;
+				broadcast_announce(c.name + " casts Holy Aura — allies within 30 feet have advantage on saves and enemies have disadvantage on attacks against them!", true);
 			}
 			else if (spell.id == "calm_emotions") {
 				// Basic Rules paras 12323-12325: "Each Humanoid in a 20-foot-radius Sphere

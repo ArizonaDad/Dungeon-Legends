@@ -79,6 +79,11 @@ class combatant {
 	bool baned = false;                  // Bane spell: subtract 1d4 from attacks + saves until concentration ends
 	int magic_weapon_bonus = 0;          // Magic Weapon spell: +1/+2/+3 to attack and damage rolls
 	bool divine_favor_active = false;    // Divine Favor spell: +1d4 radiant damage on weapon hits
+	int mirror_images = 0;               // Mirror Image spell: number of remaining illusory duplicates
+	bool blink_active = false;           // Blink spell: 50% chance to phase to Ethereal Plane
+	bool globe_of_invulnerability_active = false; // Globe of Invulnerability: blocks lower-level spells
+	int globe_of_invulnerability_level = 5;  // Highest spell level the globe blocks
+	bool holy_aura_active = false;       // Holy Aura: 30 ft aura, allies adv on saves, enemies disadv to attack
 	uint bless_source_id = 0;
 	bool guiding_bolt_advantage = false;
 	uint guiding_bolt_source_id = 0;
