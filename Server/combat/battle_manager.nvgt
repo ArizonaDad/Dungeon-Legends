@@ -1785,6 +1785,12 @@ class battle_manager {
 		disadv = false;
 		if (@attacker == null or @target == null) return;
 		bool can_ignore_invisible = attacker.has_feat("boon_of_truesight") and dist <= 60;
+		// Barbarian Reckless Attack (PHB 2024 para 2785): "When you make your first attack
+		// roll on your turn, you can decide to attack recklessly. Doing so gives you Advantage
+		// on attack rolls using Strength until the start of your next turn, and attack rolls
+		// against you have Advantage during that time."
+		if (attacker.reckless_attack_active and !attack_is_ranged) adv = true;
+		if (target.reckless_attack_active) adv = true; // Target attacked self recklessly: incoming gets advantage
 		if (target.has_condition(COND_PRONE) and !attack_is_ranged and dist <= 5) adv = true;
 		if (target.has_condition(COND_PRONE) and (attack_is_ranged or dist > 5)) disadv = true;
 		if (target.has_condition(COND_PARALYZED) or target.has_condition(COND_STUNNED) or target.has_condition(COND_UNCONSCIOUS)) adv = true;
@@ -2974,6 +2980,8 @@ class battle_manager {
 		c.shield_bash_used_this_turn = false;
 		// Reset Way of the Prophet Righteous Strike (1/turn)
 		c.righteous_strike_used_this_turn = false;
+		// Reckless Attack ends at the start of the barbarian's next turn (PHB 2024 para 2785).
+		c.reckless_attack_active = false;
 
 		// Sacred Weapon glow reminder
 		if (c.sacred_weapon_active) {

@@ -92,6 +92,11 @@ class combatant {
 	bool beacon_of_hope_active = false; // Beacon of Hope spell: max healing + adv on WIS/death saves
 	bool death_ward_active = false; // Death Ward spell: first 0 HP becomes 1 HP and ends spell
 	bool holy_weapon_active = false; // Xanathar's Holy Weapon: +2d8 radiant on weapon hits
+	// Barbarian PHB 2024 base class features
+	bool reckless_attack_active = false; // Set on the turn the barbarian declares Reckless Attack
+	bool danger_sense_active = false;    // Always-on if Barbarian level 2+ (advantage on DEX saves)
+	int relentless_rage_dc = 10;         // Resets to 10 on rest, +5 each successful use
+	bool persistent_rage_active = false; // Barbarian L15: rage doesn't auto-end after 1 round
 	// --- Companion / Summon System (TODO §7C) ---
 	// Companions are full combatants tracked in combat.combatants with their own initiative,
 	// HP, AC, attacks, and conditions. They're owned by another combatant via owner_id and
@@ -608,6 +613,12 @@ class combatant {
 		if (save_proficiencies[ability_id] == 1) mod += proficiency;
 		// 2024 exhaustion: subtract 2 * level from d20 rolls
 		mod -= exhaustion_level * 2;
+		// Barbarian Danger Sense (PHB 2024 para 2783, L2): "You have Advantage on Dexterity
+		// saving throws unless you have the Incapacitated condition." Approximated as +5
+		// to the save bonus since the existing save flow doesn't currently roll twice.
+		if (danger_sense_active and ability_id == ABILITY_DEX and !has_condition(COND_INCAPACITATED)) {
+			mod += 5;
+		}
 		return mod;
 	}
 
@@ -1004,6 +1015,22 @@ class battle {
 
 		// Check for dropping to 0
 		if (target.current_hp <= 0) {
+			// Barbarian Relentless Rage (PHB 2024 paras 2806-2807, L11): "If you drop to
+			// 0 Hit Points while your Rage is active and don't die outright, you can make
+			// a DC 10 Constitution saving throw. If you succeed, your Hit Points instead
+			// change to a number equal to twice your Barbarian level. Each time you use
+			// this feature after the first, the DC increases by 5."
+			if (target.class_name == "Barbarian" and target.level >= 11 and target.raging and !target.is_dead) {
+				int rr_overflow = -target.current_hp;
+				if (rr_overflow < target.max_hp) { // Not instant death
+					int rr_save = random(1, 20) + target.get_save_bonus(ABILITY_CON);
+					if (rr_save >= target.relentless_rage_dc) {
+						target.current_hp = 2 * target.level;
+						target.relentless_rage_dc += 5;
+						return;
+					}
+				}
+			}
 			// Shadow Magic Sorcerer: Strength of the Grave — CHA save DC 5+damage to avoid drop
 			if (target.class_name == "Sorcerer" and target.subclass == "Shadow Magic" and !target.strength_of_the_grave_used and damage_type != DMG_RADIANT and !target.is_dead) {
 				int overflow_check = -target.current_hp;

@@ -2753,6 +2753,18 @@ void handle_user_message(user@ u, json_object@ msg)
 			c.mark_of_heretic_target = tgt.id;
 			u.room.bm.broadcast_announce(c.name + " marks " + tgt.name + " with the Mark of the Heretic! Crit on 19+ and reactions.", true);
 		}
+		else if (feature == "reckless_attack") {
+			// PHB 2024 para 2785, Barbarian L2: "When you make your first attack roll on
+			// your turn, you can decide to attack recklessly. Doing so gives you Advantage
+			// on attack rolls using Strength until the start of your next turn, and attack
+			// rolls against you have Advantage during that time."
+			// Implemented as a turn-toggle flag (no action cost; declared instead of paid).
+			if (c.class_name != "Barbarian") { u.send({{"type", message_types::announce}, {"text", "Only Barbarians can use Reckless Attack."}, {"interrupt", true}}); return; }
+			if (c.level < 2) { u.send({{"type", message_types::announce}, {"text", "Reckless Attack unlocks at level 2."}, {"interrupt", true}}); return; }
+			if (c.reckless_attack_active) { u.send({{"type", message_types::announce}, {"text", "Already attacking recklessly this turn."}, {"interrupt", true}}); return; }
+			c.reckless_attack_active = true;
+			u.room.bm.broadcast_announce(c.name + " attacks recklessly! Advantage on Strength attacks until next turn, but attacks against them also have advantage.", true);
+		}
 		else if (feature == "summon_primal_companion") {
 			// Tasha's Beast Master Ranger L3 Primal Companion: bonus action summon a Land/
 			// Sea/Sky beast companion. Source stat block: HP = 5 + 5*ranger level, AC =
