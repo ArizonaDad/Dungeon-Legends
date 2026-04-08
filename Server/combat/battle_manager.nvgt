@@ -6899,6 +6899,157 @@ class battle_manager {
 					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Paralyzed"}});
 				}
 			}
+			else if (spell.id == "hold_monster" and @target != null) {
+				// Basic Rules para 13781: "Choose a creature that you can see within range.
+				// The target must succeed on a Wisdom saving throw or have the Paralyzed
+				// condition for the duration. At the end of each of its turns, the target
+				// repeats the save, ending the spell on itself on a success."
+				// Upcast adds extra targets - one additional creature per slot above 5.
+				combatant@[] hm_targets;
+				hm_targets.insert_last(target);
+				int extra_targets = upcast_levels;
+				for (uint hi = 0; hi < combat.combatants.length() and int(hm_targets.length()) < 1 + extra_targets; hi++) {
+					combatant@ extra = combat.combatants[hi];
+					if (@extra == null or extra.id == c.id or extra.id == target.id or extra.is_dead) continue;
+					if (!combat.are_hostile(c, extra)) continue;
+					if (feet_distance(c.x, c.y, extra.x, extra.y) > 90) continue;
+					if (!combat.can_see(c, extra)) continue;
+					hm_targets.insert_last(extra);
+				}
+				for (uint hi = 0; hi < hm_targets.length(); hi++) {
+					combatant@ hm_t = hm_targets[hi];
+					int save_roll = random(1, 20);
+					int save_bonus = hm_t.get_save_bonus(ABILITY_WIS);
+					int bless_bonus = roll_bless_bonus(hm_t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					if (bless_bonus > 0) broadcast_announce(hm_t.name + "'s Bless adds " + bless_bonus + " to the save.", false);
+					broadcast_roll(hm_t.name, "WIS save vs Hold Monster", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Paralyzed!");
+					if (!saved) {
+						hm_t.add_condition(COND_PARALYZED);
+						broadcast_to_battle({{"type", message_types::condition_applied}, {"target", hm_t.name}, {"condition", "Paralyzed"}});
+					}
+				}
+			}
+			else if (spell.id == "cloudkill") {
+				// Basic Rules para 12408-12410: "You create a 20-foot-radius Sphere of
+				// yellow-green fog... Each creature in the Sphere makes a Constitution
+				// saving throw, taking 5d8 Poison damage on a failed save or half as much
+				// damage on a successful one." Upcast adds 1d8/level above 5.
+				int dice_count = 5 + upcast_levels;
+				int center_x = @target != null ? target.x : c.x;
+				int center_y = @target != null ? target.y : c.y;
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 8);
+				combatant@[] ck_targets;
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (feet_distance(center_x, center_y, t.x, t.y) <= 20) ck_targets.insert_last(t);
+				}
+				broadcast_announce(c.name + " conjures a 20-foot Cloudkill of poisonous fog!", true);
+				for (uint ti = 0; ti < ck_targets.length(); ti++) {
+					combatant@ t = ck_targets[ti];
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_CON);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					int dmg = saved ? total_damage / 2 : total_damage;
+					if (dmg < 1) dmg = 1;
+					broadcast_roll(t.name, "CON save vs Cloudkill", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+					combat.apply_damage(t, dmg, DMG_POISON, c);
+					broadcast_announce(t.name + " takes " + dmg + " poison damage from the Cloudkill.", false);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "wall_of_fire") {
+				// Basic Rules para 15545-15547: "You create a wall of fire on a solid surface
+				// within range... When the wall appears, each creature in its area makes a
+				// Dexterity saving throw, taking 5d8 Fire damage on a failed save or half as
+				// much damage on a successful one. One side of the wall... deals 5d8 Fire
+				// damage to each creature that ends its turn within 10 feet of that side or
+				// inside the wall." Upcast adds 1d8/level above 4.
+				// Wall positioning is approximated as a 60ft line centered on the target.
+				int dice_count = 5 + upcast_levels;
+				int center_x = @target != null ? target.x : c.x;
+				int center_y = @target != null ? target.y : c.y;
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 8);
+				combatant@[] wf_targets;
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (feet_distance(center_x, center_y, t.x, t.y) <= 30) wf_targets.insert_last(t);
+				}
+				broadcast_announce(c.name + " conjures a Wall of Fire 60 feet long!", true);
+				for (uint ti = 0; ti < wf_targets.length(); ti++) {
+					combatant@ t = wf_targets[ti];
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_DEX);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					int dmg = saved ? total_damage / 2 : total_damage;
+					if (dmg < 1) dmg = 1;
+					broadcast_roll(t.name, "DEX save vs Wall of Fire", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+					combat.apply_damage(t, dmg, DMG_FIRE, c);
+					broadcast_announce(t.name + " takes " + dmg + " fire damage from the Wall of Fire.", false);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "stinking_cloud") {
+				// Basic Rules para 15152-15153: "You create a 20-foot-radius Sphere of
+				// yellow, nauseating gas... Each creature that starts its turn in the Sphere
+				// must succeed on a Constitution saving throw or have the Poisoned condition
+				// until the end of the current turn. While Poisoned in this way, the
+				// creature can't take an action or a Bonus Action."
+				int center_x = @target != null ? target.x : c.x;
+				int center_y = @target != null ? target.y : c.y;
+				combatant@[] sc_targets;
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (feet_distance(center_x, center_y, t.x, t.y) <= 20) sc_targets.insert_last(t);
+				}
+				broadcast_announce(c.name + " conjures a 20-foot Stinking Cloud of nauseating gas!", true);
+				for (uint ti = 0; ti < sc_targets.length(); ti++) {
+					combatant@ t = sc_targets[ti];
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_CON);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					broadcast_roll(t.name, "CON save vs Stinking Cloud", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Poisoned!");
+					if (!saved) {
+						t.add_condition(COND_POISONED);
+						broadcast_to_battle({{"type", message_types::condition_applied}, {"target", t.name}, {"condition", "Poisoned"}});
+					}
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "dominate_person" and @target != null) {
+				// Basic Rules para 12980: "One Humanoid you can see within range must succeed
+				// on a Wisdom saving throw or have the Charmed condition for the duration."
+				int save_roll = random(1, 20);
+				int save_bonus = target.get_save_bonus(ABILITY_WIS);
+				int bless_bonus = roll_bless_bonus(target);
+				int save_total = save_roll + save_bonus + bless_bonus;
+				bool saved = save_total >= save_dc;
+				if (bless_bonus > 0) broadcast_announce(target.name + "'s Bless adds " + bless_bonus + " to the save.", false);
+				broadcast_roll(target.name, "WIS save vs Dominate Person", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Charmed!");
+				if (!saved) {
+					target.add_condition(COND_CHARMED);
+					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Charmed"}});
+					broadcast_announce(target.name + " is dominated by " + c.name + "!", true);
+				}
+			}
 			else if (spell.id == "banishment" and @target != null) {
 				int save_roll = random(1, 20);
 				int save_bonus = target.get_save_bonus(ABILITY_CHA);
