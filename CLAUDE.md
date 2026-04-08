@@ -62,7 +62,12 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 ### Attack Resolution
 - Separate roll to hit (d20 + ability mod + proficiency vs AC), then roll for damage
 - Advantage/disadvantage from conditions (prone, paralyzed, dodging, etc.)
-- **Extra Attack**: Fighters (level 5+) and other martial classes chain additional attacks
+- **Extra Attack**: Fighters level 5 (2 attacks), 11 (3 attacks), 17 (3 attacks + 2 Action Surge). Other martials get 1 extra at level 5.
+- **Reaction Prompt System**: When a player is about to be hit, they are prompted for available reactions (Shield, Cutting Words, Warding Flare) before hit resolves
+- **Divine Smite**: Dual mode �� bonus action pre-cast OR auto-prompt on melee hit (keys 1-5 for slot level, Escape to skip)
+- **Grapple/Shove**: 2024 rules — target makes STR or DEX saving throw (DC 8 + STR mod + Prof), not contested checks
+- **AC System**: Proper armor types (leather/studded/chain shirt/breastplate/half plate/chain mail/splint/plate) with correct AC calculations per 2024 PHB
+- **End-of-Turn Saves**: Hold Person, Web, Blindness/Deafness, Fear, Tasha's Hideous Laughter — affected creatures save at end of turn
 - Out-of-range attacks show distance and range info to the player
 - Finesse weapons use higher of STR/DEX
 - Ranged disadvantage when hostile within 5ft
