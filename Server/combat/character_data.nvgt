@@ -1129,6 +1129,22 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         if (cs.subclass == "Circle of the Shepherd" and cs.level >= 2) {
             c.shepherd_circle_active = true;
         }
+        // Book of Ebon Tides: Circle of Shadows
+        // L2 Umbral Form (paras 1016-1021): bonus action expend Wild Shape to take umbral
+        // form for 10 minutes. Hide as bonus action in dim/dark, fit through 1-inch spaces,
+        // reaction PB cold damage on melee hit.
+        // L6 Dark Servant (paras 1040-1043): bonus action, target a creature within 30 ft;
+        // its shadow becomes a hostile minion under your command for 5 minutes. Uses = WIS mod/LR.
+        // L10 Shadow Mass: Umbral Form gains fly speed and B/P/S nonmagical resistance.
+        // L14 Darkness Falls: action, 15-foot magical darkness sphere centered on self,
+        // 1 minute. Dispels light spells L7 or lower. 1/SR or LR.
+        if (cs.subclass == "Circle of Shadows" and cs.level >= 2) {
+            c.circle_of_shadows_active = true;
+            if (cs.level >= 6) {
+                int wis_mod_cs = (cs.wisdom - 10) / 2;
+                c.dark_servant_uses = wis_mod_cs > 0 ? wis_mod_cs : 1;
+            }
+        }
     }
     if (cs.class_name == "Monk") {
         // Sword Coast: Way of the Long Death
@@ -1231,6 +1247,24 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         }
         if (cs.subclass == "Wand Lore" and cs.level >= 2) {
             c.wand_lore_focus = true;
+        }
+        // Book of Ebon Tides: Shadow Arcane Tradition
+        // L2 Shadow Symbiote (paras 1151-1154): "You bond a living shadow to your body,
+        // wearing it like a second skin." Grants 60 ft darkvision (+60 if already had),
+        // sees 30 ft in magical darkness, sunlight sensitivity (disadvantage on attack
+        // rolls and Perception checks in sunlight).
+        // L2 Dark Transfusion (para 1157): bonus action, expend two spell slots to recover
+        // one slot equal to or less than their combined value.
+        // L6 Orb of Night (paras 1159-1160): reaction when targeted by attack roll, encase
+        // self in 10 ft darkness sphere; if hit, can't reuse on same attacker until LR.
+        // L10 From the Shadows (para 1162): auto-hide on initiative roll if in dim/dark.
+        // L14 Second Skin (para 1164): +2 AC and B/P/S resistance while in dim/dark.
+        if (cs.subclass == "Shadow Arcane Tradition" and cs.level >= 2) {
+            c.shadow_arcane_active = true;
+            c.shadow_arcane_darkvision_bonus = 60; // Source: 60 ft darkvision (or +60 if already)
+            c.sunlight_sensitivity = true;
+            if (cs.level >= 10) c.from_the_shadows_pending = true;
+            if (cs.level >= 14) c.second_skin_active = true;
         }
     }
     if (cs.class_name == "Artificer") {

@@ -299,6 +299,20 @@ class combatant {
 	bool sickening_revenge_used = false;    // L6 Sickening Revenge: 1/SR or LR
 	bool dark_inoculation = false;          // L10 Dark Inoculation: immunity to disease, poison damage, poisoned
 	bool touch_of_sorrow_used = false;      // L14 Touch of Sorrow: 1/SR or LR
+	// --- Book of Ebon Tides: Circle of Shadows Druid ---
+	bool circle_of_shadows_active = false;  // L2 origin
+	bool umbral_form_active = false;        // L2 Umbral Form alternative wild shape
+	int umbral_form_rounds = 0;             // 10 minute duration = 100 rounds
+	int dark_servant_uses = 0;              // L6 Dark Servant: WIS mod uses/LR
+	bool darkness_falls_used = false;       // L14 Darkness Falls: 1/SR or LR
+	// --- Book of Ebon Tides: Shadow Arcane Tradition Wizard ---
+	bool shadow_arcane_active = false;      // L2 origin (Shadow Symbiote bond)
+	int shadow_arcane_darkvision_bonus = 0; // L2 darkvision range bonus from symbiote
+	bool sunlight_sensitivity = false;      // L2 sunlight sensitivity from symbiote
+	bool orb_of_night_used = false;         // L6 Orb of Night: 1/LR per attacker
+	uint orb_of_night_locked_attacker_id = 0; // L6 prevents reusing on same attacker until LR
+	bool from_the_shadows_pending = false;  // L10 From the Shadows: auto-hide on initiative
+	bool second_skin_active = false;        // L14 Second Skin: +2 AC and B/P/S resistance in dim/dark
 	uint mark_of_heretic_target = 0; // Target with crit range 19+
 	bool astral_domain_active = false; // Astral Domain Cleric
 	bool warrior_celestial_radiant = false; // Warrior of the Celestial Monk
@@ -386,6 +400,7 @@ class combatant {
 	bool spiritual_weapon_active = false;
 	int spiritual_weapon_slot_level = 0;
 	bool wild_shape_active = false;
+	int wild_shape_uses = 2; // PHB Druid L2: 2 uses per short/long rest
 	string wild_shape_form_id = "";
 	bool wild_shape_just_ended = false;
 	string wild_shape_saved_name = "";

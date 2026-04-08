@@ -847,6 +847,9 @@ void show_bonus_action_menu() {
 	int refraction_shield_opt = -1;
 	int dancing_shadows_opt = -1;
 	int venomous_mark_opt = -1;
+	int umbral_form_opt = -1;
+	int darkness_falls_opt = -1;
+	int dark_transfusion_opt = -1;
 	int magic_coin_opt = -1;
 	int create_void_opt = -1;
 	int breath_of_dragon_opt = -1;
@@ -1116,6 +1119,17 @@ void show_bonus_action_menu() {
 	// Book of Ebon Tides: Mother of Sorrows Warlock
 	if (lc == "warlock" and subclass == "Mother of Sorrows") {
 		venomous_mark_opt = m.add_item("Venomous Mark. Bonus action. Curse a target within 30ft for 1 minute. +1d6 poison on spell attack hit.");
+	}
+	// Book of Ebon Tides: Circle of Shadows Druid
+	if (lc == "druid" and subclass == "Circle of Shadows" and level >= 2) {
+		umbral_form_opt = m.add_item("Umbral Form. Bonus action, expend Wild Shape. 10 minutes shadowy form: hide as bonus action in dim/dark, fit through 1-inch spaces, reaction PB cold damage on melee hit." + (level >= 10 ? " Shadow Mass adds fly speed and B/P/S resistance." : ""));
+		if (level >= 14) {
+			darkness_falls_opt = m.add_item("Darkness Falls. Action. 15-foot magical darkness sphere centered on you, 1 minute. Dispels light spells of L7 or lower. 1/SR or LR.");
+		}
+	}
+	// Book of Ebon Tides: Shadow Arcane Tradition Wizard
+	if (lc == "wizard" and subclass == "Shadow Arcane Tradition" and level >= 2) {
+		dark_transfusion_opt = m.add_item("Dark Transfusion. Bonus action. Expend two spell slots to recover one of equal or lesser combined value.");
 	}
 	if (lc == "bard" and subclass == "College of Mercantile" and level >= 3) {
 		magic_coin_opt = m.add_item("Magic Coin. Action. Fling a coin at target for 1d12 thunder damage (scales).");
@@ -1561,6 +1575,18 @@ void show_bonus_action_menu() {
 		if (current_target_id == 0) { speak("No target selected.", true); return; }
 		send({{"type", message_types::bonus_action}, {"feature", "venomous_mark"}, {"target_id", current_target_id}});
 		speak("Venomous Mark placed.", true);
+	}
+	else if (umbral_form_opt >= 0 and res == umbral_form_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "umbral_form"}});
+		speak("Taking Umbral Form.", true);
+	}
+	else if (darkness_falls_opt >= 0 and res == darkness_falls_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "darkness_falls"}});
+		speak("Darkness Falls.", true);
+	}
+	else if (dark_transfusion_opt >= 0 and res == dark_transfusion_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "dark_transfusion"}});
+		speak("Dark Transfusion.", true);
 	}
 	else if (magic_coin_opt >= 0 and res == magic_coin_opt) {
 		if (current_target_id == 0) { speak("No target selected.", true); return; }

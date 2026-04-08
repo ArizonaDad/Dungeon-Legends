@@ -2753,6 +2753,68 @@ void handle_user_message(user@ u, json_object@ msg)
 			c.mark_of_heretic_target = tgt.id;
 			u.room.bm.broadcast_announce(c.name + " marks " + tgt.name + " with the Mark of the Heretic! Crit on 19+ and reactions.", true);
 		}
+		else if (feature == "umbral_form") {
+			// Book of Ebon Tides para 1016, Circle of Shadows Druid L2:
+			// "as a bonus action, you can expend a use of your Wild Shape feature to take
+			// on a shadowy umbral form, rather than transforming into a beast. The form
+			// lasts for 10 minutes."
+			if (c.class_name != "Druid" or c.subclass != "Circle of Shadows") { u.send({{"type", message_types::announce}, {"text", "Only Circle of Shadows druids can take Umbral Form."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			if (c.wild_shape_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Wild Shape uses remaining."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.wild_shape_uses--;
+			c.umbral_form_active = true;
+			c.umbral_form_rounds = 100; // 10 minutes
+			// L10 Shadow Mass: Umbral Form grants fly speed and B/P/S nonmagical resistance
+			if (c.level >= 10) {
+				c.bludgeoning_resistance = true;
+				c.piercing_resistance = true;
+				c.slashing_resistance = true;
+				c.flying_speed = c.speed;
+			}
+			u.room.bm.broadcast_announce(c.name + " takes on a shadowy Umbral Form. They can hide as a bonus action in dim light or darkness." + (c.level >= 10 ? " Shadow Mass grants flight and physical resistance." : ""), true);
+		}
+		else if (feature == "darkness_falls") {
+			// Book of Ebon Tides para 1049-1051, Circle of Shadows L14:
+			// "you can use an action to emit a 15-foot-radius sphere of magical darkness
+			// centered on yourself... lasts for 1 minute, until you are incapacitated, or
+			// until it comes into contact with sunlight."
+			if (c.class_name != "Druid" or c.subclass != "Circle of Shadows") { u.send({{"type", message_types::announce}, {"text", "Only Circle of Shadows druids can call Darkness Falls."}, {"interrupt", true}}); return; }
+			if (c.level < 14) { u.send({{"type", message_types::announce}, {"text", "Darkness Falls unlocks at level 14."}, {"interrupt", true}}); return; }
+			if (!c.has_action) { u.send({{"type", message_types::announce}, {"text", "You've already used your action."}, {"interrupt", true}}); return; }
+			if (c.darkness_falls_used) { u.send({{"type", message_types::announce}, {"text", "Darkness Falls has been used; rest to recover."}, {"interrupt", true}}); return; }
+			c.has_action = false;
+			c.used_action = true;
+			c.darkness_falls_used = true;
+			c.darkness_active = true;
+			u.room.bm.broadcast_announce(c.name + " calls Darkness Falls! A 15-foot sphere of magical darkness surrounds them, dispelling lower-level light spells. (1 minute)", true);
+		}
+		else if (feature == "dark_transfusion") {
+			// Book of Ebon Tides para 1157, Shadow Arcane Wizard L2:
+			// "As a bonus action, you can expend two spell slots to recover one spell slot
+			// equal to or less than the total combined value of the expended spell slots."
+			if (c.class_name != "Wizard" or c.subclass != "Shadow Arcane Tradition") { u.send({{"type", message_types::announce}, {"text", "Only Shadow Arcane wizards can perform Dark Transfusion."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			// Find two lowest-level slots to expend (greedy heuristic to maximize the recovered slot value).
+			int first_slot = -1;
+			int second_slot = -1;
+			for (int sl = 1; sl <= 9; sl++) {
+				if (c.spell_slots_current[sl] > 0) {
+					if (first_slot < 0) { first_slot = sl; }
+					else if (second_slot < 0) { second_slot = sl; break; }
+				}
+			}
+			if (first_slot < 0 or second_slot < 0) { u.send({{"type", message_types::announce}, {"text", "You need at least two spell slots to perform Dark Transfusion."}, {"interrupt", true}}); return; }
+			int combined = first_slot + second_slot;
+			int recovered_slot = combined > 9 ? 9 : combined;
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.spell_slots_current[first_slot]--;
+			c.spell_slots_current[second_slot]--;
+			c.spell_slots_current[recovered_slot]++;
+			u.room.bm.broadcast_announce(c.name + " performs Dark Transfusion: expends a level " + first_slot + " slot and a level " + second_slot + " slot to recover a level " + recovered_slot + " slot.", true);
+		}
 		else if (feature == "dancing_shadows") {
 			// Book of Ebon Tides para 1056-1058, College of Shadow Bard L3:
 			// "As a bonus action, you can expend a Bardic Inspiration to create a 20-foot-radius

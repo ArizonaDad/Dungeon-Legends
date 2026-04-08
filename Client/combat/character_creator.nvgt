@@ -1093,6 +1093,7 @@ void get_subclass_options(string class_name, string[]@ names, string[]@ descript
         add_text_pair(names, descriptions, "Circle of the Unbroken", "Circle of the Unbroken. Draw power from unbroken nature. (Griffon's Saddlebag)");
         add_text_pair(names, descriptions, "Circle of Dragons", "Circle of Dragons. Transform into draconic forms. (Griffon's Saddlebag)");
         add_text_pair(names, descriptions, "Circle of the Forged", "Circle of the Forged. Wild Shape into constructed beasts. (Exploring Eberron)");
+        add_text_pair(names, descriptions, "Circle of Shadows", "Circle of Shadows. Wild Shape into shadowy umbral form, command living shadows. (Book of Ebon Tides)");
     } else if (class_name == "Fighter") {
         add_text_pair(names, descriptions, "Battle Master", "Battle Master. Control combat with maneuvers and tactical superiority.");
         add_text_pair(names, descriptions, "Champion", "Champion. Focus on straightforward martial excellence and critical hits.");
@@ -1192,6 +1193,7 @@ void get_subclass_options(string class_name, string[]@ names, string[]@ descript
         add_text_pair(names, descriptions, "Graviturgy Magic", "Graviturgy Magic. Control gravity with Dunamancy. (Wildemount)");
         add_text_pair(names, descriptions, "Materializer", "Materializer. Create objects from pure arcane energy. (Griffon's Saddlebag)");
         add_text_pair(names, descriptions, "Wand Lore", "Wand Lore. Specialize in wand-based arcane casting. (Griffon's Saddlebag)");
+        add_text_pair(names, descriptions, "Shadow Arcane Tradition", "Shadow Arcane Tradition. Bond a shadow symbiote, recover spell slots, and cloak yourself in darkness. (Book of Ebon Tides)");
     } else if (class_name == "Artificer") {
         add_text_pair(names, descriptions, "Alchemist", "Alchemist. Solve problems with restorative and transformative concoctions.");
         add_text_pair(names, descriptions, "Armorer", "Armorer. Build a magical suit that changes how you fight.");
