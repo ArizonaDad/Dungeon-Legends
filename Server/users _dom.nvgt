@@ -2753,6 +2753,31 @@ void handle_user_message(user@ u, json_object@ msg)
 			c.mark_of_heretic_target = tgt.id;
 			u.room.bm.broadcast_announce(c.name + " marks " + tgt.name + " with the Mark of the Heretic! Crit on 19+ and reactions.", true);
 		}
+		else if (feature == "arcane_recovery") {
+			// PHB 2024 Wizard L1 Arcane Recovery: "Once per day when you finish a Short
+			// Rest, you can choose expended spell slots to recover. The slots can have a
+			// combined level equal to no more than half your Wizard level (rounded up),
+			// and none of the slots can be level 6 or higher."
+			// Implemented as a bonus action available once per long rest (arcane_recovery_charges).
+			if (c.class_name != "Wizard") { u.send({{"type", message_types::announce}, {"text", "Only Wizards can use Arcane Recovery."}, {"interrupt", true}}); return; }
+			if (c.arcane_recovery_charges <= 0) { u.send({{"type", message_types::announce}, {"text", "You've already used Arcane Recovery today; rest to recover."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.arcane_recovery_charges--;
+			// Recover slots summing to <= half level (rounded up), none L6+
+			int budget = (c.level + 1) / 2;
+			int recovered = 0;
+			// Greedy: try to refill from highest slot level downward within budget
+			for (int sl = 5; sl >= 1 and budget > 0; sl--) {
+				while (budget >= sl and c.spell_slots_current[sl] < c.spell_slots_max[sl]) {
+					c.spell_slots_current[sl]++;
+					budget -= sl;
+					recovered++;
+				}
+			}
+			u.room.bm.broadcast_announce(c.name + " uses Arcane Recovery to restore " + recovered + " spell slot" + (recovered == 1 ? "" : "s") + " (combined level budget half wizard level, rounded up).", true);
+		}
 		else if (feature == "reckless_attack") {
 			// PHB 2024 para 2785, Barbarian L2: "When you make your first attack roll on
 			// your turn, you can decide to attack recklessly. Doing so gives you Advantage

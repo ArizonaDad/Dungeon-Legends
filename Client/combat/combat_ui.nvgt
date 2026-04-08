@@ -860,6 +860,7 @@ void show_bonus_action_menu() {
 	int summon_wildfire_spirit_opt = -1;
 	int create_eldritch_cannon_opt = -1;
 	int reckless_attack_opt = -1;
+	int arcane_recovery_opt = -1;
 	int magic_coin_opt = -1;
 	int create_void_opt = -1;
 	int breath_of_dragon_opt = -1;
@@ -1177,6 +1178,10 @@ void show_bonus_action_menu() {
 	// Barbarian L2 Reckless Attack (PHB 2024 base class feature)
 	if (lc == "barbarian" and level >= 2) {
 		reckless_attack_opt = m.add_item("Reckless Attack. Declare on your first attack. Advantage on STR attacks until next turn, but enemies have advantage on attacks against you.");
+	}
+	// Wizard L1 Arcane Recovery (PHB 2024 base class feature)
+	if (lc == "wizard") {
+		arcane_recovery_opt = m.add_item("Arcane Recovery. Bonus action, 1/day. Recover spell slots totaling up to half your level (rounded up), no slots of L6+.");
 	}
 	if (lc == "bard" and subclass == "College of Mercantile" and level >= 3) {
 		magic_coin_opt = m.add_item("Magic Coin. Action. Fling a coin at target for 1d12 thunder damage (scales).");
@@ -1676,6 +1681,10 @@ void show_bonus_action_menu() {
 	else if (reckless_attack_opt >= 0 and res == reckless_attack_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "reckless_attack"}});
 		speak("Reckless attack.", true);
+	}
+	else if (arcane_recovery_opt >= 0 and res == arcane_recovery_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "arcane_recovery"}});
+		speak("Arcane Recovery.", true);
 	}
 	else if (magic_coin_opt >= 0 and res == magic_coin_opt) {
 		if (current_target_id == 0) { speak("No target selected.", true); return; }

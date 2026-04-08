@@ -1180,6 +1180,9 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         }
     }
     if (cs.class_name == "Rogue") {
+        // PHB 2024 Rogue L11 Reliable Talent: treat d20 <=9 as 10 on ability checks
+        // using proficient skills
+        if (cs.level >= 11) c.reliable_talent_active = true;
         if (cs.subclass == "Misfortune Bringer" and cs.level >= 3) {
             c.misfortune_jinx_active = false;
         }
@@ -1367,6 +1370,10 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         }
     }
     if (cs.class_name == "Monk") {
+        // PHB 2024 Monk L6 Empowered Strikes: unarmed strike can deal force damage
+        if (cs.level >= 6) c.empowered_strikes_active = true;
+        // PHB 2024 Monk L7 Evasion: DEX save = 0 damage on success, half on failure
+        if (cs.level >= 7) c.evasion_active = true;
         // Sword Coast: Way of the Long Death
         if (cs.subclass == "Way of the Long Death" and cs.level >= 3) {
             c.long_death_active = true;
@@ -1468,6 +1475,12 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         }
     }
     if (cs.class_name == "Wizard") {
+        // PHB 2024 Wizard L1 Arcane Recovery: "Once per day when you finish a Short
+        // Rest, you can choose expended spell slots to recover. The slots can have a
+        // combined level equal to no more than half your Wizard level (rounded up),
+        // and none of the slots can be level 6 or higher."
+        // Charge count = 1 per long rest (1/day per source).
+        c.arcane_recovery_charges = 1;
         if (cs.subclass == "Materializer" and cs.level >= 2) {
             c.materializer_object = true;
         }

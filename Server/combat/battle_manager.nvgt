@@ -1753,6 +1753,21 @@ class battle_manager {
 			int damage = base_damage;
 			if (saved) damage = damage / 2;
 			if (damage < 1) damage = 1;
+			// Evasion (PHB 2024 Monk L7 / Rogue L7): "When you're subjected to an effect
+			// that allows you to make a Dexterity saving throw to take only half damage,
+			// you instead take no damage if you succeed on the saving throw and only half
+			// damage if you fail."
+			// Overwrites the computed damage: success = 0, failure = half (not full).
+			if (t.evasion_active and pr.spell_save_type == ABILITY_DEX and !t.has_condition(COND_INCAPACITATED)) {
+				if (saved) {
+					damage = 0;
+					broadcast_announce(t.name + "'s Evasion turns the save into no damage!", false);
+				} else {
+					damage = base_damage / 2;
+					if (damage < 1) damage = 1;
+					broadcast_announce(t.name + "'s Evasion reduces the failed save to half damage.", false);
+				}
+			}
 
 			bool aoe_target_was_full = (t.current_hp == t.max_hp);
 			bool aoe_caster_was_hidden = caster.is_hidden;
@@ -1911,6 +1926,11 @@ class battle_manager {
 	int get_attack_damage_type(combatant@ attacker, bool use_secondary = false) {
 		if (@attacker == null) return DMG_SLASHING;
 		if (!attacker.is_player and use_secondary) return attacker.monster_attack2_type;
+		// Monk Empowered Strikes (PHB 2024 para 6472, L6): "Whenever you deal damage with
+		// your Unarmed Strike, it can deal your choice of Force damage or its normal
+		// damage type." Since this is a choice the player should make, we default to the
+		// normal type and let future UI toggle set a flag. For now, force damage is only
+		// applied to subclass features that auto-wire to it (e.g., Way of the Aether).
 		return attacker.main_hand_damage_type;
 	}
 
@@ -4180,6 +4200,27 @@ class battle_manager {
 				broadcast_announce(c.name + "'s Silver Tongue treats the " + natural_roll + " as a 10.", false);
 				natural_roll = 10;
 				total = natural_roll + pr.modifier + bless_bonus + bardic_bonus;
+			}
+		}
+		// Reliable Talent (PHB 2024 Rogue L11): "Whenever you make an ability check that
+		// uses a skill proficiency, you can treat a d20 roll of 9 or lower as a 10."
+		// Applies to ANY skill check where the rogue is proficient, broader than Silver
+		// Tongue which only hits Persuasion/Deception.
+		if (c.reliable_talent_active and pr.roll_type == ROLL_ABILITY_CHECK and natural_roll < 10) {
+			// Extract skill name from resolution_tag ("skill_stealth" -> "Stealth")
+			if (pr.resolution_tag.find("skill_") == 0) {
+				string skill_key = pr.resolution_tag.substr(6);
+				// Check if the rogue has proficiency in any skill matching this tag
+				bool has_prof = false;
+				for (uint si = 0; si < c.skill_proficiencies.length(); si++) {
+					string canonical_tag = skill_resolution_tag(c.skill_proficiencies[si]).substr(6);
+					if (canonical_tag == skill_key) { has_prof = true; break; }
+				}
+				if (has_prof) {
+					broadcast_announce(c.name + "'s Reliable Talent treats the " + natural_roll + " as a 10.", false);
+					natural_roll = 10;
+					total = natural_roll + pr.modifier + bless_bonus + bardic_bonus;
+				}
 			}
 		}
 
