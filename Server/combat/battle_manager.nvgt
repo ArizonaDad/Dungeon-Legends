@@ -1826,6 +1826,14 @@ class battle_manager {
 				if (martial_die > attacker.main_hand_damage_dice) return martial_die;
 			}
 			if (attacker.has_feat("tavern_brawler") and attacker.main_hand_damage_dice < 4) return 4;
+			// Unarmed Fighting feat (PHB para 7880): "you can deal Bludgeoning damage equal
+			// to 1d6 plus your Strength modifier instead of the normal damage of an Unarmed
+			// Strike. If you aren't holding any weapons or a Shield when you make the
+			// attack, the d6 becomes a d8."
+			if (attacker.unarmed_fighting_active) {
+				int uf_die = (attacker.has_shield) ? 6 : 8;
+				if (uf_die > attacker.main_hand_damage_dice) return uf_die;
+			}
 		}
 		return attacker.main_hand_damage_dice;
 	}
@@ -5737,7 +5745,11 @@ class battle_manager {
 
 		c.has_action = false;
 		c.used_action = true;
-		c.movement_remaining += c.speed;
+		int dash_speed = c.speed;
+		// Charger feat (PHB para 7557) - Improved Dash: "When you take the Dash action,
+		// your Speed increases by 10 feet for that action."
+		if (c.has_feat("charger")) dash_speed += 10;
+		c.movement_remaining += dash_speed;
 		broadcast_announce(c.name + " takes the Dash action. " + c.movement_remaining + " feet of movement remaining.");
 		broadcast_state();
 	}

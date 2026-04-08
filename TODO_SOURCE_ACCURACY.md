@@ -158,8 +158,15 @@ Every base class has features that need the same level of rigor as subclasses:
 
 **Current status (verified 2026-04-08):** 77 feats defined in `common/feat_data.nvgt`. Only 24 have `has_feat()` checks in combat code. **53 feats have no combat logic at all** — they're selectable at character creation but do nothing in combat.
 
-### Feats WITH combat logic (32 after batch 4A; 21 still missing):
-alert, archery, athlete (BATCH 4A), boon_of_combat_prowess, boon_of_irresistible_offense, boon_of_truesight, crossbow_expert, crusher, defensive_duelist, dueling, grappler, great_weapon_fighting, great_weapon_master, healer, heavy_armor_master, inspiring_leader (BATCH 4A), mage_slayer, observant (BATCH 4A), piercer, poisoner (BATCH 4A), polearm_master, resilient (BATCH 4A), savage_attacker, sentinel, sharpshooter (BATCH 4A), shield_master, skill_expert (BATCH 4A), skulker (BATCH 4A), slasher, spell_sniper (BATCH 4A), tavern_brawler, telekinetic (BATCH 4A), thrown_weapon_fighting, war_caster
+### Feats WITH combat logic (37 after batches 4A+4B; 16 still missing):
+alert, archery, athlete (BATCH 4A), blind_fighting (BATCH 4B), boon_of_combat_prowess, boon_of_irresistible_offense, boon_of_truesight, charger (BATCH 4B), crossbow_expert, crusher, defensive_duelist, dueling, fey_touched (BATCH 4B), grappler, great_weapon_fighting, great_weapon_master, healer, heavy_armor_master, inspiring_leader (BATCH 4A), mage_slayer, observant (BATCH 4A), piercer, poisoner (BATCH 4A), polearm_master, resilient (BATCH 4A), savage_attacker, sentinel, shadow_touched (BATCH 4B), sharpshooter (BATCH 4A), shield_master, skill_expert (BATCH 4A), skulker (BATCH 4A), slasher, spell_sniper (BATCH 4A), tavern_brawler, telekinetic (BATCH 4A), thrown_weapon_fighting, unarmed_fighting (BATCH 4B), war_caster
+
+**Batch 4B wired (5 new feats):**
+- **Blind Fighting** (PHB para 7846) - sets `combatant.blindsight_range = 10` (used by future LoS / hidden checks)
+- **Unarmed Fighting** (PHB para 7880) - 1d6 (with shield) or 1d8 (no shield) bludgeoning unarmed strike, picks the higher of weapon die / monk MA die / Tavern Brawler die
+- **Charger** (PHB para 7557) - Improved Dash adds +10 ft to Dash speed. The d8 Charge Attack rider after a 10-ft straight-line move is deferred (needs movement-direction tracking).
+- **Fey Touched** (PHB para 7614) - auto-prepares Misty Step + Bless (default L1 Enchantment) at character init. Free-cast tracking deferred.
+- **Shadow Touched** (PHB para 7753) - auto-prepares Invisibility + Blindness/Deafness (default L2 Necromancy) at character init. Free-cast tracking deferred.
 
 **Batch 4A wired (10 new feats):**
 - **Athlete** (PHB para 7549) - climb_speed = base speed

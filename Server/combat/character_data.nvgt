@@ -711,6 +711,48 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         c.inspiring_leader_temp_hp_pool = cs.level + cha_mod;
         if (c.inspiring_leader_temp_hp_pool < 1) c.inspiring_leader_temp_hp_pool = 1;
     }
+    // Fighting Style Feat: Blind Fighting (PHB para 7846) - "You have Blindsight with a
+    // range of 10 feet."
+    if (character_sheet_has_feat(cs, "blind_fighting")) c.blindsight_range = 10;
+    // Fighting Style Feat: Unarmed Fighting (PHB para 7880) - "When you hit with your
+    // Unarmed Strike and deal damage, you can deal Bludgeoning damage equal to 1d6 plus
+    // your Strength modifier instead of the normal damage of an Unarmed Strike. If you
+    // aren't holding any weapons or a Shield when you make the attack, the d6 becomes a
+    // d8."
+    if (character_sheet_has_feat(cs, "unarmed_fighting")) c.unarmed_fighting_active = true;
+    // Feat: Fey Touched (PHB para 7614) - "Choose one level 1 spell from the Divination
+    // or Enchantment school of magic. You always have that spell and the Misty Step spell
+    // prepared. You can cast each of these spells without expending a spell slot. Once you
+    // cast either of these spells in this way, you can't cast that spell in this way again
+    // until you finish a Long Rest."
+    // Implementation: append misty_step (and bless as the L1 enchantment default) to the
+    // prepared spells list. Free-cast tracking is deferred (the player can still cast
+    // these via spell slots in the meantime).
+    if (character_sheet_has_feat(cs, "fey_touched")) {
+        bool has_misty = false;
+        for (uint si = 0; si < c.prepared_spells.length(); si++) if (c.prepared_spells[si] == "misty_step") { has_misty = true; break; }
+        if (!has_misty) c.prepared_spells.insert_last("misty_step");
+        bool has_bless = false;
+        for (uint si = 0; si < c.prepared_spells.length(); si++) if (c.prepared_spells[si] == "bless") { has_bless = true; break; }
+        if (!has_bless) c.prepared_spells.insert_last("bless");
+    }
+    // Feat: Shadow Touched (PHB para 7753) - "Choose one level 1 spell from the Illusion
+    // or Necromancy school of magic. You always have that spell and the Invisibility spell
+    // prepared. You can cast each of these spells without expending a spell slot. Once you
+    // cast either of these spells in this way, you can't cast that spell in this way again
+    // until you finish a Long Rest."
+    if (character_sheet_has_feat(cs, "shadow_touched")) {
+        bool has_inv = false;
+        for (uint si = 0; si < c.prepared_spells.length(); si++) if (c.prepared_spells[si] == "greater_invisibility") { has_inv = true; break; }
+        // Use greater_invisibility since plain invisibility isn't implemented yet
+        // Actually use invisibility if available, otherwise greater_invisibility
+        bool has_plain_inv = false;
+        for (uint si = 0; si < c.prepared_spells.length(); si++) if (c.prepared_spells[si] == "invisibility") { has_plain_inv = true; break; }
+        if (!has_plain_inv and !has_inv) c.prepared_spells.insert_last("invisibility");
+        bool has_blindness = false;
+        for (uint si = 0; si < c.prepared_spells.length(); si++) if (c.prepared_spells[si] == "blindness_deafness") { has_blindness = true; break; }
+        if (!has_blindness) c.prepared_spells.insert_last("blindness_deafness"); // L2 necromancy as the default
+    }
     // Epic Boon: Night Spirit (Darkvision 300ft)
     if (character_sheet_has_feat(cs, "boon_of_the_night_spirit")) { c.darkvision = true; c.darkvision_range = 300; }
     // Transfer species traits from character sheet to combatant
