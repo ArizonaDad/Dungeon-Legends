@@ -845,6 +845,8 @@ void show_bonus_action_menu() {
 	int fade_to_black_opt = -1;
 	int flickering_aura_opt = -1;
 	int refraction_shield_opt = -1;
+	int dancing_shadows_opt = -1;
+	int venomous_mark_opt = -1;
 	int magic_coin_opt = -1;
 	int create_void_opt = -1;
 	int breath_of_dragon_opt = -1;
@@ -1106,6 +1108,14 @@ void show_bonus_action_menu() {
 		if (level >= 6) {
 			refraction_shield_opt = m.add_item("Refraction Shield. Bonus action, 3 SP. Melee attackers within 5ft take 2d8 radiant or necrotic damage.");
 		}
+	}
+	// Book of Ebon Tides: College of Shadow Bard
+	if (lc == "bard" and subclass == "College of Shadow" and level >= 3) {
+		dancing_shadows_opt = m.add_item("Dancing Shadows. Bonus action, 1 BI. 20-foot half-cover sphere for allies, 1 minute.");
+	}
+	// Book of Ebon Tides: Mother of Sorrows Warlock
+	if (lc == "warlock" and subclass == "Mother of Sorrows") {
+		venomous_mark_opt = m.add_item("Venomous Mark. Bonus action. Curse a target within 30ft for 1 minute. +1d6 poison on spell attack hit.");
 	}
 	if (lc == "bard" and subclass == "College of Mercantile" and level >= 3) {
 		magic_coin_opt = m.add_item("Magic Coin. Action. Fling a coin at target for 1d12 thunder damage (scales).");
@@ -1542,6 +1552,15 @@ void show_bonus_action_menu() {
 	else if (refraction_shield_opt >= 0 and res == refraction_shield_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "refraction_shield"}});
 		speak("Refraction Shield raised.", true);
+	}
+	else if (dancing_shadows_opt >= 0 and res == dancing_shadows_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "dancing_shadows"}});
+		speak("Dancing Shadows woven.", true);
+	}
+	else if (venomous_mark_opt >= 0 and res == venomous_mark_opt) {
+		if (current_target_id == 0) { speak("No target selected.", true); return; }
+		send({{"type", message_types::bonus_action}, {"feature", "venomous_mark"}, {"target_id", current_target_id}});
+		speak("Venomous Mark placed.", true);
 	}
 	else if (magic_coin_opt >= 0 and res == magic_coin_opt) {
 		if (current_target_id == 0) { speak("No target selected.", true); return; }

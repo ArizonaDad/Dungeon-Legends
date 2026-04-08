@@ -2753,6 +2753,42 @@ void handle_user_message(user@ u, json_object@ msg)
 			c.mark_of_heretic_target = tgt.id;
 			u.room.bm.broadcast_announce(c.name + " marks " + tgt.name + " with the Mark of the Heretic! Crit on 19+ and reactions.", true);
 		}
+		else if (feature == "dancing_shadows") {
+			// Book of Ebon Tides para 1056-1058, College of Shadow Bard L3:
+			// "As a bonus action, you can expend a Bardic Inspiration to create a 20-foot-radius
+			// sphere of shifting shadows centered on you. The sphere moves with you, spreads
+			// around corners, and lasts for 1 minute or until you are incapacitated or die.
+			// Allied creatures (including you) standing in the sphere have half cover, and
+			// creatures outside the sphere have disadvantage on Wisdom (Perception) checks
+			// made to perceive anything inside the sphere."
+			if (c.class_name != "Bard" or c.subclass != "College of Shadow") { u.send({{"type", message_types::announce}, {"text", "Only College of Shadow bards can weave Dancing Shadows."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			if (c.bardic_inspiration_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Bardic Inspiration remaining."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.bardic_inspiration_uses--;
+			c.dancing_shadows_active = true;
+			c.dancing_shadows_rounds = 10; // 1 minute
+			u.room.bm.broadcast_announce(c.name + " expends a Bardic Inspiration to weave Dancing Shadows in a 20-foot sphere. Allies inside have half cover.", true);
+		}
+		else if (feature == "venomous_mark") {
+			// Book of Ebon Tides para 1137, Mother of Sorrows Warlock L1:
+			// "as a bonus action, choose one creature you can see within 30 feet of you.
+			// The target is cursed for 1 minute. The curse ends early if the target dies,
+			// you die, or you are incapacitated. Until the curse ends, you deal an extra
+			// 1d6 poison damage to the target whenever you hit it with a spell attack."
+			if (c.class_name != "Warlock" or c.subclass != "Mother of Sorrows") { u.send({{"type", message_types::announce}, {"text", "Only Mother of Sorrows warlocks can place a Venomous Mark."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			if (target_id == 0) { u.send({{"type", message_types::announce}, {"text", "No target selected."}, {"interrupt", true}}); return; }
+			combatant@ tgt = u.room.bm.combat.get_combatant(target_id);
+			if (@tgt == null or tgt.is_dead) { u.send({{"type", message_types::announce}, {"text", "Invalid target."}, {"interrupt", true}}); return; }
+			if (feet_distance(c.x, c.y, tgt.x, tgt.y) > 30) { u.send({{"type", message_types::announce}, {"text", "Target out of range (30 feet)."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.venomous_mark_target_id = tgt.id;
+			c.venomous_mark_rounds = 10; // 1 minute
+			u.room.bm.broadcast_announce(c.name + " curses " + tgt.name + " with a Venomous Mark. +1d6 poison damage on each spell attack hit.", true);
+		}
 		else if (feature == "shadow_grasp") {
 			// Book of Ebon Tides para 1186, Shadow Domain Cleric L2 Channel Divinity:
 			// "As an action, choose one creature that you can see within 30 feet of you.

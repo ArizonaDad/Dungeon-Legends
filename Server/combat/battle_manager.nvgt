@@ -2107,6 +2107,25 @@ class battle_manager {
 	void announce_turn_start(combatant@ c) {
 		if (@c == null) return;
 
+		// Tick down 1-minute concentration / curse counters at the start of the caster's turn.
+		// Dancing Shadows (College of Shadow): 10-round sphere
+		if (c.dancing_shadows_active) {
+			c.dancing_shadows_rounds--;
+			if (c.dancing_shadows_rounds <= 0) {
+				c.dancing_shadows_active = false;
+				broadcast_announce(c.name + "'s Dancing Shadows fade.", false);
+			}
+		}
+		// Venomous Mark (Mother of Sorrows): 10-round curse
+		if (c.venomous_mark_target_id != 0 and c.venomous_mark_rounds > 0) {
+			c.venomous_mark_rounds--;
+			if (c.venomous_mark_rounds <= 0) {
+				combatant@ vm_tgt = combat.get_combatant(c.venomous_mark_target_id);
+				if (@vm_tgt != null) broadcast_announce(c.name + "'s Venomous Mark on " + vm_tgt.name + " fades.", false);
+				c.venomous_mark_target_id = 0;
+			}
+		}
+
 		string round_text = "";
 		if (combat.current_turn_index == 0) {
 			round_text = "Round " + combat.round_number + "! ";
@@ -4341,6 +4360,18 @@ class battle_manager {
 				int hex_damage = random(1, 6);
 				total_damage += hex_damage;
 				broadcast_announce(c.name + "'s Hex deals " + hex_damage + " extra necrotic damage to " + target.name + ".", false);
+			}
+			// Mother of Sorrows Venomous Mark (Book of Ebon Tides para 1137):
+			// "Until the curse ends, you deal an extra 1d6 poison damage to the target
+			// whenever you hit it with a spell attack."
+			// Source clarifies: "You can only apply this damage once per spell even if
+			// there are multiple spell attack instances, such as with eldritch blast."
+			// We approximate "once per spell" by checking the first attack instance only
+			// (rolls_completed == 0 on the chain).
+			if (pr.is_spell_effect and pr.spell_uses_attack_roll and c.venomous_mark_target_id == target.id and c.venomous_mark_rounds > 0 and pr.rolls_completed == 0) {
+				int vm_damage = random(1, 6);
+				total_damage += vm_damage;
+				broadcast_announce(c.name + "'s Venomous Mark adds " + vm_damage + " poison damage to " + target.name + ".", false);
 			}
 			// Ensnaring Strike: restrain target on weapon hit
 			if (!pr.is_spell_effect and c.ensnaring_strike_pending and pr.is_weapon_attack) {

@@ -285,6 +285,20 @@ class combatant {
 	bool blessed_chosen_used = false;       // L11 Blessed Chosen revival used this long rest
 	bool wise_words_active = false;         // L3 Wise Words: use WIS instead of CHA on CHA-skill checks
 	bool righteous_strike_used_this_turn = false; // L6 Righteous Strike: 1/turn marker
+	// --- Book of Ebon Tides: College of Shadow Bard ---
+	bool college_of_shadow_active = false;  // L3 origin
+	bool dancing_shadows_active = false;    // L3 Dancing Shadows: 20-ft sphere half cover for allies
+	int dancing_shadows_rounds = 0;         // 1 minute = 10 rounds
+	bool fear_of_dark_active = false;       // L3 Fear of the Dark: passive aura advantage on fear saves
+	bool night_music_used = false;          // L14 Night Music: 1/SR or LR
+	// --- Book of Ebon Tides: Mother of Sorrows Warlock ---
+	bool mother_of_sorrows_active = false;  // L1 origin
+	bool poison_soul_active = false;        // L1 Poison Soul: poison damage ignores resistance/immunity
+	uint venomous_mark_target_id = 0;       // L1 Venomous Mark: cursed target (1 minute)
+	int venomous_mark_rounds = 0;           // Remaining duration in rounds
+	bool sickening_revenge_used = false;    // L6 Sickening Revenge: 1/SR or LR
+	bool dark_inoculation = false;          // L10 Dark Inoculation: immunity to disease, poison damage, poisoned
+	bool touch_of_sorrow_used = false;      // L14 Touch of Sorrow: 1/SR or LR
 	uint mark_of_heretic_target = 0; // Target with crit range 19+
 	bool astral_domain_active = false; // Astral Domain Cleric
 	bool warrior_celestial_radiant = false; // Warrior of the Celestial Monk
@@ -880,8 +894,12 @@ class battle {
 		if (damage_type == DMG_BLUDGEONING and target.bludgeoning_resistance) amount = (amount + 1) / 2;
 		if (damage_type == DMG_SLASHING and target.slashing_resistance) amount = (amount + 1) / 2;
 		if (damage_type == DMG_FIRE and target.fire_resistance) amount = (amount + 1) / 2;
-		if (damage_type == DMG_POISON and target.poison_resistance and !target.poison_immunity) amount = (amount + 1) / 2;
-		if (damage_type == DMG_POISON and target.poison_immunity) amount = 0;
+		// Mother of Sorrows Poison Soul (Book of Ebon Tides para 1135):
+		// "Any poison damage you deal ignores any resistance or immunity."
+		// Skip the poison resistance + immunity branches if the source has Poison Soul.
+		bool skip_poison_resistance = (@source != null and source.poison_soul_active);
+		if (damage_type == DMG_POISON and target.poison_resistance and !target.poison_immunity and !skip_poison_resistance) amount = (amount + 1) / 2;
+		if (damage_type == DMG_POISON and target.poison_immunity and !skip_poison_resistance) amount = 0;
 
 		// Arcane Ward absorbs damage for Abjurer Wizards
 		if (target.arcane_ward_hp > 0 and target.class_name == "Wizard" and target.subclass == "Abjurer") {

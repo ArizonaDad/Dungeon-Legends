@@ -1063,6 +1063,7 @@ void get_subclass_options(string class_name, string[]@ names, string[]@ descript
         add_text_pair(names, descriptions, "College of Mercantile", "College of Mercantile. Profit and persuasion through trade magic. (Griffon's Saddlebag)");
         add_text_pair(names, descriptions, "College of Requiems", "College of Requiems. Dark melodies that raise the dead. (Grim Hollow)");
         add_text_pair(names, descriptions, "College of the Dirge Singer", "College of the Dirge Singer. Historian and battle-caller. (Exploring Eberron)");
+        add_text_pair(names, descriptions, "College of Shadow", "College of Shadow. Manipulate fear and protective shadows. (Book of Ebon Tides)");
     } else if (class_name == "Cleric") {
         add_text_pair(names, descriptions, "Life Domain", "Life Domain. Restore, preserve, and protect life.");
         add_text_pair(names, descriptions, "Light Domain", "Light Domain. Wield radiant fire against darkness.");
@@ -1178,6 +1179,7 @@ void get_subclass_options(string class_name, string[]@ names, string[]@ descript
         add_text_pair(names, descriptions, "The Undying", "The Undying. Pact with an immortal entity. Resist aging, death. (Sword Coast)");
         add_text_pair(names, descriptions, "Pact of the Astral Griffon", "Pact of the Astral Griffon. Bound to an astral griffon. (Griffon's Saddlebag)");
         add_text_pair(names, descriptions, "Pact of the Many", "Pact of the Many. Multiple lesser patrons. (Griffon's Saddlebag)");
+        add_text_pair(names, descriptions, "Mother of Sorrows", "Mother of Sorrows. Spread venomous vengeance and supernatural poison. (Book of Ebon Tides)");
     } else if (class_name == "Wizard") {
         add_text_pair(names, descriptions, "Abjurer", "Abjurer. Focus on wards, protection, and magical negation.");
         add_text_pair(names, descriptions, "Diviner", "Diviner. Read fate and twist probabilities.");

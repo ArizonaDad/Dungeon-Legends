@@ -1073,6 +1073,18 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         if (cs.subclass == "College of Mercantile" and cs.level >= 3) {
             c.college_mercantile_active = true;
         }
+        // Book of Ebon Tides: College of Shadow
+        // Sources para 1054-1066. Level 3 Dancing Shadows (BI bonus action, 20-ft sphere
+        // of half-cover for allies, 1 min duration), Fear of the Dark (passive aura - in
+        // dim light or darkness, you and allies who can see you have advantage on saves
+        // against being frightened; hostile creatures who can see you have disadvantage
+        // on those saves). Level 6 Shade Step (BI rider - target teleports 30 ft after
+        // adding the die). Level 14 Night Music (reaction on cast - frighten up to CHA mod
+        // creatures within 60 ft, CHA save).
+        if (cs.subclass == "College of Shadow" and cs.level >= 3) {
+            c.college_of_shadow_active = true;
+            c.fear_of_dark_active = true;
+        }
         // Exploring Eberron: College of the Dirge Singer
         if (cs.subclass == "College of the Dirge Singer" and cs.level >= 3) {
             c.dirge_singer_active = true;
@@ -1184,6 +1196,22 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         // Sword Coast: The Undying
         if (cs.subclass == "The Undying" and cs.level >= 1) {
             c.undying_active = true;
+        }
+        // Book of Ebon Tides: Mother of Sorrows
+        // L1 Poison Soul (para 1135): "your affinity for poison becomes supernatural.
+        // Any poison damage you deal ignores any resistance or immunity."
+        // L1 Venomous Mark (para 1137): bonus action curse, +1d6 poison on spell hit
+        // L6 Sickening Revenge (para 1141): reaction CON save or poisoned 1 min
+        // L10 Dark Inoculation (para 1144): immune to disease, poison damage, poisoned
+        // L14 Touch of Sorrow (para 1146): rider on attack hit, WIS save or paralyzed+poisoned 24h
+        if (cs.subclass == "Mother of Sorrows" and cs.level >= 1) {
+            c.mother_of_sorrows_active = true;
+            c.poison_soul_active = true;
+            if (cs.level >= 10) {
+                c.dark_inoculation = true;
+                c.poison_resistance = true;
+                c.poison_immunity = true;
+            }
         }
         if (cs.subclass == "Pact of the Astral Griffon" and cs.level >= 1) {
             c.astral_griffon_bond = true;
