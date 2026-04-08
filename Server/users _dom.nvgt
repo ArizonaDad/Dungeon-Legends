@@ -2753,6 +2753,101 @@ void handle_user_message(user@ u, json_object@ msg)
 			c.mark_of_heretic_target = tgt.id;
 			u.room.bm.broadcast_announce(c.name + " marks " + tgt.name + " with the Mark of the Heretic! Crit on 19+ and reactions.", true);
 		}
+		else if (feature == "divine_initiative") {
+			// Book of Ebon Tides paras 1088-1090, Keeper Domain L2 Channel Divinity:
+			// "As an action, you present your holy symbol and choose a number of creatures
+			// that you can see and that can see you within 60 feet of you, up to a number
+			// equal to your Wisdom modifier (minimum of one). Each of them gains 5
+			// temporary hit points. When a target gains these temporary hit points, they
+			// can immediately use their reaction to make one weapon attack."
+			// Temp HP scales: 5 (L2), 8 (L6), 11 (L8), 14 (L17).
+			if (c.class_name != "Cleric" or c.subclass != "Keeper Domain") { u.send({{"type", message_types::announce}, {"text", "Only Keeper Domain clerics can use Divine Initiative."}, {"interrupt", true}}); return; }
+			if (!c.has_action) { u.send({{"type", message_types::announce}, {"text", "You've already used your action."}, {"interrupt", true}}); return; }
+			if (c.channel_divinity_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Channel Divinity remaining."}, {"interrupt", true}}); return; }
+			c.has_action = false;
+			c.used_action = true;
+			c.channel_divinity_uses--;
+			int wis_mod = c.get_ability_mod(ABILITY_WIS);
+			if (wis_mod < 1) wis_mod = 1;
+			int temp_hp = 5;
+			if (c.level >= 17) temp_hp = 14;
+			else if (c.level >= 8) temp_hp = 11;
+			else if (c.level >= 6) temp_hp = 8;
+			int blessed_count = 0;
+			for (uint i = 0; i < u.room.bm.combat.combatants.length() and blessed_count < wis_mod; i++) {
+				combatant@ ally = u.room.bm.combat.combatants[i];
+				if (@ally == null or ally.is_dead) continue;
+				if (ally.is_player != c.is_player and ally.id != c.id) continue;
+				if (feet_distance(c.x, c.y, ally.x, ally.y) > 60) continue;
+				if (ally.temp_hp < temp_hp) ally.temp_hp = temp_hp;
+				blessed_count++;
+				u.room.bm.broadcast_announce(ally.name + " gains " + temp_hp + " temporary hit points from Divine Initiative.", false);
+			}
+			u.room.bm.broadcast_announce(c.name + " presents their holy symbol and channels Divine Initiative for " + blessed_count + " allies.", true);
+		}
+		else if (feature == "creeping_fog") {
+			// Book of Ebon Tides para 1200, Shadow Gnawer Barbarian L6:
+			// "As an action, you magically teleport, along with any equipment you are
+			// wearing or carrying, up to 60 feet to an unoccupied space you can see.
+			// Before or after teleporting, you can make one melee attack."
+			// Movement is approximated: places the barbarian adjacent to the chosen target
+			// (if any) within 60 ft, then resolves a single melee attack.
+			if (c.class_name != "Barbarian" or c.subclass != "Shadow Gnawer") { u.send({{"type", message_types::announce}, {"text", "Only Shadow Gnawer barbarians can use Creeping Fog."}, {"interrupt", true}}); return; }
+			if (c.level < 6) { u.send({{"type", message_types::announce}, {"text", "Creeping Fog unlocks at level 6."}, {"interrupt", true}}); return; }
+			if (!c.has_action) { u.send({{"type", message_types::announce}, {"text", "You've already used your action."}, {"interrupt", true}}); return; }
+			if (target_id == 0) { u.send({{"type", message_types::announce}, {"text", "No target selected."}, {"interrupt", true}}); return; }
+			combatant@ tgt = u.room.bm.combat.get_combatant(target_id);
+			if (@tgt == null or tgt.is_dead) { u.send({{"type", message_types::announce}, {"text", "Invalid target."}, {"interrupt", true}}); return; }
+			if (feet_distance(c.x, c.y, tgt.x, tgt.y) > 60) { u.send({{"type", message_types::announce}, {"text", "Target out of range (60 feet)."}, {"interrupt", true}}); return; }
+			c.has_action = false;
+			c.used_action = true;
+			// Teleport adjacent to target on a free side
+			int new_x = tgt.x;
+			int new_y = tgt.y - 1;
+			if (new_y < 0) new_y = tgt.y + 1;
+			c.x = new_x;
+			c.y = new_y;
+			u.room.bm.broadcast_announce(c.name + " bursts into mist and reforms next to " + tgt.name + " with Creeping Fog.", true);
+			// Resolve a single melee attack as part of the teleport (mirrors the source).
+			pending_roll pr;
+			pr.combatant_id = c.id;
+			pr.player_username = c.player_username;
+			pr.roll_type = ROLL_ATTACK;
+			pr.dice_sides = 20;
+			pr.modifier = u.room.bm.get_attack_bonus_for_roll(c, false);
+			pr.reason = c.main_hand + " attack against " + tgt.name + " (Creeping Fog)";
+			pr.target_id = tgt.id;
+			pr.attack_name = c.main_hand;
+			pr.damage_dice_count = u.room.bm.get_attack_damage_count(c, false);
+			pr.damage_dice_sides = u.room.bm.get_attack_damage_dice(c, false);
+			pr.damage_modifier = u.room.bm.get_damage_modifier_for_attack(c, false);
+			pr.damage_type = c.main_hand_damage_type;
+			pr.is_weapon_attack = true;
+			@u.room.bm.current_roll = pr;
+			u.room.bm.send_roll_request(u, pr);
+		}
+		else if (feature == "consume_darkness") {
+			// Book of Ebon Tides paras 1202-1203, Shadow Gnawer L10:
+			// "While in dim light or darkness, you can use a bonus action to regain hit
+			// points equal to 1d12 + your Constitution modifier. For the duration of your
+			// rage (up to 1 minute), you regain 1 hit point at the start of each of your
+			// turns. Once you use this feature, you must finish a short or long rest
+			// before you can use it again."
+			if (c.class_name != "Barbarian" or c.subclass != "Shadow Gnawer") { u.send({{"type", message_types::announce}, {"text", "Only Shadow Gnawer barbarians can consume darkness."}, {"interrupt", true}}); return; }
+			if (c.level < 10) { u.send({{"type", message_types::announce}, {"text", "Consume Darkness unlocks at level 10."}, {"interrupt", true}}); return; }
+			if (!c.raging) { u.send({{"type", message_types::announce}, {"text", "You must be raging to use Consume Darkness."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			if (c.consume_darkness_used) { u.send({{"type", message_types::announce}, {"text", "Consume Darkness has been used; rest to recover."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.consume_darkness_used = true;
+			int heal = random(1, 12) + c.get_ability_mod(ABILITY_CON);
+			if (heal < 1) heal = 1;
+			c.current_hp += heal;
+			if (c.current_hp > c.max_hp) c.current_hp = c.max_hp;
+			c.consume_darkness_per_turn_heal = 1; // Drains over the rage duration
+			u.room.bm.broadcast_announce(c.name + " consumes the surrounding darkness, regaining " + heal + " hit points and 1 HP at the start of each turn while raging.", true);
+		}
 		else if (feature == "umbral_form") {
 			// Book of Ebon Tides para 1016, Circle of Shadows Druid L2:
 			// "as a bonus action, you can expend a use of your Wild Shape feature to take

@@ -2116,6 +2116,14 @@ class battle_manager {
 				broadcast_announce(c.name + "'s Dancing Shadows fade.", false);
 			}
 		}
+		// Shadow Gnawer Consume Darkness L10: 1 HP regen at the start of each turn while
+		// raging, after the initial bonus action heal. Source para 1202.
+		if (c.consume_darkness_per_turn_heal > 0 and c.raging) {
+			c.current_hp += 1;
+			if (c.current_hp > c.max_hp) c.current_hp = c.max_hp;
+		} else if (c.consume_darkness_per_turn_heal > 0 and !c.raging) {
+			c.consume_darkness_per_turn_heal = 0;
+		}
 		// Venomous Mark (Mother of Sorrows): 10-round curse
 		if (c.venomous_mark_target_id != 0 and c.venomous_mark_rounds > 0) {
 			c.venomous_mark_rounds--;
@@ -3969,6 +3977,35 @@ class battle_manager {
 			bonus += requiem_dmg;
 			attacker.bardic_inspiration_uses--;
 			broadcast_announce(attacker.name + " plucks the heartstrings, adding " + requiem_dmg + " necrotic damage! (1 Bardic Inspiration spent)", false);
+		}
+
+		// Keeper Domain Cleric L8 - Hobbling Strike (Book of Ebon Tides para 1096):
+		// "Once on each of your turns when you hit a creature with a weapon attack, the
+		// target must make a Strength saving throw against your spell save DC or be
+		// knocked prone. When you reach 14th level, the target's speed is also halved
+		// until the start of your next turn." Auto-applies on the first weapon hit per turn.
+		if (attacker.class_name == "Cleric" and attacker.subclass == "Keeper Domain" and attacker.level >= 8 and is_weapon_attack and attacker.is_first_hit_this_turn) {
+			int hs_dc = 8 + attacker.proficiency + attacker.get_ability_mod(ABILITY_WIS);
+			int hs_save = random(1, 20) + target.get_save_bonus(ABILITY_STR);
+			if (hs_save < hs_dc) {
+				target.add_condition(COND_PRONE);
+				if (attacker.level >= 14) {
+					target.speed = target.speed / 2;
+					broadcast_announce(attacker.name + "'s Hobbling Strike knocks " + target.name + " prone and halves their speed! (save " + hs_save + " vs DC " + hs_dc + ")", true);
+				} else {
+					broadcast_announce(attacker.name + "'s Hobbling Strike knocks " + target.name + " prone! (save " + hs_save + " vs DC " + hs_dc + ")", true);
+				}
+			}
+		}
+
+		// Umbral Binder Rogue L3 - Shadow Bind cold rider (option 2 of 3):
+		// Source para 1215: "When you hit with a melee or ranged weapon attack, you can
+		// cause the attack to deal additional cold damage equal to your proficiency bonus.
+		// You can use this feature only once on each of your turns."
+		if (attacker.class_name == "Rogue" and attacker.subclass == "Umbral Binder" and attacker.shadow_bind_choice == 2 and is_weapon_attack and attacker.is_first_hit_this_turn) {
+			int sb_dmg = attacker.proficiency;
+			bonus += sb_dmg;
+			broadcast_announce(attacker.name + "'s Shadow Bind adds " + sb_dmg + " cold damage.", false);
 		}
 
 		// Way of the Prophet Monk L6 - Righteous Strike (Book of Ebon Tides para 1231):

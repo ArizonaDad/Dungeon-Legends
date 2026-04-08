@@ -313,6 +313,25 @@ class combatant {
 	uint orb_of_night_locked_attacker_id = 0; // L6 prevents reusing on same attacker until LR
 	bool from_the_shadows_pending = false;  // L10 From the Shadows: auto-hide on initiative
 	bool second_skin_active = false;        // L14 Second Skin: +2 AC and B/P/S resistance in dim/dark
+	// --- Book of Ebon Tides: Keeper Domain Cleric ---
+	bool keeper_domain_active = false;      // L1 origin
+	int blessed_chosen_uses = 0;            // L1 Blessed Chosen reaction: WIS mod uses/LR
+	int divine_initiative_uses = 0;         // L2 Channel Divinity: per-CD use, no separate tracker
+	int fighting_fit_uses = 0;              // L6 Fighting Fit reaction: WIS mod uses/LR
+	bool keeper_hobbling_strike_pending = false; // L8 Hobbling Strike: prone rider 1/turn (and halve speed at L14)
+	bool duty_over_death_used = false;      // L17 Duty Over Death: 1/SR or LR
+	// --- Book of Ebon Tides: Shadow Gnawer Barbarian ---
+	bool shadow_gnawer_active = false;      // L3 origin
+	bool shadow_smoke_active = false;       // L3 Shadow Smoke: 10-foot disadvantage cloud while raging
+	bool consume_darkness_used = false;     // L10 Consume Darkness: 1/SR or LR
+	int consume_darkness_per_turn_heal = 0; // L10 ongoing rage heal: 1 HP/turn while rage active after Consume
+	// --- Book of Ebon Tides: Umbral Binder Rogue ---
+	bool umbral_binder_active = false;      // L3 origin
+	int shadow_bind_choice = 0;             // L3 Shadow Bind ritual: 0=teleport, 1=half cover, 2=cold rider
+	bool cloaked_dagger_active = false;     // L9 Cloaked Dagger: passive sneak attack in dim/dark
+	int black_magic_darkness_uses = 0;      // L13 Black Magic: 3 free darkness casts/LR
+	bool black_magic_invisible = false;     // L13 invisible action while in dim/dark
+	bool umbral_shadow_grasp_used = false;  // L17 Shadow Grasp on sneak attack hit: 1/SR or LR
 	uint mark_of_heretic_target = 0; // Target with crit range 19+
 	bool astral_domain_active = false; // Astral Domain Cleric
 	bool warrior_celestial_radiant = false; // Warrior of the Celestial Monk

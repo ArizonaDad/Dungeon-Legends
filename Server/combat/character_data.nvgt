@@ -1032,6 +1032,24 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         if (cs.subclass == "Grim Surgeon" and cs.level >= 3) {
             c.grim_surgeon_precision = false;
         }
+        // Book of Ebon Tides: Umbral Binder
+        // L3 Eyes In the Dark (para 1210): "You gain darkvision out to a range of 120 feet."
+        // L3 Shadow Bind (paras 1211-1215): ritual at long rest, choose 1 of 3 effects:
+        //   0 = teleport half speed in dim/dark + advantage on first Stealth check before
+        //       end of turn
+        //   1 = +2 AC and +2 DEX saves while moving in dim/dark (half cover)
+        //   2 = +PB cold damage rider on melee/ranged weapon hit (1/turn)
+        // L9 Cloaked Dagger (para 1217): sneak attack works at 30 ft in dim/dark without
+        // needing advantage (and without disadvantage on the attack).
+        // L13 Black Magic (paras 1218-1220): bonus action cast darkness without components
+        // (3 uses/LR) AND action while in dim/dark to become invisible until attack/spell.
+        // L17 Shadow Grasp (paras 1221-1222): on Sneak Attack hit, target makes DEX save
+        // or restrained 1 minute. 1/SR or LR.
+        if (cs.subclass == "Umbral Binder" and cs.level >= 3) {
+            c.umbral_binder_active = true;
+            c.shadow_bind_choice = 2; // Default to cold damage rider; player can re-ritual on long rest
+            if (cs.level >= 13) c.black_magic_darkness_uses = 3;
+        }
     }
     if (cs.class_name == "Barbarian") {
         if (cs.subclass == "Path of the Carrion Raven" and cs.level >= 3) {
@@ -1040,6 +1058,20 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         // Sword Coast: Path of the Battlerager (Dwarves only in lore)
         if (cs.subclass == "Path of the Battlerager" and cs.level >= 3) {
             c.battlerager_active = true;
+        }
+        // Book of Ebon Tides: Shadow Gnawer
+        // L3 Shadow Smoke (para 1198): "you emanate tendrils of shadow smoke while you
+        // rage. The smoke extends 10 feet from you in every direction. Any creature
+        // (other than you) that starts its turn in the smoke has disadvantage on its
+        // next attack roll."
+        // L6 Creeping Fog (para 1200): action, teleport 60 ft to a visible unoccupied
+        // space + one melee attack before or after.
+        // L10 Consume Darkness (paras 1202-1203): bonus action while raging in dim/dark,
+        // regain 1d12 + CON mod HP and 1 HP/turn for the rest of rage. 1/SR or LR.
+        // L14 Corrosive Haze (para 1206): hostile creatures in the smoke must succeed on
+        // a CON save or be blinded until the start of their next turn. DC = 8 + PB + CON.
+        if (cs.subclass == "Shadow Gnawer" and cs.level >= 3) {
+            c.shadow_gnawer_active = true;
         }
         if (cs.subclass == "Path of the Glacier" and cs.level >= 3) {
             c.path_of_glacier_active = true;
@@ -1107,6 +1139,27 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
     if (cs.class_name == "Cleric") {
         if (cs.subclass == "Trickery Domain" and cs.level >= 1) {
             c.trickery_domain_active = true;
+        }
+        // Book of Ebon Tides: Keeper Domain
+        // L1 Blessed Chosen (paras 1083-1084): reaction to impose disadvantage on an enemy
+        // attack roll vs an ally within 30 ft. Uses = WIS mod/LR.
+        // L1 Bonus Proficiencies (para 1086): martial weapons + Persuasion skill.
+        // L2 Channel Divinity Divine Initiative (paras 1088-1090): action, present holy
+        // symbol, grant temp HP and immediate reaction weapon attack to WIS-mod creatures
+        // within 60 ft. Temp HP scales: 5 (L2), 8 (L6), 11 (L8), 14 (L17).
+        // L6 Fighting Fit (paras 1093-1094): reaction, remove charmed/frightened/
+        // paralyzed/stunned from self or ally within 30 ft. Uses = WIS mod/LR.
+        // L8 Hobbling Strike (para 1096): once per turn, weapon hit forces STR save vs
+        // spell save DC or knocked prone. L14 also halves the target's speed.
+        // L17 Duty Over Death (para 1098): when an ally within 60 ft drops to 0 HP but
+        // isn't killed outright, they remain conscious at half max HP. 1/SR or LR.
+        if (cs.subclass == "Keeper Domain" and cs.level >= 1) {
+            c.keeper_domain_active = true;
+            int wis_mod_kd = (cs.wisdom - 10) / 2;
+            if (wis_mod_kd < 1) wis_mod_kd = 1;
+            c.blessed_chosen_uses = wis_mod_kd;
+            if (cs.level >= 6) c.fighting_fit_uses = wis_mod_kd;
+            if (!c.has_skill_proficiency("Persuasion")) c.skill_proficiencies.insert_last("Persuasion");
         }
         // Book of Ebon Tides: Shadow Domain
         // Source para 1180-1181 (Cover of Night L1): "you gain proficiency in the Stealth

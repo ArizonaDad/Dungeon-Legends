@@ -850,6 +850,9 @@ void show_bonus_action_menu() {
 	int umbral_form_opt = -1;
 	int darkness_falls_opt = -1;
 	int dark_transfusion_opt = -1;
+	int divine_initiative_opt = -1;
+	int creeping_fog_opt = -1;
+	int consume_darkness_opt = -1;
 	int magic_coin_opt = -1;
 	int create_void_opt = -1;
 	int breath_of_dragon_opt = -1;
@@ -1130,6 +1133,19 @@ void show_bonus_action_menu() {
 	// Book of Ebon Tides: Shadow Arcane Tradition Wizard
 	if (lc == "wizard" and subclass == "Shadow Arcane Tradition" and level >= 2) {
 		dark_transfusion_opt = m.add_item("Dark Transfusion. Bonus action. Expend two spell slots to recover one of equal or lesser combined value.");
+	}
+	// Book of Ebon Tides: Keeper Domain Cleric
+	if (lc == "cleric" and subclass == "Keeper Domain" and level >= 2) {
+		divine_initiative_opt = m.add_item("Divine Initiative. Channel Divinity action. Grant up to WIS-mod allies within 60ft 5 to 14 temp HP (level scaling) and an immediate reaction weapon attack.");
+	}
+	// Book of Ebon Tides: Shadow Gnawer Barbarian
+	if (lc == "barbarian" and subclass == "Shadow Gnawer") {
+		if (level >= 6) {
+			creeping_fog_opt = m.add_item("Creeping Fog. Action. Teleport up to 60ft to a visible space and make one melee attack.");
+		}
+		if (level >= 10) {
+			consume_darkness_opt = m.add_item("Consume Darkness. Bonus action while raging. Heal 1d12+CON and 1 HP/turn for the rest of rage. 1/SR.");
+		}
 	}
 	if (lc == "bard" and subclass == "College of Mercantile" and level >= 3) {
 		magic_coin_opt = m.add_item("Magic Coin. Action. Fling a coin at target for 1d12 thunder damage (scales).");
@@ -1587,6 +1603,19 @@ void show_bonus_action_menu() {
 	else if (dark_transfusion_opt >= 0 and res == dark_transfusion_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "dark_transfusion"}});
 		speak("Dark Transfusion.", true);
+	}
+	else if (divine_initiative_opt >= 0 and res == divine_initiative_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "divine_initiative"}});
+		speak("Divine Initiative.", true);
+	}
+	else if (creeping_fog_opt >= 0 and res == creeping_fog_opt) {
+		if (current_target_id == 0) { speak("No target selected.", true); return; }
+		send({{"type", message_types::bonus_action}, {"feature", "creeping_fog"}, {"target_id", current_target_id}});
+		speak("Creeping Fog.", true);
+	}
+	else if (consume_darkness_opt >= 0 and res == consume_darkness_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "consume_darkness"}});
+		speak("Consuming darkness.", true);
 	}
 	else if (magic_coin_opt >= 0 and res == magic_coin_opt) {
 		if (current_target_id == 0) { speak("No target selected.", true); return; }

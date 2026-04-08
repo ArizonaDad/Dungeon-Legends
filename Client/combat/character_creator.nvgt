@@ -1049,6 +1049,7 @@ void get_subclass_options(string class_name, string[]@ names, string[]@ descript
         add_text_pair(names, descriptions, "Path of the Infernal", "Path of the Infernal. Channel hellfire and fiendish power. (Griffon's Saddlebag)");
         add_text_pair(names, descriptions, "Path of the Carrion Raven", "Path of the Carrion Raven. Beast maneuvers and primal cunning. (Grim Hollow)");
         add_text_pair(names, descriptions, "Path of the Battlerager", "Path of the Battlerager. Spiked armor melee rage. Dwarves only. (Sword Coast)");
+        add_text_pair(names, descriptions, "Shadow Gnawer", "Shadow Gnawer. Consume raw shadow to gain teleport, stealth smoke, and corrosive haze. (Book of Ebon Tides)");
     } else if (class_name == "Bard") {
         add_text_pair(names, descriptions, "College of Dance", "College of Dance. Turn movement and rhythm into magical performance.");
         add_text_pair(names, descriptions, "College of Glamour", "College of Glamour. Beguile and command with fey majesty.");
@@ -1079,7 +1080,7 @@ void get_subclass_options(string class_name, string[]@ names, string[]@ descript
         add_text_pair(names, descriptions, "Inquisition Domain", "Inquisition Domain. Hunt heretics and counter magic. (Grim Hollow)");
         add_text_pair(names, descriptions, "Mind Domain", "Mind Domain. Psychic power through divine devotion. (Exploring Eberron)");
         add_text_pair(names, descriptions, "Arcana Domain", "Arcana Domain. Knowledge of arcane secrets + wizard cantrips. (Sword Coast)");
-        add_text_pair(names, descriptions, "Keeper Domain", "Keeper Domain. Protect and lead allies, social bonds and martial prowess. (Book of Ebon Tides)");
+        add_text_pair(names, descriptions, "Keeper Domain", "Keeper Domain. Protect allies with martial prowess, leadership, and divine reactions. (Book of Ebon Tides)");
         add_text_pair(names, descriptions, "Shadow Domain", "Shadow Domain. Walk between light and dark; stealth, invisibility, and shadow grasp. (Book of Ebon Tides)");
     } else if (class_name == "Druid") {
         add_text_pair(names, descriptions, "Circle of the Land", "Circle of the Land. Draw deeper magic from a chosen environment.");
@@ -1157,6 +1158,7 @@ void get_subclass_options(string class_name, string[]@ names, string[]@ descript
         add_text_pair(names, descriptions, "Runetagger", "Runetagger. Mark targets with magical runes. (Griffon's Saddlebag)");
         add_text_pair(names, descriptions, "Grim Surgeon", "Grim Surgeon. Deadly precision with surgical knowledge. (Griffon's Saddlebag)");
         add_text_pair(names, descriptions, "Misfortune Bringer", "Misfortune Bringer. Curse enemies with jinxes and bad luck. (Grim Hollow)");
+        add_text_pair(names, descriptions, "Umbral Binder", "Umbral Binder. Bind shadow magic to enhance stealth, sneak attacks, and invisibility. (Book of Ebon Tides)");
     } else if (class_name == "Sorcerer") {
         add_text_pair(names, descriptions, "Aberrant Sorcery", "Aberrant Sorcery. Mutate your magic with psychic and alien influence.");
         add_text_pair(names, descriptions, "Clockwork Sorcery", "Clockwork Sorcery. Impose order and balance with lawful magic.");
