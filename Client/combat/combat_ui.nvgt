@@ -853,6 +853,7 @@ void show_bonus_action_menu() {
 	int divine_initiative_opt = -1;
 	int creeping_fog_opt = -1;
 	int consume_darkness_opt = -1;
+	int telekinetic_shove_opt = -1;
 	int magic_coin_opt = -1;
 	int create_void_opt = -1;
 	int breath_of_dragon_opt = -1;
@@ -1146,6 +1147,10 @@ void show_bonus_action_menu() {
 		if (level >= 10) {
 			consume_darkness_opt = m.add_item("Consume Darkness. Bonus action while raging. Heal 1d12+CON and 1 HP/turn for the rest of rage. 1/SR.");
 		}
+	}
+	// Telekinetic feat (PHB para 7813) - bonus action shove available to anyone with the feat
+	if (feat_selected("telekinetic")) {
+		telekinetic_shove_opt = m.add_item("Telekinetic Shove. Bonus action. Push a creature within 30ft 5 feet (STR save vs DC 8 + PB + spellcasting mod).");
 	}
 	if (lc == "bard" and subclass == "College of Mercantile" and level >= 3) {
 		magic_coin_opt = m.add_item("Magic Coin. Action. Fling a coin at target for 1d12 thunder damage (scales).");
@@ -1616,6 +1621,11 @@ void show_bonus_action_menu() {
 	else if (consume_darkness_opt >= 0 and res == consume_darkness_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "consume_darkness"}});
 		speak("Consuming darkness.", true);
+	}
+	else if (telekinetic_shove_opt >= 0 and res == telekinetic_shove_opt) {
+		if (current_target_id == 0) { speak("No target selected.", true); return; }
+		send({{"type", message_types::bonus_action}, {"feature", "telekinetic_shove"}, {"target_id", current_target_id}});
+		speak("Telekinetic shove.", true);
 	}
 	else if (magic_coin_opt >= 0 and res == magic_coin_opt) {
 		if (current_target_id == 0) { speak("No target selected.", true); return; }

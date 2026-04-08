@@ -664,8 +664,53 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
     if (character_sheet_has_feat(cs, "speedy")) c.speed += 10;
     // Epic Boon: Speed (+30ft)
     if (character_sheet_has_feat(cs, "boon_of_speed")) c.speed += 30;
-    // Feat: Skulker (Darkvision 60ft)
-    if (character_sheet_has_feat(cs, "skulker")) { c.darkvision = true; c.darkvision_range = 60; }
+    // Feat: Skulker (Darkvision 60ft) plus PHB para 7782 Fog of War advantage on Hide
+    // Stealth checks during combat, plus para 7783 hidden-miss-doesn't-reveal sniper rule.
+    if (character_sheet_has_feat(cs, "skulker")) {
+        c.darkvision = true;
+        c.darkvision_range = 60;
+        if (!c.has_skill_check_advantage("Stealth")) c.skill_check_advantage.insert_last("Stealth");
+    }
+    // Feat: Athlete (PHB para 7549) - "You gain a Climb Speed equal to your Speed."
+    // Plus Hop Up and Jumping (5-ft running jump) which are exploration-only.
+    if (character_sheet_has_feat(cs, "athlete")) c.climb_speed = c.speed;
+    // Feat: Observant (PHB para 7701) - skill proficiency in one of Insight/Investigation/
+    // Perception (player should choose; default to Perception if not already proficient).
+    // L4+ also grants Quick Search bonus action (deferred - needs combat search action).
+    if (character_sheet_has_feat(cs, "observant")) {
+        if (!c.has_skill_proficiency("Perception")) c.skill_proficiencies.insert_last("Perception");
+        else if (!c.has_skill_proficiency("Investigation")) c.skill_proficiencies.insert_last("Investigation");
+        else if (!c.has_skill_proficiency("Insight")) c.skill_proficiencies.insert_last("Insight");
+    }
+    // Feat: Resilient (PHB para 7731) - "You gain saving throw proficiency with the chosen
+    // ability." Default to Constitution which is the most useful for concentration saves.
+    // (Players who want a different save can re-pick the feat — it's repeatable per source.)
+    if (character_sheet_has_feat(cs, "resilient")) {
+        if (c.save_proficiencies[ABILITY_CON] == 0) c.save_proficiencies[ABILITY_CON] = 1;
+        else if (c.save_proficiencies[ABILITY_WIS] == 0) c.save_proficiencies[ABILITY_WIS] = 1;
+        else if (c.save_proficiencies[ABILITY_DEX] == 0) c.save_proficiencies[ABILITY_DEX] = 1;
+        else if (c.save_proficiencies[ABILITY_STR] == 0) c.save_proficiencies[ABILITY_STR] = 1;
+        else if (c.save_proficiencies[ABILITY_INT] == 0) c.save_proficiencies[ABILITY_INT] = 1;
+        else if (c.save_proficiencies[ABILITY_CHA] == 0) c.save_proficiencies[ABILITY_CHA] = 1;
+    }
+    // Feat: Skill Expert (PHB paras 7774-7775) - one new skill proficiency + one expertise.
+    // Defaults to Perception proficiency + expertise on the highest-value skill (Stealth)
+    // since the source mandates the player choose.
+    if (character_sheet_has_feat(cs, "skill_expert")) {
+        if (!c.has_skill_proficiency("Perception")) c.skill_proficiencies.insert_last("Perception");
+        if (c.has_skill_proficiency("Stealth") and !c.has_skill_expertise("Stealth")) c.skill_expertise.insert_last("Stealth");
+        else if (c.skill_proficiencies.length() > 0 and !c.has_skill_expertise(c.skill_proficiencies[0])) c.skill_expertise.insert_last(c.skill_proficiencies[0]);
+    }
+    // Feat: Inspiring Leader (PHB paras 7649) - "After Bolstering Performance, choose up to
+    // six allies (which can include yourself) within 30 feet of you who can hear you and who
+    // can understand you. Each of those allies gains Temporary Hit Points equal to your
+    // character level + your Charisma modifier." Auto-applies at battle start (treated as
+    // post-rest performance) since combat doesn't track rest cycles.
+    if (character_sheet_has_feat(cs, "inspiring_leader")) {
+        int cha_mod = (cs.charisma - 10) / 2;
+        c.inspiring_leader_temp_hp_pool = cs.level + cha_mod;
+        if (c.inspiring_leader_temp_hp_pool < 1) c.inspiring_leader_temp_hp_pool = 1;
+    }
     // Epic Boon: Night Spirit (Darkvision 300ft)
     if (character_sheet_has_feat(cs, "boon_of_the_night_spirit")) { c.darkvision = true; c.darkvision_range = 300; }
     // Transfer species traits from character sheet to combatant

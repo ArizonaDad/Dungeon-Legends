@@ -158,22 +158,35 @@ Every base class has features that need the same level of rigor as subclasses:
 
 **Current status (verified 2026-04-08):** 77 feats defined in `common/feat_data.nvgt`. Only 24 have `has_feat()` checks in combat code. **53 feats have no combat logic at all** — they're selectable at character creation but do nothing in combat.
 
-### Feats WITH combat logic (24 — need audit pass for 2024 accuracy):
-alert, archery, boon_of_combat_prowess, boon_of_irresistible_offense, boon_of_truesight, crossbow_expert, crusher, defensive_duelist, dueling, grappler, great_weapon_fighting, great_weapon_master, healer, heavy_armor_master, mage_slayer, piercer, polearm_master, savage_attacker, sentinel, shield_master, slasher, tavern_brawler, thrown_weapon_fighting, war_caster
+### Feats WITH combat logic (32 after batch 4A; 21 still missing):
+alert, archery, athlete (BATCH 4A), boon_of_combat_prowess, boon_of_irresistible_offense, boon_of_truesight, crossbow_expert, crusher, defensive_duelist, dueling, grappler, great_weapon_fighting, great_weapon_master, healer, heavy_armor_master, inspiring_leader (BATCH 4A), mage_slayer, observant (BATCH 4A), piercer, poisoner (BATCH 4A), polearm_master, resilient (BATCH 4A), savage_attacker, sentinel, sharpshooter (BATCH 4A), shield_master, skill_expert (BATCH 4A), skulker (BATCH 4A), slasher, spell_sniper (BATCH 4A), tavern_brawler, telekinetic (BATCH 4A), thrown_weapon_fighting, war_caster
 
-### Feats WITHOUT combat logic (53 — need full implementation):
+**Batch 4A wired (10 new feats):**
+- **Athlete** (PHB para 7549) - climb_speed = base speed
+- **Observant** (PHB para 7701) - skill proficiency in Perception (or Investigation/Insight if already proficient)
+- **Resilient** (PHB para 7731) - saving throw proficiency in CON (default; falls through to other abilities if already proficient)
+- **Skill Expert** (PHB paras 7774-7775) - one skill proficiency (Perception default) + one expertise (Stealth default)
+- **Inspiring Leader** (PHB para 7649) - on battle start, grants level + CHA mod temp HP to up to 6 allies within 30 ft
+- **Skulker** (PHB para 7782) - skill_check_advantage["Stealth"] (was already wired for darkvision)
+- **Sharpshooter** (PHB para 7760) - skips ranged-attack-in-melee disadvantage. Bypass cover and Long Shots are no-ops because cover and long range disadvantage aren't currently tracked.
+- **Spell Sniper** (PHB para 7805) - skips ranged-spell-in-melee disadvantage. Same caveats as Sharpshooter.
+- **Poisoner** (PHB para 7715) - poison damage from this character bypasses Resistance (but NOT Immunity, unlike Mother of Sorrows Poison Soul)
+- **Telekinetic** (PHB para 7813) - bonus action shove: target within 30 ft, STR save vs DC 8 + PB + best of INT/WIS/CHA mod, push 5 ft on fail. New telekinetic_shove menu entry visible only to characters with the feat.
+
+### Feats WITHOUT combat logic (43 still missing after batch 4A):
 
 **Origin feats (6 missing):**
-- crafter, magic_initiate_cleric, magic_initiate_druid, magic_initiate_wizard, musician, skilled, tough, lucky
+- crafter, magic_initiate_cleric, magic_initiate_druid, magic_initiate_wizard, musician, skilled
+- (tough and lucky already wired in earlier batches.)
 
-**General feats (29 missing — level 4+, the biggest group):**
-- ability_score_improvement, actor, athlete, charger, chef, defense, dual_wielder, durable, elemental_adept, fey_touched, heavily_armored, inspiring_leader, keen_mind, lightly_armored, martial_weapon_training, medium_armor_master, moderately_armored, mounted_combatant, observant, poisoner, resilient, ritual_caster, shadow_touched, sharpshooter, skill_expert, skulker, speedy, spell_sniper, telekinetic, telepathic, weapon_master
+**General feats (still missing — level 4+, the biggest group):**
+- ability_score_improvement (data only — not really a "feat" in the combat sense), actor, charger, chef, defense (already wired as +1 AC), dual_wielder (already wired as +1 AC), durable, elemental_adept, fey_touched, heavily_armored, keen_mind, lightly_armored, martial_weapon_training, medium_armor_master, moderately_armored, mounted_combatant, ritual_caster, shadow_touched, speedy (already wired as +10 speed), telepathic, weapon_master
 
-**Fighting Style feats (4 missing):**
+**Fighting Style feats (5 missing):**
 - blind_fighting, interception, protection, two_weapon_fighting, unarmed_fighting
 
 **Epic Boon feats (8 missing):**
-- boon_of_dimensional_travel, boon_of_energy_resistance, boon_of_fate, boon_of_fortitude, boon_of_recovery, boon_of_skill, boon_of_speed, boon_of_spell_recall, boon_of_the_night_spirit
+- boon_of_dimensional_travel, boon_of_energy_resistance, boon_of_fate, boon_of_fortitude (already wired as +40 HP), boon_of_recovery, boon_of_skill, boon_of_speed (already wired as +30 speed), boon_of_spell_recall, boon_of_the_night_spirit (already wired as 300 ft darkvision)
 
 ### Key complex feat effects still needing work:
 - **Polearm Master Reactive Strike** — opportunity attack when a creature enters reach (not just when leaving). Current game only supports leave-reach OAs.

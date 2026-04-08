@@ -2753,6 +2753,49 @@ void handle_user_message(user@ u, json_object@ msg)
 			c.mark_of_heretic_target = tgt.id;
 			u.room.bm.broadcast_announce(c.name + " marks " + tgt.name + " with the Mark of the Heretic! Crit on 19+ and reactions.", true);
 		}
+		else if (feature == "telekinetic_shove") {
+			// Telekinetic feat (PHB para 7813): "As a Bonus Action, you can telekinetically
+			// shove one creature you can see within 30 feet of yourself. When you do so,
+			// the target must succeed on a Strength saving throw (DC 8 plus the relevant
+			// ability modifier and your Proficiency Bonus) or be moved 5 feet toward you
+			// or away from you."
+			if (!c.has_feat("telekinetic")) { u.send({{"type", message_types::announce}, {"text", "You don't have the Telekinetic feat."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			if (target_id == 0) { u.send({{"type", message_types::announce}, {"text", "No target selected."}, {"interrupt", true}}); return; }
+			combatant@ tgt = u.room.bm.combat.get_combatant(target_id);
+			if (@tgt == null or tgt.is_dead) { u.send({{"type", message_types::announce}, {"text", "Invalid target."}, {"interrupt", true}}); return; }
+			if (feet_distance(c.x, c.y, tgt.x, tgt.y) > 30) { u.send({{"type", message_types::announce}, {"text", "Target out of range (30 feet)."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			// "Relevant ability modifier" = the player's INT, WIS, or CHA (highest of the three)
+			int int_mod = c.get_ability_mod(ABILITY_INT);
+			int wis_mod = c.get_ability_mod(ABILITY_WIS);
+			int cha_mod = c.get_ability_mod(ABILITY_CHA);
+			int best_mod = int_mod;
+			if (wis_mod > best_mod) best_mod = wis_mod;
+			if (cha_mod > best_mod) best_mod = cha_mod;
+			int dc = 8 + c.proficiency + best_mod;
+			int save_roll = random(1, 20) + tgt.get_save_bonus(ABILITY_STR);
+			if (save_roll < dc) {
+				// Push 5 ft directly away from caster (one tile)
+				int dx = 0;
+				int dy = 0;
+				if (tgt.x > c.x) dx = 1;
+				else if (tgt.x < c.x) dx = -1;
+				if (tgt.y > c.y) dy = 1;
+				else if (tgt.y < c.y) dy = -1;
+				if (dx == 0 and dy == 0) dy = 1; // Same square: arbitrary push direction
+				int new_x = tgt.x + dx;
+				int new_y = tgt.y + dy;
+				if (new_x >= 0 and new_x < u.room.bm.combat.map_width and new_y >= 0 and new_y < u.room.bm.combat.map_height) {
+					tgt.x = new_x;
+					tgt.y = new_y;
+				}
+				u.room.bm.broadcast_announce(c.name + "'s telekinetic shove pushes " + tgt.name + " 5 feet away! (STR save " + save_roll + " vs DC " + dc + ")", true);
+			} else {
+				u.room.bm.broadcast_announce(tgt.name + " resists " + c.name + "'s telekinetic shove. (STR save " + save_roll + " vs DC " + dc + ")", true);
+			}
+		}
 		else if (feature == "divine_initiative") {
 			// Book of Ebon Tides paras 1088-1090, Keeper Domain L2 Channel Divinity:
 			// "As an action, you present your holy symbol and choose a number of creatures

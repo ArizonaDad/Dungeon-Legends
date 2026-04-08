@@ -1737,7 +1737,10 @@ class battle_manager {
 		if (target.has_condition(COND_RESTRAINED)) adv = true;
 		if (attacker.is_hidden and combat.are_hostile(attacker, target)) adv = true;
 		// Crossbow Expert: no disadvantage on ranged attacks within 5ft
-		if (attack_is_ranged and has_hostile_within_5_feet(attacker) and !attacker.has_feat("crossbow_expert")) disadv = true;
+		// Sharpshooter (PHB para 7760): "Being within 5 feet of an enemy doesn't impose
+		// Disadvantage on your attack rolls with Ranged weapons."
+		// Spell Sniper (PHB para 7805): same effect for spell attacks.
+		if (attack_is_ranged and has_hostile_within_5_feet(attacker) and !attacker.has_feat("crossbow_expert") and !attacker.has_feat("sharpshooter") and !attacker.has_feat("spell_sniper")) disadv = true;
 		if (attacker.has_feat("grappler") and target.grapple_source_id == attacker.id and target.has_condition(COND_GRAPPLED)) adv = true;
 		if (target.guiding_bolt_advantage) {
 			adv = true;
@@ -2545,6 +2548,30 @@ class battle_manager {
 				{"mode", combat.mode},
 				{"scenario", scenario_id}
 			});
+		}
+
+		// Inspiring Leader feat (PHB para 7649): "After Bolstering Performance, choose
+		// up to six allies (which can include yourself) within 30 feet... Each of those
+		// allies gains Temporary Hit Points equal to your character level + your Charisma
+		// modifier." Battle start is treated as the post-rest performance moment since
+		// combat doesn't currently track rest cycles.
+		for (uint il = 0; il < combat.combatants.length(); il++) {
+			combatant@ leader = combat.combatants[il];
+			if (@leader == null or leader.is_dead) continue;
+			if (!leader.is_player) continue;
+			if (leader.inspiring_leader_temp_hp_pool <= 0) continue;
+			int granted = 0;
+			for (uint tg = 0; tg < combat.combatants.length() and granted < 6; tg++) {
+				combatant@ ally = combat.combatants[tg];
+				if (@ally == null or ally.is_dead) continue;
+				if (ally.is_player != leader.is_player) continue;
+				if (feet_distance(leader.x, leader.y, ally.x, ally.y) > 30) continue;
+				if (ally.temp_hp < leader.inspiring_leader_temp_hp_pool) ally.temp_hp = leader.inspiring_leader_temp_hp_pool;
+				granted++;
+			}
+			if (granted > 0) {
+				broadcast_announce(leader.name + "'s Inspiring Leader grants " + leader.inspiring_leader_temp_hp_pool + " temporary hit points to " + granted + " ally" + (granted == 1 ? "" : "ies") + ".", false);
+			}
 		}
 
 		// Delay initiative to let clients enter combat loop.

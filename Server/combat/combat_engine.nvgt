@@ -85,6 +85,8 @@ class combatant {
 	int focus_points = 0;
 	int sorcery_points = 0;     // Sorcerer Font of Magic resource (PHB Sorcerer L2)
 	int sorcery_points_max = 0;
+	int climb_speed = 0;        // PHB Athlete feat / climbing race trait
+	int inspiring_leader_temp_hp_pool = 0; // Pool of temp HP grants from Inspiring Leader rest performance
 	int lay_on_hands_pool = 0;
 	int bardic_inspiration_uses = 0;
 	int bardic_inspiration_grant_die = 0;
@@ -930,10 +932,15 @@ class battle {
 		if (damage_type == DMG_FIRE and target.fire_resistance) amount = (amount + 1) / 2;
 		// Mother of Sorrows Poison Soul (Book of Ebon Tides para 1135):
 		// "Any poison damage you deal ignores any resistance or immunity."
-		// Skip the poison resistance + immunity branches if the source has Poison Soul.
-		bool skip_poison_resistance = (@source != null and source.poison_soul_active);
+		// Poisoner feat (PHB para 7715): "When you make a damage roll that deals Poison
+		// damage, it ignores Resistance to Poison damage."
+		// Note: Poisoner only bypasses RESISTANCE, not immunity. Mother of Sorrows bypasses both.
+		bool source_poison_soul = (@source != null and source.poison_soul_active);
+		bool source_poisoner = (@source != null and source.has_feat("poisoner"));
+		bool skip_poison_resistance = source_poison_soul or source_poisoner;
+		bool skip_poison_immunity = source_poison_soul; // Poisoner does NOT bypass immunity
 		if (damage_type == DMG_POISON and target.poison_resistance and !target.poison_immunity and !skip_poison_resistance) amount = (amount + 1) / 2;
-		if (damage_type == DMG_POISON and target.poison_immunity and !skip_poison_resistance) amount = 0;
+		if (damage_type == DMG_POISON and target.poison_immunity and !skip_poison_immunity) amount = 0;
 
 		// Arcane Ward absorbs damage for Abjurer Wizards
 		if (target.arcane_ward_hp > 0 and target.class_name == "Wizard" and target.subclass == "Abjurer") {
