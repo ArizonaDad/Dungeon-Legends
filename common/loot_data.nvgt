@@ -142,6 +142,52 @@ void init_item_catalog() {
 	add_item("glory_shield", "Glory Shield", SLOT_ARMOR, RARITY_EPIC, "An impenetrable shield of radiant energy.", 4, 0, 15, 0, 0, 0, 0, 0);
 	add_item("ring_of_glory", "Ring of Glory", SLOT_RING, RARITY_RARE, "A ring pulsing with earned power.", 0, 0, 0, 0, 0, 0, 2, 0);
 	add_item("crown_of_glory", "Crown of Glory", SLOT_AMULET, RARITY_LEGENDARY, "The ultimate symbol of achievement.", 2, 0, 20, 3, 0, 0, 0, 0);
+
+	// ============================================================
+	// DMG 2024 MAGIC ITEMS (extracted from source paragraphs 7290+)
+	// ============================================================
+
+	// DMG 2024 Amulets (paras 7290+)
+	add_item("dmg_amulet_of_health", "Amulet of Health (DMG 2024)", SLOT_AMULET, RARITY_RARE, "Your Constitution is 19 while you wear this amulet. It has no effect on you if your Constitution is 19 or higher without it.", 0, 0, 20, 0, 0, 0, 1, 0);
+	add_item("dmg_amulet_of_proof", "Amulet of Proof against Detection and Location", SLOT_AMULET, RARITY_UNCOMMON, "While wearing this amulet, you can't be targeted by Divination spells or perceived through magical scrying sensors unless you allow it.", 0, 0, 0, 0, 0, 0, 1, 0);
+	add_item("dmg_amulet_of_planes", "Amulet of the Planes", SLOT_AMULET, RARITY_RARE, "While wearing this amulet, you can take a Magic action to name a location that you are familiar with on another plane of existence.", 0, 0, 0, 1, 0, 0, 1, 0);
+
+	// DMG 2024 Armor / Shields (paras 7311+)
+	add_item("dmg_animated_shield", "Animated Shield", SLOT_ARMOR, RARITY_RARE, "While holding this Shield, you can take a Bonus Action to cause it to animate. The Shield leaps into the air and hovers in your space to protect you as if you were wielding it, leaving your hands free.", 3, 0, 0, 0, 0, 0, 1, 0);
+
+	// DMG 2024 Bags / Wondrous (paras 7479+)
+	add_item("dmg_bag_of_holding", "Bag of Holding", SLOT_AMULET, RARITY_UNCOMMON, "This bag has an interior space considerably larger than its outside dimensions, roughly 2 feet square by 4 feet deep, holding up to 500 pounds.", 0, 0, 0, 0, 0, 0, 0, 0);
+
+	// DMG 2024 Belts (paras 7561+)
+	add_item("dmg_belt_of_dwarvenkind", "Belt of Dwarvenkind", SLOT_AMULET, RARITY_RARE, "While wearing this belt, your Constitution score increases by 2 (max 20), you gain Advantage on saves against Poison, and you have Resistance to Poison damage.", 0, 0, 10, 0, 0, 0, 1, 0);
+	add_item("dmg_belt_of_giant_str_hill", "Belt of Hill Giant Strength", SLOT_AMULET, RARITY_RARE, "Your Strength score is 21 while you wear this belt. It has no effect on you if your Strength is 21 or higher without it.", 0, 3, 0, 0, 0, 0, 0, 0);
+	add_item("dmg_belt_of_giant_str_stone", "Belt of Stone/Frost Giant Strength", SLOT_AMULET, RARITY_EPIC, "Your Strength score is 23 while you wear this belt.", 0, 4, 0, 0, 0, 0, 0, 0);
+	add_item("dmg_belt_of_giant_str_fire", "Belt of Fire Giant Strength", SLOT_AMULET, RARITY_EPIC, "Your Strength score is 25 while you wear this belt.", 0, 5, 0, 0, 0, 0, 0, 0);
+	add_item("dmg_belt_of_giant_str_cloud", "Belt of Cloud Giant Strength", SLOT_AMULET, RARITY_LEGENDARY, "Your Strength score is 27 while you wear this belt.", 0, 6, 0, 0, 0, 0, 0, 0);
+	add_item("dmg_belt_of_giant_str_storm", "Belt of Storm Giant Strength", SLOT_AMULET, RARITY_LEGENDARY, "Your Strength score is 29 while you wear this belt.", 0, 7, 0, 0, 0, 0, 0, 0);
+
+	// DMG 2024 Boots (paras 7666+)
+	add_item("dmg_boots_of_elvenkind", "Boots of Elvenkind", SLOT_ARMOR, RARITY_UNCOMMON, "While you wear these boots, your steps make no sound, regardless of the surface you are moving across. You also have Advantage on Dexterity (Stealth) checks that rely on moving silently.", 0, 0, 0, 0, 1, 0, 0, 0);
+	add_item("dmg_boots_of_levitation", "Boots of Levitation", SLOT_ARMOR, RARITY_RARE, "While you wear these boots, you can cast Levitate on yourself.", 0, 0, 0, 0, 0, 5, 0, 0);
+	add_item("dmg_boots_of_speed", "Boots of Speed", SLOT_ARMOR, RARITY_RARE, "While you wear these boots, you can take a Bonus Action and click the boots' heels together. If you do, the boots double your Speed for 10 minutes.", 0, 0, 0, 0, 2, 15, 0, 0);
+	add_item("dmg_boots_of_striding", "Boots of Striding and Springing", SLOT_ARMOR, RARITY_UNCOMMON, "While you wear these boots, your Speed becomes 30 if it isn't already, and your Speed isn't reduced if you are encumbered or wearing Heavy armor.", 0, 0, 0, 0, 0, 5, 0, 0);
+	add_item("dmg_winged_boots", "Winged Boots", SLOT_ARMOR, RARITY_RARE, "While you wear these boots, you have a Fly Speed equal to your walking Speed.", 0, 0, 0, 0, 1, 0, 0, 0);
+
+	// DMG 2024 Cloaks (paras 7822+)
+	add_item("dmg_cloak_of_arachnida", "Cloak of Arachnida", SLOT_ARMOR, RARITY_EPIC, "This fine garment is made of black silk interwoven with faint, silvery threads. While wearing it, you have Resistance to Poison damage and a Climb Speed equal to your walking Speed.", 1, 0, 0, 0, 0, 5, 1, 0);
+	add_item("dmg_cloak_of_displacement", "Cloak of Displacement", SLOT_ARMOR, RARITY_RARE, "While you wear this cloak, it magically projects an illusion that makes you appear to be standing in a place near your actual location, causing any creature to have Disadvantage on attack rolls against you.", 2, 0, 0, 0, 1, 0, 0, 0);
+	add_item("dmg_cloak_of_elvenkind", "Cloak of Elvenkind", SLOT_ARMOR, RARITY_UNCOMMON, "While you wear this cloak with its hood up, Wisdom (Perception) checks made to see you have Disadvantage, and you have Advantage on Dexterity (Stealth) checks made to hide.", 0, 0, 0, 0, 1, 0, 0, 0);
+	add_item("dmg_cloak_of_protection", "Cloak of Protection", SLOT_ARMOR, RARITY_UNCOMMON, "You gain a +1 bonus to AC and saving throws while you wear this cloak.", 1, 0, 0, 0, 0, 0, 1, 0);
+
+	// DMG 2024 Rings (paras 9557+)
+	add_item("dmg_ring_animal_influence", "Ring of Animal Influence", SLOT_RING, RARITY_RARE, "This ring has 3 charges, and it regains 1d3 expended charges daily at dawn. While wearing the ring, you can expend 1 of its charges to cast Animal Friendship, Fear (on Beasts only), or Speak with Animals.", 0, 0, 0, 1, 0, 0, 0, 0);
+	add_item("dmg_ring_djinni_summoning", "Ring of Djinni Summoning", SLOT_RING, RARITY_LEGENDARY, "While wearing this ring, you can take a Magic action to summon a particular Djinni from the Elemental Plane of Air.", 1, 2, 10, 2, 0, 0, 1, 0);
+	add_item("dmg_ring_evasion", "Ring of Evasion", SLOT_RING, RARITY_RARE, "This ring has 3 charges. When you fail a Dexterity saving throw while wearing it, you can take a Reaction to expend 1 charge to succeed instead.", 0, 0, 0, 0, 1, 0, 2, 0);
+	add_item("dmg_ring_protection", "Ring of Protection", SLOT_RING, RARITY_RARE, "You gain a +1 bonus to AC and saving throws while you wear this ring.", 1, 0, 0, 0, 0, 0, 1, 0);
+	add_item("dmg_ring_regeneration", "Ring of Regeneration", SLOT_RING, RARITY_EPIC, "While wearing this ring, you regain 1d6 Hit Points every 10 minutes if you have at least 1 Hit Point.", 0, 0, 25, 0, 0, 0, 1, 0);
+	add_item("dmg_ring_resistance", "Ring of Resistance", SLOT_RING, RARITY_RARE, "You have Resistance to one type of damage while wearing this ring.", 0, 0, 5, 0, 0, 0, 1, 0);
+	add_item("dmg_ring_spell_storing", "Ring of Spell Storing", SLOT_RING, RARITY_RARE, "This ring stores spells cast into it, holding them until the attuned wearer uses them. The ring can store up to 5 levels worth of spells at a time.", 0, 0, 0, 2, 0, 0, 0, 0);
+	add_item("dmg_ring_three_wishes", "Ring of Three Wishes", SLOT_RING, RARITY_LEGENDARY, "While wearing this ring, you can take a Magic action to expend 1 of its 3 charges to cast Wish from it.", 1, 2, 15, 2, 3, 5, 2, 0);
 }
 
 // ---- LOOT GENERATION ----
