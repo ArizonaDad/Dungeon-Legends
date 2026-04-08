@@ -7306,6 +7306,149 @@ class battle_manager {
 				check_battle_end();
 				return;
 			}
+			else if (spell.id == "phantasmal_killer" and @target != null) {
+				// Basic Rules paras 14448-14449: "The target makes a Wisdom saving throw.
+				// On a failed save, the target takes 4d10 Psychic damage and has the
+				// Frightened condition for the duration. For the duration, the target
+				// makes a Wisdom saving throw at the end of each of its turns. On a failed
+				// save, it takes the Psychic damage again."
+				int dice_count = 4 + upcast_levels;
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 10);
+				int save_roll = random(1, 20);
+				int save_bonus = target.get_save_bonus(ABILITY_WIS);
+				int bless_bonus = roll_bless_bonus(target);
+				int save_total = save_roll + save_bonus + bless_bonus;
+				bool saved = save_total >= save_dc;
+				broadcast_roll(target.name, "WIS save vs Phantasmal Killer", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Frightened!");
+				if (!saved) {
+					combat.apply_damage(target, total_damage, DMG_PSYCHIC, c);
+					target.add_condition(COND_FRIGHTENED);
+					broadcast_announce(c.name + "'s Phantasmal Killer terrifies " + target.name + " for " + total_damage + " psychic damage!", true);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "shatter") {
+				// Basic Rules para 14946: "A loud noise erupts from a point of your choice
+				// within range. Each creature in a 10-foot-radius Sphere centered there
+				// makes a Constitution saving throw, taking 3d8 Thunder damage on a failed
+				// save or half as much damage on a successful one."
+				int dice_count = 3 + upcast_levels;
+				int center_x = @target != null ? target.x : c.x;
+				int center_y = @target != null ? target.y : c.y;
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 8);
+				broadcast_announce(c.name + " casts Shatter — a loud noise erupts in a 10-foot sphere!", true);
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (feet_distance(center_x, center_y, t.x, t.y) > 10) continue;
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_CON);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					int dmg = saved ? total_damage / 2 : total_damage;
+					if (dmg < 1) dmg = 1;
+					broadcast_roll(t.name, "CON save vs Shatter", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+					combat.apply_damage(t, dmg, DMG_THUNDER, c);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "wall_of_ice") {
+				// Basic Rules para 15566: "If the wall cuts through a creature's space when
+				// it appears, the creature is pushed to one side of the wall (you choose
+				// which side) and makes a Dexterity saving throw, taking 10d6 Cold damage
+				// on a failed save or half as much damage on a successful one."
+				int dice_count = 10 + upcast_levels;
+				int center_x = @target != null ? target.x : c.x;
+				int center_y = @target != null ? target.y : c.y;
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 6);
+				broadcast_announce(c.name + " creates a Wall of Ice — a frozen barrier crashes down!", true);
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (feet_distance(center_x, center_y, t.x, t.y) > 30) continue;
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_DEX);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					int dmg = saved ? total_damage / 2 : total_damage;
+					if (dmg < 1) dmg = 1;
+					broadcast_roll(t.name, "DEX save vs Wall of Ice", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+					combat.apply_damage(t, dmg, DMG_COLD, c);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "heat_metal" and @target != null) {
+				// Basic Rules paras 13734-13735: "Choose a manufactured metal object...
+				// You cause the object to glow red-hot. Any creature in physical contact
+				// with the object takes 2d8 Fire damage when you cast the spell. Until
+				// the spell ends, you can take a Bonus Action on each of your turns to
+				// cause this damage again. If a creature is holding or wearing the object
+				// and takes the damage from it, the creature must succeed on a Constitution
+				// saving throw or drop the object."
+				// Approximation: damage hits any target wearing metal armor (chain_mail,
+				// plate, splint, half_plate, scale_mail, breastplate, ring_mail).
+				bool wearing_metal = (target.armor_type == "chain_mail" or target.armor_type == "plate" or target.armor_type == "splint" or target.armor_type == "half_plate" or target.armor_type == "scale_mail" or target.armor_type == "breastplate" or target.armor_type == "ring_mail" or target.armor_type == "chain_shirt");
+				if (!wearing_metal) {
+					broadcast_announce(target.name + " isn't wearing any metal — Heat Metal has no effect.", false);
+				} else {
+					int dice_count = 2 + upcast_levels;
+					int hm_dmg = 0;
+					for (int d = 0; d < dice_count; d++) hm_dmg += random(1, 8);
+					combat.apply_damage(target, hm_dmg, DMG_FIRE, c);
+					broadcast_announce(c.name + "'s Heat Metal sears " + target.name + " for " + hm_dmg + " fire damage!", true);
+					int save_roll = random(1, 20);
+					int save_bonus = target.get_save_bonus(ABILITY_CON);
+					int save_total = save_roll + save_bonus;
+					if (save_total < save_dc) {
+						// Approximation: target gets disadvantage flag for one turn
+						target.baned = true; // closest existing flag
+						broadcast_announce(target.name + " can't drop the searing metal! Disadvantage on attacks and ability checks.", true);
+					}
+				}
+			}
+			else if (spell.id == "faerie_fire") {
+				// Basic Rules paras 13167-13168: "Objects in a 20-foot Cube within range
+				// are outlined in blue, green, or violet light... Each creature in the
+				// Cube is also outlined if it fails a Dexterity saving throw. For the
+				// duration, objects and affected creatures shed Dim Light in a 10-foot
+				// radius and can't benefit from being Invisible. Attack rolls against an
+				// affected creature or object have Advantage if the attacker can see it."
+				int center_x = @target != null ? target.x : c.x;
+				int center_y = @target != null ? target.y : c.y;
+				int affected = 0;
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (feet_distance(center_x, center_y, t.x, t.y) > 20) continue;
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_DEX);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					broadcast_roll(t.name, "DEX save vs Faerie Fire", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Outlined!");
+					if (!saved) {
+						// Use guiding_bolt_advantage flag as approximation - next attack vs them gets advantage
+						t.guiding_bolt_advantage = true;
+						t.guiding_bolt_source_id = c.id;
+						t.remove_condition(COND_INVISIBLE);
+						affected++;
+					}
+				}
+				broadcast_announce(c.name + " casts Faerie Fire — " + affected + " creature" + (affected == 1 ? "" : "s") + " outlined in colorful light. Attacks against them have advantage.", true);
+				broadcast_state();
+				return;
+			}
 			else if (spell.id == "bestow_curse" and @target != null) {
 				// Basic Rules paras 12219-12222: "You touch a creature, which must succeed
 				// on a Wisdom saving throw or become cursed for the duration. Until the
