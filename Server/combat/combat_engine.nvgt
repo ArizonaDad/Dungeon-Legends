@@ -139,6 +139,17 @@ class combatant {
 	bool giants_might_active = false; // Rune Knight Fighter
 	int giants_might_uses = 0;
 	bool wrath_of_storms_available = false; // Storm Sorcerer
+	bool emboldening_bond_active = false; // Peace Domain Cleric
+	bool drunken_master_opportunity = false; // Way of the Drunken Master
+	bool arcane_shot_pending = false; // Arcane Archer Fighter
+	string arcane_shot_type = "";
+	int arcane_shot_uses = 0;
+	bool restore_balance_ready = false; // Clockwork Soul Sorcerer
+	int restore_balance_uses = 0;
+	bool twilight_sanctuary_active = false; // Twilight Domain Cleric
+	int twilight_sanctuary_rounds = 0;
+	bool abjure_extraplanar_active = false; // Oath of Watchers Paladin
+	int spirit_shield_reduction = 0; // Ancestral Guardian Barbarian reaction
 	int rage_turns_remaining = 0;
 	int action_surge_uses_remaining = 0;
 	bool second_wind_available = false;
@@ -587,6 +598,13 @@ class battle {
 
 		if (target.raging and (damage_type == DMG_BLUDGEONING or damage_type == DMG_PIERCING or damage_type == DMG_SLASHING)) {
 			amount = (amount + 1) / 2;
+		}
+
+		// Ancestral Guardian Barbarian: Spirit Shield damage reduction (used reaction)
+		if (target.spirit_shield_reduction > 0) {
+			amount -= target.spirit_shield_reduction;
+			if (amount < 0) amount = 0;
+			target.spirit_shield_reduction = 0;
 		}
 
 		// Heavy Armor Master: reduce B/P/S damage by Proficiency Bonus when wearing heavy armor

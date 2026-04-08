@@ -458,6 +458,8 @@ bool check_reaction_prompt_input() {
 			else if (choice_name == "cutting_words") choice_name = "Cutting Words";
 			else if (choice_name == "warding_flare") choice_name = "Warding Flare";
 			else if (choice_name == "defensive_duelist") choice_name = "Defensive Duelist";
+			else if (choice_name == "restore_balance") choice_name = "Restore Balance";
+			else if (choice_name == "spirit_shield") choice_name = "Spirit Shield";
 			speak("Using " + choice_name + "!", true);
 			return true;
 		}
@@ -678,6 +680,10 @@ void show_bonus_action_menu() {
 	int guided_strike_opt = -1;
 	int giants_might_opt = -1;
 	int empowered_healing_opt = -1;
+	int emboldening_bond_opt = -1;
+	int twilight_sanctuary_opt = -1;
+	int arcane_shot_opt = -1;
+	int abjure_extraplanar_opt = -1;
 
 	if (lc == "barbarian" and !my_is_raging and my_rage_uses_remaining > 0) rage_opt = m.add_item("Rage. Bonus action. Uses left: " + my_rage_uses_remaining + ". Damage bonus: " + my_rage_damage_bonus + ".");
 	if (lc == "fighter" and my_second_wind_available) second_wind_opt = m.add_item("Second Wind. Bonus action. Heal 1d10 plus fighter level.");
@@ -792,6 +798,18 @@ void show_bonus_action_menu() {
 	}
 	if (lc == "sorcerer" and subclass == "Divine Soul") {
 		empowered_healing_opt = m.add_item("Empowered Healing. Reroll dice on next healing spell.");
+	}
+	if (lc == "cleric" and subclass == "Peace Domain") {
+		emboldening_bond_opt = m.add_item("Emboldening Bond. Channel Divinity. Bond allies for bonus d4 on rolls.");
+	}
+	if (lc == "cleric" and subclass == "Twilight Domain") {
+		twilight_sanctuary_opt = m.add_item("Twilight Sanctuary. Channel Divinity. Grant nearby allies temp HP each round.");
+	}
+	if (lc == "fighter" and subclass == "Arcane Archer") {
+		arcane_shot_opt = m.add_item("Arcane Shot. Apply a magical effect to your next ranged attack.");
+	}
+	if (lc == "paladin" and subclass == "Oath of the Watchers") {
+		abjure_extraplanar_opt = m.add_item("Abjure the Extraplanar. Channel Divinity. Frighten aberrations, fey, fiends, and celestials.");
 	}
 
 	int options = 1;
@@ -1024,6 +1042,22 @@ void show_bonus_action_menu() {
 	else if (empowered_healing_opt >= 0 and res == empowered_healing_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "empowered_healing"}});
 		speak("Empowered Healing readied.", true);
+	}
+	else if (emboldening_bond_opt >= 0 and res == emboldening_bond_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "emboldening_bond"}});
+		speak("Emboldening Bond. Allies bonded for +1d4 bonus.", true);
+	}
+	else if (twilight_sanctuary_opt >= 0 and res == twilight_sanctuary_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "twilight_sanctuary"}});
+		speak("Twilight Sanctuary. Creating healing aura.", true);
+	}
+	else if (arcane_shot_opt >= 0 and res == arcane_shot_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "arcane_shot"}, {"shot_type", "beguiling"}});
+		speak("Arcane Shot readied. Next ranged attack applies the magical effect.", true);
+	}
+	else if (abjure_extraplanar_opt >= 0 and res == abjure_extraplanar_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "abjure_extraplanar"}});
+		speak("Abjure the Extraplanar. Channeling divine power.", true);
 	}
 }
 

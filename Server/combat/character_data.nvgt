@@ -786,6 +786,17 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         c.giants_might_uses = proficiency_bonus(cs.level);
     }
 
+    // Arcane Archer Fighter: Arcane Shot uses (2 per rest, scales with level)
+    if (cs.class_name == "Fighter" and cs.subclass == "Arcane Archer" and cs.level >= 3) {
+        c.arcane_shot_uses = 2;
+    }
+
+    // Clockwork Soul Sorcerer: Restore Balance reaction uses (Prof per day)
+    if (cs.class_name == "Sorcerer" and cs.subclass == "Clockwork Sorcery" and cs.level >= 1) {
+        c.restore_balance_uses = proficiency_bonus(cs.level);
+        c.restore_balance_ready = true;
+    }
+
     // Wizard subclasses
     if (cs.class_name == "Wizard") {
         if (cs.subclass == "Diviner" and cs.level >= 2) {

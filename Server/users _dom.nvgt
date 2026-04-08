@@ -2237,6 +2237,54 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.room.bm.broadcast_announce(c.name + " grows with Giant's Might! Size increased to Large, +1d6 damage.", true);
 		}
 
+		else if (feature == "emboldening_bond") {
+			// Peace Domain Cleric: Emboldening Bond channel divinity (allies get +1d4 to rolls)
+			if (c.class_name != "Cleric" or c.subclass != "Peace Domain") { u.send({{"type", message_types::announce}, {"text", "Only Peace Domain clerics can use Emboldening Bond."}, {"interrupt", true}}); return; }
+			if (c.channel_divinity_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Channel Divinity uses remaining."}, {"interrupt", true}}); return; }
+			if (!c.has_action) { u.send({{"type", message_types::announce}, {"text", "No action remaining."}, {"interrupt", true}}); return; }
+			c.has_action = false;
+			c.used_action = true;
+			c.channel_divinity_uses--;
+			c.emboldening_bond_active = true;
+			u.room.bm.broadcast_announce(c.name + " forms an Emboldening Bond with allies! Bonds grant +1d4 to attacks and saves.", true);
+		}
+
+		else if (feature == "twilight_sanctuary") {
+			// Twilight Domain Cleric: channel divinity creates a healing aura
+			if (c.class_name != "Cleric" or c.subclass != "Twilight Domain") { u.send({{"type", message_types::announce}, {"text", "Only Twilight Domain clerics can use Twilight Sanctuary."}, {"interrupt", true}}); return; }
+			if (c.channel_divinity_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Channel Divinity uses remaining."}, {"interrupt", true}}); return; }
+			if (!c.has_action) { u.send({{"type", message_types::announce}, {"text", "No action remaining."}, {"interrupt", true}}); return; }
+			c.has_action = false;
+			c.used_action = true;
+			c.channel_divinity_uses--;
+			c.twilight_sanctuary_active = true;
+			c.twilight_sanctuary_rounds = 10;
+			u.room.bm.broadcast_announce(c.name + " creates a Twilight Sanctuary! Allies in 30 feet gain 1d6 + cleric level temp HP each round.", true);
+		}
+
+		else if (feature == "arcane_shot") {
+			// Arcane Archer Fighter: activate an arcane shot type for next hit
+			if (c.class_name != "Fighter" or c.subclass != "Arcane Archer") { u.send({{"type", message_types::announce}, {"text", "Only Arcane Archers can use Arcane Shot."}, {"interrupt", true}}); return; }
+			if (c.arcane_shot_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Arcane Shot uses remaining."}, {"interrupt", true}}); return; }
+			string shot_type = msg.exists("shot_type") ? string(msg["shot_type"]) : "beguiling";
+			c.arcane_shot_pending = true;
+			c.arcane_shot_type = shot_type;
+			c.arcane_shot_uses--;
+			u.room.bm.broadcast_announce(c.name + " readies " + shot_type + " arcane shot! Next ranged attack applies the effect.", false);
+		}
+
+		else if (feature == "abjure_extraplanar") {
+			// Oath of Watchers Paladin: channel divinity frightens extraplanar creatures
+			if (c.class_name != "Paladin" or c.subclass != "Oath of the Watchers") { u.send({{"type", message_types::announce}, {"text", "Only Oath of the Watchers paladins can use Abjure the Extraplanar."}, {"interrupt", true}}); return; }
+			if (c.channel_divinity_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Channel Divinity uses remaining."}, {"interrupt", true}}); return; }
+			if (!c.has_action) { u.send({{"type", message_types::announce}, {"text", "No action remaining."}, {"interrupt", true}}); return; }
+			c.has_action = false;
+			c.used_action = true;
+			c.channel_divinity_uses--;
+			c.abjure_extraplanar_active = true;
+			u.room.bm.broadcast_announce(c.name + " invokes Abjure the Extraplanar! Nearby aberrations, celestials, elementals, fey, and fiends must save vs fear.", true);
+		}
+
 		else {
 			u.send({{"type", message_types::announce}, {"text", "That bonus action is not available to your character."}, {"interrupt", true}});
 			return;

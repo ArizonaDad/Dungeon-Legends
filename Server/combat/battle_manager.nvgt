@@ -3566,6 +3566,14 @@ class battle_manager {
 				if (target.has_feat("defensive_duelist") and target.main_hand_finesse and !target.main_hand_is_ranged) {
 					reaction_options.insert_last("defensive_duelist");
 				}
+				// Clockwork Soul: Restore Balance reaction — cancel advantage/disadvantage
+				if (target.class_name == "Sorcerer" and target.subclass == "Clockwork Sorcery" and target.restore_balance_uses > 0) {
+					reaction_options.insert_last("restore_balance");
+				}
+				// Path of the Ancestral Guardian: Spirit Shield reaction — reduce damage
+				if (target.class_name == "Barbarian" and target.subclass == "Ancestral Guardian" and target.raging and target.level >= 6) {
+					reaction_options.insert_last("spirit_shield");
+				}
 
 				if (reaction_options.length() > 0) {
 					user@ def_user = find_user_for_combatant(target);
@@ -3592,6 +3600,8 @@ class battle_manager {
 							else if (reaction_options[oi] == "cutting_words") opts += "Cutting Words (-1d" + target.bardic_inspiration_die + ")";
 							else if (reaction_options[oi] == "warding_flare") opts += "Warding Flare (reroll attack)";
 							else if (reaction_options[oi] == "defensive_duelist") opts += "Defensive Duelist (+" + target.proficiency + " AC)";
+							else if (reaction_options[oi] == "restore_balance") opts += "Restore Balance (cancel advantage)";
+							else if (reaction_options[oi] == "spirit_shield") opts += "Spirit Shield (reduce damage by 2d6+)";
 						}
 						def_user.send({{"type", message_types::reaction_prompt}, {"attacker", c.name}, {"options", opts}, {"options_csv", opts_csv}});
 						return; // Pause — wait for reaction_response
@@ -4446,6 +4456,28 @@ class battle_manager {
 				// Revert the AC bonus after resolving this attack (done in resume_attack_after_reaction)
 				// We'll track this with a temporary field
 				defender.temp_ac_bonus_this_attack = temp_ac_bonus;
+			}
+		}
+		else if (choice == "restore_balance" and defender.is_player) {
+			// Clockwork Soul: Restore Balance — cancel advantage/disadvantage on attack
+			if (defender.restore_balance_uses > 0) {
+				defender.restore_balance_uses--;
+				defender.has_reaction = false;
+				// Approximation: reduce attack roll by 5 to represent canceled advantage
+				rp.attack_total -= 5;
+				broadcast_announce(defender.name + " invokes Restore Balance! Attack advantage canceled.", true);
+			}
+		}
+		else if (choice == "spirit_shield" and defender.is_player) {
+			// Ancestral Guardian Barbarian: Spirit Shield — reduce incoming damage by 2d6
+			if (defender.raging and defender.class_name == "Barbarian" and defender.subclass == "Ancestral Guardian") {
+				defender.has_reaction = false;
+				int reduction = random(1, 6) + random(1, 6);
+				if (defender.level >= 10) reduction += random(1, 6);
+				if (defender.level >= 14) reduction += random(1, 6);
+				// Store damage reduction for when damage is applied
+				defender.spirit_shield_reduction = reduction;
+				broadcast_announce(defender.name + " summons Spirit Shield! Next damage reduced by " + reduction + ".", true);
 			}
 		}
 
