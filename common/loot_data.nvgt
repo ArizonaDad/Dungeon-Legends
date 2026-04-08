@@ -244,6 +244,22 @@ void init_item_catalog() {
 	add_item("dmg_wand_war_mage_3", "Wand of the War Mage +3", SLOT_WEAPON, RARITY_EPIC, "While holding this wand, you gain a +3 bonus to spell attack rolls. In addition, you ignore Half Cover when making a spell attack.", 0, 3, 0, 3, 0, 0, 0, 0);
 	add_item("dmg_wand_web", "Wand of Web", SLOT_WEAPON, RARITY_UNCOMMON, "This wand has 7 charges. You can take a Magic action to expend 1 charge to cast Web from it.", 0, 1, 0, 1, 0, 0, 0, 0);
 	add_item("dmg_wand_wonder", "Wand of Wonder", SLOT_WEAPON, RARITY_RARE, "This wand has 7 charges. You can take a Magic action to expend 1 charge to cause one of many random magical effects.", 0, 2, 0, 2, 0, 0, 0, 0);
+
+	// DMG 2024 Rods, Stones, Wondrous Items (paras 7484-10275)
+	add_item("dmg_stone_good_luck", "Stone of Good Luck (Luckstone)", SLOT_AMULET, RARITY_UNCOMMON, "While this polished agate is on your person, you gain a +1 bonus to ability checks and saving throws.", 0, 0, 0, 0, 1, 0, 1, 0);
+	add_item("dmg_rod_absorption", "Rod of Absorption", SLOT_WEAPON, RARITY_EPIC, "While holding this rod, you can use your reaction to absorb a spell that's targeting only you and not with an area of effect. The absorbed spell's effect is canceled, and the spell's energy is stored in the rod.", 0, 2, 0, 2, 0, 0, 1, 0);
+	add_item("dmg_rod_lordly_might", "Rod of Lordly Might", SLOT_WEAPON, RARITY_LEGENDARY, "This rod has the properties of a +3 mace and a +3 melee weapon. You can use 6 different functions: Intimidate, Drain Life, Climb, Paralyze, Quarterstaff, and Battleaxe.", 0, 5, 0, 0, 0, 0, 1, 0);
+	add_item("dmg_rod_resurrection", "Rod of Resurrection", SLOT_WEAPON, RARITY_LEGENDARY, "The rod has 5 charges. While you hold it, you can cast one of the following spells from it: Heal (expends 1 charge) or Resurrection (expends 5 charges).", 0, 2, 20, 2, 0, 0, 0, 0);
+	add_item("dmg_bag_of_tricks", "Bag of Tricks", SLOT_AMULET, RARITY_UNCOMMON, "This bag made from gray, rust, or tan cloth appears empty. Reaching inside the bag reveals a small fuzzy object that becomes a creature when thrown up to 20 feet.", 0, 0, 0, 0, 0, 0, 0, 0);
+	add_item("dmg_decanter_endless_water", "Decanter of Endless Water", SLOT_AMULET, RARITY_UNCOMMON, "This stoppered flask sloshes when shaken, as if it contains water. The decanter weighs 2 pounds. You can take a Magic action to remove the stopper and speak one of three command words to cause water to pour out.", 0, 0, 0, 0, 0, 0, 0, 0);
+	add_item("dmg_bead_of_force", "Bead of Force", SLOT_AMULET, RARITY_RARE, "This black sphere has been infused with destructive force. As an action, you can throw the bead up to 60 feet, where it detonates in a 10-foot-radius sphere, dealing 5d4 force damage on a failed DEX save.", 0, 0, 0, 1, 0, 0, 0, 0);
+
+	// Tasha's wondrous items already in DMG 2024
+	add_item("dmg_immovable_rod", "Immovable Rod", SLOT_WEAPON, RARITY_UNCOMMON, "This flat iron rod has a button on one end. You can take a Magic action to press the button, which causes the rod to become magically fixed in place.", 0, 1, 0, 0, 0, 0, 0, 0);
+
+	// Common consumable items mentioned by name in DMG 2024
+	add_item("dmg_potion_healing_greater", "Potion of Healing (Greater)", SLOT_AMULET, RARITY_UNCOMMON, "You regain 4d4+4 hit points when you drink this potion.", 0, 0, 0, 0, 0, 0, 0, 0);
+	add_item("dmg_potion_climbing", "Potion of Climbing", SLOT_AMULET, RARITY_COMMON, "When you drink this potion, you gain a Climb Speed equal to your walking Speed for 1 hour.", 0, 0, 0, 0, 0, 0, 0, 0);
 }
 
 // ---- LOOT GENERATION ----
