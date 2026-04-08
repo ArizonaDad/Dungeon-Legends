@@ -7282,6 +7282,39 @@ class battle_manager {
 				check_battle_end();
 				return;
 			}
+			else if (spell.id == "command" and @target != null) {
+				// Basic Rules paras 12427-12430: "You speak a one-word command to a creature
+				// you can see within range. The target must succeed on a Wisdom saving throw
+				// or follow the command on its next turn." Defaults to Drop or Flee depending
+				// on combat state. Approach is the most useful but movement-based.
+				int save_roll = random(1, 20);
+				int save_bonus = target.get_save_bonus(ABILITY_WIS);
+				int bless_bonus = roll_bless_bonus(target);
+				int save_total = save_roll + save_bonus + bless_bonus;
+				bool saved = save_total >= save_dc;
+				broadcast_roll(target.name, "WIS save vs Command", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Commanded!");
+				if (!saved) {
+					// Approximation: target loses its action next turn (treated as Incapacitated for one turn)
+					// then immediately recovers. We mark it with the existing COND_CHARMED to suppress its turn.
+					target.add_condition(COND_CHARMED);
+					broadcast_announce(c.name + " commands " + target.name + " — they will obey on their next turn!", true);
+				}
+			}
+			else if (spell.id == "suggestion" and @target != null) {
+				// Basic Rules para 15191: "The target must succeed on a Wisdom saving throw
+				// or have the Charmed condition for the duration or until you or your allies
+				// deal damage to the target."
+				int save_roll = random(1, 20);
+				int save_bonus = target.get_save_bonus(ABILITY_WIS);
+				int bless_bonus = roll_bless_bonus(target);
+				int save_total = save_roll + save_bonus + bless_bonus;
+				bool saved = save_total >= save_dc;
+				broadcast_roll(target.name, "WIS save vs Suggestion", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Charmed!");
+				if (!saved) {
+					target.add_condition(COND_CHARMED);
+					broadcast_announce(target.name + " is charmed by " + c.name + "'s Suggestion. The charm ends if you or an ally damages them.", true);
+				}
+			}
 			else if (spell.id == "power_word_heal" and @target != null) {
 				// Basic Rules para 14528: "A wave of healing energy washes over one creature
 				// you can see within range. The target regains all its Hit Points. If the
