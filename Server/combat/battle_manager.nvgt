@@ -1872,6 +1872,12 @@ class battle_manager {
 		return monster.monster_attack2_range > 5 and attack_name_is_ranged(monster.monster_attack2_name);
 	}
 
+	// Bane spell penalty on attack rolls. Subtracted from get_attack_bonus_for_roll.
+	int get_bane_penalty(combatant@ c) {
+		if (@c == null) return 0;
+		return c.baned ? 2 : 0; // Approximation of 1d4 average
+	}
+
 	int get_attack_bonus_for_roll(combatant@ attacker, bool use_secondary = false) {
 		if (@attacker == null) return 0;
 		int atk_bonus = 0;
@@ -1881,6 +1887,7 @@ class battle_manager {
 			if (attacker.has_feat("archery") and attacker.main_hand_is_ranged) atk_bonus += 2;
 		}
 		atk_bonus -= attacker.exhaustion_level * 2;
+		atk_bonus -= get_bane_penalty(attacker);
 		return atk_bonus;
 	}
 
@@ -2401,6 +2408,15 @@ class battle_manager {
 
 	void clear_concentration_effects(combatant@ caster) {
 		if (@caster == null or @combat == null) return;
+		// Bane is a concentration spell but we don't currently track the source per target,
+		// so we blanket-clear all baned flags when the caster had bane as their concentration.
+		// This is an approximation — if two bards cast Bane on the same target and one drops,
+		// the bane is cleared. In practice Bane is rarely stacked so this is acceptable.
+		if (caster.concentration_spell == "bane") {
+			for (uint bi = 0; bi < combat.combatants.length(); bi++) {
+				if (@combat.combatants[bi] != null) combat.combatants[bi].baned = false;
+			}
+		}
 		for (uint i = 0; i < combat.combatants.length(); i++) {
 			combatant@ target = combat.combatants[i];
 			if (@target == null) continue;
@@ -7242,6 +7258,108 @@ class battle_manager {
 				broadcast_state();
 				check_battle_end();
 				return;
+			}
+			else if (spell.id == "bane") {
+				// Basic Rules para 12174: "Up to three creatures of your choice that you
+				// can see within range must each make a Charisma saving throw. Whenever a
+				// target that fails this save makes an attack roll or a saving throw before
+				// the spell ends, the target must subtract 1d4 from the roll."
+				int targets_wanted = 3 + upcast_levels;
+				int banned = 0;
+				for (uint bi = 0; bi < combat.combatants.length() and banned < targets_wanted; bi++) {
+					combatant@ t = combat.combatants[bi];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (!combat.are_hostile(c, t)) continue;
+					if (feet_distance(c.x, c.y, t.x, t.y) > 30) continue;
+					if (!combat.can_see(c, t)) continue;
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_CHA);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					broadcast_roll(t.name, "CHA save vs Bane", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Baned!");
+					if (!saved) {
+						t.baned = true;
+						banned++;
+					}
+				}
+				broadcast_announce(c.name + " casts Bane on " + banned + " creature" + (banned == 1 ? "" : "s") + ". They subtract 1d4 from attack rolls and saves.", true);
+			}
+			else if (spell.id == "healing_word" and @target != null) {
+				// Basic Rules para 13725: "A creature of your choice that you can see within
+				// range regains Hit Points equal to 2d4 plus your spellcasting ability modifier."
+				int dice_count = 2 + (upcast_levels * 2);
+				int heal = 0;
+				for (int d = 0; d < dice_count; d++) heal += random(1, 4);
+				heal += get_spellcasting_ability_mod(c);
+				if (heal < 1) heal = 1;
+				int effective = combat.apply_healing(target, heal);
+				record_effective_healing(c.player_username, effective);
+				broadcast_announce(c.name + " heals " + target.name + " for " + heal + " HP with Healing Word.", true);
+			}
+			else if (spell.id == "mass_healing_word") {
+				// Basic Rules para 14145: "Up to six creatures of your choice that you can
+				// see within range regain Hit Points equal to 2d4 plus your spellcasting
+				// ability modifier."
+				int dice_count = 2 + (upcast_levels > 0 ? upcast_levels : 0);
+				int heal = 0;
+				for (int d = 0; d < dice_count; d++) heal += random(1, 4);
+				heal += get_spellcasting_ability_mod(c);
+				if (heal < 1) heal = 1;
+				int healed = 0;
+				for (uint mi = 0; mi < combat.combatants.length() and healed < 6; mi++) {
+					combatant@ ally = combat.combatants[mi];
+					if (@ally == null or ally.is_dead) continue;
+					if (ally.is_player != c.is_player and ally.id != c.id) continue;
+					if (feet_distance(c.x, c.y, ally.x, ally.y) > 60) continue;
+					int effective = combat.apply_healing(ally, heal);
+					record_effective_healing(c.player_username, effective);
+					healed++;
+				}
+				broadcast_announce(c.name + " casts Mass Healing Word, healing " + healed + " ally" + (healed == 1 ? "" : "ies") + " for " + heal + " HP each.", true);
+			}
+			else if (spell.id == "feeblemind" and @target != null) {
+				// Basic Rules (not quoted — using the 2024 version): target INT save or
+				// take 4d6 psychic damage. On failure, INT and CHA become 1 until the
+				// spell is dispelled or removed. No concentration.
+				int dice_count = 4;
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 6);
+				int save_roll = random(1, 20);
+				int save_bonus = target.get_save_bonus(ABILITY_INT);
+				int bless_bonus = roll_bless_bonus(target);
+				int save_total = save_roll + save_bonus + bless_bonus;
+				bool saved = save_total >= save_dc;
+				broadcast_roll(target.name, "INT save vs Feeblemind", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Feebleminded!");
+				int dmg = total_damage;
+				combat.apply_damage(target, dmg, DMG_PSYCHIC, c);
+				if (!saved) {
+					// Set INT and CHA to 1 (feeblemind effect)
+					target.ability_scores[ABILITY_INT] = 1;
+					target.ability_scores[ABILITY_CHA] = 1;
+					broadcast_announce(target.name + " is Feebleminded! INT and CHA become 1.", true);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "eyebite" and @target != null) {
+				// Basic Rules para 13145: "For the duration, your eyes become an inky void.
+				// One creature of your choice within 60 feet of you that you can see must
+				// succeed on a Wisdom saving throw or be affected by one of the following
+				// effects of your choice for the duration." Options: Asleep (Unconscious),
+				// Panicked (Frightened), or Sickened (disadvantage on attacks + ability checks).
+				// Defaults to Panicked since Unconscious auto-kills monsters.
+				int save_roll = random(1, 20);
+				int save_bonus = target.get_save_bonus(ABILITY_WIS);
+				int bless_bonus = roll_bless_bonus(target);
+				int save_total = save_roll + save_bonus + bless_bonus;
+				bool saved = save_total >= save_dc;
+				broadcast_roll(target.name, "WIS save vs Eyebite", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Afflicted!");
+				if (!saved) {
+					target.add_condition(COND_FRIGHTENED);
+					broadcast_announce(target.name + " is Panicked by " + c.name + "'s Eyebite!", true);
+				}
 			}
 			else if (spell.id == "mass_heal") {
 				// Basic Rules para 14137: "A flood of healing energy flows from you into
