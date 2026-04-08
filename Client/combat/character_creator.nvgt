@@ -1061,6 +1061,7 @@ void get_subclass_options(string class_name, string[]@ names, string[]@ descript
         add_text_pair(names, descriptions, "College of Choreography", "College of Choreography. Magical dance to inspire and control. (Griffon's Saddlebag)");
         add_text_pair(names, descriptions, "College of Mercantile", "College of Mercantile. Profit and persuasion through trade magic. (Griffon's Saddlebag)");
         add_text_pair(names, descriptions, "College of Requiems", "College of Requiems. Dark melodies that raise the dead. (Grim Hollow)");
+        add_text_pair(names, descriptions, "College of the Dirge Singer", "College of the Dirge Singer. Historian and battle-caller. (Exploring Eberron)");
     } else if (class_name == "Cleric") {
         add_text_pair(names, descriptions, "Life Domain", "Life Domain. Restore, preserve, and protect life.");
         add_text_pair(names, descriptions, "Light Domain", "Light Domain. Wield radiant fire against darkness.");
@@ -1074,6 +1075,7 @@ void get_subclass_options(string class_name, string[]@ names, string[]@ descript
         add_text_pair(names, descriptions, "Astral Domain", "Astral Domain. Channel power from the astral plane. (Griffon's Saddlebag)");
         add_text_pair(names, descriptions, "Festus Domain", "Festus Domain. Celebration, feasting, and communal magic. (Griffon's Saddlebag)");
         add_text_pair(names, descriptions, "Inquisition Domain", "Inquisition Domain. Hunt heretics and counter magic. (Grim Hollow)");
+        add_text_pair(names, descriptions, "Mind Domain", "Mind Domain. Psychic power through divine devotion. (Exploring Eberron)");
     } else if (class_name == "Druid") {
         add_text_pair(names, descriptions, "Circle of the Land", "Circle of the Land. Draw deeper magic from a chosen environment.");
         add_text_pair(names, descriptions, "Circle of the Moon", "Circle of the Moon. Focus on stronger Wild Shape forms.");
@@ -1085,6 +1087,7 @@ void get_subclass_options(string class_name, string[]@ names, string[]@ descript
         add_text_pair(names, descriptions, "Circle of Wildfire", "Circle of Wildfire. Command a wildfire spirit of destruction and renewal. (Tasha's)");
         add_text_pair(names, descriptions, "Circle of the Unbroken", "Circle of the Unbroken. Draw power from unbroken nature. (Griffon's Saddlebag)");
         add_text_pair(names, descriptions, "Circle of Dragons", "Circle of Dragons. Transform into draconic forms. (Griffon's Saddlebag)");
+        add_text_pair(names, descriptions, "Circle of the Forged", "Circle of the Forged. Wild Shape into constructed beasts. (Exploring Eberron)");
     } else if (class_name == "Fighter") {
         add_text_pair(names, descriptions, "Battle Master", "Battle Master. Control combat with maneuvers and tactical superiority.");
         add_text_pair(names, descriptions, "Champion", "Champion. Focus on straightforward martial excellence and critical hits.");

@@ -9,3 +9,4 @@ Client/client/
 Client/lib/
 Dungeon Legends/
 .last_deployed_manifest.json
+_tmp_*.txt

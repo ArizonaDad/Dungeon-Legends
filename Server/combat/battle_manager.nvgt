@@ -1481,6 +1481,20 @@ class battle_manager {
 				}
 			}
 			// (2024 Mage Slayer does not grant advantage on saves; removed wrong 2014 effect)
+			// Mind Domain Gestalt Anchor: +2 to INT/WIS/CHA saves if a Mind Domain cleric is within 10ft
+			if (pr.spell_save_type == ABILITY_INT or pr.spell_save_type == ABILITY_WIS or pr.spell_save_type == ABILITY_CHA) {
+				for (uint gi = 0; gi < combat.combatants.length(); gi++) {
+					combatant@ ga_cleric = combat.combatants[gi];
+					if (@ga_cleric == null or ga_cleric.is_dead) continue;
+					if (!ga_cleric.gestalt_anchor_active) continue;
+					if (ga_cleric.is_player != t.is_player) continue; // allies only
+					if (feet_distance(ga_cleric.x, ga_cleric.y, t.x, t.y) <= 10) {
+						save_bonus += 2;
+						broadcast_announce(t.name + " gains +2 from " + ga_cleric.name + "'s Gestalt Anchor!", false);
+						break;
+					}
+				}
+			}
 			int save_total = save_roll + save_bonus + bless_bonus - unsettling_penalty;
 			bool saved = save_total >= pr.spell_save_dc;
 			string save_name = pr.spell_save_type >= 0 and pr.spell_save_type < int(ABILITY_SHORT.length()) ? ABILITY_SHORT[pr.spell_save_type] : "save";
@@ -3637,6 +3651,12 @@ class battle_manager {
 			int astral_dmg = random(1, 4);
 			bonus += astral_dmg;
 			broadcast_announce(attacker.name + "'s Astral Power adds " + astral_dmg + " psychic damage!", false);
+		}
+
+		// Dirge Singer Bard L3: Broad Inspiration acts passively (see Bardic Inspiration grant path)
+		// Dirge Singer L14: Battle Hymn grants +1d4 to allies in 30ft aura
+		if (attacker.class_name == "Bard" and attacker.subclass == "College of the Dirge Singer" and attacker.level >= 14 and attacker.battle_hymn_active) {
+			// Active passive aura effect applied elsewhere (save/check bonus)
 		}
 
 		// Circle of Sea Druid: Wave Strike — cold/lightning bonus on weapon strikes

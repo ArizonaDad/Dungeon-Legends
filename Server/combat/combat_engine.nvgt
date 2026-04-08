@@ -279,6 +279,15 @@ class combatant {
 	bool wand_lore_focus = false; // Wand Lore Wizard
 	bool cartographer_marked = false; // Cartographer Artificer - Adventurer's Atlas map holder
 	int illuminated_cartography_uses = 0; // Faerie Fire free casts, INT mod/LR
+	// Exploring Eberron subclasses
+	bool dirge_singer_active = false; // College of the Dirge Singer Bard
+	bool battle_hymn_active = false; // L14 Battle Hymn +1d4 to saves/checks in aura
+	bool mind_domain_active = false; // Mind Domain Cleric (Exploring Eberron)
+	bool gestalt_anchor_active = false; // L6 passive aura +2 INT/WIS/CHA saves
+	bool bend_reality_used = false; // L17 1/SR
+	bool forged_circle_active = false; // Circle of the Forged Druid
+	int elemental_cascade_type = 0; // 0=normal 1=acid 2=cold 3=fire 4=lightning
+	bool adamantine_hide_used = false; // L10 reaction
 	bool circle_unbroken_active = false; // Circle of the Unbroken
 	bool circle_dragons_form = false; // Circle of Dragons Druid
 	bool path_of_glacier_active = false; // Barbarian Path of the Glacier

@@ -918,6 +918,19 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
             c.sea_circle_active = true;
             c.sea_wrath_dice = 1 + (cs.level / 5); // 1d6 cold/lightning, scales with level
         }
+        // Exploring Eberron: Circle of the Forged
+        if (cs.subclass == "Circle of the Forged" and cs.level >= 2) {
+            c.forged_circle_active = true;
+            c.poison_resistance = true; // Skin of Steel
+            if (cs.level >= 10) {
+                c.bludgeoning_resistance = true;
+                c.piercing_resistance = true;
+                c.slashing_resistance = true;
+            }
+            if (cs.level >= 14) {
+                c.poison_immunity = true;
+            }
+        }
         if (cs.subclass == "Circle of the Unbroken" and cs.level >= 2) {
             c.circle_unbroken_active = true;
             c.fire_resistance = true; // unbroken nature
@@ -953,6 +966,11 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
     if (cs.class_name == "Cleric") {
         if (cs.subclass == "Festus Domain" and cs.level >= 1) {
             c.festus_blessing_active = false;
+        }
+        // Exploring Eberron: Mind Domain
+        if (cs.subclass == "Mind Domain" and cs.level >= 3) {
+            c.mind_domain_active = true;
+            if (cs.level >= 6) c.gestalt_anchor_active = true;
         }
         if (cs.subclass == "Inquisition Domain" and cs.level >= 1) {
             // Grim Hollow: NO magic resistance at L1 (removed wrong flag).
@@ -1008,6 +1026,11 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         }
         if (cs.subclass == "College of Mercantile" and cs.level >= 3) {
             c.college_mercantile_active = true;
+        }
+        // Exploring Eberron: College of the Dirge Singer
+        if (cs.subclass == "College of the Dirge Singer" and cs.level >= 3) {
+            c.dirge_singer_active = true;
+            // Broad Inspiration: BI die copies to 2nd creature (auto-grant to nearby allies)
         }
     }
     if (cs.class_name == "Cleric") {
