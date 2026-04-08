@@ -4,18 +4,32 @@
 
 ---
 
-## 1. Skill Check System (blocks several features)
+## 1. Skill Check System
 
-Combat currently has no skill check resolution. Some features need this to function correctly:
+**Infrastructure status (RESOLVED 2026-04-08, batch 2A):** `request_skill_check(u, c, skill_name, dc, custom_tag, extra_advantage, extra_disadvantage)` is live in `battle_manager.nvgt`. The pipeline:
 
-- **Silver Tongue (College of Eloquence Bard L3)** — "treat a d20 roll of 9 or lower as a 10" on Persuasion and Deception checks
-- **Blessing of the Trickster (Trickery Domain Cleric)** — "Advantage on Dexterity (Stealth) checks" (currently approximated with +5 hide_dc)
-- **Inquisitor's Eye (Oath of Zeal Paladin)** — "advantage on Intelligence (Investigation), Wisdom (Insight), and Wisdom (Perception)"
-- **Keeper of History (Dirge Singer Bard)** — Expertise in History and Performance
-- **Benevolent Presence (Couatl Herald Fighter)** — expend Mercy Dice on Insight/Performance/Persuasion checks
-- Many other subclass features that grant skill proficiency or advantage
+1. Computes modifier from `combatant.get_skill_bonus()` (now correctly handles **expertise** = double prof, **Jack of All Trades** = half prof on non-proficient, plus exhaustion)
+2. Pulls per-skill advantage/disadvantage from `combatant.skill_check_advantage` / `skill_check_disadvantage`
+3. Stacks Pass Without Trace bonus on Stealth automatically
+4. Builds a `pending_roll` with `roll_type = ROLL_ABILITY_CHECK` and `resolution_tag = skill_<lowercase>` (e.g., `skill_persuasion`, `skill_sleight_of_hand`)
+5. Routes through the standard reroll prompt chain (Bardic, Lucky, Heroic) — `maybe_prompt_bardic_inspiration` now fires on **any** failed `ROLL_ABILITY_CHECK` with a positive DC, not just Hide
+6. `handle_roll_result` advantage/disadvantage path now triggers for `ROLL_ABILITY_CHECK` so the d20 is correctly rolled twice
 
-**Required work:** Add a `roll_skill_check` handler to battle_manager, hook it into actions that need skill checks (social encounters, searches, stealth), and respect subclass/feat modifiers.
+New constants in `common/combat_constants.nvgt`: `DC_VERY_EASY`/`DC_EASY`/`DC_MEDIUM`/`DC_HARD`/`DC_VERY_HARD`/`DC_NEARLY_IMPOSSIBLE`, plus the canonical 18-skill `SKILL_NAMES` array. New helper `skill_to_ability(skill_name)` provides the canonical D&D 5e skill→ability mapping.
+
+**Subclass features wired (RESOLVED 2026-04-08, batch 2B):**
+
+- **Silver Tongue** (College of Eloquence Bard L3, Tasha's para 1696) — clamps natural d20 ≤9 to 10 on `skill_persuasion` and `skill_deception` checks. Always-on, no resource cost. Verified against source: "When you make a Charisma (Persuasion) or Charisma (Deception) check, you can treat a d20 roll of 9 or lower as a 10."
+- **Blessing of the Trickster** (Trickery Domain Cleric L3, PHB 2024 para 4697) — Magic action, self or willing creature within 30 feet, target gains advantage on Stealth checks until long rest. Now uses `skill_check_advantage["Stealth"]` flag. **Replaces the pre-existing `+5 hide_dc` bug** which was a wrong-direction approximation (it made the target harder to find rather than rolling Stealth with advantage).
+- **Inquisitor's Eye** (Oath of Zeal Paladin L3 Channel Divinity, Grim Hollow Player Pack para 434) — bonus action, costs 1 Channel Divinity, grants advantage on Investigation/Insight/Perception checks for 10 minutes plus immunity to surprise. New `inquisitors_eye_active` combatant flag and `inquisitors_eye` bonus action menu entry. Verified against source.
+- **Keeper of History** (College of the Dirge Singer Bard L3, Exploring Eberron para 5263-5264) — at character init, grants History + Performance proficiency, OR Expertise if already proficient. Verified against source: "You gain proficiency in the History and Performance skills. If you already have these proficiencies, you instead gain Expertise."
+
+**Still pending:**
+
+- **Benevolent Presence** (Couatl Herald Fighter) — expend Mercy Dice on Insight/Performance/Persuasion checks. Combat doesn't currently have these social check triggers; the feature is partially blocked on a future Search/Influence action implementation.
+- ~50 other subclass / feat features that grant skill proficiency, expertise, or advantage. Most can be wired by adding a few lines to `character_data.nvgt` init or by setting a `skill_check_advantage[]` flag from a feature's bonus action handler.
+
+The Hide action still uses the legacy direct path (`request_hide_check` -> `request_roll`); migrating it to use `request_skill_check` is batch 2C.
 
 ---
 

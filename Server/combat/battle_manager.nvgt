@@ -3990,6 +3990,18 @@ class battle_manager {
 			broadcast_announce(c.name + " earns Heroic Inspiration!", false);
 		}
 
+		// Silver Tongue (College of Eloquence Bard L3, Tasha's para 1696):
+		// "When you make a Charisma (Persuasion) or Charisma (Deception) check, you can
+		// treat a d20 roll of 9 or lower as a 10."
+		// Clamps the natural roll BEFORE total recalc so a sub-10 roll becomes 10.
+		if (c.silver_tongue_active and pr.roll_type == ROLL_ABILITY_CHECK and natural_roll < 10) {
+			if (pr.resolution_tag == "skill_persuasion" or pr.resolution_tag == "skill_deception") {
+				broadcast_announce(c.name + "'s Silver Tongue treats the " + natural_roll + " as a 10.", false);
+				natural_roll = 10;
+				total = natural_roll + pr.modifier + bless_bonus + bardic_bonus;
+			}
+		}
+
 		if (pr.roll_type == ROLL_INITIATIVE) {
 			if (!initiative_phase) return; // Guard against stale/duplicate initiative rolls
 			c.initiative_roll = total;

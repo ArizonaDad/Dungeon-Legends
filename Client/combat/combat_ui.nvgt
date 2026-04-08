@@ -839,6 +839,7 @@ void show_bonus_action_menu() {
 	int event_horizon_opt = -1;
 	int momentary_stasis_opt = -1;
 	int mark_of_heretic_opt = -1;
+	int inquisitors_eye_opt = -1;
 	int magic_coin_opt = -1;
 	int create_void_opt = -1;
 	int breath_of_dragon_opt = -1;
@@ -1085,6 +1086,7 @@ void show_bonus_action_menu() {
 	}
 	if (lc == "paladin" and subclass == "Oath of Zeal" and level >= 3) {
 		mark_of_heretic_opt = m.add_item("Mark of the Heretic. Channel Divinity. Mark target for crit 19+ range.");
+		inquisitors_eye_opt = m.add_item("Inquisitor's Eye. Channel Divinity bonus action. Advantage on Investigation, Insight, Perception for 10 minutes; cannot be surprised.");
 	}
 	if (lc == "bard" and subclass == "College of Mercantile" and level >= 3) {
 		magic_coin_opt = m.add_item("Magic Coin. Action. Fling a coin at target for 1d12 thunder damage (scales).");
@@ -1500,6 +1502,10 @@ void show_bonus_action_menu() {
 		if (current_target_id == 0) { speak("No target selected.", true); return; }
 		send({{"type", message_types::bonus_action}, {"feature", "mark_of_heretic"}, {"target_id", current_target_id}});
 		speak("Mark of the Heretic placed.", true);
+	}
+	else if (inquisitors_eye_opt >= 0 and res == inquisitors_eye_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "inquisitors_eye"}});
+		speak("Inquisitor's Eye opens.", true);
 	}
 	else if (magic_coin_opt >= 0 and res == magic_coin_opt) {
 		if (current_target_id == 0) { speak("No target selected.", true); return; }

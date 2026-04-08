@@ -209,6 +209,39 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 
 - **Prompt chain order**: Bardic Inspiration (additive) -> Lucky (reroll with advantage) -> Heroic Inspiration (reroll)
 
+### Skill Check System
+
+Skill checks (Stealth, Persuasion, Investigation, etc.) flow through the standard `pending_roll` pipeline so they get reroll prompts (Bardic, Lucky, Heroic), advantage/disadvantage handling, and Silver Tongue clamping for free.
+
+**Foundation in `combatant`:**
+- `skill_proficiencies[]` — proficient skills (proficiency bonus added)
+- `skill_expertise[]` — expertise skills (proficiency bonus DOUBLED) — Bard L3, Rogue L1, Knowledge Domain, Mastermind, Keeper of History (Dirge Singer Bard L3)
+- `jack_of_all_trades` flag (Bard L2) — adds half proficiency bonus (rounded down) to ANY ability check that doesn't already include proficiency
+- `skill_check_advantage[]` and `skill_check_disadvantage[]` — per-skill flag arrays for feature-granted modifiers
+
+**`get_skill_bonus(skill_name, ability_id)`** returns: `ability_mod + (2*prof if expertise else prof if proficient else half_prof if Jack of All Trades) - (exhaustion * 2)`. Plus Pass Without Trace adds +10 on Stealth automatically inside `request_skill_check`.
+
+**`battle_manager` API:**
+- `skill_to_ability(skill_name)` — canonical D&D 5e mapping (returns -1 for unknown)
+- `skill_resolution_tag(skill_name)` — converts "Sleight of Hand" → `"skill_sleight_of_hand"` for the resolution tag
+- `request_skill_check(u, c, skill_name, dc, custom_tag, extra_advantage, extra_disadvantage)` — builds the `pending_roll` and routes through `send_roll_request` (player) or auto-rolls (bot/NPC)
+- `handle_roll_result` advantage path now also fires for `ROLL_ABILITY_CHECK` (was attack-only)
+- `maybe_prompt_bardic_inspiration` now fires for any failed `ROLL_ABILITY_CHECK` with a positive DC (was hide-only)
+
+**DC table (`common/combat_constants.nvgt`):** `DC_VERY_EASY=5`, `DC_EASY=10`, `DC_MEDIUM=15`, `DC_HARD=20`, `DC_VERY_HARD=25`, `DC_NEARLY_IMPOSSIBLE=30`
+
+**Subclass features that use the system:**
+- **Silver Tongue** (Eloquence Bard L3) — `silver_tongue_active` clamps natural d20 ≤9 → 10 on `skill_persuasion`/`skill_deception` checks in `finalize_roll_result`
+- **Blessing of the Trickster** (Trickery Cleric L3) — Magic action grants `skill_check_advantage["Stealth"]` to self or ally within 30 ft until long rest
+- **Inquisitor's Eye** (Oath of Zeal Paladin L3 Channel Divinity) — bonus action grants `skill_check_advantage["Investigation"/"Insight"/"Perception"]` for 10 minutes
+- **Keeper of History** (Dirge Singer Bard L3) — auto-grants History + Performance proficiency on character init, or Expertise if already proficient
+
+**Adding a new skill-check-using feature:**
+1. To grant always-on advantage: add the skill name to `combatant.skill_check_advantage` from the feature's init or activation
+2. To grant proficiency: append to `skill_proficiencies` (or `skill_expertise` for double prof)
+3. To trigger a check from combat: call `request_skill_check(u, c, skill_name, dc)` from the action handler
+4. To add a per-skill clamp / modifier (like Silver Tongue): add a branch in `finalize_roll_result` that checks `pr.resolution_tag` against `skill_<lowercase>` strings
+
 ### Mid-Spell Player Choice System
 
 Server-side `pending_spell_choice` state on `battle_manager` pauses spell finalisation when a spell offers the caster a mechanical choice the source quote requires (e.g., Fire Shield warm/chill, Spirit Guardians radiant/necrotic). The pattern mirrors `pending_smite_prompt`:

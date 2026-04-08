@@ -1062,6 +1062,19 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         if (cs.subclass == "College of the Dirge Singer" and cs.level >= 3) {
             c.dirge_singer_active = true;
             // Broad Inspiration: BI die copies to 2nd creature (auto-grant to nearby allies)
+            // Exploring Eberron para 5263-5264 - Keeper of History: "You gain proficiency
+            // in the History and Performance skills. If you already have these proficiencies,
+            // you instead gain Expertise."
+            if (c.has_skill_proficiency("History")) {
+                if (!c.has_skill_expertise("History")) c.skill_expertise.insert_last("History");
+            } else {
+                c.skill_proficiencies.insert_last("History");
+            }
+            if (c.has_skill_proficiency("Performance")) {
+                if (!c.has_skill_expertise("Performance")) c.skill_expertise.insert_last("Performance");
+            } else {
+                c.skill_proficiencies.insert_last("Performance");
+            }
         }
     }
     if (cs.class_name == "Cleric") {
