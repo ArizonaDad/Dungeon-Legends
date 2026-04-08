@@ -227,6 +227,23 @@ void init_item_catalog() {
 	add_item("dmg_elven_chain", "Elven Chain", SLOT_ARMOR, RARITY_RARE, "You gain a +1 bonus to Armor Class while you wear this armor. You are considered trained with this armor even if you lack training with Medium or Heavy armor.", 1, 0, 0, 0, 1, 0, 0, 0);
 	add_item("dmg_mithral_armor", "Mithral Armor", SLOT_ARMOR, RARITY_UNCOMMON, "Mithral is a light, flexible metal. Armor made of this substance can be worn under normal clothes. If the armor normally imposes Disadvantage on Dexterity (Stealth) checks or has a Strength requirement, the mithral version doesn't.", 0, 0, 0, 0, 1, 5, 0, 0);
 	add_item("dmg_plate_etherealness", "Plate Armor of Etherealness", SLOT_ARMOR, RARITY_LEGENDARY, "While you're wearing this armor, you can take a Magic action and use a command word to gain the effect of the Etherealness spell.", 4, 0, 15, 0, 1, 0, 1, 0);
+
+	// DMG 2024 Wands (paras 10414-10527)
+	add_item("dmg_wand_binding", "Wand of Binding", SLOT_WEAPON, RARITY_RARE, "This wand has 7 charges. While holding it, you can use an action to expend 1 or more charges to cast Hold Monster or Hold Person from it.", 0, 1, 0, 1, 0, 0, 0, 0);
+	add_item("dmg_wand_conducting", "Wand of Conducting", SLOT_WEAPON, RARITY_COMMON, "This wand has 3 charges. While holding it, you can take a Magic action to expend 1 charge and create orchestral music by waving it around.", 0, 0, 0, 0, 0, 0, 0, 0);
+	add_item("dmg_wand_enemy_detection", "Wand of Enemy Detection", SLOT_WEAPON, RARITY_RARE, "This wand has 3 charges. While holding it, you can take a Magic action to expend 1 charge and detect creatures within 60 feet that are hostile to you.", 0, 1, 0, 0, 1, 0, 0, 0);
+	add_item("dmg_wand_fear", "Wand of Fear", SLOT_WEAPON, RARITY_RARE, "This wand has 7 charges. You can take a Magic action to expend 1 or more charges to force creatures to make a Wisdom save or be Frightened.", 0, 1, 0, 1, 0, 0, 0, 0);
+	add_item("dmg_wand_fireballs", "Wand of Fireballs", SLOT_WEAPON, RARITY_RARE, "This wand has 7 charges. You can take a Magic action to expend 1 or more charges to cast Fireball from it. For 1 charge it casts the level 3 version; for each additional charge the slot level increases by 1, up to level 7.", 0, 2, 0, 2, 0, 0, 0, 0);
+	add_item("dmg_wand_lightning_bolts", "Wand of Lightning Bolts", SLOT_WEAPON, RARITY_RARE, "This wand has 7 charges. You can take a Magic action to expend 1 or more charges to cast Lightning Bolt from it.", 0, 2, 0, 2, 0, 0, 0, 0);
+	add_item("dmg_wand_magic_missiles", "Wand of Magic Missiles", SLOT_WEAPON, RARITY_UNCOMMON, "This wand has 7 charges. You can take a Magic action to expend 1 or more charges to cast Magic Missile from it.", 0, 1, 0, 1, 0, 0, 0, 0);
+	add_item("dmg_wand_orcus", "Wand of Orcus", SLOT_WEAPON, RARITY_LEGENDARY, "This wand and its rod-like form possess immense necromantic power. Wielding it requires attunement to a creature of evil alignment, and the wielder gains command over Undead.", 0, 5, 10, 3, 0, 0, 1, 0);
+	add_item("dmg_wand_paralysis", "Wand of Paralysis", SLOT_WEAPON, RARITY_RARE, "This wand has 7 charges. You can take a Magic action to expend 1 charge to cause a creature within 60 feet to make a Constitution save or be paralyzed for 1 minute.", 0, 2, 0, 2, 0, 0, 0, 0);
+	add_item("dmg_wand_polymorph", "Wand of Polymorph", SLOT_WEAPON, RARITY_EPIC, "This wand has 7 charges. You can take a Magic action to expend 1 charge to cast Polymorph from it.", 0, 3, 0, 3, 0, 0, 0, 0);
+	add_item("dmg_wand_war_mage_1", "Wand of the War Mage +1", SLOT_WEAPON, RARITY_UNCOMMON, "While holding this wand, you gain a +1 bonus to spell attack rolls. In addition, you ignore Half Cover when making a spell attack.", 0, 1, 0, 1, 0, 0, 0, 0);
+	add_item("dmg_wand_war_mage_2", "Wand of the War Mage +2", SLOT_WEAPON, RARITY_RARE, "While holding this wand, you gain a +2 bonus to spell attack rolls. In addition, you ignore Half Cover when making a spell attack.", 0, 2, 0, 2, 0, 0, 0, 0);
+	add_item("dmg_wand_war_mage_3", "Wand of the War Mage +3", SLOT_WEAPON, RARITY_EPIC, "While holding this wand, you gain a +3 bonus to spell attack rolls. In addition, you ignore Half Cover when making a spell attack.", 0, 3, 0, 3, 0, 0, 0, 0);
+	add_item("dmg_wand_web", "Wand of Web", SLOT_WEAPON, RARITY_UNCOMMON, "This wand has 7 charges. You can take a Magic action to expend 1 charge to cast Web from it.", 0, 1, 0, 1, 0, 0, 0, 0);
+	add_item("dmg_wand_wonder", "Wand of Wonder", SLOT_WEAPON, RARITY_RARE, "This wand has 7 charges. You can take a Magic action to expend 1 charge to cause one of many random magical effects.", 0, 2, 0, 2, 0, 0, 0, 0);
 }
 
 // ---- LOOT GENERATION ----
