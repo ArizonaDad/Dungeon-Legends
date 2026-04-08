@@ -2575,6 +2575,75 @@ void handle_user_message(user@ u, json_object@ msg)
 			c.steel_defender_active = true;
 		}
 
+		else if (feature == "primal_companion") {
+			// Beast Master Ranger: summon animal companion (simplified)
+			if (c.class_name != "Ranger" or c.subclass != "Beast Master") { u.send({{"type", message_types::announce}, {"text", "Only Beast Masters have a Primal Companion."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			combatant@ tgt = target_id != 0 ? u.room.bm.combat.get_combatant(target_id) : null;
+			if (@tgt == null or tgt.is_dead) { u.send({{"type", message_types::announce}, {"text", "Invalid target."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			// Companion attacks with 1d8 + prof damage
+			int atk_bonus = c.proficiency + c.get_ability_mod(ABILITY_WIS);
+			int roll = random(1, 20) + atk_bonus;
+			if (roll >= tgt.armor_class) {
+				int dmg = random(1, 8) + c.proficiency;
+				u.room.bm.combat.apply_damage(tgt, dmg, DMG_PIERCING, c);
+				u.room.bm.broadcast_announce(c.name + "'s Primal Companion attacks " + tgt.name + " for " + dmg + " damage!", true);
+			} else {
+				u.room.bm.broadcast_announce(c.name + "'s Primal Companion misses " + tgt.name + ".", false);
+			}
+			c.beast_companion_active = true;
+		}
+
+		else if (feature == "drake_attack") {
+			// Drakewarden Ranger: drake companion breath weapon
+			if (c.class_name != "Ranger" or c.subclass != "Drakewarden") { u.send({{"type", message_types::announce}, {"text", "Only Drakewardens have a Drake Companion."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			combatant@ tgt = target_id != 0 ? u.room.bm.combat.get_combatant(target_id) : null;
+			if (@tgt == null or tgt.is_dead) { u.send({{"type", message_types::announce}, {"text", "Invalid target."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			int atk_bonus = c.proficiency + c.get_ability_mod(ABILITY_WIS);
+			int roll = random(1, 20) + atk_bonus;
+			if (roll >= tgt.armor_class) {
+				int dmg = random(1, 6) + c.proficiency;
+				u.room.bm.combat.apply_damage(tgt, dmg, DMG_FIRE, c);
+				u.room.bm.broadcast_announce(c.name + "'s Drake breathes fire at " + tgt.name + " for " + dmg + " fire damage!", true);
+			} else {
+				u.room.bm.broadcast_announce(c.name + "'s Drake misses " + tgt.name + ".", false);
+			}
+			c.drake_companion_active = true;
+		}
+
+		else if (feature == "slayers_prey") {
+			// Monster Slayer Ranger: mark a target as prey for +1d6 damage per turn
+			if (c.class_name != "Ranger" or c.subclass != "Monster Slayer") { u.send({{"type", message_types::announce}, {"text", "Only Monster Slayers can mark prey."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.monster_slayer_target = target_id;
+			u.room.bm.broadcast_announce(c.name + " marks a target as their slayer prey!", false);
+		}
+
+		else if (feature == "swarmkeeper_shift") {
+			// Swarmkeeper Ranger: bonus damage + move target with swarm
+			if (c.class_name != "Ranger" or c.subclass != "Swarmkeeper") { u.send({{"type", message_types::announce}, {"text", "Only Swarmkeepers have a magical swarm."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			u.room.bm.broadcast_announce(c.name + " commands the swarm! Next attack deals bonus force damage.", false);
+			c.swarmkeeper_swarm_active = true;
+		}
+
+		else if (feature == "chronal_shift") {
+			// Chronurgy Wizard: force a roll to be rerolled (reaction equivalent)
+			if (c.class_name != "Wizard" or c.subclass != "Chronurgy Magic") { u.send({{"type", message_types::announce}, {"text", "Only Chronurgy wizards can use Chronal Shift."}, {"interrupt", true}}); return; }
+			if (c.chronal_shift_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Chronal Shift uses remaining."}, {"interrupt", true}}); return; }
+			c.chronal_shift_uses--;
+			u.room.bm.broadcast_announce(c.name + " uses Chronal Shift to manipulate time!", true);
+		}
+
 		else if (feature == "experimental_elixir") {
 			// Alchemist Artificer: create an experimental elixir (random effect)
 			if (c.class_name != "Artificer" or c.subclass != "Alchemist") { u.send({{"type", message_types::announce}, {"text", "Only Alchemists can create Experimental Elixirs."}, {"interrupt", true}}); return; }

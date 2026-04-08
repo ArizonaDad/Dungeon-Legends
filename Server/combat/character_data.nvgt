@@ -869,6 +869,11 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         c.form_of_dread_rounds = 0;
     }
 
+    // Chronurgy Wizard: Chronal Shift uses per rest (2 per long rest)
+    if (cs.class_name == "Wizard" and cs.subclass == "Chronurgy Magic" and cs.level >= 2) {
+        c.chronal_shift_uses = 2;
+    }
+
     // Wizard subclasses
     if (cs.class_name == "Wizard") {
         if (cs.subclass == "Diviner" and cs.level >= 2) {
