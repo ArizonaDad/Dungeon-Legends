@@ -96,6 +96,28 @@ const int ROLL_DEATH_SAVE = 5;
 const int ROLL_CONCENTRATION = 6;
 const int ROLL_HIT_DICE = 7;
 
+// Difficulty Class table (PHB Basic Rules para 192-207).
+// "Typical Difficulty Classes" — the rules provide DCs for certain checks but the DM
+// (interpreted here as the developer/system) ultimately sets them.
+const int DC_VERY_EASY = 5;
+const int DC_EASY = 10;
+const int DC_MEDIUM = 15;
+const int DC_HARD = 20;
+const int DC_VERY_HARD = 25;
+const int DC_NEARLY_IMPOSSIBLE = 30;
+
+// Canonical D&D 5e skill list (PHB Basic Rules para 303-360). Each skill is associated
+// with a single ability for ability checks, though the DM may allow other abilities
+// for unusual circumstances. Skills are stored as exact strings on combatant.skill_proficiencies
+// and combatant.skill_expertise so the spell handlers and subclass features can match them.
+string[] SKILL_NAMES = {
+	"Acrobatics", "Animal Handling", "Arcana", "Athletics",
+	"Deception", "History", "Insight", "Intimidation",
+	"Investigation", "Medicine", "Nature", "Perception",
+	"Performance", "Persuasion", "Religion", "Sleight of Hand",
+	"Stealth", "Survival"
+};
+
 string[] ABILITY_NAMES = {"Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"};
 string[] ABILITY_SHORT = {"STR", "DEX", "CON", "INT", "WIS", "CHA"};
 string[] DAMAGE_TYPE_NAMES = {"Acid", "Bludgeoning", "Cold", "Fire", "Force", "Lightning", "Necrotic", "Piercing", "Poison", "Psychic", "Radiant", "Slashing", "Thunder"};

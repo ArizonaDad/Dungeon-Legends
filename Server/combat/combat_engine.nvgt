@@ -416,6 +416,18 @@ class combatant {
 	int divine_smite_slot_level = 0;      // Spell slot level used for smite
 	string[] feats;
 	string[] skill_proficiencies;
+	// Expertise: Bard (L3+), Rogue (L1+), some subclass features (Keeper of History
+	// Dirge Singer Bard L3, Knowledge Domain Cleric, Mastermind Rogue, etc.). When a
+	// skill is in this list, the proficiency bonus is doubled. PHB 2024 rule.
+	string[] skill_expertise;
+	// Bard L2 Jack of All Trades: add half proficiency (rounded down) to ANY ability check
+	// the bard makes that doesn't already include their proficiency bonus.
+	bool jack_of_all_trades = false;
+	// Per-skill advantage flags from features (Inquisitor's Eye, Blessing of the Trickster,
+	// Pass Without Trace, etc.). Stored as skill names; the skill check helper checks the
+	// list and applies advantage if the relevant skill is present.
+	string[] skill_check_advantage;
+	string[] skill_check_disadvantage;
 	string[] tool_proficiencies;
 	string[] spellcasting_override_spells;
 	int[] spellcasting_override_abilities;
@@ -556,9 +568,43 @@ class combatant {
 		return false;
 	}
 
+	bool has_skill_expertise(string skill_name) {
+		for (uint i = 0; i < skill_expertise.length(); i++) {
+			if (skill_expertise[i] == skill_name) return true;
+		}
+		return false;
+	}
+
+	bool has_skill_check_advantage(string skill_name) {
+		for (uint i = 0; i < skill_check_advantage.length(); i++) {
+			if (skill_check_advantage[i] == skill_name) return true;
+		}
+		return false;
+	}
+
+	bool has_skill_check_disadvantage(string skill_name) {
+		for (uint i = 0; i < skill_check_disadvantage.length(); i++) {
+			if (skill_check_disadvantage[i] == skill_name) return true;
+		}
+		return false;
+	}
+
 	int get_skill_bonus(string skill_name, int ability_id) {
+		// PHB 2024: ability mod + proficiency bonus (if proficient) + 2x prof if expertise +
+		// half prof if Jack of All Trades and not otherwise proficient.
 		int bonus = get_ability_mod(ability_id);
-		if (has_skill_proficiency(skill_name)) bonus += proficiency;
+		bool proficient = has_skill_proficiency(skill_name);
+		if (has_skill_expertise(skill_name)) {
+			// Expertise: doubled proficiency. Source: Bard L3 / Rogue L1 PHB.
+			bonus += proficiency * 2;
+		} else if (proficient) {
+			bonus += proficiency;
+		} else if (jack_of_all_trades) {
+			// Jack of All Trades (Bard L2): "you can add half your Proficiency Bonus, rounded
+			// down, to any ability check you make that doesn't already include your Proficiency
+			// Bonus." PHB Bard class feature.
+			bonus += proficiency / 2;
+		}
 		bonus -= exhaustion_level * 2;
 		return bonus;
 	}

@@ -998,6 +998,115 @@ class battle_manager {
 		return null;
 	}
 
+	// Canonical D&D 5e skill -> ability mapping (PHB Basic Rules para 303-360).
+	// Returns -1 for unknown skill names so callers can fall back to a default.
+	int skill_to_ability(string skill_name) {
+		if (skill_name == "Athletics") return ABILITY_STR;
+		if (skill_name == "Acrobatics") return ABILITY_DEX;
+		if (skill_name == "Sleight of Hand") return ABILITY_DEX;
+		if (skill_name == "Stealth") return ABILITY_DEX;
+		if (skill_name == "Arcana") return ABILITY_INT;
+		if (skill_name == "History") return ABILITY_INT;
+		if (skill_name == "Investigation") return ABILITY_INT;
+		if (skill_name == "Nature") return ABILITY_INT;
+		if (skill_name == "Religion") return ABILITY_INT;
+		if (skill_name == "Animal Handling") return ABILITY_WIS;
+		if (skill_name == "Insight") return ABILITY_WIS;
+		if (skill_name == "Medicine") return ABILITY_WIS;
+		if (skill_name == "Perception") return ABILITY_WIS;
+		if (skill_name == "Survival") return ABILITY_WIS;
+		if (skill_name == "Deception") return ABILITY_CHA;
+		if (skill_name == "Intimidation") return ABILITY_CHA;
+		if (skill_name == "Performance") return ABILITY_CHA;
+		if (skill_name == "Persuasion") return ABILITY_CHA;
+		return -1;
+	}
+
+	// Build the resolution_tag string used by finalize_roll_result and the bardic prompt
+	// to dispatch on a specific skill check. Format: "skill_<lowercased_skill_name>".
+	// Spaces in skill names are converted to underscores.
+	string skill_resolution_tag(string skill_name) {
+		string tag = "skill_";
+		for (uint i = 0; i < skill_name.length(); i++) {
+			string ch = skill_name.substr(i, 1);
+			if (ch == " ") tag += "_";
+			else if (ch == "A") tag += "a";
+			else if (ch == "B") tag += "b";
+			else if (ch == "C") tag += "c";
+			else if (ch == "D") tag += "d";
+			else if (ch == "E") tag += "e";
+			else if (ch == "F") tag += "f";
+			else if (ch == "G") tag += "g";
+			else if (ch == "H") tag += "h";
+			else if (ch == "I") tag += "i";
+			else if (ch == "J") tag += "j";
+			else if (ch == "K") tag += "k";
+			else if (ch == "L") tag += "l";
+			else if (ch == "M") tag += "m";
+			else if (ch == "N") tag += "n";
+			else if (ch == "O") tag += "o";
+			else if (ch == "P") tag += "p";
+			else if (ch == "Q") tag += "q";
+			else if (ch == "R") tag += "r";
+			else if (ch == "S") tag += "s";
+			else if (ch == "T") tag += "t";
+			else if (ch == "U") tag += "u";
+			else if (ch == "V") tag += "v";
+			else if (ch == "W") tag += "w";
+			else if (ch == "X") tag += "x";
+			else if (ch == "Y") tag += "y";
+			else if (ch == "Z") tag += "z";
+			else tag += ch;
+		}
+		return tag;
+	}
+
+	// Request a generic skill check. Computes the modifier from get_skill_bonus, applies
+	// advantage/disadvantage from feature flags, and routes through the standard
+	// pending_roll pipeline so reroll prompts (Bardic, Lucky, Heroic) and Silver Tongue
+	// clamping work automatically.
+	bool request_skill_check(user@ u, combatant@ c, string skill_name, int dc, string custom_tag = "", bool extra_advantage = false, bool extra_disadvantage = false) {
+		if (@combat == null or @c == null) return false;
+		int ability_id = skill_to_ability(skill_name);
+		if (ability_id < 0) return false;
+		int mod = c.get_skill_bonus(skill_name, ability_id);
+		bool adv = extra_advantage or c.has_skill_check_advantage(skill_name);
+		bool disadv = extra_disadvantage or c.has_skill_check_disadvantage(skill_name);
+		// Pass Without Trace stacks +10 onto Stealth checks (also Dexterity (Stealth)).
+		if (skill_name == "Stealth") mod += c.pass_without_trace_bonus;
+		string tag = custom_tag != "" ? custom_tag : skill_resolution_tag(skill_name);
+		string reason = skill_name + " check";
+		if (dc > 0) reason += " (DC " + dc + ")";
+		// Build the pending_roll directly so we can set advantage/disadvantage on the roll.
+		pending_roll pr;
+		pr.combatant_id = c.id;
+		pr.player_username = c.is_player ? c.player_username : c.name;
+		pr.roll_type = ROLL_ABILITY_CHECK;
+		pr.dice_sides = 20;
+		pr.modifier = mod;
+		pr.reason = reason;
+		pr.dc = dc;
+		pr.has_advantage = adv;
+		pr.has_disadvantage = disadv;
+		pr.resolution_tag = tag;
+		@current_roll = pr;
+		if (@u != null and !u.is_bot and c.is_player) {
+			send_roll_request(u, pr);
+		} else {
+			// Bot / NPC: roll immediately and process the result.
+			int natural = random(1, 20);
+			if (adv and !disadv) {
+				int second = random(1, 20);
+				if (second > natural) natural = second;
+			} else if (disadv and !adv) {
+				int second = random(1, 20);
+				if (second < natural) natural = second;
+			}
+			process_roll_result(natural);
+		}
+		return true;
+	}
+
 	int parse_nonnegative_int(string text) {
 		int value = 0;
 		for (uint i = 0; i < text.length(); i++) {
@@ -3468,6 +3577,14 @@ class battle_manager {
 			failure_margin = pr.dc - total;
 			prompt_text = "Your Hide check failed by " + failure_margin + ".";
 		}
+		else if (pr.roll_type == ROLL_ABILITY_CHECK and pr.dc > 0) {
+			// Generic skill check with a target DC. Includes Persuasion, Deception, Athletics,
+			// Investigation, etc. via the skill_<name> resolution tags. Bardic Inspiration
+			// applies to ANY ability check the bard gives the die to (PHB Bard L1).
+			if (total >= pr.dc) return false;
+			failure_margin = pr.dc - total;
+			prompt_text = "Your " + pr.reason + " failed by " + failure_margin + ".";
+		}
 		else {
 			return false;
 		}
@@ -4548,7 +4665,7 @@ class battle_manager {
 			}
 		}
 
-		if (pr.roll_type == ROLL_ATTACK and (has_effective_advantage(pr) or has_effective_disadvantage(pr))) {
+		if ((pr.roll_type == ROLL_ATTACK or pr.roll_type == ROLL_ABILITY_CHECK) and (has_effective_advantage(pr) or has_effective_disadvantage(pr))) {
 			int die_roll = random(1, pr.dice_sides);
 			string roller_name = @roller != null ? roller.name : pr.player_username;
 			string mode = has_effective_advantage(pr) ? "advantage" : "disadvantage";
