@@ -7306,6 +7306,158 @@ class battle_manager {
 				check_battle_end();
 				return;
 			}
+			else if (spell.id == "disintegrate" and @target != null) {
+				// Basic Rules para 12875: "A creature targeted by this spell makes a
+				// Dexterity saving throw. On a failed save, the target takes 10d6 + 40
+				// Force damage. If this damage reduces it to 0 Hit Points, it and
+				// everything nonmagical it is wearing and carrying are disintegrated."
+				int dice_count = 10 + (3 * upcast_levels);
+				int total_damage = 40;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 6);
+				int save_roll = random(1, 20);
+				int save_bonus = target.get_save_bonus(ABILITY_DEX);
+				int bless_bonus = roll_bless_bonus(target);
+				int save_total = save_roll + save_bonus + bless_bonus;
+				bool saved = save_total >= save_dc;
+				broadcast_roll(target.name, "DEX save vs Disintegrate", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "DISINTEGRATED!");
+				if (!saved) {
+					combat.apply_damage(target, total_damage, DMG_FORCE, c);
+					broadcast_announce(c.name + "'s green ray strikes " + target.name + " for " + total_damage + " force damage!", true);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "cone_of_cold") {
+				// Basic Rules para 12483: "Each creature in a 60-foot Cone originating
+				// from you makes a Constitution saving throw, taking 8d8 Cold damage on
+				// a failed save or half as much damage on a successful one."
+				int dice_count = 8 + upcast_levels;
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 8);
+				broadcast_announce(c.name + " unleashes a 60-foot Cone of Cold!", true);
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (feet_distance(c.x, c.y, t.x, t.y) > 60) continue;
+					if (!combat.can_see(c, t)) continue;
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_CON);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					int dmg = saved ? total_damage / 2 : total_damage;
+					if (dmg < 1) dmg = 1;
+					broadcast_roll(t.name, "CON save vs Cone of Cold", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+					combat.apply_damage(t, dmg, DMG_COLD, c);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "chain_lightning" and @target != null) {
+				// Basic Rules paras 12333-12334: "You launch a lightning bolt toward a
+				// target you can see within range. Three bolts then leap from that target
+				// to as many as three other targets of your choice... Each target makes
+				// a Dexterity saving throw, taking 10d8 Lightning damage on a failed save
+				// or half as much damage on a successful one."
+				int dice_count = 10;
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 8);
+				int extra_bolts = 3 + upcast_levels;
+				combatant@[] cl_targets;
+				cl_targets.insert_last(target);
+				// Find up to 3 more targets within 30 ft of the primary target
+				for (uint ti = 0; ti < combat.combatants.length() and int(cl_targets.length()) < 1 + extra_bolts; ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id or t.id == target.id) continue;
+					if (!combat.are_hostile(c, t)) continue;
+					if (feet_distance(target.x, target.y, t.x, t.y) > 30) continue;
+					cl_targets.insert_last(t);
+				}
+				broadcast_announce(c.name + " unleashes Chain Lightning! " + cl_targets.length() + " creatures struck.", true);
+				for (uint ti = 0; ti < cl_targets.length(); ti++) {
+					combatant@ t = cl_targets[ti];
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_DEX);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					int dmg = saved ? total_damage / 2 : total_damage;
+					if (dmg < 1) dmg = 1;
+					broadcast_roll(t.name, "DEX save vs Chain Lightning", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+					combat.apply_damage(t, dmg, DMG_LIGHTNING, c);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "meteor_swarm") {
+				// Basic Rules para 14211: "Blazing orbs of fire plummet to the ground at
+				// four different points you can see within range. Each creature in a
+				// 40-foot-radius Sphere centered on each of those points makes a Dexterity
+				// saving throw. A creature takes 20d6 Fire damage and 20d6 Bludgeoning
+				// damage on a failed save, or half as much damage on a successful one."
+				int fire_dice = 20;
+				int bludg_dice = 20;
+				int total_damage = 0;
+				for (int d = 0; d < fire_dice; d++) total_damage += random(1, 6);
+				int bludg_damage = 0;
+				for (int d = 0; d < bludg_dice; d++) bludg_damage += random(1, 6);
+				broadcast_announce(c.name + " calls down a Meteor Swarm! Four 40-foot fire spheres devastate the area!", true);
+				// All hostiles within 40 ft of caster get hit (single big AoE approximation)
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (feet_distance(c.x, c.y, t.x, t.y) > 80) continue;
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_DEX);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					int fire_dmg = saved ? total_damage / 2 : total_damage;
+					int b_dmg = saved ? bludg_damage / 2 : bludg_damage;
+					if (fire_dmg < 1) fire_dmg = 1;
+					if (b_dmg < 1) b_dmg = 1;
+					broadcast_roll(t.name, "DEX save vs Meteor Swarm", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+					combat.apply_damage(t, fire_dmg, DMG_FIRE, c);
+					combat.apply_damage(t, b_dmg, DMG_BLUDGEONING, c);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "maze" and @target != null) {
+				// Basic Rules paras 14164-14166: "You banish a creature that you can see
+				// within range into a labyrinthine demiplane. The target remains there
+				// for the duration or until it escapes the maze. The target can take a
+				// Study action to try to escape... DC 20 Intelligence (Investigation) check."
+				// Approximation: apply COND_INCAPACITATED until concentration ends
+				target.add_condition(COND_INCAPACITATED);
+				broadcast_announce(c.name + " banishes " + target.name + " into a labyrinthine demiplane! They can attempt to escape on each of their turns (DC 20 INT check).", true);
+			}
+			else if (spell.id == "mass_suggestion") {
+				// Basic Rules para 14155: "Each target must succeed on a Wisdom saving
+				// throw or have the Charmed condition for the duration or until you or
+				// your allies deal damage to the target." Up to 12 visible creatures.
+				int count = 0;
+				for (uint ti = 0; ti < combat.combatants.length() and count < 12; ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (feet_distance(c.x, c.y, t.x, t.y) > 60) continue;
+					if (!combat.can_see(c, t)) continue;
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_WIS);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					if (!saved) {
+						t.add_condition(COND_CHARMED);
+						count++;
+					}
+				}
+				broadcast_announce(c.name + " casts Mass Suggestion, charming " + count + " creature" + (count == 1 ? "" : "s") + ".", true);
+			}
 			else if (spell.id == "command" and @target != null) {
 				// Basic Rules paras 12427-12430: "You speak a one-word command to a creature
 				// you can see within range. The target must succeed on a Wisdom saving throw
