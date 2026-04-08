@@ -2477,6 +2477,55 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.room.bm.broadcast_announce(c.name + " manifests Form of Dread! Gains " + temp_hp + " temp HP, enemies hit may be frightened.", true);
 		}
 
+		else if (feature == "starry_form") {
+			// Circle of Stars Druid: bonus action to assume Starry Form (Chalice/Archer/Dragon)
+			if (c.class_name != "Druid" or c.subclass != "Circle of the Stars") { u.send({{"type", message_types::announce}, {"text", "Only Circle of the Stars druids can use Starry Form."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.starry_form_active = true;
+			string form = msg.exists("form") ? string(msg["form"]) : "Chalice";
+			c.starry_form_type = form;
+			u.room.bm.broadcast_announce(c.name + " assumes Starry Form: " + form + "!", true);
+		}
+
+		else if (feature == "land_stride") {
+			// Circle of the Land Druid: Land's Stride - ignore difficult terrain
+			if (c.class_name != "Druid" or c.subclass != "Circle of the Land") { u.send({{"type", message_types::announce}, {"text", "Only Circle of the Land druids can use Land's Stride."}, {"interrupt", true}}); return; }
+			c.land_stride_active = true;
+			u.room.bm.broadcast_announce(c.name + "'s Land's Stride activates.", false);
+		}
+
+		else if (feature == "wildfire_spirit") {
+			// Wildfire Druid: summon Wildfire Spirit (simplified: flag for temp HP + bonus damage)
+			if (c.class_name != "Druid" or c.subclass != "Circle of Wildfire") { u.send({{"type", message_types::announce}, {"text", "Only Circle of Wildfire druids can summon a Wildfire Spirit."}, {"interrupt", true}}); return; }
+			if (!c.has_action) { u.send({{"type", message_types::announce}, {"text", "No action remaining."}, {"interrupt", true}}); return; }
+			c.has_action = false;
+			c.used_action = true;
+			c.wildfire_spirit_active = true;
+			u.room.bm.broadcast_announce(c.name + " summons a Wildfire Spirit!", true);
+		}
+
+		else if (feature == "echo_knight_manifest") {
+			// Echo Knight Fighter: Manifest Echo — bonus action summon an echo
+			if (c.class_name != "Fighter" or c.subclass != "Echo Knight") { u.send({{"type", message_types::announce}, {"text", "Only Echo Knights can manifest echoes."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			u.room.bm.broadcast_announce(c.name + " manifests an Echo from an alternate timeline!", true);
+		}
+
+		else if (feature == "rebuke_violent") {
+			// Oath of Redemption Paladin: Rebuke the Violent reaction
+			if (c.class_name != "Paladin" or c.subclass != "Oath of Redemption") { u.send({{"type", message_types::announce}, {"text", "Only Oath of Redemption paladins can Rebuke the Violent."}, {"interrupt", true}}); return; }
+			if (c.channel_divinity_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Channel Divinity uses remaining."}, {"interrupt", true}}); return; }
+			if (!c.has_reaction) { u.send({{"type", message_types::announce}, {"text", "No reaction available."}, {"interrupt", true}}); return; }
+			c.has_reaction = false;
+			c.channel_divinity_uses--;
+			c.rebuke_violent_ready = true;
+			u.room.bm.broadcast_announce(c.name + " readies Rebuke the Violent! Next time an enemy damages an ally within 30ft, they take equal damage.", false);
+		}
+
 		else {
 			u.send({{"type", message_types::announce}, {"text", "That bonus action is not available to your character."}, {"interrupt", true}});
 			return;

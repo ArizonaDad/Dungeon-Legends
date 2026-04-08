@@ -696,6 +696,10 @@ void show_bonus_action_menu() {
 	int tentacle_opt = -1;
 	int genie_vessel_opt = -1;
 	int form_of_dread_opt = -1;
+	int starry_form_opt = -1;
+	int wildfire_opt = -1;
+	int echo_manifest_opt = -1;
+	int rebuke_violent_opt = -1;
 
 	if (lc == "barbarian" and !my_is_raging and my_rage_uses_remaining > 0) rage_opt = m.add_item("Rage. Bonus action. Uses left: " + my_rage_uses_remaining + ". Damage bonus: " + my_rage_damage_bonus + ".");
 	if (lc == "fighter" and my_second_wind_available) second_wind_opt = m.add_item("Second Wind. Bonus action. Heal 1d10 plus fighter level.");
@@ -852,6 +856,18 @@ void show_bonus_action_menu() {
 	}
 	if (lc == "warlock" and subclass == "The Undead") {
 		form_of_dread_opt = m.add_item("Form of Dread. Bonus action. Transform into undead visage for temp HP and fear.");
+	}
+	if (lc == "druid" and subclass == "Circle of the Stars") {
+		starry_form_opt = m.add_item("Starry Form. Bonus action. Assume Chalice, Archer, or Dragon form.");
+	}
+	if (lc == "druid" and subclass == "Circle of Wildfire") {
+		wildfire_opt = m.add_item("Wildfire Spirit. Action. Summon a wildfire spirit companion.");
+	}
+	if (lc == "fighter" and subclass == "Echo Knight") {
+		echo_manifest_opt = m.add_item("Manifest Echo. Bonus action. Summon an echo from an alternate timeline.");
+	}
+	if (lc == "paladin" and subclass == "Oath of Redemption") {
+		rebuke_violent_opt = m.add_item("Rebuke the Violent. Channel Divinity. Reaction damage reflection.");
 	}
 
 	int options = 1;
@@ -1156,6 +1172,30 @@ void show_bonus_action_menu() {
 	else if (form_of_dread_opt >= 0 and res == form_of_dread_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "form_of_dread"}});
 		speak("Form of Dread manifests.", true);
+	}
+	else if (starry_form_opt >= 0 and res == starry_form_opt) {
+		menu@ sf = setup_sub_menu("Choose Starry Form:");
+		sf.add_item("Archer. Ranged radiant attacks.");
+		sf.add_item("Chalice. Healing on heal cast.");
+		sf.add_item("Dragon. Minimum of 10 on concentration saves.");
+		int sfr = sf.run();
+		string form = "Chalice";
+		if (sfr == 0) form = "Archer";
+		else if (sfr == 2) form = "Dragon";
+		send({{"type", message_types::bonus_action}, {"feature", "starry_form"}, {"form", form}});
+		speak("Starry Form: " + form, true);
+	}
+	else if (wildfire_opt >= 0 and res == wildfire_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "wildfire_spirit"}});
+		speak("Summoning Wildfire Spirit.", true);
+	}
+	else if (echo_manifest_opt >= 0 and res == echo_manifest_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "echo_knight_manifest"}});
+		speak("Manifesting echo.", true);
+	}
+	else if (rebuke_violent_opt >= 0 and res == rebuke_violent_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "rebuke_violent"}});
+		speak("Rebuke the Violent readied.", true);
 	}
 }
 
