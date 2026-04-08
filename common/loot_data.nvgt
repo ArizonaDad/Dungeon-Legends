@@ -260,6 +260,17 @@ void init_item_catalog() {
 	// Common consumable items mentioned by name in DMG 2024
 	add_item("dmg_potion_healing_greater", "Potion of Healing (Greater)", SLOT_AMULET, RARITY_UNCOMMON, "You regain 4d4+4 hit points when you drink this potion.", 0, 0, 0, 0, 0, 0, 0, 0);
 	add_item("dmg_potion_climbing", "Potion of Climbing", SLOT_AMULET, RARITY_COMMON, "When you drink this potion, you gain a Climb Speed equal to your walking Speed for 1 hour.", 0, 0, 0, 0, 0, 0, 0, 0);
+
+	// DMG 2024 Tomes/Manuals (paras 9700-10300+) - permanent stat-boost books
+	add_item("dmg_pearl_of_power", "Pearl of Power", SLOT_AMULET, RARITY_UNCOMMON, "While this pearl is on your person, you can take a Magic action to regain one expended spell slot of level 3 or lower.", 0, 0, 0, 1, 0, 0, 0, 0);
+	add_item("dmg_quiver_ehlonna", "Quiver of Ehlonna", SLOT_AMULET, RARITY_UNCOMMON, "Each of the quiver's three compartments connects to an extradimensional space that allows the quiver to hold numerous items while never weighing more than 2 pounds.", 0, 0, 0, 0, 0, 0, 0, 0);
+	add_item("dmg_mantle_spell_resist", "Mantle of Spell Resistance", SLOT_ARMOR, RARITY_RARE, "You have Advantage on saving throws against spells while you wear this cloak.", 1, 0, 0, 0, 0, 0, 2, 0);
+	add_item("dmg_tome_understanding", "Tome of Understanding", SLOT_AMULET, RARITY_EPIC, "After spending 48 hours studying this tome, your Wisdom score increases by 2, as does your maximum for that score. The book then loses its magic.", 0, 0, 5, 1, 0, 0, 1, 0);
+	add_item("dmg_tome_clear_thought", "Tome of Clear Thought", SLOT_AMULET, RARITY_EPIC, "After spending 48 hours studying this tome, your Intelligence score increases by 2, as does your maximum for that score.", 0, 0, 5, 1, 0, 0, 1, 0);
+	add_item("dmg_tome_leadership", "Tome of Leadership and Influence", SLOT_AMULET, RARITY_EPIC, "After spending 48 hours studying this tome, your Charisma score increases by 2, as does your maximum for that score.", 0, 0, 5, 1, 0, 0, 1, 0);
+	add_item("dmg_manual_bodily_health", "Manual of Bodily Health", SLOT_AMULET, RARITY_EPIC, "After spending 48 hours studying this tome, your Constitution score increases by 2.", 0, 0, 15, 0, 0, 0, 1, 0);
+	add_item("dmg_manual_gainful_exercise", "Manual of Gainful Exercise", SLOT_AMULET, RARITY_EPIC, "After spending 48 hours studying this tome, your Strength score increases by 2.", 0, 3, 5, 0, 0, 0, 0, 0);
+	add_item("dmg_manual_quickness", "Manual of Quickness of Action", SLOT_AMULET, RARITY_EPIC, "After spending 48 hours studying this tome, your Dexterity score increases by 2.", 0, 0, 5, 0, 2, 5, 0, 0);
 }
 
 // ---- LOOT GENERATION ----
