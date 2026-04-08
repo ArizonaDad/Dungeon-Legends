@@ -90,18 +90,18 @@ The rule remains: **NEVER choose for the player when a spell has a choice.** Bot
 
 ## 4. Subclass Implementation Status (147 total)
 
-### Source extracted, ready to implement (14):
-**Book of Ebon Tides (10):**
-- Circle of Shadows (Druid) — Umbral Form wild shape, Dark Servant, Shadow Mass, Darkness Falls
-- College of Shadow (Bard) — Dancing Shadows sphere, Fear of the Dark aura, Shade Step, Night Music
-- Keeper Domain (Cleric) — Blessed Chosen reaction, Divine Initiative CD, Fighting Fit, Hobbling Strike, Duty Over Death
-- Light Weaver (Sorcerer) — Trick of the Light, Flickering Aura, Refraction Shield, Aura Magnification, Spell Blind
-- Mother of Sorrows (Warlock) — Poison Soul, Venomous Mark, Sickening Revenge, Dark Inoculation, Touch of Sorrow
-- Shadow Arcane Tradition (Wizard) — Shadow Symbiote, Dark Transfusion, Orb of Night, From the Shadows, Second Skin
-- Shadow Domain (Cleric) — Cover of Night, Lengthen Shadow, Shadow Grasp CD, Fade to Black, Potent Spellcasting, Army of Shadow
-- Shadow Gnawer (Barbarian) — Shadow Smoke, Creeping Fog teleport, Consume Darkness, Corrosive Haze
-- Umbral Binder (Rogue) — Eyes In the Dark, Shadow Bind ritual, Cloaked Dagger, Black Magic, Shadow Grasp
-- Way of the Prophet (Monk) — Wise Words, Ki spellcasting, Prophecy
+### Source extracted, in progress / shipped:
+**Book of Ebon Tides (10 — 3 shipped, 7 pending):**
+- **Light Weaver (Sorcerer)** — SHIPPED batch 3A. Trick of the Light, Flickering Aura toggle, Refraction Shield melee retort. Spell Blind capstone (L18) deferred (needs aura concentration system). Aura Magnification (L14) is a passive flag — implemented as light-shifted vs dark-shifted variant on the existing aura.
+- **Shadow Domain (Cleric)** — SHIPPED batch 3A. Cover of Night Stealth proficiency, Shadow Grasp Channel Divinity action (with L17 Army of Shadow PB-target expansion), Fade to Black bonus action invisibility. Lengthen Shadow (touch spell delivery via shadow), Potent Spellcasting (cantrip damage WIS bonus), and Army of Shadow's full effect deferred — Lengthen Shadow needs spell delivery tracking, Potent Spellcasting needs to touch every cantrip damage path.
+- **Way of the Prophet (Monk)** — SHIPPED batch 3A. Wise Words skill proficiency + WIS-on-CHA-skills flag, Righteous Strike on-hit ki rider (1/turn proficiency-bonus radiant damage). Charming Aura (ki spellcasting), Blessed Chosen revival (L11), and Force of Personality reaction deferred — they need spell-from-class infrastructure and a death save intercept.
+- Circle of Shadows (Druid) — pending batch 3C. Umbral Form wild shape, Dark Servant, Shadow Mass, Darkness Falls
+- College of Shadow (Bard) — pending batch 3B. Dancing Shadows sphere, Fear of the Dark aura, Shade Step, Night Music
+- Keeper Domain (Cleric) — pending batch 3D. Blessed Chosen reaction, Divine Initiative CD, Fighting Fit, Hobbling Strike, Duty Over Death
+- Mother of Sorrows (Warlock) — pending batch 3B. Poison Soul, Venomous Mark, Sickening Revenge, Dark Inoculation, Touch of Sorrow
+- Shadow Arcane Tradition (Wizard) — pending batch 3C. Shadow Symbiote, Dark Transfusion, Orb of Night, From the Shadows, Second Skin
+- Shadow Gnawer (Barbarian) — pending batch 3D. Shadow Smoke, Creeping Fog teleport, Consume Darkness, Corrosive Haze
+- Umbral Binder (Rogue) — pending batch 3D. Eyes In the Dark, Shadow Bind ritual, Cloaked Dagger, Black Magic, Shadow Grasp
 
 ### Source missing entirely (2):
 - **College of Spirits** (Ravenloft Bard) — zero matches in Van Richten's cleaned or uncleaned docx

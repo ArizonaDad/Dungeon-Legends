@@ -1078,6 +1078,8 @@ void get_subclass_options(string class_name, string[]@ names, string[]@ descript
         add_text_pair(names, descriptions, "Inquisition Domain", "Inquisition Domain. Hunt heretics and counter magic. (Grim Hollow)");
         add_text_pair(names, descriptions, "Mind Domain", "Mind Domain. Psychic power through divine devotion. (Exploring Eberron)");
         add_text_pair(names, descriptions, "Arcana Domain", "Arcana Domain. Knowledge of arcane secrets + wizard cantrips. (Sword Coast)");
+        add_text_pair(names, descriptions, "Keeper Domain", "Keeper Domain. Protect and lead allies, social bonds and martial prowess. (Book of Ebon Tides)");
+        add_text_pair(names, descriptions, "Shadow Domain", "Shadow Domain. Walk between light and dark; stealth, invisibility, and shadow grasp. (Book of Ebon Tides)");
     } else if (class_name == "Druid") {
         add_text_pair(names, descriptions, "Circle of the Land", "Circle of the Land. Draw deeper magic from a chosen environment.");
         add_text_pair(names, descriptions, "Circle of the Moon", "Circle of the Moon. Focus on stronger Wild Shape forms.");
@@ -1117,6 +1119,7 @@ void get_subclass_options(string class_name, string[]@ names, string[]@ descript
         add_text_pair(names, descriptions, "Warrior of the Celestial", "Warrior of the Celestial. Channel divine light through martial arts. (Griffon's Saddlebag)");
         add_text_pair(names, descriptions, "Way of the Aether", "Way of the Aether. Manipulate ethereal energy. (Griffon's Saddlebag)");
         add_text_pair(names, descriptions, "Way of the Long Death", "Way of the Long Death. Extract vitality from dying creatures. (Sword Coast)");
+        add_text_pair(names, descriptions, "Way of the Prophet", "Way of the Prophet. Spread the wisdom of your faith with charm and divine inspiration. (Book of Ebon Tides)");
     } else if (class_name == "Paladin") {
         add_text_pair(names, descriptions, "Oath of Devotion", "Oath of Devotion. Embody honesty, courage, and justice.");
         add_text_pair(names, descriptions, "Oath of Glory", "Oath of Glory. Pursue heroic achievement and inspiring deeds.");
@@ -1162,6 +1165,7 @@ void get_subclass_options(string class_name, string[]@ names, string[]@ descript
         add_text_pair(names, descriptions, "Storm Sorcery", "Storm Sorcery. Command wind, lightning, and thunder. (Xanathar's)");
         add_text_pair(names, descriptions, "Frost Sorcerer", "Frost Sorcerer. Master of ice and cold magic. (Griffon's Saddlebag)");
         add_text_pair(names, descriptions, "Desert Soul", "Desert Soul. Channel the scorching power of the desert. (Griffon's Saddlebag)");
+        add_text_pair(names, descriptions, "Light Weaver", "Light Weaver. Cosmic balance between radiance and shadow; flickering aura of light or darkness. (Book of Ebon Tides)");
     } else if (class_name == "Warlock") {
         add_text_pair(names, descriptions, "Archfey Patron", "Archfey Patron. Gain beguiling power from a mighty fey being.");
         add_text_pair(names, descriptions, "Celestial Patron", "Celestial Patron. Channel radiant aid from a heavenly power.");

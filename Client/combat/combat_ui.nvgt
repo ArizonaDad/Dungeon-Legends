@@ -840,6 +840,11 @@ void show_bonus_action_menu() {
 	int momentary_stasis_opt = -1;
 	int mark_of_heretic_opt = -1;
 	int inquisitors_eye_opt = -1;
+	// Book of Ebon Tides
+	int shadow_grasp_opt = -1;
+	int fade_to_black_opt = -1;
+	int flickering_aura_opt = -1;
+	int refraction_shield_opt = -1;
 	int magic_coin_opt = -1;
 	int create_void_opt = -1;
 	int breath_of_dragon_opt = -1;
@@ -1087,6 +1092,20 @@ void show_bonus_action_menu() {
 	if (lc == "paladin" and subclass == "Oath of Zeal" and level >= 3) {
 		mark_of_heretic_opt = m.add_item("Mark of the Heretic. Channel Divinity. Mark target for crit 19+ range.");
 		inquisitors_eye_opt = m.add_item("Inquisitor's Eye. Channel Divinity bonus action. Advantage on Investigation, Insight, Perception for 10 minutes; cannot be surprised.");
+	}
+	// Book of Ebon Tides: Shadow Domain Cleric
+	if (lc == "cleric" and subclass == "Shadow Domain") {
+		shadow_grasp_opt = m.add_item("Shadow Grasp. Channel Divinity action. Target STR save or restrained until end of next turn (grappled on success).");
+		if (level >= 6) {
+			fade_to_black_opt = m.add_item("Fade to Black. Bonus action in dim light/darkness. Become invisible for 1 minute. PB uses/LR.");
+		}
+	}
+	// Book of Ebon Tides: Light Weaver Sorcerer
+	if (lc == "sorcerer" and subclass == "Light Weaver") {
+		flickering_aura_opt = m.add_item("Flickering Aura. Action toggle. Emit a 15-foot bright light or darkness aura.");
+		if (level >= 6) {
+			refraction_shield_opt = m.add_item("Refraction Shield. Bonus action, 3 SP. Melee attackers within 5ft take 2d8 radiant or necrotic damage.");
+		}
 	}
 	if (lc == "bard" and subclass == "College of Mercantile" and level >= 3) {
 		magic_coin_opt = m.add_item("Magic Coin. Action. Fling a coin at target for 1d12 thunder damage (scales).");
@@ -1506,6 +1525,23 @@ void show_bonus_action_menu() {
 	else if (inquisitors_eye_opt >= 0 and res == inquisitors_eye_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "inquisitors_eye"}});
 		speak("Inquisitor's Eye opens.", true);
+	}
+	else if (shadow_grasp_opt >= 0 and res == shadow_grasp_opt) {
+		if (current_target_id == 0) { speak("No target selected.", true); return; }
+		send({{"type", message_types::bonus_action}, {"feature", "shadow_grasp"}, {"target_id", current_target_id}});
+		speak("Shadow Grasp.", true);
+	}
+	else if (fade_to_black_opt >= 0 and res == fade_to_black_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "fade_to_black"}});
+		speak("Fading into shadow.", true);
+	}
+	else if (flickering_aura_opt >= 0 and res == flickering_aura_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "flickering_aura"}});
+		speak("Flickering Aura toggled.", true);
+	}
+	else if (refraction_shield_opt >= 0 and res == refraction_shield_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "refraction_shield"}});
+		speak("Refraction Shield raised.", true);
 	}
 	else if (magic_coin_opt >= 0 and res == magic_coin_opt) {
 		if (current_target_id == 0) { speak("No target selected.", true); return; }

@@ -698,6 +698,9 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
     c.known_cantrips = cs.cantrips;
     c.prepared_spells = cs.spells;
     c.focus_points = cs.ki_points;
+    // Sorcerer Font of Magic: copy the character sheet's sorcery_points (cs.level for L2+)
+    c.sorcery_points = cs.sorcery_points;
+    c.sorcery_points_max = cs.sorcery_points;
     c.lay_on_hands_pool = cs.lay_on_hands_pool;
     c.bardic_inspiration_uses = cs.bardic_inspiration_uses;
     c.bardic_inspiration_grant_die = cs.bardic_inspiration_die;
@@ -950,6 +953,18 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
             c.desert_soul_heat = true;
             // Source: no flat weapon bonus; Sandstorm is bonus action AoE push
         }
+        // Book of Ebon Tides: Light Weaver
+        // Source para 1104 (Trick of the Light L1): "you can see normally in darkness,
+        // both magical and nonmagical, to a distance of 60 feet."
+        // Source para 1106-1108 (Flickering Aura L1): "you can choose whether your magic
+        // is light-shifted or dark-shifted. You can change your choice at the end of a long
+        // rest." Light-shifted = bright light aura (radiant). Dark-shifted = nonmagical
+        // darkness aura (necrotic).
+        if (cs.subclass == "Light Weaver" and cs.level >= 1) {
+            c.light_weaver_active = true;
+            c.light_weaver_dark_shifted = false; // Default to light-shifted; player can toggle on long rest
+            c.light_weaver_aura_radius = 15;     // Source: 15 ft starting bright light radius
+        }
     }
     if (cs.class_name == "Fighter") {
         // Sword Coast: Purple Dragon Knight / Banneret
@@ -1081,6 +1096,22 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         if (cs.subclass == "Trickery Domain" and cs.level >= 1) {
             c.trickery_domain_active = true;
         }
+        // Book of Ebon Tides: Shadow Domain
+        // Source para 1180-1181 (Cover of Night L1): "you gain proficiency in the Stealth
+        // skill and darkvision out to a range of 60 feet. If you already have darkvision,
+        // its range increases by 30 feet. In addition, when you are in dim light or darkness,
+        // you can use a bonus action to Hide."
+        if (cs.subclass == "Shadow Domain" and cs.level >= 1) {
+            c.shadow_domain_active = true;
+            if (!c.has_skill_proficiency("Stealth")) c.skill_proficiencies.insert_last("Stealth");
+            // Darkvision is approximated via the existing perception model; the range bonus
+            // is recorded as a flag for future LoS work. The +30 ft for already-darkvision
+            // species is a no-op until darkvision distance is tracked.
+            // L6 Fade to Black uses = proficiency bonus per long rest (source para 1188).
+            if (cs.level >= 6) {
+                c.fade_to_black_uses = proficiency_bonus(cs.level);
+            }
+        }
     }
     if (cs.class_name == "Druid") {
         if (cs.subclass == "Circle of the Shepherd" and cs.level >= 2) {
@@ -1091,6 +1122,17 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         // Sword Coast: Way of the Long Death
         if (cs.subclass == "Way of the Long Death" and cs.level >= 3) {
             c.long_death_active = true;
+        }
+        // Book of Ebon Tides: Way of the Prophet
+        // Source para 1227 (Wise Words L3): "you gain proficiency in the Performance and
+        // Persuasion skills. Additionally, whenever you roll an ability check using a
+        // Charisma-based skill, you can use your Wisdom modifier instead of your Charisma
+        // modifier."
+        if (cs.subclass == "Way of the Prophet" and cs.level >= 3) {
+            c.way_of_prophet_active = true;
+            c.wise_words_active = true;
+            if (!c.has_skill_proficiency("Performance")) c.skill_proficiencies.insert_last("Performance");
+            if (!c.has_skill_proficiency("Persuasion")) c.skill_proficiencies.insert_last("Persuasion");
         }
         if (cs.subclass == "Warrior of the Celestial" and cs.level >= 3) {
             c.warrior_celestial_radiant = true;

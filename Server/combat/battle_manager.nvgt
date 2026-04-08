@@ -2853,6 +2853,8 @@ class battle_manager {
 		c.is_first_hit_this_turn = true;
 		// Reset Shield Master once-per-turn shove
 		c.shield_bash_used_this_turn = false;
+		// Reset Way of the Prophet Righteous Strike (1/turn)
+		c.righteous_strike_used_this_turn = false;
 
 		// Sacred Weapon glow reminder
 		if (c.sacred_weapon_active) {
@@ -3950,6 +3952,22 @@ class battle_manager {
 			broadcast_announce(attacker.name + " plucks the heartstrings, adding " + requiem_dmg + " necrotic damage! (1 Bardic Inspiration spent)", false);
 		}
 
+		// Way of the Prophet Monk L6 - Righteous Strike (Book of Ebon Tides para 1231):
+		// "When you hit a target with an unarmed strike, you can spend 1 ki point to cause
+		// the attack to deal either radiant (if you are good-aligned or neutral-aligned)
+		// or necrotic (if you are evil-aligned) damage equal to your proficiency bonus.
+		// You can use this feature only once on each of your turns."
+		// Auto-applies if the monk has at least 1 focus point and hasn't used it this turn,
+		// since the source ties damage type to alignment which the game doesn't track —
+		// defaults to radiant. (Players can disable by emptying their focus pool.)
+		if (attacker.class_name == "Monk" and attacker.subclass == "Way of the Prophet" and attacker.level >= 6 and attacker.focus_points > 0 and !attacker.righteous_strike_used_this_turn and is_weapon_attack and attack_name_is_unarmed(attacker.main_hand)) {
+			attacker.focus_points--;
+			attacker.righteous_strike_used_this_turn = true;
+			int prof_dmg = attacker.proficiency;
+			bonus += prof_dmg;
+			broadcast_announce(attacker.name + "'s Righteous Strike adds " + prof_dmg + " radiant damage! (1 focus spent)", false);
+		}
+
 		// Inquisitive Rogue: Insightful Fighting — sneak attack without advantage vs studied target
 		if (attacker.class_name == "Rogue" and attacker.subclass == "Inquisitive" and attacker.inquisitive_target == target.id and attacker.is_first_hit_this_turn and is_weapon_attack) {
 			int dice = (attacker.level + 1) / 2;
@@ -4426,6 +4444,19 @@ class battle_manager {
 				string fs_name = target.fire_shield_warm ? "fire" : "cold";
 				combat.apply_damage(c, fs_dmg, fs_type, target);
 				broadcast_announce(target.name + "'s Fire Shield burns " + c.name + " for " + fs_dmg + " " + fs_name + " damage!", true);
+			}
+
+			// Refraction Shield (Light Weaver Sorcerer L6): melee attacker within 5 ft
+			// takes 2d8 radiant (light-shifted) or 2d8 necrotic (dark-shifted) on hit.
+			// Source para 1111: "the shield flashes with searing energy, and the attacker
+			// takes 2d8 radiant damage if you are light-shifted or 2d8 necrotic damage if
+			// you are dark-shifted."
+			if (target.refraction_shield_active and !c.main_hand_is_ranged and !pr.is_spell_effect and feet_distance(c.x, c.y, target.x, target.y) <= 5) {
+				int rs_dmg = random(1, 8) + random(1, 8);
+				int rs_type = target.light_weaver_dark_shifted ? DMG_NECROTIC : DMG_RADIANT;
+				string rs_name = target.light_weaver_dark_shifted ? "necrotic" : "radiant";
+				combat.apply_damage(c, rs_dmg, rs_type, target);
+				broadcast_announce(target.name + "'s Refraction Shield flashes, dealing " + rs_dmg + " " + rs_name + " damage to " + c.name + "!", true);
 			}
 
 			// Shield Master 2024: after hitting with a melee weapon as part of Attack action with a shield, shove

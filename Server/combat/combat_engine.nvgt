@@ -83,6 +83,8 @@ class combatant {
 	int pass_without_trace_bonus = 0;
 	uint pass_without_trace_source_id = 0;
 	int focus_points = 0;
+	int sorcery_points = 0;     // Sorcerer Font of Magic resource (PHB Sorcerer L2)
+	int sorcery_points_max = 0;
 	int lay_on_hands_pool = 0;
 	int bardic_inspiration_uses = 0;
 	int bardic_inspiration_grant_die = 0;
@@ -265,6 +267,24 @@ class combatant {
 	int witch_hunter_strikes_remaining = 0; // Inquisition Domain L1 - WIS-mod uses per long rest
 	bool mark_of_heretic_active = false; // Oath of Zeal L3 Channel Divinity
 	bool inquisitors_eye_active = false; // Oath of Zeal L3 Channel Divinity (10 min advantage on INT/WIS skill checks)
+	// --- Book of Ebon Tides: Light Weaver Sorcerer ---
+	bool light_weaver_active = false;       // Sorcerer Light Weaver L1 origin
+	bool light_weaver_dark_shifted = false; // false=light-shifted (radiant), true=dark-shifted (necrotic)
+	bool light_weaver_aura_active = false;  // Flickering Aura currently emitting
+	int light_weaver_aura_radius = 15;      // 15 ft starting radius (10-30 range)
+	bool refraction_shield_active = false;  // L6 Refraction Shield melee retort active
+	bool spell_blind_active = false;        // L18 Spell Blind aura active (1 min concentration)
+	int spell_blind_dc = 0;                 // Cached spell save DC for Spell Blind
+	// --- Book of Ebon Tides: Shadow Domain Cleric ---
+	bool shadow_domain_active = false;      // Shadow Domain L1 origin
+	int fade_to_black_uses = 0;             // L6 Fade to Black: prof bonus uses/LR
+	bool fade_to_black_active = false;      // Currently invisible from Fade to Black
+	int shadow_grasp_targets_remaining = 0; // L17 Army of Shadow: targets affected this Channel Divinity use
+	// --- Book of Ebon Tides: Way of the Prophet Monk ---
+	bool way_of_prophet_active = false;     // L3 origin
+	bool blessed_chosen_used = false;       // L11 Blessed Chosen revival used this long rest
+	bool wise_words_active = false;         // L3 Wise Words: use WIS instead of CHA on CHA-skill checks
+	bool righteous_strike_used_this_turn = false; // L6 Righteous Strike: 1/turn marker
 	uint mark_of_heretic_target = 0; // Target with crit range 19+
 	bool astral_domain_active = false; // Astral Domain Cleric
 	bool warrior_celestial_radiant = false; // Warrior of the Celestial Monk
