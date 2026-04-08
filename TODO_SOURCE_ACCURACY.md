@@ -137,12 +137,145 @@ Every base class has features that need the same level of rigor as subclasses:
 
 ## 7. Feat TODOs
 
-Roughly 80 feats have at least a flag in the code. The ones with correct 2024 mechanics (verified against source):
-- Mage Slayer (Concentration Breaker implemented, Guarded Mind TODO)
-- Shield Master (automatic rider implemented, Interpose Shield reaction TODO)
-- Polearm Master (bonus action implemented, Reactive Strike TODO)
+**Current status (verified 2026-04-08):** 77 feats defined in `common/feat_data.nvgt`. Only 24 have `has_feat()` checks in combat code. **53 feats have no combat logic at all** — they're selectable at character creation but do nothing in combat.
 
-Every other feat needs a 2024 PHB source pass to verify it matches the current text.
+### Feats WITH combat logic (24 — need audit pass for 2024 accuracy):
+alert, archery, boon_of_combat_prowess, boon_of_irresistible_offense, boon_of_truesight, crossbow_expert, crusher, defensive_duelist, dueling, grappler, great_weapon_fighting, great_weapon_master, healer, heavy_armor_master, mage_slayer, piercer, polearm_master, savage_attacker, sentinel, shield_master, slasher, tavern_brawler, thrown_weapon_fighting, war_caster
+
+### Feats WITHOUT combat logic (53 — need full implementation):
+
+**Origin feats (6 missing):**
+- crafter, magic_initiate_cleric, magic_initiate_druid, magic_initiate_wizard, musician, skilled, tough, lucky
+
+**General feats (29 missing — level 4+, the biggest group):**
+- ability_score_improvement, actor, athlete, charger, chef, defense, dual_wielder, durable, elemental_adept, fey_touched, heavily_armored, inspiring_leader, keen_mind, lightly_armored, martial_weapon_training, medium_armor_master, moderately_armored, mounted_combatant, observant, poisoner, resilient, ritual_caster, shadow_touched, sharpshooter, skill_expert, skulker, speedy, spell_sniper, telekinetic, telepathic, weapon_master
+
+**Fighting Style feats (4 missing):**
+- blind_fighting, interception, protection, two_weapon_fighting, unarmed_fighting
+
+**Epic Boon feats (8 missing):**
+- boon_of_dimensional_travel, boon_of_energy_resistance, boon_of_fate, boon_of_fortitude, boon_of_recovery, boon_of_skill, boon_of_speed, boon_of_spell_recall, boon_of_the_night_spirit
+
+### Key complex feat effects still needing work:
+- **Polearm Master Reactive Strike** — opportunity attack when a creature enters reach (not just when leaving). Current game only supports leave-reach OAs.
+- **Shield Master Interpose Shield** — reaction to take 0 damage instead of half on a successful DEX save against a half-damage effect.
+- **Shield Master push option** — player choice of Push 5ft OR Prone (currently always Prone).
+- **Mage Slayer Guarded Mind** — 1/rest reaction auto-succeed on failed INT/WIS/CHA save.
+- **Charger** — When you Dash, bonus action melee attack or shove with +1d8 damage.
+- **Inspiring Leader** — After short/long rest, grant 6 creatures temp HP = level + CHA mod.
+- **Elemental Adept** — ignore resistance to chosen damage type, treat 1s as 2s on damage dice.
+- **Fey Touched** — free Misty Step + one 1st-level Div/Enchant spell once per long rest each.
+- **Shadow Touched** — free Invisibility + one 1st-level Illusion/Necromancy spell once per long rest each.
+- **Telekinetic** — bonus action Mage Hand / push-pull 5ft.
+- **Telepathic** — telepathic communication + Detect Thoughts spell.
+- **Sharpshooter** — ignore cover, no long range penalty, -5/+10 trade.
+- **Spell Sniper** — double spell attack range, ignore cover, learn an attack cantrip.
+- **Poisoner** — apply poison for +2d8 poison damage + poisoned condition.
+- **Resilient** — gain proficiency in one saving throw.
+- **Ability Score Improvement** — +2 or +1/+1 (data only, no combat effect beyond stats).
+
+**Total new feat implementations needed: ~40** (53 feats missing, but ability_score_improvement is purely stat-based and doesn't need combat code; several are simply +skill/+tool proficiency and will partly land in the skill check system).
+
+---
+
+## 7B. Custom Spell Handlers (SEPARATE from generic resolver)
+
+The generic spell resolver in `battle_manager.nvgt` handles most damage/healing/save spells via the `pending_roll` → save loop flow. But many spells have unique mechanics that need custom handlers. Status as of 2026-04-08:
+
+### Spells with custom handlers implemented:
+true_strike, spiritual_weapon, revivify, heal, ice_storm, finger_of_death, power_word_stun, magic_missile, shield, longstrider, misty_step, bless, lesser_restoration, pass_without_trace, haste, heroism, hex, hunters_mark, mage_armor, web, blindness_deafness, animate_dead, fear, hypnotic_pattern, polymorph, wall_of_force, hold_person, banishment, charm_person, sleep, color_spray, tashas_hideous_laughter, ensnaring_strike, sanctuary, aid, stoneskin, greater_invisibility, fly, fire_shield, spirit_guardians, fog_cloud, darkness
+
+### Spells from the catalog (367+) that lack custom handlers and need them for correct source behavior:
+
+**Wall spells** — entire category has no grid implementation:
+- Wall of Fire, Wall of Stone, Wall of Thorns, Wall of Ice, Wall of Water, Wall of Sand, Wall of Light, Blade Barrier
+
+**Summon/Conjure spells** — no creature-spawn flow for most:
+- Summon Beast, Summon Celestial, Summon Construct, Summon Draconic Spirit, Summon Elemental, Summon Fey, Summon Fiend, Summon Shadowspawn, Summon Undead, Summon Dragon
+- Conjure Animals, Conjure Celestial, Conjure Elemental, Conjure Fey, Conjure Minor Elementals, Conjure Woodland Beings
+- Animate Objects, Create Undead, Danse Macabre, Find Familiar, Find Steed, Find Greater Steed
+
+**Control / manipulation spells** — need new movement / target-grab flow:
+- Telekinesis (move creature/object by thought each turn)
+- Bigby's Hand (5 action modes: clenched fist / forceful hand / grasping hand / interposing hand)
+- Control Water, Control Winds, Control Weather, Control Flames
+- Investiture of Flame/Ice/Stone/Wind
+- Reverse Gravity
+- Maelstrom
+
+**Shape-shift / transformation spells**:
+- Alter Self, Disguise Self, Enlarge/Reduce, Gaseous Form, Giant Insect, Shapechange, True Polymorph
+- Druid Wild Shape already has partial flow — needs verification against 2024 rules
+
+**Concentration-ongoing damage/control fields**:
+- Evard's Black Tentacles, Sickening Radiance, Maelstrom, Storm Sphere, Tidal Wave, Cloudkill, Stinking Cloud, Incendiary Cloud, Insect Plague
+- Antimagic Field, Globe of Invulnerability, Resilient Sphere
+- Guardian of Faith, Forbiddance
+
+**Utility / save-or-suck**:
+- Banishment (partial), Blink, Contingency, Crown of Madness, Dominate Person/Monster/Beast, Eyebite, Feeblemind, Flesh to Stone, Geas, Hold Monster, Imprisonment, Plane Shift, Planar Binding, Suggestion, Temporal Stasis, Tongues, Weird
+
+**Divination** — no exploration flow so skipped for combat:
+- Augury, Clairvoyance, Commune, Contact Other Plane, Detect Evil and Good, Detect Magic, Detect Poison and Disease, Detect Thoughts, Divination, Find the Path, Foresight, Legend Lore, Locate Animals/Object/Creature, Scrying, See Invisibility, True Seeing, Vision
+
+**Healing / buff spells needing proper resource tracking**:
+- Aura of Life, Aura of Purity, Aura of Vitality, Beacon of Hope, Death Ward, Gift of Alacrity, Holy Weapon, Regenerate, Resurrection, True Resurrection, Reincarnate, Life Transference
+
+**Eldritch Blast / Scorching Ray / Magic Missile distribution** — auto-split dart/beam counts evenly. Source lets the caster distribute them freely. Needs a target-distribution prompt (same mid-spell choice system).
+
+**True Strike** (2024) — new version is a melee weapon attack with a spellcasting ability modifier. Source text has been implemented but needs re-verification.
+
+**Estimated custom-handler gap: ~60-80 spells** out of 367+ currently in `spell_data.nvgt`, plus probably ~150+ more spells not yet added to the catalog (Basic Rules has 300+ descriptions, Griffon's Saddlebag + Book of Ebon Tides + Valda's add hundreds more).
+
+---
+
+## 7C. Companion / Summon System
+
+Currently a single-minded stub exists (Beast Master `beast_companion_active` flag, Drakewarden `drake_hp`, Battle Smith `steel_defender_active`), but there's no proper companion system. A real implementation needs:
+
+### System requirements:
+1. **Companion entity** — a combatant tracked in the battle with its own HP, AC, initiative, actions, reactions, and stat block.
+2. **Ownership** — each companion is owned by a player combatant; if owner dies, companion may remain / flee / die depending on subclass.
+3. **Command action** — owner spends action (or bonus action) to command companion; some subclasses grant free commands.
+4. **Companion AI** — for moments when the companion acts without a direct command (Beast Master L7+ Exceptional Training, Battle Smith passive attack).
+5. **Stat block scaling** — companion stats scale with the owner's level / proficiency bonus per subclass rules.
+6. **Death and resurrection** — each subclass has different rules for bringing back a slain companion.
+
+### Subclasses currently flagged but NOT functioning correctly:
+- **Beast Master (Ranger)** — Primal Companion has Land/Sea/Sky variants each with full stat blocks in Tasha's. None are implemented. Current code has a flag but no entity spawns.
+- **Battle Smith (Artificer)** — Steel Defender has a full stat block in Tasha's. Current code has a flag and a placeholder "Steel Defender Attack" bonus action, but no actual entity.
+- **Drakewarden (Ranger)** — Drake Companion has a full stat block in Fizban's (Small → Medium → Large scaling). Partially tracked via `drake_hp` but no entity.
+- **Circle of the Shepherd (Druid)** — Spirit Totem is an aura, not a companion, but Guardian Spirit (L10) heals summoned creatures. Needs the generic summon tracker first.
+- **Circle of Wildfire (Druid)** — Wildfire Spirit is a full companion with Teleport + Fiery Teleportation mechanics. Currently just a flag.
+- **Circle of the Land (Druid)** — no companion, skip
+- **Artillerist (Artificer)** — Eldritch Cannon is a companion-like entity (Flamethrower / Force Ballista / Protector modes). Partially implemented with `eldritch_cannon_hp`, but the 3 modes and their specific attacks aren't.
+- **Alchemist (Artificer)** — no companion, skip
+- **Armorer (Artificer)** — not a companion, but the suit is basically a form change with different attack options. Needs similar state-swap logic.
+- **Echo Knight (Fighter)** — Echo is a pseudo-companion (1 HP shadow). Partially implemented in batch 22, but needs proper entity tracking for Unleash Incarnation + Reclaim Potential + Shadow Martyr + Legion of One (two echoes at L18).
+- **Ancestral Guardian (Barbarian)** — Ancestral Protectors is an aura effect, not a companion, but tracked as `ancestral_protector_target`.
+- **The Fathomless (Warlock)** — Tentacle of the Deeps is a companion-like 1d8 cold damage reach weapon. Partial.
+- **Circle of the Stars (Druid)** — Starry Form is a self-buff, not a companion.
+
+### Full spells that are companion-adjacent:
+- **Find Familiar** — owl / hawk / cat / etc. with its own stat block
+- **Find Steed** — mount with its own stat block
+- **Find Greater Steed** — same, larger
+- **Animate Dead** — zombie/skeleton minions under command
+- **Create Undead** — ghoul minions
+- **Danse Macabre** — temporary zombie/skeleton minions
+- **Conjure X spells** (Animals/Celestial/Elemental/Fey/Minor Elementals/Woodland Beings) — summon creatures
+- **Summon X spells** (Beast/Celestial/Construct/Draconic/Elemental/Fey/Fiend/Shadowspawn/Undead/Dragon) — summon creature with a scaling stat block
+
+### Minimum viable companion implementation:
+1. Extend `combatant` class with `owner_id`, `is_companion`, `companion_subclass`
+2. Add `create_companion(owner, stat_block_name)` in combat_engine
+3. Add `companion_act(companion)` in battle_manager (uses owner's turn or bonus action)
+4. Add companion stat blocks to `monster_data.nvgt` or a new `companion_data.nvgt`
+5. Hook subclass bonus actions (Primal Companion Attack, Steel Defender Attack, Drake Breath, Summon Wildfire Spirit, Manifest Echo) into the companion spawn/command flow
+6. Handle companion death separately from player death (no death saves, just removal)
+7. Apply ownership rules: companion uses owner's proficiency bonus, companion's stats scale with owner level per source tables
+
+**This is a major refactor** — estimated 500+ lines of new code across combat_engine, battle_manager, monster_data, users _dom, and combat_ui. Should be its own milestone.
 
 ---
 
