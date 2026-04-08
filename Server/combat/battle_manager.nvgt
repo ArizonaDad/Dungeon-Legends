@@ -2923,6 +2923,9 @@ class battle_manager {
 			// Opportunity attack triggers when leaving reach.
 			if (old_dist <= reach and new_dist > reach) {
 				if (enemy.main_hand_is_ranged) continue;
+				// Swashbuckler Rogue: Fancy Footwork — enemies attacked by Swashbuckler can't make OA
+				if (mover.class_name == "Rogue" and mover.subclass == "Swashbuckler" and enemy.swashbuckler_attacked_this_turn) continue;
+				// Feat: Mobile — (not yet implemented)
 				// This enemy gets an opportunity attack.
 				enemy.has_reaction = false;
 				broadcast_announce(enemy.name + " makes an opportunity attack against " + mover.name + "!");
@@ -3436,6 +3439,21 @@ class battle_manager {
 			int giant_dmg = random(1, 6);
 			bonus += giant_dmg;
 			broadcast_announce(attacker.name + "'s Giant's Might adds " + giant_dmg + " damage!", false);
+		}
+
+		// Inquisitive Rogue: Insightful Fighting — sneak attack without advantage vs studied target
+		if (attacker.class_name == "Rogue" and attacker.subclass == "Inquisitive" and attacker.inquisitive_target == target.id and attacker.is_first_hit_this_turn and is_weapon_attack) {
+			int dice = (attacker.level + 1) / 2;
+			int sneak_bonus = 0;
+			for (int sd = 0; sd < dice; sd++) sneak_bonus += random(1, 6);
+			bonus += sneak_bonus;
+			broadcast_announce(attacker.name + "'s Insightful Fighting adds " + sneak_bonus + " sneak attack damage!", false);
+		}
+
+		// Scout Rogue: Skirmisher (handled via movement system, just notes)
+		// Swashbuckler Rogue: Fancy Footwork — mark target as attacked (prevents OA)
+		if (attacker.class_name == "Rogue" and attacker.subclass == "Swashbuckler") {
+			target.swashbuckler_attacked_this_turn = true;
 		}
 
 		// Samurai: Fighting Spirit (advantage handled in advantage check; temp HP gained on activation)

@@ -2311,6 +2311,35 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.room.bm.broadcast_announce(c.name + " invokes Abjure the Extraplanar! Nearby aberrations, celestials, elementals, fey, and fiends must save vs fear.", true);
 		}
 
+		else if (feature == "insightful_fighting") {
+			// Inquisitive Rogue: Study target to enable sneak attack without advantage
+			if (c.class_name != "Rogue" or c.subclass != "Inquisitive") { u.send({{"type", message_types::announce}, {"text", "Only Inquisitive rogues can use Insightful Fighting."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.inquisitive_target = target_id;
+			u.room.bm.broadcast_announce(c.name + " studies a target with Insightful Fighting!", false);
+		}
+
+		else if (feature == "mastermind_help") {
+			// Mastermind Rogue: bonus action Help at 30ft range
+			if (c.class_name != "Rogue" or c.subclass != "Mastermind") { u.send({{"type", message_types::announce}, {"text", "Only Mastermind rogues can use Mastermind Help."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.help_target_id = target_id;
+			u.room.bm.broadcast_announce(c.name + " uses Master of Tactics to Help an ally as a bonus action!", false);
+		}
+
+		else if (feature == "fast_hands") {
+			// Thief Rogue: Fast Hands bonus action (use object / use item)
+			if (c.class_name != "Rogue" or c.subclass != "Thief") { u.send({{"type", message_types::announce}, {"text", "Only Thieves can use Fast Hands."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			u.room.bm.broadcast_announce(c.name + " uses Fast Hands to quickly manipulate an object.", false);
+		}
+
 		else {
 			u.send({{"type", message_types::announce}, {"text", "That bonus action is not available to your character."}, {"interrupt", true}});
 			return;

@@ -171,6 +171,9 @@ class combatant {
 	uint arcane_trickster_mage_hand = 0; // Arcane Trickster
 	bool mastermind_help = false; // Mastermind Rogue
 	bool swashbuckler_fancy_footwork = false; // Swashbuckler Rogue
+	bool swashbuckler_attacked_this_turn = false; // Track for Fancy Footwork
+	uint inquisitive_target = 0; // Inquisitive Rogue
+	bool scout_skirmisher = false; // Scout Rogue
 	bool starry_form_active = false; // Circle of Stars Druid
 	string starry_form_type = ""; // Archer/Chalice/Dragon
 	bool land_stride_active = false; // Circle of the Land
@@ -578,6 +581,7 @@ class battle {
 		c.piercer_reroll_used_this_turn = false;
 		c.fighting_spirit_active = false;
 		c.planar_warrior_active = false;
+		c.swashbuckler_attacked_this_turn = false;
 		c.trip_attack_pending = false;
 		c.precision_attack_pending = false;
 
