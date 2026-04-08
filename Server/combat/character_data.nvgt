@@ -1070,6 +1070,11 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
             c.way_of_aether_active = true;
             c.psychic_resistance = true;
         }
+        // Fizban's: Way of the Ascendant Dragon
+        if (cs.subclass == "Way of the Ascendant Dragon" and cs.level >= 3) {
+            int prof_ad = proficiency_bonus(cs.level);
+            c.ascendant_dragon_breath_uses = prof_ad;
+        }
     }
     if (cs.class_name == "Paladin") {
         if (cs.subclass == "Oath of the Hearth" and cs.level >= 3) {
@@ -1080,6 +1085,14 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         }
     }
     if (cs.class_name == "Ranger") {
+        // Fizban's: Drakewarden (Drake Companion HP and stats)
+        if (cs.subclass == "Drakewarden" and cs.level >= 3) {
+            c.drake_companion_active = false; // toggled by action
+            // Drake HP = 5 + 5 * ranger level
+            c.drake_max_hp = 5 + 5 * cs.level;
+            c.drake_hp = c.drake_max_hp;
+            c.drake_damage_type = 2; // Default fire
+        }
         if (cs.subclass == "Winter Trapper" and cs.level >= 3) {
             c.winter_trapper_traps = true;
             // Source: Pin Down adds 1d6 weapon-type damage + 10ft speed reduction; no cold resistance

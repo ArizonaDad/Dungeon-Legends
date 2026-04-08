@@ -2607,6 +2607,59 @@ void handle_user_message(user@ u, json_object@ msg)
 				u.room.bm.broadcast_announce(evt.name + (save >= ev_dc ? " resists" : " is crushed by") + " the Event Horizon: " + ev_dmg + " force damage.", true);
 			}
 		}
+		else if (feature == "breath_of_the_dragon") {
+			// Way of the Ascendant Dragon L3: replace one attack with 20ft cone or 30ft line
+			// Deals 2 * Martial Arts die damage (acid/cold/fire/lightning/poison). Dex save for half.
+			// PB uses/LR, or 2 ki points
+			if (c.class_name != "Monk" or c.subclass != "Way of the Ascendant Dragon") { u.send({{"type", message_types::announce}, {"text", "Only Ascendant Dragon monks have this feature."}, {"interrupt", true}}); return; }
+			if (!c.has_action and !c.used_action) { u.send({{"type", message_types::announce}, {"text", "You must take the Attack action."}, {"interrupt", true}}); return; }
+			if (c.ascendant_dragon_breath_uses <= 0 and c.focus_points < 2) { u.send({{"type", message_types::announce}, {"text", "No uses remaining and insufficient Focus Points."}, {"interrupt", true}}); return; }
+			if (c.ascendant_dragon_breath_uses <= 0) c.focus_points -= 2;
+			else c.ascendant_dragon_breath_uses--;
+			// Martial Arts die size
+			int ma_die = 4;
+			if (c.level >= 5) ma_die = 6;
+			if (c.level >= 11) ma_die = 8;
+			if (c.level >= 17) ma_die = 10;
+			int breath_dice = 2;
+			if (c.level >= 11) breath_dice = 3;
+			int breath_dc = 8 + c.proficiency + c.get_ability_mod(ABILITY_WIS);
+			// AoE: hit all enemies within 20ft (cone approximation)
+			u.room.bm.broadcast_announce(c.name + " unleashes Breath of the Dragon!", true);
+			for (uint bdi = 0; bdi < u.room.bm.combat.combatants.length(); bdi++) {
+				combatant@ bdt = u.room.bm.combat.combatants[bdi];
+				if (@bdt == null or bdt.is_dead or bdt.id == c.id) continue;
+				if (bdt.is_player == c.is_player) continue;
+				if (feet_distance(c.x, c.y, bdt.x, bdt.y) > 20) continue;
+				int bd_dmg = 0;
+				for (int bd = 0; bd < breath_dice; bd++) bd_dmg += random(1, ma_die);
+				int save = random(1, 20) + bdt.get_save_bonus(ABILITY_DEX);
+				if (save >= breath_dc) bd_dmg /= 2;
+				if (bd_dmg < 1) bd_dmg = 1;
+				u.room.bm.combat.apply_damage(bdt, bd_dmg, DMG_FIRE, c);
+				u.room.bm.broadcast_announce(bdt.name + " takes " + bd_dmg + " fire damage (save " + save + " vs DC " + breath_dc + ")", false);
+			}
+		}
+		else if (feature == "aspect_of_the_wyrm") {
+			// Way of the Ascendant Dragon L11: bonus action aura 10ft, 1 min, frightful or resistance
+			if (c.class_name != "Monk" or c.subclass != "Way of the Ascendant Dragon") { u.send({{"type", message_types::announce}, {"text", "Only Ascendant Dragon monks have this feature."}, {"interrupt", true}}); return; }
+			if (c.level < 11) { u.send({{"type", message_types::announce}, {"text", "Aspect of the Wyrm unlocks at level 11."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			if (c.aspect_of_wyrm_used and c.focus_points < 3) { u.send({{"type", message_types::announce}, {"text", "Already used; need 3 Focus Points."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			if (c.aspect_of_wyrm_used) c.focus_points -= 3;
+			c.aspect_of_wyrm_used = true;
+			// Apply fire resistance to self and allies in 10ft
+			for (uint awi = 0; awi < u.room.bm.combat.combatants.length(); awi++) {
+				combatant@ awa = u.room.bm.combat.combatants[awi];
+				if (@awa == null or awa.is_dead) continue;
+				if (awa.is_player != c.is_player and awa.id != c.id) continue;
+				if (feet_distance(c.x, c.y, awa.x, awa.y) > 10) continue;
+				awa.fire_resistance = true;
+			}
+			u.room.bm.broadcast_announce(c.name + " activates Aspect of the Wyrm! 10ft aura grants fire resistance.", true);
+		}
 		else if (feature == "magic_coin") {
 			// College of Mercantile L3: Action — ranged spell attack (CHA + prof) vs AC, 1d12 thunder (scales)
 			if (c.class_name != "Bard" or c.subclass != "College of Mercantile") { u.send({{"type", message_types::announce}, {"text", "Only Mercantile bards can fling Magic Coins."}, {"interrupt", true}}); return; }

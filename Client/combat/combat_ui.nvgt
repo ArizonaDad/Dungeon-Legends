@@ -706,6 +706,8 @@ void show_bonus_action_menu() {
 	int mark_of_heretic_opt = -1;
 	int magic_coin_opt = -1;
 	int create_void_opt = -1;
+	int breath_of_dragon_opt = -1;
+	int aspect_of_wyrm_opt = -1;
 	int rebuke_violent_opt = -1;
 	int eldritch_cannon_opt = -1;
 	int cannon_fire_opt = -1;
@@ -954,6 +956,12 @@ void show_bonus_action_menu() {
 	}
 	if (lc == "cleric" and subclass == "Astral Domain" and level >= 3) {
 		create_void_opt = m.add_item("Create Void. Channel Divinity bonus action. 15ft sphere within 60ft, Dex save.");
+	}
+	if (lc == "monk" and subclass == "Way of the Ascendant Dragon" and level >= 3) {
+		breath_of_dragon_opt = m.add_item("Breath of the Dragon. Replace attack with 20ft cone. PB/LR or 2 focus.");
+		if (level >= 11) {
+			aspect_of_wyrm_opt = m.add_item("Aspect of the Wyrm. Bonus action. 10ft aura, fire resistance to allies. 1/LR or 3 focus.");
+		}
 	}
 	if (lc == "monk" and subclass == "Warrior of the Open Hand") {
 		open_hand_opt = m.add_item("Open Hand Technique. Use on Flurry hit to push, knock prone, or prevent reactions.");
@@ -1367,6 +1375,14 @@ void show_bonus_action_menu() {
 		if (current_target_id == 0) { speak("No target selected (center of void).", true); return; }
 		send({{"type", message_types::bonus_action}, {"feature", "create_void"}, {"target_id", current_target_id}});
 		speak("Void created.", true);
+	}
+	else if (breath_of_dragon_opt >= 0 and res == breath_of_dragon_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "breath_of_the_dragon"}});
+		speak("Breath of the Dragon unleashed.", true);
+	}
+	else if (aspect_of_wyrm_opt >= 0 and res == aspect_of_wyrm_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "aspect_of_the_wyrm"}});
+		speak("Aspect of the Wyrm active.", true);
 	}
 	else if (rebuke_violent_opt >= 0 and res == rebuke_violent_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "rebuke_violent"}});

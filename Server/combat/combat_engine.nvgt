@@ -296,6 +296,13 @@ class combatant {
 	int glacier_rage_extensions = 0; // Rage Extension uses = CON mod/LR
 	// College of Choreography
 	bool choreography_dance_ready = false;
+	// Way of the Ascendant Dragon (Fizban's)
+	int ascendant_dragon_breath_uses = 0; // PB/LR
+	bool aspect_of_wyrm_used = false; // 1/LR
+	// Drakewarden extras (Fizban's) - drake_companion_active already exists
+	int drake_damage_type = 0; // 0=acid 1=cold 2=fire 3=lightning 4=poison
+	int drake_hp = 0;
+	int drake_max_hp = 0;
 	bool circle_unbroken_active = false; // Circle of the Unbroken
 	bool circle_dragons_form = false; // Circle of Dragons Druid
 	bool path_of_glacier_active = false; // Barbarian Path of the Glacier
