@@ -77,6 +77,8 @@ class combatant {
 	int shield_ac_bonus = 0;
 	bool blessed = false;
 	bool baned = false;                  // Bane spell: subtract 1d4 from attacks + saves until concentration ends
+	int magic_weapon_bonus = 0;          // Magic Weapon spell: +1/+2/+3 to attack and damage rolls
+	bool divine_favor_active = false;    // Divine Favor spell: +1d4 radiant damage on weapon hits
 	uint bless_source_id = 0;
 	bool guiding_bolt_advantage = false;
 	uint guiding_bolt_source_id = 0;

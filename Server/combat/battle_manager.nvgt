@@ -1911,6 +1911,8 @@ class battle_manager {
 		}
 		atk_bonus -= attacker.exhaustion_level * 2;
 		atk_bonus -= get_bane_penalty(attacker);
+		// Magic Weapon spell (Basic Rules para 14108): +1/+2/+3 to attack rolls
+		if (attacker.magic_weapon_bonus > 0) atk_bonus += attacker.magic_weapon_bonus;
 		return atk_bonus;
 	}
 
@@ -1923,6 +1925,8 @@ class battle_manager {
 		if (attacker.has_feat("dueling") and !attacker.main_hand_is_ranged and attacker.main_hand_range <= 5) mod += 2;
 		// Fighting Style: Thrown Weapon Fighting (+2 damage with thrown weapons)
 		if (attacker.has_feat("thrown_weapon_fighting") and attacker.main_hand_is_ranged and attacker.main_hand_range <= 60) mod += 2;
+		// Magic Weapon spell (Basic Rules para 14108): +1/+2/+3 to damage rolls
+		if (attacker.magic_weapon_bonus > 0) mod += attacker.magic_weapon_bonus;
 		return mod;
 	}
 
@@ -4622,6 +4626,13 @@ class battle_manager {
 				total_damage += hw_dmg;
 				broadcast_announce(c.name + "'s Holy Weapon adds " + hw_dmg + " radiant damage.", false);
 			}
+			// Divine Favor (Basic Rules para 12922): "Until the spell ends, your attacks
+			// with weapons deal an extra 1d4 Radiant damage on a hit."
+			if (c.divine_favor_active and !pr.is_spell_effect and pr.is_weapon_attack) {
+				int df_dmg = random(1, 4);
+				total_damage += df_dmg;
+				broadcast_announce(c.name + "'s Divine Favor adds " + df_dmg + " radiant damage.", false);
+			}
 			// Mother of Sorrows Venomous Mark (Book of Ebon Tides para 1137):
 			// "Until the curse ends, you deal an extra 1d6 poison damage to the target
 			// whenever you hit it with a spell attack."
@@ -7305,6 +7316,70 @@ class battle_manager {
 				broadcast_state();
 				check_battle_end();
 				return;
+			}
+			else if (spell.id == "calm_emotions") {
+				// Basic Rules paras 12323-12325: "Each Humanoid in a 20-foot-radius Sphere
+				// centered on a point you choose within range must succeed on a Charisma
+				// saving throw or be affected by... The creature has Immunity to the
+				// Charmed and Frightened conditions until the spell ends."
+				int center_x = @target != null ? target.x : c.x;
+				int center_y = @target != null ? target.y : c.y;
+				int affected = 0;
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (feet_distance(center_x, center_y, t.x, t.y) > 20) continue;
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_CHA);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					if (!saved) {
+						t.remove_condition(COND_CHARMED);
+						t.remove_condition(COND_FRIGHTENED);
+						affected++;
+					}
+				}
+				broadcast_announce(c.name + " casts Calm Emotions, suppressing Charmed and Frightened on " + affected + " creature" + (affected == 1 ? "" : "s") + " in a 20-foot sphere.", true);
+			}
+			else if (spell.id == "chromatic_orb" and @target != null) {
+				// Basic Rules para 12370: "You hurl an orb of energy at a target within
+				// range. Choose Acid, Cold, Fire, Lightning, Poison, or Thunder for the
+				// type of orb you create, and then make a ranged spell attack against the
+				// target. On a hit, the target takes 3d8 damage of the chosen type."
+				// Defaults to Fire damage since the source mandates a player choice.
+				int dice_count = 3 + upcast_levels;
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 8);
+				int atk_roll = random(1, 20);
+				int atk_total = atk_roll + spell_atk;
+				bool hit = atk_total >= target.armor_class;
+				broadcast_roll(c.name, "Chromatic Orb attack roll", atk_roll, spell_atk, atk_total, hit ? "Hit!" : "Missed!");
+				if (hit) {
+					combat.apply_damage(target, total_damage, DMG_FIRE, c);
+					broadcast_announce(c.name + "'s Chromatic Orb deals " + total_damage + " fire damage to " + target.name + "!", true);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "magic_weapon" and @target != null) {
+				// Basic Rules para 14108: "You touch a nonmagical weapon. Until the spell
+				// ends, that weapon becomes a magic weapon with a +1 bonus to attack rolls
+				// and damage rolls."
+				// Approximation: target's main hand becomes magical (treats damage as
+				// magical) and +1 to attack/damage. Stored as a flat bonus.
+				int bonus_amt = 1;
+				if (cast_slot_level >= 3 and cast_slot_level <= 5) bonus_amt = 2;
+				else if (cast_slot_level >= 6) bonus_amt = 3;
+				target.magic_weapon_bonus = bonus_amt;
+				broadcast_announce(c.name + " enchants " + target.name + "'s weapon with Magic Weapon. +" + bonus_amt + " to attack and damage rolls.", true);
+			}
+			else if (spell.id == "divine_favor") {
+				// Basic Rules para 12922: "Until the spell ends, your attacks with weapons
+				// deal an extra 1d4 Radiant damage on a hit."
+				c.divine_favor_active = true;
+				broadcast_announce(c.name + " casts Divine Favor — weapon attacks deal +1d4 radiant damage until concentration ends.", true);
 			}
 			else if (spell.id == "lightning_bolt") {
 				// Basic Rules para 13996: "A stroke of lightning forming a 100-foot-long,
