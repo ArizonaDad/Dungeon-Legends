@@ -2426,6 +2426,57 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.room.bm.broadcast_announce(c.name + " manifests Astral Arms! Reach extended to 10ft, unarmed strikes deal force damage.", true);
 		}
 
+		else if (feature == "tentacle_of_deeps") {
+			// The Fathomless Warlock: summon tentacle, or reactivate for attack
+			if (c.class_name != "Warlock" or c.subclass != "The Fathomless") { u.send({{"type", message_types::announce}, {"text", "Only Fathomless warlocks can summon Tentacle of the Deeps."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			combatant@ tgt = target_id != 0 ? u.room.bm.combat.get_combatant(target_id) : null;
+			if (@tgt != null and !tgt.is_dead) {
+				// Attack with tentacle — 1d8 cold damage + reduce speed
+				int dex_mod = c.get_ability_mod(ABILITY_DEX);
+				int atk_bonus = dex_mod + c.proficiency;
+				int roll = random(1, 20);
+				if (roll + atk_bonus >= tgt.armor_class) {
+					int cold_dmg = random(1, 8);
+					if (c.level >= 10) cold_dmg += random(1, 8);
+					u.room.bm.combat.apply_damage(tgt, cold_dmg, DMG_COLD, c);
+					tgt.speed -= 10;
+					if (tgt.speed < 0) tgt.speed = 0;
+					u.room.bm.broadcast_announce(c.name + "'s Tentacle of the Deeps strikes " + tgt.name + " for " + cold_dmg + " cold damage and reduces their speed!", true);
+				} else {
+					u.room.bm.broadcast_announce(c.name + "'s Tentacle of the Deeps misses " + tgt.name + ".", false);
+				}
+			}
+			c.tentacle_of_deeps_active = true;
+		}
+
+		else if (feature == "genie_vessel") {
+			// The Genie Warlock: retreat to vessel (flavor: temp HP + concealed)
+			if (c.class_name != "Warlock" or c.subclass != "The Genie") { u.send({{"type", message_types::announce}, {"text", "Only Genie warlocks can enter their Vessel."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			int temp_hp = c.proficiency + c.level;
+			if (c.temp_hp < temp_hp) c.temp_hp = temp_hp;
+			c.genie_vessel_active = true;
+			u.room.bm.broadcast_announce(c.name + " retreats into their Genie's Vessel, gaining " + temp_hp + " temp HP!", true);
+		}
+
+		else if (feature == "form_of_dread") {
+			// Undead Warlock: Form of Dread — bonus action, frighten on hit, temp HP
+			if (c.class_name != "Warlock" or c.subclass != "The Undead") { u.send({{"type", message_types::announce}, {"text", "Only Undead warlocks can manifest Form of Dread."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			int temp_hp = 1 + c.level;
+			if (c.temp_hp < temp_hp) c.temp_hp = temp_hp;
+			c.form_of_dread_active = true;
+			c.form_of_dread_rounds = 10;
+			u.room.bm.broadcast_announce(c.name + " manifests Form of Dread! Gains " + temp_hp + " temp HP, enemies hit may be frightened.", true);
+		}
+
 		else {
 			u.send({{"type", message_types::announce}, {"text", "That bonus action is not available to your character."}, {"interrupt", true}});
 			return;
