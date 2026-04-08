@@ -1396,6 +1396,12 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         }
     }
     if (cs.class_name == "Paladin") {
+        // PHB 2024 Paladin L7 Aura of Protection: CHA modifier (minimum +1) added to all
+        // saving throws for the paladin (and allies within 10 ft - aura coverage deferred).
+        if (cs.level >= 7) {
+            int cha_mod_pal = (cs.charisma - 10) / 2;
+            c.aura_of_protection_bonus = cha_mod_pal > 0 ? cha_mod_pal : 1;
+        }
         if (cs.subclass == "Oath of the Hearth" and cs.level >= 3) {
             c.oath_of_hearth_active = true;
         }

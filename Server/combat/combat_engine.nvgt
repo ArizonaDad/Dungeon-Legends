@@ -114,6 +114,7 @@ class combatant {
 	int companion_attack_dmg_mod = 0;   // Damage flat modifier
 	int companion_attack_dmg_type = 0;  // Damage type ID
 	int lay_on_hands_pool = 0;
+	int aura_of_protection_bonus = 0; // PHB 2024 Paladin L7+: CHA mod added to all saves (self only currently)
 	int bardic_inspiration_uses = 0;
 	int bardic_inspiration_grant_die = 0;
 	int bardic_inspiration_die = 0;
@@ -622,6 +623,15 @@ class combatant {
 		// to the save bonus since the existing save flow doesn't currently roll twice.
 		if (danger_sense_active and ability_id == ABILITY_DEX and !has_condition(COND_INCAPACITATED)) {
 			mod += 5;
+		}
+		// Paladin Aura of Protection (PHB 2024 L7): "You radiate a protective aura that
+		// fortifies the saving throws of you and your allies. You and creatures of your
+		// choice within 10 feet of you (or 30 feet at level 18) have a bonus to saving
+		// throws equal to your Charisma modifier (with a minimum bonus of +1)." Currently
+		// applied to the paladin themselves; ally aura coverage is deferred (needs a
+		// position-aware lookup at save time).
+		if (aura_of_protection_bonus > 0) {
+			mod += aura_of_protection_bonus;
 		}
 		return mod;
 	}
