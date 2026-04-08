@@ -169,6 +169,15 @@ void apply_class_defaults(character_sheet@ cs) {
         cs.is_caster = true; cs.spellcasting_ability = ABILITY_INT;
         cs.armor_type = "scale_mail"; cs.has_shield = true; // Medium armor + shield
         apply_half_caster_slots(cs);
+    } else if (c == "Gunslinger") {
+        cs.hit_die = 8; cs.save_profs = {0,1,0,0,0,1}; // DEX, CHA
+        cs.armor_type = "leather"; // Light armor
+        if (cs.level >= 5) cs.extra_attacks = 1;
+        // Spellslinger subclass gets half-caster slots
+        if (cs.subclass == "Spellslinger") {
+            cs.is_caster = true; cs.spellcasting_ability = ABILITY_CHA;
+            apply_half_caster_slots(cs);
+        }
     }
 }
 

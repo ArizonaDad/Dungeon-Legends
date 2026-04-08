@@ -119,6 +119,67 @@ void init_feat_data() {
 	add_feat_choice("boon_of_spell_recall", "Boon of Spell Recall", FEAT_CATEGORY_EPIC, "Increase Intelligence, Wisdom, or Charisma by 1. Lower-level spell slots can sometimes be preserved.", false, 19, "", false, true);
 	add_feat_choice("boon_of_truesight", "Boon of Truesight", FEAT_CATEGORY_EPIC, "Increase one ability score by 1 and gain truesight out to 60 feet.", false, 19);
 
+	// === PHB 2024 General Feats (Level 4+) ===
+	add_feat_choice("actor", "Actor", FEAT_CATEGORY_GENERAL, "Increase Charisma by 1. Advantage on Deception and Performance checks when impersonating someone. Mimic speech of creatures you have heard.", false, 4);
+	add_feat_choice("athlete", "Athlete", FEAT_CATEGORY_GENERAL, "Increase Strength or Dexterity by 1. Standing from Prone uses only 5 feet. Climbing does not cost extra movement.", false, 4);
+	add_feat_choice("charger", "Charger", FEAT_CATEGORY_GENERAL, "Increase Strength or Dexterity by 1. When you Dash, you can make one melee attack or shove as a Bonus Action with +1d8 damage.", false, 4);
+	add_feat_choice("chef", "Chef", FEAT_CATEGORY_GENERAL, "Increase Constitution or Wisdom by 1. You can cook special food during a Short Rest to heal extra 1d8 HP. Treats grant temp HP.", false, 4);
+	add_feat_choice("crossbow_expert", "Crossbow Expert", FEAT_CATEGORY_GENERAL, "Increase Dexterity by 1. Ignore Loading property on crossbows. No disadvantage on ranged attacks within 5 feet.", false, 4);
+	add_feat_choice("crusher", "Crusher", FEAT_CATEGORY_GENERAL, "Increase Strength or Constitution by 1. Once per turn when you deal Bludgeoning damage, push target 5 feet. On a critical hit, attacks against target have advantage until your next turn.", false, 4);
+	add_feat_choice("defensive_duelist", "Defensive Duelist", FEAT_CATEGORY_GENERAL, "Increase Dexterity by 1. When wielding a Finesse weapon and hit by melee attack, use Reaction to add Proficiency Bonus to AC for that attack.", false, 4);
+	add_feat_choice("dual_wielder", "Dual Wielder", FEAT_CATEGORY_GENERAL, "Increase Strength or Dexterity by 1. When wielding a weapon in each hand, gain +1 AC. Draw or stow two weapons at once.", false, 4);
+	add_feat_choice("durable", "Durable", FEAT_CATEGORY_GENERAL, "Increase Constitution by 1. When you roll Hit Dice to regain HP, the minimum roll equals twice your Constitution modifier.", false, 4);
+	add_feat_choice("elemental_adept", "Elemental Adept", FEAT_CATEGORY_GENERAL, "Increase Intelligence, Wisdom, or Charisma by 1. Choose a damage type (Acid, Cold, Fire, Lightning, or Thunder). Spells of that type ignore resistance and treat 1s as 2s on damage dice.", false, 4);
+	add_feat_choice("fey_touched", "Fey Touched", FEAT_CATEGORY_GENERAL, "Increase Intelligence, Wisdom, or Charisma by 1. Learn Misty Step and one 1st-level Divination or Enchantment spell. Cast each once for free per Long Rest.", false, 4);
+	add_feat_choice("great_weapon_master", "Great Weapon Master", FEAT_CATEGORY_GENERAL, "Increase Strength by 1. When you score a critical hit or reduce a creature to 0 HP with a Heavy melee weapon, you can make one melee attack as a Bonus Action.", false, 4);
+	add_feat_choice("heavily_armored", "Heavily Armored", FEAT_CATEGORY_GENERAL, "Increase Strength by 1. Gain proficiency with Heavy Armor.", false, 4);
+	add_feat_choice("heavy_armor_master", "Heavy Armor Master", FEAT_CATEGORY_GENERAL, "Increase Strength by 1. When wearing Heavy Armor, reduce Bludgeoning, Piercing, and Slashing damage from nonmagical weapons by your Proficiency Bonus.", false, 4);
+	add_feat_choice("inspiring_leader", "Inspiring Leader", FEAT_CATEGORY_GENERAL, "Increase Wisdom or Charisma by 1. After a Short or Long Rest, give a speech to grant up to 6 creatures temp HP equal to your level plus your Charisma modifier.", false, 4);
+	add_feat_choice("keen_mind", "Keen Mind", FEAT_CATEGORY_GENERAL, "Increase Intelligence by 1. You can take the Study action as a Bonus Action. You always know the time and direction of north.", false, 4);
+	add_feat_choice("lightly_armored", "Lightly Armored", FEAT_CATEGORY_GENERAL, "Increase Strength or Dexterity by 1. Gain proficiency with Light Armor and Shields.", false, 4);
+	add_feat_choice("mage_slayer", "Mage Slayer", FEAT_CATEGORY_GENERAL, "Increase Strength or Dexterity by 1. When a creature within 5 feet casts a spell, you can use your Reaction to make a melee attack against it. You have advantage on saves against spells cast within 5 feet.", false, 4);
+	add_feat_choice("martial_weapon_training", "Martial Weapon Training", FEAT_CATEGORY_GENERAL, "Increase Strength or Dexterity by 1. Gain proficiency with Martial Weapons.", false, 4);
+	add_feat_choice("medium_armor_master", "Medium Armor Master", FEAT_CATEGORY_GENERAL, "Increase Strength or Dexterity by 1. Medium Armor no longer imposes disadvantage on Stealth. You can add up to +3 DEX modifier in Medium Armor.", false, 4);
+	add_feat_choice("moderately_armored", "Moderately Armored", FEAT_CATEGORY_GENERAL, "Increase Strength or Dexterity by 1. Gain proficiency with Medium Armor and Shields.", false, 4);
+	add_feat_choice("mounted_combatant", "Mounted Combatant", FEAT_CATEGORY_GENERAL, "Increase Strength, Dexterity, or Wisdom by 1. Advantage on melee attacks against unmounted creatures smaller than your mount. Force attacks targeting mount to target you instead.", false, 4);
+	add_feat_choice("observant", "Observant", FEAT_CATEGORY_GENERAL, "Increase Intelligence or Wisdom by 1. You can take the Search action as a Bonus Action. +5 to passive Perception and passive Investigation.", false, 4);
+	add_feat_choice("piercer", "Piercer", FEAT_CATEGORY_GENERAL, "Increase Strength or Dexterity by 1. Once per turn, reroll one Piercing damage die. Critical hits with Piercing damage deal one extra damage die.", false, 4);
+	add_feat_choice("poisoner", "Poisoner", FEAT_CATEGORY_GENERAL, "Increase Dexterity or Intelligence by 1. You can apply poison as a Bonus Action. Creatures have no advantage on saves against your poisons.", false, 4);
+	add_feat_choice("polearm_master", "Polearm Master", FEAT_CATEGORY_GENERAL, "Increase Strength or Dexterity by 1. Bonus Action butt-end attack for 1d4 with polearms. Creatures provoke Opportunity Attacks when entering your reach.", false, 4);
+	add_feat_choice("resilient", "Resilient", FEAT_CATEGORY_GENERAL, "Increase one ability score by 1 and gain proficiency in saving throws using that ability.", false, 4);
+	add_feat_choice("ritual_caster", "Ritual Caster", FEAT_CATEGORY_GENERAL, "Increase Intelligence, Wisdom, or Charisma by 1. Learn two Ritual spells. Cast Ritual spells without spell slots.", false, 4);
+	add_feat_choice("sentinel", "Sentinel", FEAT_CATEGORY_GENERAL, "Increase Strength or Dexterity by 1. Opportunity Attacks reduce target speed to 0. Creatures that attack allies within 5 feet provoke Opportunity Attacks.", false, 4);
+	add_feat_choice("shadow_touched", "Shadow Touched", FEAT_CATEGORY_GENERAL, "Increase Intelligence, Wisdom, or Charisma by 1. Learn Invisibility and one 1st-level Illusion or Necromancy spell. Cast each once for free per Long Rest.", false, 4);
+	add_feat_choice("sharpshooter", "Sharpshooter", FEAT_CATEGORY_GENERAL, "Increase Dexterity by 1. Ranged attacks ignore Half and Three-Quarters Cover. Attack at long range without disadvantage.", false, 4);
+	add_feat_choice("shield_master", "Shield Master", FEAT_CATEGORY_GENERAL, "Increase Strength by 1. Bonus Action shove when taking Attack action. Add shield AC bonus to DEX saves.", false, 4);
+	add_feat_choice("skill_expert", "Skill Expert", FEAT_CATEGORY_GENERAL, "Increase one ability score by 1. Gain proficiency in one skill. Choose one proficient skill for Expertise.", false, 4);
+	add_feat_choice("skulker", "Skulker", FEAT_CATEGORY_GENERAL, "Increase Dexterity by 1. Hide when Lightly Obscured. Missing ranged attacks while hidden does not reveal you. Darkvision 60 feet.", false, 4);
+	add_feat_choice("slasher", "Slasher", FEAT_CATEGORY_GENERAL, "Increase Strength or Dexterity by 1. Slashing damage reduces target speed by 10 feet. Critical Slashing hits cause disadvantage on attacks.", false, 4);
+	add_feat_choice("speedy", "Speedy", FEAT_CATEGORY_GENERAL, "Increase Dexterity or Constitution by 1. Speed increases by 10 feet. Opportunity Attacks have disadvantage against you. Dash as Bonus Action.", false, 4);
+	add_feat_choice("spell_sniper", "Spell Sniper", FEAT_CATEGORY_GENERAL, "Increase Intelligence, Wisdom, or Charisma by 1. Spell attacks ignore Half and Three-Quarters Cover. Learn one attack cantrip.", false, 4);
+	add_feat_choice("telekinetic", "Telekinetic", FEAT_CATEGORY_GENERAL, "Increase Intelligence, Wisdom, or Charisma by 1. Learn invisible Mage Hand. Bonus Action shove creature 5 feet (STR save).", false, 4);
+	add_feat_choice("telepathic", "Telepathic", FEAT_CATEGORY_GENERAL, "Increase Intelligence, Wisdom, or Charisma by 1. Telepathic speech within 60 feet. Cast Detect Thoughts once for free per Long Rest.", false, 4);
+	add_feat_choice("war_caster", "War Caster", FEAT_CATEGORY_GENERAL, "Increase Intelligence, Wisdom, or Charisma by 1. Advantage on Concentration saves. Cantrip for Opportunity Attacks. Somatic components with full hands.", false, 4);
+	add_feat_choice("weapon_master", "Weapon Master", FEAT_CATEGORY_GENERAL, "Increase Strength or Dexterity by 1. Gain a Weapon Mastery property of your choice to use with one weapon.", false, 4);
+
+	// === PHB 2024 Fighting Style Feats ===
+	add_feat_choice("blind_fighting", "Blind Fighting", FEAT_CATEGORY_FIGHTING_STYLE, "You have Blindsight 10 feet. You can see anything not behind Total Cover within that range, even if Blinded.", false, 1, "", true);
+	add_feat_choice("dueling", "Dueling", FEAT_CATEGORY_FIGHTING_STYLE, "When wielding a melee weapon in one hand and no other weapons, +2 to damage rolls with that weapon.", false, 1, "", true);
+	add_feat_choice("interception", "Interception", FEAT_CATEGORY_FIGHTING_STYLE, "When an ally within 5 feet is hit, use Reaction to reduce damage by 1d10 plus Proficiency Bonus.", false, 1, "", true);
+	add_feat_choice("protection", "Protection", FEAT_CATEGORY_FIGHTING_STYLE, "When an ally within 5 feet is targeted, use Reaction to impose disadvantage on the attack roll. Requires Shield.", false, 1, "", true);
+	add_feat_choice("thrown_weapon_fighting", "Thrown Weapon Fighting", FEAT_CATEGORY_FIGHTING_STYLE, "Draw Thrown weapons as part of the attack. +2 to damage with Thrown weapons.", false, 1, "", true);
+	add_feat_choice("unarmed_fighting", "Unarmed Fighting", FEAT_CATEGORY_FIGHTING_STYLE, "Unarmed strikes deal 1d6 (or 1d8 with both hands free). Deal 1d4 to grappled creature at start of your turn.", false, 1, "", true);
+
+	// === PHB 2024 Epic Boon Feats (Level 19+) ===
+	add_feat_choice("boon_of_dimensional_travel", "Boon of Dimensional Travel", FEAT_CATEGORY_EPIC, "Increase one ability score by 1. After using a spell slot, teleport up to 30 feet.", false, 19);
+	add_feat_choice("boon_of_energy_resistance", "Boon of Energy Resistance", FEAT_CATEGORY_EPIC, "Increase one ability score by 1. Use Reaction to gain Resistance to Acid, Cold, Fire, Lightning, or Thunder until next turn.", false, 19);
+	add_feat_choice("boon_of_fate", "Boon of Fate", FEAT_CATEGORY_EPIC, "Increase one ability score by 1. Change a D20 Test within 60 feet by 2d4. Uses equal to Proficiency Bonus.", false, 19);
+	add_feat_choice("boon_of_fortitude", "Boon of Fortitude", FEAT_CATEGORY_EPIC, "Increase one ability score by 1. Your Hit Point maximum increases by 40.", false, 19);
+	add_feat_choice("boon_of_recovery", "Boon of Recovery", FEAT_CATEGORY_EPIC, "Increase one ability score by 1. Bonus Action to regain half your Hit Point maximum. Once per Long Rest.", false, 19);
+	add_feat_choice("boon_of_skill", "Boon of Skill", FEAT_CATEGORY_EPIC, "Increase one ability score by 1. Proficiency in all skills. Expertise in two skills.", false, 19);
+	add_feat_choice("boon_of_speed", "Boon of Speed", FEAT_CATEGORY_EPIC, "Increase one ability score by 1. Your Speed increases by 30 feet.", false, 19);
+	add_feat_choice("boon_of_the_night_spirit", "Boon of the Night Spirit", FEAT_CATEGORY_EPIC, "Increase one ability score by 1. Darkvision 300 feet. Become Invisible as Bonus Action in Dim Light or Darkness.", false, 19);
+
 	string[] acolyte_skills = {"Insight", "Religion"};
 	string[] criminal_skills = {"Sleight of Hand", "Stealth"};
 	string[] sage_skills = {"Arcana", "History"};
@@ -151,6 +212,72 @@ void init_feat_data() {
 	add_background_choice("sailor", "Sailor", "Sailor. Sea legs, brawling, and navigation.", "str,dex,wis", "tavern_brawler", sailor_skills, "Navigator's Tools");
 	add_background_choice("scribe", "Scribe", "Scribe. Research, investigation, and meticulous observation.", "dex,int,wis", "skilled", scribe_skills, "Calligrapher's Supplies");
 	add_background_choice("wayfarer", "Wayfarer", "Wayfarer. Wandering, intuition, and lucky breaks.", "dex,wis,cha", "lucky", wayfarer_skills, "Thieves' Tools");
+
+	// === Setting-Specific Backgrounds (Sword Coast) ===
+	string[] city_watch_skills = {"Athletics", "Insight"};
+	string[] clan_crafter_skills = {"History", "Insight"};
+	string[] cloistered_scholar_skills = {"Arcana", "History"};
+	string[] courtier_skills = {"Insight", "Persuasion"};
+	string[] faction_agent_skills = {"Insight", "Investigation"};
+	string[] far_traveler_skills = {"Insight", "Perception"};
+	string[] inheritor_skills = {"Survival", "Arcana"};
+	string[] knight_order_skills = {"Persuasion", "Religion"};
+	string[] mercenary_skills = {"Athletics", "Persuasion"};
+	string[] bounty_hunter_skills = {"Investigation", "Stealth"};
+	string[] uthgardt_skills = {"Athletics", "Survival"};
+	string[] waterdhavian_skills = {"History", "Persuasion"};
+	add_background_choice("city_watch", "City Watch", "City Watch. Patrol the streets and enforce the law.", "str,int,wis", "alert", city_watch_skills, "Gaming Set");
+	add_background_choice("clan_crafter", "Clan Crafter", "Clan Crafter. Dwarven tradition and master craftsmanship.", "str,con,int", "crafter", clan_crafter_skills, "Artisan's Tools");
+	add_background_choice("cloistered_scholar", "Cloistered Scholar", "Cloistered Scholar. Library research and arcane study.", "con,int,wis", "skilled", cloistered_scholar_skills, "Calligrapher's Supplies");
+	add_background_choice("courtier", "Courtier", "Courtier. Political savvy and diplomatic connections.", "int,wis,cha", "skilled", courtier_skills, "Gaming Set");
+	add_background_choice("faction_agent", "Faction Agent", "Faction Agent. Serve a major faction across the Realms.", "dex,int,cha", "alert", faction_agent_skills, "Disguise Kit");
+	add_background_choice("far_traveler", "Far Traveler", "Far Traveler. From distant lands with exotic knowledge.", "str,wis,cha", "observant", far_traveler_skills, "Musical Instrument");
+	add_background_choice("inheritor", "Inheritor", "Inheritor. Inherited a mysterious or valuable item.", "con,int,wis", "lucky", inheritor_skills, "Gaming Set");
+	add_background_choice("knight_of_the_order", "Knight of the Order", "Knight of the Order. Sworn to a knightly organization.", "str,con,cha", "savage_attacker", knight_order_skills, "Gaming Set");
+	add_background_choice("mercenary_veteran", "Mercenary Veteran", "Mercenary Veteran. A life of battle for coin.", "str,dex,con", "tough", mercenary_skills, "Gaming Set");
+	add_background_choice("urban_bounty_hunter", "Urban Bounty Hunter", "Urban Bounty Hunter. Track and capture fugitives.", "dex,int,wis", "alert", bounty_hunter_skills, "Thieves' Tools");
+	add_background_choice("uthgardt_tribe_member", "Uthgardt Tribe Member", "Uthgardt Tribe Member. Barbarian tribal heritage.", "str,con,wis", "savage_attacker", uthgardt_skills, "Musical Instrument");
+	add_background_choice("waterdhavian_noble", "Waterdhavian Noble", "Waterdhavian Noble. High society of the City of Splendors.", "int,wis,cha", "skilled", waterdhavian_skills, "Gaming Set");
+
+	// === Setting-Specific Backgrounds (Ravnica Guilds) ===
+	string[] azorius_skills = {"Insight", "Intimidation"};
+	string[] boros_skills = {"Athletics", "Intimidation"};
+	string[] dimir_skills = {"Deception", "Stealth"};
+	string[] golgari_skills = {"Nature", "Survival"};
+	string[] gruul_skills = {"Animal Handling", "Athletics"};
+	string[] izzet_skills = {"Arcana", "Investigation"};
+	string[] orzhov_skills = {"Intimidation", "Religion"};
+	string[] rakdos_skills = {"Acrobatics", "Performance"};
+	string[] selesnya_skills = {"Nature", "Persuasion"};
+	string[] simic_skills = {"Arcana", "Medicine"};
+	add_background_choice("azorius_functionary", "Azorius Functionary", "Azorius Functionary. Law, order, and bureaucracy.", "int,wis,cha", "alert", azorius_skills, "Calligrapher's Supplies");
+	add_background_choice("boros_legionnaire", "Boros Legionnaire", "Boros Legionnaire. Military discipline and righteous fury.", "str,dex,con", "savage_attacker", boros_skills, "Gaming Set");
+	add_background_choice("dimir_operative", "Dimir Operative", "Dimir Operative. Espionage, secrets, and shadow work.", "dex,int,cha", "alert", dimir_skills, "Disguise Kit");
+	add_background_choice("golgari_agent", "Golgari Agent", "Golgari Agent. Death, decay, and the cycle of life.", "str,con,wis", "tough", golgari_skills, "Herbalism Kit");
+	add_background_choice("gruul_anarch", "Gruul Anarch", "Gruul Anarch. Primal fury and untamed wilderness.", "str,dex,con", "tavern_brawler", gruul_skills, "Herbalism Kit");
+	add_background_choice("izzet_engineer", "Izzet Engineer", "Izzet Engineer. Invention, experimentation, and explosions.", "dex,int,cha", "crafter", izzet_skills, "Artisan's Tools");
+	add_background_choice("orzhov_representative", "Orzhov Representative", "Orzhov Representative. Wealth, debt, and spiritual commerce.", "con,int,cha", "skilled", orzhov_skills, "Gaming Set");
+	add_background_choice("rakdos_cultist", "Rakdos Cultist", "Rakdos Cultist. Chaos, performance, and sadistic entertainment.", "str,dex,cha", "musician", rakdos_skills, "Musical Instrument");
+	add_background_choice("selesnya_initiate", "Selesnya Initiate", "Selesnya Initiate. Harmony, community, and natural growth.", "str,wis,cha", "healer", selesnya_skills, "Herbalism Kit");
+	add_background_choice("simic_scientist", "Simic Scientist", "Simic Scientist. Biological adaptation and evolution.", "con,int,wis", "skilled", simic_skills, "Herbalism Kit");
+
+	// === Other Setting Backgrounds ===
+	string[] haunted_skills = {"Arcana", "Investigation"};
+	string[] investigator_skills = {"Insight", "Investigation"};
+	string[] grinner_skills = {"Deception", "Performance"};
+	string[] volstrucker_skills = {"Deception", "Stealth"};
+	string[] house_agent_skills = {"Investigation", "Persuasion"};
+	string[] athlete_bg_skills = {"Acrobatics", "Athletics"};
+	string[] rewarded_skills = {"Insight", "Persuasion"};
+	string[] ruined_skills = {"Stealth", "Survival"};
+	add_background_choice("haunted_one", "Haunted One", "Haunted One. Touched by darkness and horror. (Ravenloft)", "con,wis,cha", "tough", haunted_skills, "Herbalism Kit");
+	add_background_choice("investigator", "Investigator", "Investigator. Uncover truth and solve mysteries. (Ravenloft)", "dex,int,wis", "alert", investigator_skills, "Disguise Kit");
+	add_background_choice("grinner", "Grinner", "Grinner. Covert agent of mirth and rebellion. (Wildemount)", "dex,cha,int", "skilled", grinner_skills, "Disguise Kit");
+	add_background_choice("volstrucker_agent", "Volstrucker Agent", "Volstrucker Agent. Trained spy and assassin. (Wildemount)", "dex,int,cha", "alert", volstrucker_skills, "Poisoner's Kit");
+	add_background_choice("house_agent", "House Agent", "House Agent. Serve a Dragonmarked House. (Eberron)", "int,wis,cha", "skilled", house_agent_skills, "Artisan's Tools");
+	add_background_choice("athlete_bg", "Athlete", "Athlete. Trained competitor and champion. (Theros)", "str,dex,con", "athlete", athlete_bg_skills, "Gaming Set");
+	add_background_choice("rewarded", "Rewarded", "Rewarded. Blessed by the Deck of Many Things. (Book of Many Things)", "dex,int,cha", "lucky", rewarded_skills, "Gaming Set");
+	add_background_choice("ruined", "Ruined", "Ruined. Cursed by the Deck of Many Things. (Book of Many Things)", "str,con,wis", "tough", ruined_skills, "Thieves' Tools");
 }
 
 feat_choice_def@ get_feat_choice(string id) {
