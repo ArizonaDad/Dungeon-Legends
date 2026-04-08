@@ -89,6 +89,7 @@ class combatant {
 	int inspiring_leader_temp_hp_pool = 0; // Pool of temp HP grants from Inspiring Leader rest performance
 	int blindsight_range = 0;   // PHB Blind Fighting feat (10 ft) and various species/subclass effects
 	bool unarmed_fighting_active = false; // PHB Unarmed Fighting feat: 1d6+STR unarmed damage
+	bool beacon_of_hope_active = false; // Beacon of Hope spell: max healing + adv on WIS/death saves
 	int lay_on_hands_pool = 0;
 	int bardic_inspiration_uses = 0;
 	int bardic_inspiration_grant_die = 0;

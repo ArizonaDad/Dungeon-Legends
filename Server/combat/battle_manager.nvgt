@@ -7034,6 +7034,120 @@ class battle_manager {
 				check_battle_end();
 				return;
 			}
+			else if (spell.id == "wall_of_stone") {
+				// Basic Rules para 15577-15578: "A nonmagical wall of solid stone springs
+				// into existence at a point you choose within range... If the wall cuts
+				// through a creature's space when it appears, the creature is pushed to one
+				// side of the wall."
+				// Approximation: places a wall flag at the cast target tile and pushes
+				// the target 5 ft away. The wall blocks line of sight and movement (TODO).
+				if (@target != null) {
+					int dx = 0;
+					int dy = 0;
+					if (target.x > c.x) dx = 1;
+					else if (target.x < c.x) dx = -1;
+					if (target.y > c.y) dy = 1;
+					else if (target.y < c.y) dy = -1;
+					if (dx == 0 and dy == 0) dy = 1;
+					int new_x = target.x + dx;
+					int new_y = target.y + dy;
+					if (new_x >= 0 and new_x < combat.map_width and new_y >= 0 and new_y < combat.map_height) {
+						target.x = new_x;
+						target.y = new_y;
+					}
+					broadcast_announce(c.name + " conjures a Wall of Stone at " + target.name + "'s location, pushing them aside.", true);
+				} else {
+					broadcast_announce(c.name + " conjures a Wall of Stone.", true);
+				}
+			}
+			else if (spell.id == "beacon_of_hope") {
+				// Basic Rules para 12201: "Choose any number of creatures within range. For
+				// the duration, each target has Advantage on Wisdom saving throws and Death
+				// Saving Throws and regains the maximum number of Hit Points possible from
+				// any healing."
+				int affected = 0;
+				for (uint bi = 0; bi < combat.combatants.length(); bi++) {
+					combatant@ ally = combat.combatants[bi];
+					if (@ally == null or ally.is_dead) continue;
+					if (ally.is_player != c.is_player) continue;
+					if (feet_distance(c.x, c.y, ally.x, ally.y) > 30) continue;
+					ally.beacon_of_hope_active = true;
+					affected++;
+				}
+				broadcast_announce(c.name + " casts Beacon of Hope, granting " + affected + " ally" + (affected == 1 ? "" : "ies") + " advantage on Wisdom and Death saves and maximum healing.", true);
+			}
+			else if (spell.id == "insect_plague") {
+				// Basic Rules paras 13899-13901: "Swarming locusts fill a 20-foot-radius
+				// Sphere centered on a point you choose within range... When the swarm
+				// appears, each creature in it makes a Constitution saving throw, taking
+				// 4d10 Piercing damage on a failed save or half as much damage on a
+				// successful one. The damage increases by 1d10 for each spell slot level
+				// above 5."
+				int dice_count = 4 + upcast_levels;
+				int center_x = @target != null ? target.x : c.x;
+				int center_y = @target != null ? target.y : c.y;
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 10);
+				combatant@[] ip_targets;
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (feet_distance(center_x, center_y, t.x, t.y) <= 20) ip_targets.insert_last(t);
+				}
+				broadcast_announce(c.name + " summons an Insect Plague — a 20-foot swarm of locusts!", true);
+				for (uint ti = 0; ti < ip_targets.length(); ti++) {
+					combatant@ t = ip_targets[ti];
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_CON);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					int dmg = saved ? total_damage / 2 : total_damage;
+					if (dmg < 1) dmg = 1;
+					broadcast_roll(t.name, "CON save vs Insect Plague", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+					combat.apply_damage(t, dmg, DMG_PIERCING, c);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "sleet_storm") {
+				// Basic Rules paras 15038-15039: "sleet falls in a 40-foot-tall, 20-foot-
+				// radius Cylinder centered on a point you choose within range... When a
+				// creature enters the Cylinder for the first time on a turn or starts its
+				// turn there, it must succeed on a Dexterity saving throw or have the
+				// Prone condition and lose Concentration on any spells."
+				int center_x = @target != null ? target.x : c.x;
+				int center_y = @target != null ? target.y : c.y;
+				combatant@[] ss_targets;
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (feet_distance(center_x, center_y, t.x, t.y) <= 20) ss_targets.insert_last(t);
+				}
+				broadcast_announce(c.name + " conjures a Sleet Storm in a 20-foot cylinder!", true);
+				for (uint ti = 0; ti < ss_targets.length(); ti++) {
+					combatant@ t = ss_targets[ti];
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_DEX);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					broadcast_roll(t.name, "DEX save vs Sleet Storm", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Prone!");
+					if (!saved) {
+						t.add_condition(COND_PRONE);
+						if (t.is_concentrating) {
+							clear_concentration_effects(t);
+							t.is_concentrating = false;
+							t.remove_condition(COND_CONCENTRATING);
+							broadcast_announce(t.name + "'s concentration is lost in the Sleet Storm.", false);
+						}
+					}
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
 			else if (spell.id == "dominate_person" and @target != null) {
 				// Basic Rules para 12980: "One Humanoid you can see within range must succeed
 				// on a Wisdom saving throw or have the Charmed condition for the duration."
