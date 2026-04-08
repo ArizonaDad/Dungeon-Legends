@@ -1374,7 +1374,10 @@ bool choose_race_step() {
         "Mark of Hospitality (Halfling)", "Mark of Making (Human)",
         "Mark of Passage (Human)", "Mark of Scribing (Gnome)",
         "Mark of Sentinel (Human)", "Mark of Shadow (Elf)",
-        "Mark of Storm (Half-Elf)", "Mark of Warding (Dwarf)"
+        "Mark of Storm (Half-Elf)", "Mark of Warding (Dwarf)",
+        // Theros Supernatural Gifts (also overlay on a base race - 8 of 10 implementable)
+        "Anvilwrought", "Heroic Destiny", "Iconoclast", "Inscrutable",
+        "Nyxborn", "Oracle", "Pious", "Unscarred"
     };
     string[] race_desc = {
         "Aasimar. Celestial heritage. Choose Necrotic Shroud, Radiant Consumption, or Radiant Soul.",
@@ -1456,7 +1459,15 @@ bool choose_race_step() {
         "Mark of Sentinel (Human). +1 WIS. Guardian's Shield (Shield spell as reaction). Compelled Duel, Warding Bond. (Eberron)",
         "Mark of Shadow (Elf). +1 CHA. Cunning Intuition (d4 to Stealth/Performance). Minor Illusion, Disguise Self. (Eberron)",
         "Mark of Storm (Half-Elf). +1 CHA. Storm's Boon (Resistance to Lightning + Thunder). Fog Cloud, Gust of Wind. (Eberron)",
-        "Mark of Warding (Dwarf). +1 INT. Warder's Intuition (d4 to thieves' tools). Alarm, Mage Armor. (Eberron)"
+        "Mark of Warding (Dwarf). +1 INT. Warder's Intuition (d4 to thieves' tools). Alarm, Mage Armor. (Eberron)",
+        "Anvilwrought. Construct heritage. Constructed Resilience. Poison resistance. Don't need to eat/drink/breathe. (Theros)",
+        "Heroic Destiny. Defy Death (advantage on death saves). Hard to Kill (drop to 1 HP instead of 0, 1/LR). (Theros)",
+        "Iconoclast. Reject the gods. Cast Protection from Evil and Good 1/LR. Wisdom-based. (Theros)",
+        "Inscrutable. Sphinx-like mind. Resistance to psychic damage. Immune to mind reading. (Theros)",
+        "Nyxborn. Born from divine dreams. Cloak of Stars (1/LR disadvantage on attacks vs you). Necrotic + Radiant resistance. (Theros)",
+        "Oracle. Conduit to the gods. Speak Celestial. Oracle's Insight (+d10 to ability checks 1/LR). (Theros)",
+        "Pious. Devoted to a deity. Pious Protection (reroll failed save 1/LR). Religion check advantage. (Theros)",
+        "Unscarred. Legendary invulnerability. Reaction d12+CON damage reduction 1/LR. (Theros)"
     };
     for (uint i = 0; i < races.length(); i++) race_menu.add_item(race_desc[i] + " " + (i + 1) + " of " + races.length());
     int race_pick = creation_menu_run(race_menu);

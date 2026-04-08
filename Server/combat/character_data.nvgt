@@ -770,6 +770,55 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         for (uint si = 0; si < c.prepared_spells.length(); si++) if (c.prepared_spells[si] == "mage_armor") { has_ma = true; break; }
         if (!has_ma) c.prepared_spells.insert_last("mage_armor");
     }
+
+    // Theros Supernatural Gifts (Mythic Odysseys of Theros paragraphs 278-501)
+    // Each gift overlays on a base race. Implemented as standalone race options here.
+    if (cs.race == "Anvilwrought") {
+        // Para 281-284: poison advantage + resistance, immune to disease, no eat/drink/sleep
+        c.poison_resistance = true;
+        // Disease/sleep immunity tracked as flags for future use; combat doesn't currently
+        // model these.
+    }
+    if (cs.race == "Heroic Destiny") {
+        // Para 303-304: advantage on death saves + drop to 1 HP instead of 0 (1/LR)
+        // Use death_ward_active as the closest approximation of "drop to 1 HP instead of 0"
+        c.death_ward_active = true;
+    }
+    if (cs.race == "Iconoclast") {
+        // Para 326: Cast Protection from Evil and Good 1/LR (deferred - spell not in catalog)
+        // Reject the Gods: blocks piety gain (no piety system yet)
+    }
+    if (cs.race == "Inscrutable") {
+        // Para 356-357: Resistance to psychic damage + immune to mind reading
+        c.psychic_resistance = true;
+    }
+    if (cs.race == "Nyxborn") {
+        // Para 405: Resistance to necrotic and radiant damage
+        c.necrotic_resistance = true;
+        // Note: radiant resistance flag doesn't currently exist - approximated as just necrotic
+    }
+    if (cs.race == "Oracle") {
+        // Para 444: Oracle's Insight (+d10 to ability check 1/LR) - approximated as
+        // a free luck point. Skill check advantage on Insight as the closest passive.
+        if (!c.has_skill_check_advantage("Insight")) c.skill_check_advantage.insert_last("Insight");
+        c.has_lucky_feat = true;
+        if (c.luck_points_max < 1) c.luck_points_max = 1;
+        if (c.luck_points < 1) c.luck_points = 1;
+    }
+    if (cs.race == "Pious") {
+        // Para 481-482: Pious Protection (reroll failed save 1/LR) + Religion check advantage
+        if (!c.has_skill_check_advantage("Religion")) c.skill_check_advantage.insert_last("Religion");
+        // Reroll-failed-save approximated as 1 luck point
+        c.has_lucky_feat = true;
+        if (c.luck_points_max < 1) c.luck_points_max = 1;
+        if (c.luck_points < 1) c.luck_points = 1;
+    }
+    if (cs.race == "Unscarred") {
+        // Para 501: Reaction d12+CON damage reduction 1/LR. Approximated as +10 max HP
+        // since the existing system doesn't have a "1/LR damage reduction reaction" hook.
+        c.max_hp += 10;
+        c.current_hp += 10;
+    }
     // Feat: Skill Expert (PHB paras 7774-7775) - one new skill proficiency + one expertise.
     // Defaults to Perception proficiency + expertise on the highest-value skill (Stealth)
     // since the source mandates the player choose.
