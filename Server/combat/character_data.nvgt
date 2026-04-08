@@ -954,6 +954,16 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
     if (cs.class_name == "Fighter") {
         if (cs.subclass == "Couatl Herald" and cs.level >= 3) {
             c.couatl_herald_mantle = true;
+            // Mercy Dice: 3d6 at L3, 4d6 at L7, 4d8 at L10, 5d8 at L15, 5d10 at L18
+            int md_count = 3;
+            int md_size = 6;
+            if (cs.level >= 7) md_count = 4;
+            if (cs.level >= 10) { md_count = 4; md_size = 8; }
+            if (cs.level >= 15) { md_count = 5; md_size = 8; }
+            if (cs.level >= 18) { md_count = 5; md_size = 10; }
+            c.mercy_dice_max = md_count;
+            c.mercy_dice_current = md_count;
+            c.mercy_die_size = md_size;
         }
         if (cs.subclass == "Steel Hawk" and cs.level >= 3) {
             c.steel_hawk_flight = true;
@@ -1007,6 +1017,11 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         if (cs.subclass == "Path of the Glacier" and cs.level >= 3) {
             c.path_of_glacier_active = true;
             c.cold_resistance = true;
+            // Rage Extension uses = CON mod/LR
+            int con_mod_pg = (cs.constitution - 10) / 2;
+            c.glacier_rage_extensions = con_mod_pg > 0 ? con_mod_pg : 1;
+            // Frosted Flesh: +1 AC while not wearing armor
+            if (cs.armor_type == "none") c.armor_class += 1;
         }
         if (cs.subclass == "Path of the Infernal" and cs.level >= 3) {
             c.path_of_infernal_active = true;
@@ -1023,6 +1038,10 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         }
         if (cs.subclass == "College of Choreography" and cs.level >= 3) {
             c.college_choreography_active = true;
+            // Fast Movement: +10 ft L3, +15 ft L6, +20 ft L14
+            c.speed += 10;
+            if (cs.level >= 6) c.speed += 5;
+            if (cs.level >= 14) c.speed += 5;
         }
         if (cs.subclass == "College of Mercantile" and cs.level >= 3) {
             c.college_mercantile_active = true;

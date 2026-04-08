@@ -1481,6 +1481,13 @@ void handle_user_message(user@ u, json_object@ msg)
 				u.room.bm.broadcast_announce(c.name + "'s Feral Celerity grants a free weapon attack on rage entry! Your next attack this turn doesn't use your action.", false);
 				c.attacks_remaining_this_turn++; // Grant one extra free attack
 			}
+			// Path of the Glacier L6: Cold Fortress — gain 1d12 + CON mod temp HP on rage entry (unarmored)
+			if (c.subclass == "Path of the Glacier" and c.level >= 6 and c.armor_type == "none") {
+				int cold_temp = random(1, 12) + c.get_ability_mod(ABILITY_CON);
+				if (cold_temp < 1) cold_temp = 1;
+				if (c.temp_hp < cold_temp) c.temp_hp = cold_temp;
+				u.room.bm.broadcast_announce(c.name + "'s Cold Fortress grants " + cold_temp + " temp HP!", false);
+			}
 			u.room.bm.broadcast_announce(c.name + " enters a Rage! Bonus damage and resistance to bludgeoning, piercing, and slashing. " + c.rage_uses_remaining + " use" + (c.rage_uses_remaining == 1 ? "" : "s") + " remain.", true);
 		}
 		else if (feature == "action_surge") {
@@ -2598,6 +2605,63 @@ void handle_user_message(user@ u, json_object@ msg)
 				else evt.speed = 0;
 				u.room.bm.combat.apply_damage(evt, ev_dmg, DMG_FORCE, c);
 				u.room.bm.broadcast_announce(evt.name + (save >= ev_dc ? " resists" : " is crushed by") + " the Event Horizon: " + ev_dmg + " force damage.", true);
+			}
+		}
+		else if (feature == "magic_coin") {
+			// College of Mercantile L3: Action — ranged spell attack (CHA + prof) vs AC, 1d12 thunder (scales)
+			if (c.class_name != "Bard" or c.subclass != "College of Mercantile") { u.send({{"type", message_types::announce}, {"text", "Only Mercantile bards can fling Magic Coins."}, {"interrupt", true}}); return; }
+			if (!c.has_action) { u.send({{"type", message_types::announce}, {"text", "You've already used your action this turn."}, {"interrupt", true}}); return; }
+			if (target_id == 0) { u.send({{"type", message_types::announce}, {"text", "No target selected."}, {"interrupt", true}}); return; }
+			combatant@ tgt = u.room.bm.combat.get_combatant(target_id);
+			if (@tgt == null or tgt.is_dead) { u.send({{"type", message_types::announce}, {"text", "Invalid target."}, {"interrupt", true}}); return; }
+			if (feet_distance(c.x, c.y, tgt.x, tgt.y) > 60) { u.send({{"type", message_types::announce}, {"text", "Target out of range (60ft)."}, {"interrupt", true}}); return; }
+			c.has_action = false;
+			c.used_action = true;
+			int mc_atk = random(1, 20) + c.get_ability_mod(ABILITY_CHA) + c.proficiency;
+			int thunder_dice = 1;
+			if (c.level >= 6) thunder_dice = 2;
+			if (c.level >= 14) thunder_dice = 3;
+			if (mc_atk >= tgt.armor_class or mc_atk >= 20) {
+				int mc_dmg = 1; // 1 bludgeoning
+				for (int td = 0; td < thunder_dice; td++) mc_dmg += random(1, 12);
+				u.room.bm.combat.apply_damage(tgt, mc_dmg, DMG_THUNDER, c);
+				u.room.bm.broadcast_announce(c.name + "'s Magic Coin strikes " + tgt.name + " for " + mc_dmg + " thunder damage!", true);
+			} else {
+				u.room.bm.broadcast_announce(c.name + "'s Magic Coin misses " + tgt.name + ".", false);
+			}
+		}
+		else if (feature == "create_void") {
+			// Astral Domain L3: Bonus Action Channel Divinity — 15ft sphere within 60ft, Dex save or
+			// 1d8 + cleric level force damage, pulled 15ft; half on success
+			if (c.class_name != "Cleric" or c.subclass != "Astral Domain") { u.send({{"type", message_types::announce}, {"text", "Only Astral Clerics can Create Void."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			if (c.channel_divinity_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Channel Divinity remaining."}, {"interrupt", true}}); return; }
+			if (target_id == 0) { u.send({{"type", message_types::announce}, {"text", "No target selected (center of void)."}, {"interrupt", true}}); return; }
+			combatant@ center = u.room.bm.combat.get_combatant(target_id);
+			if (@center == null) { u.send({{"type", message_types::announce}, {"text", "Invalid center target."}, {"interrupt", true}}); return; }
+			if (feet_distance(c.x, c.y, center.x, center.y) > 60) { u.send({{"type", message_types::announce}, {"text", "Out of range (60ft)."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.channel_divinity_uses--;
+			int cv_dc = 8 + c.proficiency + c.get_ability_mod(ABILITY_WIS);
+			u.room.bm.broadcast_announce(c.name + " tears open a planar void centered on " + center.name + "!", true);
+			for (uint cvi = 0; cvi < u.room.bm.combat.combatants.length(); cvi++) {
+				combatant@ cvt = u.room.bm.combat.combatants[cvi];
+				if (@cvt == null or cvt.is_dead) continue;
+				if (feet_distance(center.x, center.y, cvt.x, cvt.y) > 15) continue;
+				int save = random(1, 20) + cvt.get_save_bonus(ABILITY_DEX);
+				int cv_dmg = random(1, 8) + c.level;
+				bool saved = save >= cv_dc;
+				if (saved) cv_dmg /= 2;
+				u.room.bm.combat.apply_damage(cvt, cv_dmg, DMG_FORCE, c);
+				// Pull toward center 15ft (simple direction)
+				if (!saved) {
+					if (cvt.x < center.x) cvt.x += 15;
+					else if (cvt.x > center.x) cvt.x -= 15;
+					if (cvt.y < center.y) cvt.y += 15;
+					else if (cvt.y > center.y) cvt.y -= 15;
+				}
+				u.room.bm.broadcast_announce(cvt.name + " takes " + cv_dmg + " force damage from the void (save " + save + " vs DC " + cv_dc + ").", false);
 			}
 		}
 		else if (feature == "mark_of_heretic") {

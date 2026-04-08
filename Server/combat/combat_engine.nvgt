@@ -288,6 +288,14 @@ class combatant {
 	bool forged_circle_active = false; // Circle of the Forged Druid
 	int elemental_cascade_type = 0; // 0=normal 1=acid 2=cold 3=fire 4=lightning
 	bool adamantine_hide_used = false; // L10 reaction
+	// Couatl Herald Mercy Dice
+	int mercy_dice_current = 0;
+	int mercy_dice_max = 0;
+	int mercy_die_size = 6;
+	// Path of the Glacier
+	int glacier_rage_extensions = 0; // Rage Extension uses = CON mod/LR
+	// College of Choreography
+	bool choreography_dance_ready = false;
 	bool circle_unbroken_active = false; // Circle of the Unbroken
 	bool circle_dragons_form = false; // Circle of Dragons Druid
 	bool path_of_glacier_active = false; // Barbarian Path of the Glacier

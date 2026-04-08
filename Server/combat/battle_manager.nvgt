@@ -3561,14 +3561,21 @@ class battle_manager {
 		// Desert Soul: no flat weapon damage bonus in source; Sandstorm is a spell-cast rider
 		// (removed incorrect flat bonuses)
 
-		// Couatl Herald Fighter: Merciless Strike adds Mercy Die radiant damage (d6 L3, d8 L10, d10 L18) once per turn
-		if (attacker.class_name == "Fighter" and attacker.subclass == "Couatl Herald" and attacker.couatl_herald_mantle and attacker.is_first_hit_this_turn and is_weapon_attack) {
-			int mercy_die = 6;
-			if (attacker.level >= 10) mercy_die = 8;
-			if (attacker.level >= 18) mercy_die = 10;
-			int mercy_dmg = random(1, mercy_die);
-			bonus += mercy_dmg;
-			broadcast_announce(attacker.name + "'s Merciless Strike adds " + mercy_dmg + " radiant damage!", false);
+		// Couatl Herald Fighter: Merciless Strike — once per turn, expend a Mercy Die for radiant damage.
+		// L18 Heraldic Enforcer: once per turn without expending, AND can use again with expending.
+		if (attacker.class_name == "Fighter" and attacker.subclass == "Couatl Herald" and attacker.is_first_hit_this_turn and is_weapon_attack) {
+			bool free_use = attacker.level >= 18;
+			bool has_dice = attacker.mercy_dice_current > 0;
+			if (free_use or has_dice) {
+				int mercy_dmg = random(1, attacker.mercy_die_size);
+				bonus += mercy_dmg;
+				if (!free_use) {
+					attacker.mercy_dice_current--;
+					broadcast_announce(attacker.name + "'s Merciless Strike adds " + mercy_dmg + " radiant damage! (Mercy Dice: " + attacker.mercy_dice_current + "/" + attacker.mercy_dice_max + ")", false);
+				} else {
+					broadcast_announce(attacker.name + "'s Heraldic Enforcer Merciless Strike adds " + mercy_dmg + " radiant damage!", false);
+				}
+			}
 		}
 
 		// Warrior of the Celestial Monk: Soul Strike (L17) adds flat 1d4 radiant; earlier levels use Celestial Emissary (L11+) with Martial Arts die
@@ -3696,8 +3703,9 @@ class battle_manager {
 			}
 		}
 
-		// Path of the Glacier Barbarian: Frostbite adds 1d6/2d6/3d6 cold + 10ft speed reduction once per turn while raging
-		if (attacker.class_name == "Barbarian" and attacker.subclass == "Path of the Glacier" and attacker.raging and attacker.is_first_hit_this_turn and is_weapon_attack) {
+		// Path of the Glacier Barbarian L3 Frostbite: once per turn while raging, Strength-based attack
+		// adds 1d6 cold (2d6 at L9, 3d6 at L16) and reduces target speed by 10ft until start of next turn.
+		if (attacker.class_name == "Barbarian" and attacker.subclass == "Path of the Glacier" and attacker.raging and attacker.is_first_hit_this_turn and is_weapon_attack and !attacker.main_hand_is_ranged) {
 			int glacier_dice = 1;
 			if (attacker.level >= 9) glacier_dice = 2;
 			if (attacker.level >= 16) glacier_dice = 3;
@@ -3705,7 +3713,7 @@ class battle_manager {
 			for (int gd = 0; gd < glacier_dice; gd++) glacier_dmg += random(1, 6);
 			bonus += glacier_dmg;
 			target.speed = target.speed > 10 ? target.speed - 10 : 0;
-			broadcast_announce(attacker.name + "'s Frostbite adds " + glacier_dmg + " cold damage and slows " + target.name + "!", false);
+			broadcast_announce(attacker.name + "'s Frostbite deals " + glacier_dmg + " cold and slows " + target.name + " by 10ft!", false);
 		}
 
 		// Path of the Infernal Barbarian: Hellfire Claw scaling 1d6/1d8/1d10/1d12 once per turn while raging

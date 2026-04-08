@@ -704,6 +704,8 @@ void show_bonus_action_menu() {
 	int event_horizon_opt = -1;
 	int momentary_stasis_opt = -1;
 	int mark_of_heretic_opt = -1;
+	int magic_coin_opt = -1;
+	int create_void_opt = -1;
 	int rebuke_violent_opt = -1;
 	int eldritch_cannon_opt = -1;
 	int cannon_fire_opt = -1;
@@ -946,6 +948,12 @@ void show_bonus_action_menu() {
 	}
 	if (lc == "paladin" and subclass == "Oath of Zeal" and level >= 3) {
 		mark_of_heretic_opt = m.add_item("Mark of the Heretic. Channel Divinity. Mark target for crit 19+ range.");
+	}
+	if (lc == "bard" and subclass == "College of Mercantile" and level >= 3) {
+		magic_coin_opt = m.add_item("Magic Coin. Action. Fling a coin at target for 1d12 thunder damage (scales).");
+	}
+	if (lc == "cleric" and subclass == "Astral Domain" and level >= 3) {
+		create_void_opt = m.add_item("Create Void. Channel Divinity bonus action. 15ft sphere within 60ft, Dex save.");
 	}
 	if (lc == "monk" and subclass == "Warrior of the Open Hand") {
 		open_hand_opt = m.add_item("Open Hand Technique. Use on Flurry hit to push, knock prone, or prevent reactions.");
@@ -1349,6 +1357,16 @@ void show_bonus_action_menu() {
 		if (current_target_id == 0) { speak("No target selected.", true); return; }
 		send({{"type", message_types::bonus_action}, {"feature", "mark_of_heretic"}, {"target_id", current_target_id}});
 		speak("Mark of the Heretic placed.", true);
+	}
+	else if (magic_coin_opt >= 0 and res == magic_coin_opt) {
+		if (current_target_id == 0) { speak("No target selected.", true); return; }
+		send({{"type", message_types::bonus_action}, {"feature", "magic_coin"}, {"target_id", current_target_id}});
+		speak("Magic coin flung.", true);
+	}
+	else if (create_void_opt >= 0 and res == create_void_opt) {
+		if (current_target_id == 0) { speak("No target selected (center of void).", true); return; }
+		send({{"type", message_types::bonus_action}, {"feature", "create_void"}, {"target_id", current_target_id}});
+		speak("Void created.", true);
 	}
 	else if (rebuke_violent_opt >= 0 and res == rebuke_violent_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "rebuke_violent"}});
