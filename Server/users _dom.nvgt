@@ -1512,6 +1512,20 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.room.bm.record_effective_healing(c.player_username, effective_heal);
 			u.room.bm.broadcast_roll(c.name, "Second Wind healing", heal, c.level, heal, "");
 			u.room.bm.broadcast_announce(c.name + " uses Second Wind! Healed " + effective_heal + " HP. Now at " + c.current_hp + ".", false);
+			// Sword Coast: Purple Dragon Knight Rallying Cry — heal up to 3 allies within 60ft
+			if (c.purple_dragon_knight_active) {
+				int allies_healed = 0;
+				for (uint rci = 0; rci < u.room.bm.combat.combatants.length() and allies_healed < 3; rci++) {
+					combatant@ ally = u.room.bm.combat.combatants[rci];
+					if (@ally == null or ally.is_dead or ally.id == c.id) continue;
+					if (ally.is_player != c.is_player) continue;
+					if (feet_distance(c.x, c.y, ally.x, ally.y) > 60) continue;
+					int ally_heal = c.level;
+					u.room.bm.combat.apply_healing(ally, ally_heal);
+					u.room.bm.broadcast_announce(c.name + "'s Rallying Cry heals " + ally.name + " for " + ally_heal + " HP!", false);
+					allies_healed++;
+				}
+			}
 		}
 		else if (feature == "divine_smite") {
 			if (c.class_name != "Paladin") { u.send({{"type", message_types::announce}, {"text", "Only paladins can prepare Divine Smite."}, {"interrupt", true}}); return; }

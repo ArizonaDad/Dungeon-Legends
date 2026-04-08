@@ -952,6 +952,10 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         }
     }
     if (cs.class_name == "Fighter") {
+        // Sword Coast: Purple Dragon Knight / Banneret
+        if (cs.subclass == "Purple Dragon Knight" and cs.level >= 3) {
+            c.purple_dragon_knight_active = true;
+        }
         if (cs.subclass == "Couatl Herald" and cs.level >= 3) {
             c.couatl_herald_mantle = true;
             // Mercy Dice: 3d6 at L3, 4d6 at L7, 4d8 at L10, 5d8 at L15, 5d10 at L18
@@ -976,6 +980,10 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
     if (cs.class_name == "Cleric") {
         if (cs.subclass == "Festus Domain" and cs.level >= 1) {
             c.festus_blessing_active = false;
+        }
+        // Sword Coast: Arcana Domain (learns 2 wizard cantrips + Arcana proficiency)
+        if (cs.subclass == "Arcana Domain" and cs.level >= 1) {
+            c.arcana_domain_active = true;
         }
         // Exploring Eberron: Mind Domain
         if (cs.subclass == "Mind Domain" and cs.level >= 3) {
@@ -1013,6 +1021,10 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
     if (cs.class_name == "Barbarian") {
         if (cs.subclass == "Path of the Carrion Raven" and cs.level >= 3) {
             c.carrion_raven_focus = true;
+        }
+        // Sword Coast: Path of the Battlerager (Dwarves only in lore)
+        if (cs.subclass == "Path of the Battlerager" and cs.level >= 3) {
+            c.battlerager_active = true;
         }
         if (cs.subclass == "Path of the Glacier" and cs.level >= 3) {
             c.path_of_glacier_active = true;
@@ -1063,6 +1075,10 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         }
     }
     if (cs.class_name == "Monk") {
+        // Sword Coast: Way of the Long Death
+        if (cs.subclass == "Way of the Long Death" and cs.level >= 3) {
+            c.long_death_active = true;
+        }
         if (cs.subclass == "Warrior of the Celestial" and cs.level >= 3) {
             c.warrior_celestial_radiant = true;
         }
@@ -1082,6 +1098,10 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         }
         if (cs.subclass == "Oath of Zeal" and cs.level >= 3) {
             c.oath_of_zeal_active = true;
+        }
+        // Sword Coast: Oath of the Crown
+        if (cs.subclass == "Oath of the Crown" and cs.level >= 3) {
+            c.oath_of_crown_active = true;
         }
     }
     if (cs.class_name == "Ranger") {
@@ -1106,6 +1126,10 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         }
     }
     if (cs.class_name == "Warlock") {
+        // Sword Coast: The Undying
+        if (cs.subclass == "The Undying" and cs.level >= 1) {
+            c.undying_active = true;
+        }
         if (cs.subclass == "Pact of the Astral Griffon" and cs.level >= 1) {
             c.astral_griffon_bond = true;
             // Source: Magic Missile free casts + pocket dimension; no flying speed

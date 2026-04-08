@@ -1173,6 +1173,18 @@ class battle_manager {
 				broadcast_announce(attacker.name + " gains " + temp_hp + " temporary hit points from Fiend Patron.", false);
 			}
 		}
+
+		// Sword Coast: Way of the Long Death L3 Touch of Death — temp HP = WIS mod + monk level when reducing creature to 0 HP within 5ft
+		if (attacker.class_name == "Monk" and attacker.subclass == "Way of the Long Death" and attacker.level >= 3) {
+			if (feet_distance(attacker.x, attacker.y, target.x, target.y) <= 5) {
+				int td_temp = attacker.get_ability_mod(ABILITY_WIS) + attacker.level;
+				if (td_temp < 1) td_temp = 1;
+				if (td_temp > attacker.temp_hp) {
+					attacker.temp_hp = td_temp;
+					broadcast_announce(attacker.name + "'s Touch of Death grants " + td_temp + " temp HP!", false);
+				}
+			}
+		}
 	}
 
 	void clear_readied_action(combatant@ c) {
@@ -3683,6 +3695,16 @@ class battle_manager {
 				broadcast_announce(attacker.name + "'s Guided Precision adds " + cart_dmg + " damage!", false);
 			}
 		}
+
+		// Sword Coast: Path of the Battlerager L3 — +3 piercing on successful grapple while raging in spiked armor
+		// Approximated as +3 piercing on first hit per turn while raging (since grapple isn't tracked separately)
+		if (attacker.class_name == "Barbarian" and attacker.subclass == "Path of the Battlerager" and attacker.raging and is_weapon_attack and !attacker.main_hand_is_ranged and attacker.is_first_hit_this_turn) {
+			bonus += 3;
+			broadcast_announce(attacker.name + "'s spiked armor adds 3 piercing damage!", false);
+		}
+
+		// Sword Coast: Way of the Long Death L3 Touch of Death — temp HP = WIS mod + monk level when reducing to 0 HP
+		// (Handled separately when kill occurs; see below or maybe_apply_on_kill_features)
 
 		// Graviturgy L10 Violent Attraction: any Graviturgy wizard within 60ft can add +1d10 weapon-type damage to a hit (reaction)
 		// Auto-trigger for AI clarity if uses available

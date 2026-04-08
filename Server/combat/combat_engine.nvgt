@@ -303,6 +303,13 @@ class combatant {
 	int drake_damage_type = 0; // 0=acid 1=cold 2=fire 3=lightning 4=poison
 	int drake_hp = 0;
 	int drake_max_hp = 0;
+	// Sword Coast Adventurer's Guide subclasses
+	bool battlerager_active = false; // Path of the Battlerager (Dwarves only)
+	bool purple_dragon_knight_active = false; // PDK Rallying Cry on Second Wind
+	bool long_death_active = false; // Way of the Long Death Touch of Death
+	bool arcana_domain_active = false; // Arcana Domain Arcane Initiate
+	bool oath_of_crown_active = false; // Oath of the Crown
+	bool undying_active = false; // The Undying Warlock (age/death resist)
 	bool circle_unbroken_active = false; // Circle of the Unbroken
 	bool circle_dragons_form = false; // Circle of Dragons Druid
 	bool path_of_glacier_active = false; // Barbarian Path of the Glacier

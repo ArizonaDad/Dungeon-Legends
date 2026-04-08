@@ -1048,6 +1048,7 @@ void get_subclass_options(string class_name, string[]@ names, string[]@ descript
         add_text_pair(names, descriptions, "Path of the Glacier", "Path of the Glacier. Freeze the battlefield with icy rage. (Griffon's Saddlebag)");
         add_text_pair(names, descriptions, "Path of the Infernal", "Path of the Infernal. Channel hellfire and fiendish power. (Griffon's Saddlebag)");
         add_text_pair(names, descriptions, "Path of the Carrion Raven", "Path of the Carrion Raven. Beast maneuvers and primal cunning. (Grim Hollow)");
+        add_text_pair(names, descriptions, "Path of the Battlerager", "Path of the Battlerager. Spiked armor melee rage. Dwarves only. (Sword Coast)");
     } else if (class_name == "Bard") {
         add_text_pair(names, descriptions, "College of Dance", "College of Dance. Turn movement and rhythm into magical performance.");
         add_text_pair(names, descriptions, "College of Glamour", "College of Glamour. Beguile and command with fey majesty.");
@@ -1076,6 +1077,7 @@ void get_subclass_options(string class_name, string[]@ names, string[]@ descript
         add_text_pair(names, descriptions, "Festus Domain", "Festus Domain. Celebration, feasting, and communal magic. (Griffon's Saddlebag)");
         add_text_pair(names, descriptions, "Inquisition Domain", "Inquisition Domain. Hunt heretics and counter magic. (Grim Hollow)");
         add_text_pair(names, descriptions, "Mind Domain", "Mind Domain. Psychic power through divine devotion. (Exploring Eberron)");
+        add_text_pair(names, descriptions, "Arcana Domain", "Arcana Domain. Knowledge of arcane secrets + wizard cantrips. (Sword Coast)");
     } else if (class_name == "Druid") {
         add_text_pair(names, descriptions, "Circle of the Land", "Circle of the Land. Draw deeper magic from a chosen environment.");
         add_text_pair(names, descriptions, "Circle of the Moon", "Circle of the Moon. Focus on stronger Wild Shape forms.");
@@ -1101,6 +1103,7 @@ void get_subclass_options(string class_name, string[]@ names, string[]@ descript
         add_text_pair(names, descriptions, "Couatl Herald", "Couatl Herald. Celestial warrior with divine mandate. (Griffon's Saddlebag)");
         add_text_pair(names, descriptions, "Steel Hawk", "Steel Hawk. Aerial combat specialist. (Griffon's Saddlebag)");
         add_text_pair(names, descriptions, "Blade Breaker", "Blade Breaker. Weapon stances and armor-crushing maneuvers. (Grim Hollow)");
+        add_text_pair(names, descriptions, "Purple Dragon Knight", "Purple Dragon Knight. Inspire allies through valor. Also called Banneret. (Sword Coast)");
     } else if (class_name == "Monk") {
         add_text_pair(names, descriptions, "Warrior of Mercy", "Warrior of Mercy. Heal allies and harm foes with mystical medicine.");
         add_text_pair(names, descriptions, "Warrior of Shadow", "Warrior of Shadow. Move unseen and strike from darkness.");
@@ -1113,6 +1116,7 @@ void get_subclass_options(string class_name, string[]@ names, string[]@ descript
         add_text_pair(names, descriptions, "Way of the Ascendant Dragon", "Way of the Ascendant Dragon. Channel draconic breath and flight. (Fizban's)");
         add_text_pair(names, descriptions, "Warrior of the Celestial", "Warrior of the Celestial. Channel divine light through martial arts. (Griffon's Saddlebag)");
         add_text_pair(names, descriptions, "Way of the Aether", "Way of the Aether. Manipulate ethereal energy. (Griffon's Saddlebag)");
+        add_text_pair(names, descriptions, "Way of the Long Death", "Way of the Long Death. Extract vitality from dying creatures. (Sword Coast)");
     } else if (class_name == "Paladin") {
         add_text_pair(names, descriptions, "Oath of Devotion", "Oath of Devotion. Embody honesty, courage, and justice.");
         add_text_pair(names, descriptions, "Oath of Glory", "Oath of Glory. Pursue heroic achievement and inspiring deeds.");
@@ -1123,6 +1127,7 @@ void get_subclass_options(string class_name, string[]@ names, string[]@ descript
         add_text_pair(names, descriptions, "Oath of the Watchers", "Oath of the Watchers. Guard against extraplanar threats. (Tasha's)");
         add_text_pair(names, descriptions, "Oath of the Hearth", "Oath of the Hearth. Protect home and community. (Griffon's Saddlebag)");
         add_text_pair(names, descriptions, "Oath of Zeal", "Oath of Zeal. Zealous inquisitor hunting enemies of the faith. (Grim Hollow)");
+        add_text_pair(names, descriptions, "Oath of the Crown", "Oath of the Crown. Sworn to civilization and justice. (Sword Coast)");
     } else if (class_name == "Ranger") {
         add_text_pair(names, descriptions, "Beast Master", "Beast Master. Fight alongside a trusted animal companion.");
         add_text_pair(names, descriptions, "Fey Wanderer", "Fey Wanderer. Blend martial skill with beguiling fey magic.");
@@ -1166,6 +1171,7 @@ void get_subclass_options(string class_name, string[]@ names, string[]@ descript
         add_text_pair(names, descriptions, "The Fathomless", "The Fathomless. Pact with a deep-sea entity. Tentacle attacks. (Tasha's)");
         add_text_pair(names, descriptions, "The Genie", "The Genie. Bound to a genie lord. Vessel refuge. Elemental damage. (Tasha's)");
         add_text_pair(names, descriptions, "The Undead", "The Undead. Pact with an undead power. Form of Dread. (Ravenloft)");
+        add_text_pair(names, descriptions, "The Undying", "The Undying. Pact with an immortal entity. Resist aging, death. (Sword Coast)");
         add_text_pair(names, descriptions, "Pact of the Astral Griffon", "Pact of the Astral Griffon. Bound to an astral griffon. (Griffon's Saddlebag)");
         add_text_pair(names, descriptions, "Pact of the Many", "Pact of the Many. Multiple lesser patrons. (Griffon's Saddlebag)");
     } else if (class_name == "Wizard") {
