@@ -7364,6 +7364,14 @@ class battle_manager {
 				check_battle_end();
 				return;
 			}
+			else if (spell.id == "forcecage" and @target != null) {
+				// Basic Rules paras 13410-13411: "An immobile, Invisible, Cube-shaped prison
+				// composed of magical force springs into existence around an area you choose
+				// within range. The prison can be a cage or a solid box, as you choose."
+				// Approximation: applies COND_RESTRAINED to the target.
+				target.add_condition(COND_RESTRAINED);
+				broadcast_announce(c.name + " conjures a Forcecage around " + target.name + "! They are imprisoned by walls of magical force.", true);
+			}
 			else if (spell.id == "raise_dead" and @target != null) {
 				// Basic Rules para 14695: "With a touch, you revive a dead creature if it
 				// has been dead no longer than 10 days... The creature returns to life
