@@ -3574,26 +3574,17 @@ class battle_manager {
 			}
 		}
 
-		// Oath of Zeal Paladin: zealous attacks add radiant damage on first hit per turn
-		if (attacker.class_name == "Paladin" and attacker.subclass == "Oath of Zeal" and attacker.is_first_hit_this_turn and is_weapon_attack) {
-			int zeal_dmg = attacker.proficiency;
-			bonus += zeal_dmg;
-			broadcast_announce(attacker.name + "'s Zealous Strike adds " + zeal_dmg + " radiant damage!", false);
-		}
+		// Oath of Zeal Paladin (Grim Hollow): NO flat radiant rider.
+		// Actual L3 is Mark of the Heretic Channel Divinity: crit 19+ vs marked target, reaction attack on marked turn start.
+		// Flat rider removed. The crit expansion is handled in the attack roll code.
 
-		// Path of the Carrion Raven Barbarian: focus mark adds bonus damage
-		if (attacker.class_name == "Barbarian" and attacker.subclass == "Path of the Carrion Raven" and attacker.carrion_raven_focus and is_weapon_attack) {
-			int raven_dmg = random(1, 6);
-			bonus += raven_dmg;
-			broadcast_announce(attacker.name + "'s Raven's Focus adds " + raven_dmg + " necrotic damage!", false);
-		}
+		// Path of the Carrion Raven (Grim Hollow): NO flat necrotic rider exists.
+		// Baseline L3 is Feral Celerity (free attack on rage entry), maneuver pool, Carrion Feast optional.
+		// Flat rider removed.
 
-		// Misfortune Bringer Rogue: jinxed target takes extra damage
-		if (attacker.class_name == "Rogue" and attacker.subclass == "Misfortune Bringer" and attacker.misfortune_jinx_active and attacker.misfortune_jinx_target == target.id and is_weapon_attack) {
-			int jinx_dmg = random(1, 6);
-			bonus += jinx_dmg;
-			broadcast_announce(attacker.name + "'s Jinx adds " + jinx_dmg + " misfortune damage!", false);
-		}
+		// Misfortune Bringer Rogue (Grim Hollow): NO flat misfortune damage exists.
+		// Actual L3 Evil Eye enables Sneak Attack without advantage; misfortune is a jinx point system.
+		// Flat rider removed. Sneak Attack already handles its own bonus.
 
 		// Runetagger Rogue: marked target takes bonus damage
 		if (attacker.class_name == "Rogue" and attacker.subclass == "Runetagger" and attacker.runetagger_marked and attacker.runetagger_target == target.id and is_weapon_attack) {
@@ -3609,15 +3600,17 @@ class battle_manager {
 			broadcast_announce(attacker.name + "'s Surgical Strike adds " + surgery_dmg + " damage!", false);
 		}
 
-		// Inquisition Domain Cleric: anti-magic strikes against spellcasters
-		if (attacker.class_name == "Cleric" and attacker.subclass == "Inquisition Domain" and is_weapon_attack) {
-			// Bonus damage if target is a caster (has spell slots)
-			bool target_is_caster = target.spell_slots_max[1] > 0 or target.spell_slots_max[2] > 0;
-			if (target_is_caster) {
-				int inq_dmg = attacker.proficiency;
-				bonus += inq_dmg;
-				broadcast_announce(attacker.name + "'s Inquisition adds " + inq_dmg + " damage to the caster!", false);
+		// Inquisition Domain Cleric (Grim Hollow): Witch Hunter's Strike L1 — +1d8 force (+2d8 vs concentrating)
+		// Limited to WIS-mod uses per long rest (tracked loosely via once-per-turn first hit)
+		if (attacker.class_name == "Cleric" and attacker.subclass == "Inquisition Domain" and attacker.is_first_hit_this_turn and is_weapon_attack) {
+			int inq_dmg = random(1, 8);
+			if (target.is_concentrating) {
+				inq_dmg += random(1, 8);
+				broadcast_announce(attacker.name + "'s Witch Hunter's Strike adds " + inq_dmg + " force damage (double vs concentrating target)!", false);
+			} else {
+				broadcast_announce(attacker.name + "'s Witch Hunter's Strike adds " + inq_dmg + " force damage!", false);
 			}
+			bonus += inq_dmg;
 		}
 
 		// Astral Domain Cleric: psychic damage on weapon strikes
@@ -3665,12 +3658,9 @@ class battle_manager {
 			broadcast_announce(attacker.name + "'s Hellfire Claw adds " + infernal_dmg + " fire damage!", false);
 		}
 
-		// College of Requiems Bard: necrotic damage from death magic
-		if (attacker.class_name == "Bard" and attacker.subclass == "College of Requiems" and is_weapon_attack) {
-			int requiem_dmg = random(1, 4);
-			bonus += requiem_dmg;
-			broadcast_announce(attacker.name + "'s Requiem adds " + requiem_dmg + " necrotic damage!", false);
-		}
+		// College of Requiems Bard (Grim Hollow): NO flat necrotic rider.
+		// Actual: expend Bardic Inspiration die on weapon hit for necrotic damage equal to die roll.
+		// This requires a prompt flow; removed the incorrect permanent +1d4 rider.
 
 		// Inquisitive Rogue: Insightful Fighting — sneak attack without advantage vs studied target
 		if (attacker.class_name == "Rogue" and attacker.subclass == "Inquisitive" and attacker.inquisitive_target == target.id and attacker.is_first_hit_this_turn and is_weapon_attack) {

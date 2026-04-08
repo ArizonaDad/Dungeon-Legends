@@ -921,8 +921,10 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
             c.festus_blessing_active = false;
         }
         if (cs.subclass == "Inquisition Domain" and cs.level >= 1) {
+            // Grim Hollow: NO magic resistance at L1 (removed wrong flag).
+            // Witch Hunter's Strike: WIS-mod/LR, +1d8 force (+2d8 vs concentrators); impl uses flag + tracked uses
             c.inquisition_anti_magic = true;
-            c.magic_resistance = true;
+            // c.magic_resistance removed - NOT in source
         }
         if (cs.subclass == "Astral Domain" and cs.level >= 1) {
             c.astral_domain_active = true;

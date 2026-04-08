@@ -228,6 +228,19 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 
 
 
+### Source Audit Status (2026-04-08)
+All batches 15-21 implementations were audited against actual source docx files in `C:\Users\16239\Downloads\Sources_clean\Source Books and rules\`. Significant discrepancies were found and corrected. See commit log for details.
+
+**Corrected wrong implementations:**
+- PHB 2024 feats (Mage Slayer, Shield Master, Polearm Master) — had 2014 mechanics
+- PHB spells (Aid base HP, Stoneskin all-physical resistances, Spirit Guardians WIS save, Fire Shield reflection)
+- Tasha (Order's Demand is Action not Bonus Action; Awakened Spellbook swap is at-will not limited)
+- Trickery Domain Blessing of the Trickster (wrong name, no CD cost, action type)
+- Circle of the Shepherd (all 3 Totem options: Bear, Hawk, Unicorn)
+- Griffon's Saddlebag: removed fabricated flat damage bonuses on Frost Sorcerer, Desert Soul, Winter Trapper (cold resistance), Rocborne (flat flying speed), Pact of Astral Griffon (flat flying), fixed Oath of the Hearth to Burning Weapon +CHA, fixed Way of the Aether to force damage with MA die scaling, fixed Couatl Herald to Mercy Die scaling
+- Grim Hollow: removed dangerous `magic_resistance` at L1 on Inquisition Domain (NOT in source); removed fabricated flat damage on Carrion Raven, College of Requiems, Oath of Zeal, Misfortune Bringer (all use different mechanics than flat riders)
+- Gunslinger subclasses: major rewrite — Sharpshooter's Stance was NOT a damage buff (it's a Prone feature), Liar's Dice is a bluff mechanic not temp HP gamble, License to Kill is L14 not L3, Ricochet is a miss-reroll maneuver not bouncing bullet. Only Lay Down the Law (White Hat) remains as a bonus action, properly using Risk Dice.
+
 ### Subclass Combat Features (138 subclasses, 80+ with full combat logic)
 **Fully Implemented Subclasses with Combat Logic:**
 - **Barbarian**: Berserker, Wild Heart, World Tree, Zealot, Ancestral Guardian, Storm Herald, Path of the Carrion Raven
@@ -252,8 +265,16 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 - Sun Soul Radiant Bolt, Ascendant Dragon Breath, Shadow Sorcerer Strength of the Grave
 - Tentacle of the Deeps, Form of Dread, Genie Vessel, Eldritch Cannon, Steel Defender, Experimental Elixir
 - College of Eloquence Unsettling Words (subtract Bardic die from save)
-- Gunslinger Sharpshooter Stance, Liar's Dice gamble, License to Kill, Ricochet Bullet
-- Setting subclass damage bonuses: Frost (cold), Desert (heat), Couatl (radiant), Carrion Raven (necrotic), Misfortune Bringer (jinx), Runetagger (force), Astral Domain (psychic), Inquisition vs casters
+- Order Domain Voice of Authority (free ally reaction attack on spell target) and Order's Demand (30ft action charm)
+- Order of Scribes Awakened Spellbook (at-will damage type swap)
+- Circle of the Shepherd Spirit Totem (Bear/Hawk/Unicorn)
+- Inquisition Domain Witch Hunter's Strike (1d8 force, 2d8 vs concentrating, once per turn)
+- Couatl Herald Mercy Die (d6 L3 → d8 L10 → d10 L18)
+- Path of the Glacier Frostbite (1d6/2d6/3d6 cold + 10ft slow) and Path of the Infernal Hellfire Claw (d6/d8/d10/d12 scaling)
+- Warrior of Celestial Soul Strike (L17 only, 1d4 radiant)
+- Way of the Aether Spirit Strike (force damage, MA die scaling)
+- Oath of the Hearth Burning Weapon (+CHA fire damage while active)
+- Gunslinger White Hat Lay Down the Law (Risk Die temp HP + retaliation reaction)
 
 ### Feats with Combat Logic
 Origin feats: alert, crafter, healer, lucky, magic_initiate, musician, savage_attacker, skilled, tavern_brawler, tough
