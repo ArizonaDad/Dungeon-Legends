@@ -119,6 +119,14 @@ uint64 next_lucky_prompt_reminder = 0;
 bool waiting_for_heroic_prompt = false;
 string heroic_prompt_text = "";
 uint64 next_heroic_prompt_reminder = 0;
+bool waiting_for_smite_prompt = false;
+string smite_prompt_text = "";
+string smite_slots_info = "";
+uint64 next_smite_prompt_reminder = 0;
+bool waiting_for_reaction_prompt = false;
+string reaction_prompt_text = "";
+string reaction_options_csv = "";
+uint64 next_reaction_prompt_reminder = 0;
 
 // Targeting
 uint current_target_id = 0;
@@ -312,6 +320,22 @@ void prompt_heroic_choice(string text) {
 	speak(text, true);
 }
 
+void prompt_smite_choice(string text, string slots) {
+	waiting_for_smite_prompt = true;
+	smite_prompt_text = text;
+	smite_slots_info = slots;
+	next_smite_prompt_reminder = ticks() + 4000;
+	speak(text, true);
+}
+
+void prompt_reaction_choice(string text, string csv) {
+	waiting_for_reaction_prompt = true;
+	reaction_prompt_text = text;
+	reaction_options_csv = csv;
+	next_reaction_prompt_reminder = ticks() + 4000;
+	speak(text, true);
+}
+
 bool check_roll_input() {
 	if (!waiting_for_roll) return false;
 	if (key_pressed(KEY_R) or key_pressed(KEY_RETURN)) {
@@ -382,6 +406,72 @@ bool check_heroic_prompt_input() {
 		send({{"type", message_types::heroic_response}, {"use", false}});
 		speak("Saving Heroic Inspiration.", true);
 		return true;
+	}
+	return false;
+}
+
+bool check_smite_prompt_input() {
+	if (!waiting_for_smite_prompt) return false;
+	// Keys 1-5 select spell slot level
+	for (int sl = 1; sl <= 5; sl++) {
+		if (key_pressed(KEY_1 + sl - 1)) {
+			waiting_for_smite_prompt = false;
+			next_smite_prompt_reminder = 0;
+			send({{"type", message_types::smite_response}, {"slot", sl}});
+			speak("Divine Smite! Level " + sl + " slot.", true);
+			return true;
+		}
+	}
+	if (key_pressed(KEY_ESCAPE)) {
+		waiting_for_smite_prompt = false;
+		next_smite_prompt_reminder = 0;
+		send({{"type", message_types::smite_response}, {"slot", 0}});
+		speak("No smite.", true);
+		return true;
+	}
+	// Reminder
+	if (next_smite_prompt_reminder > 0 and ticks() >= next_smite_prompt_reminder) {
+		speak(smite_prompt_text, true);
+		next_smite_prompt_reminder = ticks() + 5000;
+	}
+	return false;
+}
+
+bool check_reaction_prompt_input() {
+	if (!waiting_for_reaction_prompt) return false;
+	// Parse options from CSV to build numbered choices
+	string[] opts;
+	string remaining = reaction_options_csv;
+	while (remaining.length() > 0) {
+		int comma = remaining.find(",");
+		if (comma < 0) { opts.insert_last(remaining); remaining = ""; }
+		else { opts.insert_last(remaining.substr(0, comma)); remaining = remaining.substr(comma + 1); }
+	}
+	// Keys 1-4 select a reaction option
+	for (uint oi = 0; oi < opts.length() and oi < 4; oi++) {
+		if (key_pressed(KEY_1 + oi)) {
+			waiting_for_reaction_prompt = false;
+			next_reaction_prompt_reminder = 0;
+			send({{"type", message_types::reaction_response}, {"choice", opts[oi]}});
+			string choice_name = opts[oi];
+			if (choice_name == "shield") choice_name = "Shield";
+			else if (choice_name == "cutting_words") choice_name = "Cutting Words";
+			else if (choice_name == "warding_flare") choice_name = "Warding Flare";
+			speak("Using " + choice_name + "!", true);
+			return true;
+		}
+	}
+	if (key_pressed(KEY_ESCAPE)) {
+		waiting_for_reaction_prompt = false;
+		next_reaction_prompt_reminder = 0;
+		send({{"type", message_types::reaction_response}, {"choice", "none"}});
+		speak("No reaction.", true);
+		return true;
+	}
+	// Reminder
+	if (next_reaction_prompt_reminder > 0 and ticks() >= next_reaction_prompt_reminder) {
+		speak(reaction_prompt_text, true);
+		next_reaction_prompt_reminder = ticks() + 5000;
 	}
 	return false;
 }
@@ -1639,10 +1729,14 @@ void reset_combat_state() {
 	waiting_for_bardic_prompt = false;
 	waiting_for_lucky_prompt = false;
 	waiting_for_heroic_prompt = false;
+	waiting_for_smite_prompt = false;
+	waiting_for_reaction_prompt = false;
 	next_roll_prompt_reminder = 0;
 	next_bardic_prompt_reminder = 0;
 	next_lucky_prompt_reminder = 0;
 	next_heroic_prompt_reminder = 0;
+	next_smite_prompt_reminder = 0;
+	next_reaction_prompt_reminder = 0;
 	roll_type = -1;
 	current_target_id = 0;
 	current_target_name = "";
@@ -1842,6 +1936,14 @@ void combat_game_loop() {
 				next_heroic_prompt_reminder = ticks() + 3500;
 			}
 			check_heroic_prompt_input();
+			continue;
+		}
+		if (waiting_for_smite_prompt) {
+			check_smite_prompt_input();
+			continue;
+		}
+		if (waiting_for_reaction_prompt) {
+			check_reaction_prompt_input();
 			continue;
 		}
 		// Process chat/history form only when focus is on chat or history.

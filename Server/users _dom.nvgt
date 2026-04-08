@@ -2104,6 +2104,12 @@ void handle_user_message(user@ u, json_object@ msg)
 	else if (msg_type == message_types::heroic_response) {
 		if (@u.room != null and @u.room.bm != null) u.room.bm.handle_heroic_response(u, msg);
 	}
+	else if (msg_type == message_types::smite_response) {
+		if (@u.room != null and @u.room.bm != null) u.room.bm.handle_smite_response(u, msg);
+	}
+	else if (msg_type == message_types::reaction_response) {
+		if (@u.room != null and @u.room.bm != null) u.room.bm.handle_reaction_response(u, msg);
+	}
 	else if (msg_type == message_types::action_cast) {
 		if (@u.room != null and @u.room.bm != null) {
 			u.room.bm.handle_cast(u, msg);

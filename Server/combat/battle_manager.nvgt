@@ -80,6 +80,25 @@ class pending_heroic_prompt {
 	int bardic_bonus = 0;
 }
 
+class pending_smite_prompt {
+	string player_username;
+	pending_roll@ damage_roll;       // The damage roll to resume after smite choice
+	bool is_crit = false;
+	int highest_slot = 0;            // Highest available slot for smite
+}
+
+class pending_reaction_prompt {
+	string defender_username;
+	uint attacker_id;
+	uint defender_id;
+	int attack_total;                // The attack roll total
+	int natural_roll;                // Natural d20 result
+	bool is_crit;
+	string[] options;                // Available reactions: "shield", "cutting_words", etc.
+	pending_roll@ attack_roll;       // The original attack roll to resume
+	int reported_modifier;
+}
+
 class achievement_notice {
 	string id;
 	string name;
@@ -96,6 +115,8 @@ class battle_manager {
 	pending_bardic_prompt@ current_bardic_prompt;
 	pending_lucky_prompt@ current_lucky_prompt;
 	pending_heroic_prompt@ current_heroic_prompt;
+	pending_smite_prompt@ current_smite_prompt;
+	pending_reaction_prompt@ current_reaction_prompt;
 	bool initiative_phase = false;
 	uint initiative_index = 0;
 	uint64 initiative_delay_until = 0;
@@ -2365,6 +2386,112 @@ class battle_manager {
 			}
 		}
 
+		// End-of-turn saves for the combatant whose turn just ended
+		if (@prev != null and prev.is_alive()) {
+			// Hold Person: WIS save to end Paralyzed (from Hold Person specifically)
+			if (prev.has_condition(COND_PARALYZED) and prev.is_concentrating == false) {
+				// Find if any caster is concentrating on Hold Person affecting this target
+				for (uint ci = 0; ci < combat.combatants.length(); ci++) {
+					combatant@ caster = combat.combatants[ci];
+					if (@caster == null or caster.is_dead) continue;
+					if (caster.concentration_spell == "Hold Person" and caster.is_concentrating) {
+						int save_roll = random(1, 20);
+						int save_bonus = prev.get_save_bonus(ABILITY_WIS);
+						int save_dc_val = spell_save_dc(caster);
+						int save_total = save_roll + save_bonus;
+						bool saved = save_total >= save_dc_val;
+						broadcast_roll(prev.name, "WIS save vs Hold Person (end of turn)", save_roll, save_bonus, save_total, saved ? "Freed!" : "Still paralyzed!");
+						if (saved) {
+							prev.remove_condition(COND_PARALYZED);
+							broadcast_to_battle({{"type", message_types::condition_removed}, {"target", prev.name}, {"condition", "Paralyzed"}});
+						}
+						break;
+					}
+				}
+			}
+			// Web: STR save or Athletics check to end Restrained
+			if (prev.has_condition(COND_RESTRAINED)) {
+				for (uint ci = 0; ci < combat.combatants.length(); ci++) {
+					combatant@ caster = combat.combatants[ci];
+					if (@caster == null or caster.is_dead) continue;
+					if (caster.concentration_spell == "Web" and caster.is_concentrating) {
+						int save_roll = random(1, 20);
+						int save_bonus = prev.get_save_bonus(ABILITY_DEX);
+						int save_dc_val = spell_save_dc(caster);
+						int save_total = save_roll + save_bonus;
+						bool saved = save_total >= save_dc_val;
+						broadcast_roll(prev.name, "DEX save vs Web (end of turn)", save_roll, save_bonus, save_total, saved ? "Freed!" : "Still restrained!");
+						if (saved) {
+							prev.remove_condition(COND_RESTRAINED);
+							broadcast_to_battle({{"type", message_types::condition_removed}, {"target", prev.name}, {"condition", "Restrained"}});
+						}
+						break;
+					}
+				}
+			}
+			// Blindness/Deafness: CON save each turn
+			if (prev.has_condition(COND_BLINDED)) {
+				for (uint ci = 0; ci < combat.combatants.length(); ci++) {
+					combatant@ caster = combat.combatants[ci];
+					if (@caster == null or caster.is_dead) continue;
+					if (caster.concentration_spell == "Blindness/Deafness" and caster.is_concentrating) {
+						int save_roll = random(1, 20);
+						int save_bonus = prev.get_save_bonus(ABILITY_CON);
+						int save_dc_val = spell_save_dc(caster);
+						int save_total = save_roll + save_bonus;
+						bool saved = save_total >= save_dc_val;
+						broadcast_roll(prev.name, "CON save vs Blindness/Deafness (end of turn)", save_roll, save_bonus, save_total, saved ? "Recovered!" : "Still blinded!");
+						if (saved) {
+							prev.remove_condition(COND_BLINDED);
+							broadcast_to_battle({{"type", message_types::condition_removed}, {"target", prev.name}, {"condition", "Blinded"}});
+						}
+						break;
+					}
+				}
+			}
+			// Fear: WIS save each turn
+			if (prev.has_condition(COND_FRIGHTENED)) {
+				for (uint ci = 0; ci < combat.combatants.length(); ci++) {
+					combatant@ caster = combat.combatants[ci];
+					if (@caster == null or caster.is_dead) continue;
+					if (caster.concentration_spell == "Fear" and caster.is_concentrating) {
+						int save_roll = random(1, 20);
+						int save_bonus = prev.get_save_bonus(ABILITY_WIS);
+						int save_dc_val = spell_save_dc(caster);
+						int save_total = save_roll + save_bonus;
+						bool saved = save_total >= save_dc_val;
+						broadcast_roll(prev.name, "WIS save vs Fear (end of turn)", save_roll, save_bonus, save_total, saved ? "Courage returns!" : "Still frightened!");
+						if (saved) {
+							prev.remove_condition(COND_FRIGHTENED);
+							broadcast_to_battle({{"type", message_types::condition_removed}, {"target", prev.name}, {"condition", "Frightened"}});
+						}
+						break;
+					}
+				}
+			}
+			// Tasha's Hideous Laughter: WIS save each turn
+			if (prev.has_condition(COND_INCAPACITATED) and prev.has_condition(COND_PRONE)) {
+				for (uint ci = 0; ci < combat.combatants.length(); ci++) {
+					combatant@ caster = combat.combatants[ci];
+					if (@caster == null or caster.is_dead) continue;
+					if (caster.concentration_spell == "Tasha's Hideous Laughter" and caster.is_concentrating) {
+						int save_roll = random(1, 20);
+						int save_bonus = prev.get_save_bonus(ABILITY_WIS);
+						int save_dc_val = spell_save_dc(caster);
+						int save_total = save_roll + save_bonus;
+						bool saved = save_total >= save_dc_val;
+						broadcast_roll(prev.name, "WIS save vs Tasha's Hideous Laughter (end of turn)", save_roll, save_bonus, save_total, saved ? "Laughter fades!" : "Still laughing!");
+						if (saved) {
+							prev.remove_condition(COND_INCAPACITATED);
+							prev.remove_condition(COND_PRONE);
+							broadcast_to_battle({{"type", message_types::condition_removed}, {"target", prev.name}, {"condition", "Incapacitated"}});
+						}
+						break;
+					}
+				}
+			}
+		}
+
 		combat.advance_turn();
 		combatant@ c = combat.current_combatant();
 		if (@c == null) return;
@@ -3319,6 +3446,60 @@ class battle_manager {
 			string attack_reason = pr.attack_name != "" ? pr.attack_name + " attack against " + target.name : "to attack " + target.name;
 			broadcast_roll(c.name, attack_reason, natural_roll, reported_modifier, total, outcome);
 
+			// Reaction prompt: offer defender reactions BEFORE resolving hit
+			// Only if: target is a player, has reaction, attack would hit, not a fumble
+			if (!is_fumble and target.is_player and target.has_reaction and total >= target.armor_class) {
+				string[] reaction_options;
+				// Shield: caster with Shield in prepared_spells and a spell slot available
+				bool has_shield_spell = false;
+				for (uint si = 0; si < target.prepared_spells.length(); si++) {
+					if (target.prepared_spells[si] == "shield") { has_shield_spell = true; break; }
+				}
+				if (has_shield_spell) {
+					for (int sl = 1; sl <= 9; sl++) {
+						if (target.spell_slots_current[sl] > 0) { reaction_options.insert_last("shield"); break; }
+					}
+				}
+				// Cutting Words: Lore Bard with bardic inspiration uses
+				if (target.subclass == "College of Lore" and target.bardic_inspiration_uses > 0) {
+					reaction_options.insert_last("cutting_words");
+				}
+				// Warding Flare: Light Domain Cleric with uses remaining
+				if (target.subclass == "Light Domain" and target.warding_flare_uses > 0) {
+					reaction_options.insert_last("warding_flare");
+				}
+
+				if (reaction_options.length() > 0) {
+					user@ def_user = find_user_for_combatant(target);
+					if (@def_user != null and !def_user.is_bot) {
+						pending_reaction_prompt rp;
+						rp.defender_username = target.player_username;
+						rp.attacker_id = c.id;
+						rp.defender_id = target.id;
+						rp.attack_total = total;
+						rp.natural_roll = natural_roll;
+						rp.is_crit = is_crit;
+						rp.options = reaction_options;
+						@rp.attack_roll = pr;
+						rp.reported_modifier = reported_modifier;
+						@current_reaction_prompt = rp;
+						// Build options text
+						string opts = "";
+						string opts_csv = "";
+						for (uint oi = 0; oi < reaction_options.length(); oi++) {
+							if (opts != "") opts += ", ";
+							if (opts_csv != "") opts_csv += ",";
+							opts_csv += reaction_options[oi];
+							if (reaction_options[oi] == "shield") opts += "Shield (+5 AC)";
+							else if (reaction_options[oi] == "cutting_words") opts += "Cutting Words (-1d" + target.bardic_inspiration_die + ")";
+							else if (reaction_options[oi] == "warding_flare") opts += "Warding Flare (reroll attack)";
+						}
+						def_user.send({{"type", message_types::reaction_prompt}, {"attacker", c.name}, {"options", opts}, {"options_csv", opts_csv}});
+						return; // Pause — wait for reaction_response
+					}
+				}
+			}
+
 			if (hit) {
 				int dmg_count = pr.damage_dice_count > 0 ? pr.damage_dice_count : get_attack_damage_count(c, false);
 				int dmg_sides = pr.damage_dice_sides > 0 ? pr.damage_dice_sides : get_attack_damage_dice(c, false);
@@ -3359,8 +3540,40 @@ class battle_manager {
 				dmg_pr.attacks_remaining = pr.attacks_remaining;
 				dmg_pr.resolution_tag = pr.resolution_tag;
 				dmg_pr.resume_turn_start = pr.resume_turn_start;
-				@current_roll = dmg_pr;
 
+				// Divine Smite on-hit prompt: only if Paladin didn't already pre-cast smite via bonus action
+				if (c.class_name == "Paladin" and c.is_player and !c.divine_smite_pending and pr.is_weapon_attack and !pr.is_spell_effect and !c.main_hand_is_ranged and get_attack_range(c, false) <= 5) {
+					int highest_slot = 0;
+					for (int sl = 5; sl >= 1; sl--) {
+						if (c.spell_slots_current[sl] > 0) { highest_slot = sl; break; }
+					}
+					if (highest_slot > 0) {
+						user@ su = find_user_for_combatant(c);
+						if (@su != null and !su.is_bot) {
+							// Pause damage resolution, prompt for smite
+							pending_smite_prompt sp;
+							sp.player_username = c.player_username;
+							@sp.damage_roll = dmg_pr;
+							sp.is_crit = is_crit;
+							sp.highest_slot = highest_slot;
+							@current_smite_prompt = sp;
+							// Build slot info for prompt
+							string slots_info = "";
+							for (int sl = 1; sl <= 5; sl++) {
+								if (c.spell_slots_current[sl] > 0) {
+									int smite_dice = sl + 1;
+									if (is_crit) smite_dice *= 2;
+									if (slots_info != "") slots_info += ", ";
+									slots_info += "Level " + sl + " (" + smite_dice + "d8, " + c.spell_slots_current[sl] + " slots)";
+								}
+							}
+							su.send({{"type", message_types::smite_prompt}, {"slots", slots_info}, {"is_crit", is_crit}, {"target", target.name}});
+							return; // Wait for smite_response before continuing
+						}
+					}
+				}
+
+				@current_roll = dmg_pr;
 				user@ u = find_user_for_combatant(c);
 				if (@u != null and !u.is_bot and c.is_player) {
 					send_roll_request(u, dmg_pr);
@@ -3452,6 +3665,20 @@ class battle_manager {
 				int hex_damage = random(1, 6);
 				total_damage += hex_damage;
 				broadcast_announce(c.name + "'s Hex deals " + hex_damage + " extra necrotic damage to " + target.name + ".", false);
+			}
+			// Ensnaring Strike: restrain target on weapon hit
+			if (!pr.is_spell_effect and c.ensnaring_strike_pending and pr.is_weapon_attack) {
+				c.ensnaring_strike_pending = false;
+				int ens_save_roll = random(1, 20);
+				int ens_save_bonus = target.get_save_bonus(ABILITY_STR);
+				int ens_save_total = ens_save_roll + ens_save_bonus;
+				bool ens_saved = ens_save_total >= c.ensnaring_strike_dc;
+				broadcast_roll(target.name, "STR save vs Ensnaring Strike", ens_save_roll, ens_save_bonus, ens_save_total, ens_saved ? "Saved!" : "Restrained!");
+				if (!ens_saved) {
+					target.add_condition(COND_RESTRAINED);
+					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Restrained"}});
+					broadcast_announce(target.name + " is restrained by vines from Ensnaring Strike!", false);
+				}
 			}
 			if (pr.is_crit and c.has_feat("boon_of_irresistible_offense")) {
 				int boon_damage = random(1, 10) + random(1, 10);
@@ -3978,6 +4205,206 @@ class battle_manager {
 		}
 	}
 
+	// ---- Divine Smite Response ----
+	void handle_smite_response(user@ u, json_object@ msg) {
+		if (@current_smite_prompt == null or @u == null) return;
+		if (current_smite_prompt.player_username != u.username) return;
+
+		pending_smite_prompt@ sp = current_smite_prompt;
+		@current_smite_prompt = null;
+
+		pending_roll@ dmg_pr = sp.damage_roll;
+		if (@dmg_pr == null) return;
+		combatant@ c = combat.get_combatant(dmg_pr.combatant_id);
+		if (@c == null) return;
+
+		int slot_used = msg.exists("slot") ? int(msg["slot"]) : 0;
+		if (slot_used >= 1 and slot_used <= 5 and c.spell_slots_current[slot_used] > 0) {
+			c.spell_slots_current[slot_used]--;
+			// Divine Smite: (slot_level + 1)d8 radiant, doubled on crit
+			int smite_dice = slot_used + 1;
+			if (smite_dice > 5) smite_dice = 5; // Cap at 5d8
+			if (sp.is_crit) smite_dice *= 2;
+			// Add smite as extra damage on the pending damage roll
+			dmg_pr.extra_damage_dice_count += smite_dice;
+			dmg_pr.extra_damage_dice_sides = 8;
+			dmg_pr.extra_damage_type = DMG_RADIANT;
+			broadcast_announce(c.name + " channels Divine Smite! (" + smite_dice + "d8 radiant, level " + slot_used + " slot)", true);
+		}
+		// Remove old divine_smite_pending flag if it was set
+		c.divine_smite_pending = false;
+		c.divine_smite_slot_level = 0;
+
+		// Resume damage roll
+		@current_roll = dmg_pr;
+		user@ du = find_user_for_combatant(c);
+		if (@du != null and !du.is_bot and c.is_player) {
+			send_roll_request(du, dmg_pr);
+		} else {
+			process_roll_result(roll_attack_damage_natural(c, dmg_pr));
+		}
+	}
+
+	// ---- Reaction Prompt Response ----
+	void handle_reaction_response(user@ u, json_object@ msg) {
+		if (@current_reaction_prompt == null or @u == null) return;
+		if (current_reaction_prompt.defender_username != u.username) return;
+
+		pending_reaction_prompt@ rp = current_reaction_prompt;
+		@current_reaction_prompt = null;
+
+		combatant@ defender = combat.get_combatant(rp.defender_id);
+		combatant@ attacker = combat.get_combatant(rp.attacker_id);
+		if (@defender == null or @attacker == null) return;
+
+		string choice = msg.exists("choice") ? string(msg["choice"]) : "none";
+
+		if (choice == "shield" and defender.is_player) {
+			// Shield spell: +5 AC until start of next turn, consumes reaction + level 1 slot
+			int slot_used = -1;
+			for (int sl = 1; sl <= 9; sl++) {
+				if (defender.spell_slots_current[sl] > 0) { slot_used = sl; break; }
+			}
+			if (slot_used > 0) {
+				defender.spell_slots_current[slot_used]--;
+				defender.has_reaction = false;
+				clear_shield_effect(defender, false);
+				defender.shield_active = true;
+				defender.shield_ac_bonus = 5;
+				defender.armor_class += 5;
+				broadcast_announce(defender.name + " casts Shield as a reaction! AC increased by 5.", true);
+			}
+		}
+		else if (choice == "cutting_words" and defender.is_player) {
+			// Cutting Words (Lore Bard): subtract inspiration die from attack roll
+			if (defender.bardic_inspiration_uses > 0) {
+				defender.bardic_inspiration_uses--;
+				defender.has_reaction = false;
+				int cut = random(1, defender.bardic_inspiration_die);
+				rp.attack_total -= cut;
+				broadcast_announce(defender.name + " uses Cutting Words! Attack roll reduced by " + cut + ".", true);
+			}
+		}
+		else if (choice == "warding_flare" and defender.is_player) {
+			// Warding Flare (Light Cleric): impose disadvantage on the attack (re-roll attack, take lower)
+			if (defender.warding_flare_uses > 0) {
+				defender.warding_flare_uses--;
+				defender.has_reaction = false;
+				int second_roll = random(1, 20);
+				if (second_roll < rp.natural_roll) {
+					int atk_bonus = rp.attack_total - rp.natural_roll;
+					rp.attack_total = second_roll + atk_bonus;
+					rp.natural_roll = second_roll;
+				}
+				broadcast_announce(defender.name + " uses Warding Flare! Attacker rerolls: " + rp.natural_roll + ".", true);
+			}
+		}
+
+		// Resume attack resolution with potentially modified attack total
+		// Re-check hit with updated values
+		resume_attack_after_reaction(rp);
+	}
+
+	void resume_attack_after_reaction(pending_reaction_prompt@ rp) {
+		pending_roll@ pr = rp.attack_roll;
+		if (@pr == null) return;
+		combatant@ c = combat.get_combatant(pr.combatant_id);
+		combatant@ target = combat.get_combatant(rp.defender_id);
+		if (@c == null or @target == null) return;
+
+		int natural_roll = rp.natural_roll;
+		int total = rp.attack_total;
+		bool is_crit = (natural_roll >= get_critical_threshold(c, pr));
+		bool is_fumble = (natural_roll == 1);
+		bool hit = false;
+
+		if (is_crit) {
+			hit = true;
+		} else if (is_fumble) {
+			hit = false;
+		} else {
+			hit = total >= target.armor_class;
+		}
+
+		string outcome = "";
+		if (is_crit) outcome = "Critical hit!";
+		else if (is_fumble) outcome = "Miss!";
+		else if (hit) outcome = "Hit!";
+		else outcome = "Miss! (AC " + target.armor_class + ")";
+
+		if (hit) {
+			// Build damage roll and proceed (same as normal hit flow)
+			int dmg_count = pr.damage_dice_count > 0 ? pr.damage_dice_count : get_attack_damage_count(c, false);
+			int dmg_sides = pr.damage_dice_sides > 0 ? pr.damage_dice_sides : get_attack_damage_dice(c, false);
+			int dmg_mod = pr.damage_dice_count > 0 ? pr.damage_modifier : get_damage_modifier_for_attack(c, false);
+			int dmg_type = pr.damage_dice_count > 0 ? pr.damage_type : get_attack_damage_type(c, false);
+			string dmg_attack_name = pr.attack_name != "" ? pr.attack_name : get_attack_name(c, false);
+
+			pending_roll dmg_pr;
+			dmg_pr.combatant_id = c.id;
+			dmg_pr.player_username = c.is_player ? c.player_username : c.name;
+			dmg_pr.roll_type = ROLL_DAMAGE;
+			dmg_pr.dice_sides = dmg_sides;
+			dmg_pr.modifier = dmg_mod;
+			dmg_pr.reason = dmg_attack_name + " damage";
+			dmg_pr.target_id = target.id;
+			dmg_pr.attack_name = dmg_attack_name;
+			dmg_pr.attack_index = pr.attack_index;
+			dmg_pr.damage_dice_count = is_crit ? dmg_count * 2 : dmg_count;
+			dmg_pr.damage_dice_sides = dmg_sides;
+			dmg_pr.damage_modifier = dmg_mod;
+			dmg_pr.damage_type = dmg_type;
+			dmg_pr.is_weapon_attack = pr.is_weapon_attack;
+			dmg_pr.is_crit = is_crit;
+			dmg_pr.is_spell_effect = pr.is_spell_effect;
+			dmg_pr.attacks_remaining = pr.attacks_remaining;
+			dmg_pr.resolution_tag = pr.resolution_tag;
+			dmg_pr.resume_turn_start = pr.resume_turn_start;
+
+			// Check for Divine Smite prompt (Paladin melee hit, only if not pre-cast)
+			if (c.class_name == "Paladin" and c.is_player and !c.divine_smite_pending and pr.is_weapon_attack and !pr.is_spell_effect and !c.main_hand_is_ranged and get_attack_range(c, false) <= 5) {
+				int highest_slot = 0;
+				for (int sl = 5; sl >= 1; sl--) {
+					if (c.spell_slots_current[sl] > 0) { highest_slot = sl; break; }
+				}
+				if (highest_slot > 0) {
+					user@ su = find_user_for_combatant(c);
+					if (@su != null and !su.is_bot) {
+						pending_smite_prompt sp;
+						sp.player_username = c.player_username;
+						@sp.damage_roll = dmg_pr;
+						sp.is_crit = is_crit;
+						sp.highest_slot = highest_slot;
+						@current_smite_prompt = sp;
+						string slots_info = "";
+						for (int sl = 1; sl <= 5; sl++) {
+							if (c.spell_slots_current[sl] > 0) {
+								int smite_dice = sl + 1;
+								if (is_crit) smite_dice *= 2;
+								if (slots_info != "") slots_info += ", ";
+								slots_info += "Level " + sl + " (" + smite_dice + "d8, " + c.spell_slots_current[sl] + " slots)";
+							}
+						}
+						su.send({{"type", message_types::smite_prompt}, {"slots", slots_info}, {"is_crit", is_crit}, {"target", target.name}});
+						return;
+					}
+				}
+			}
+
+			@current_roll = dmg_pr;
+			user@ u = find_user_for_combatant(c);
+			if (@u != null and !u.is_bot and c.is_player) {
+				send_roll_request(u, dmg_pr);
+			} else {
+				process_roll_result(roll_attack_damage_natural(pr.is_spell_effect ? null : c, dmg_pr));
+			}
+		} else {
+			// Attack missed after reaction
+			broadcast_announce("The attack misses " + target.name + " after the reaction!", false);
+			broadcast_state();
+		}
+	}
+
 	// ---- Action Handlers ----
 
 	void handle_attack(user@ u, json_object@ msg) {
@@ -4231,31 +4658,35 @@ class battle_manager {
 		int dist = feet_distance(c.x, c.y, target.x, target.y);
 		if (dist > 5) { u.send({{"type", message_types::error}, {"text", "Target must be within 5 feet."}}); return; }
 
+		// 2024 PHB: Target can be no more than one size larger
+		if (target.size > c.size + 1) { u.send({{"type", message_types::error}, {"text", "That creature is too large to shove."}}); return; }
+
 		c.has_action = false;
 		c.used_action = true;
 
-		// Contested check: attacker Athletics vs target Athletics or Acrobatics.
-		int atk_mod = c.get_skill_bonus("Athletics", ABILITY_STR);
-		int def_athletics = target.get_skill_bonus("Athletics", ABILITY_STR);
-		int def_acrobatics = target.get_skill_bonus("Acrobatics", ABILITY_DEX);
-		int def_mod = def_athletics > def_acrobatics ? def_athletics : def_acrobatics;
+		// 2024 PHB: Shove is part of Unarmed Strike. Target makes STR or DEX save (their choice).
+		// DC = 8 + attacker STR mod + proficiency bonus
+		int shove_dc = 8 + c.get_ability_mod(ABILITY_STR) + c.proficiency;
+		int str_save = target.get_save_bonus(ABILITY_STR);
+		int dex_save = target.get_save_bonus(ABILITY_DEX);
+		int best_save = str_save > dex_save ? str_save : dex_save;
+		string save_type = str_save > dex_save ? "STR" : "DEX";
 
-		int atk_roll = random(1, 20) + atk_mod;
-		int def_roll = random(1, 20) + def_mod;
+		int save_roll = random(1, 20);
+		int save_total = save_roll + best_save;
+		bool saved = save_total >= shove_dc;
 
-		broadcast_roll(c.name, "Athletics to shove " + target.name, atk_roll - atk_mod, atk_mod, atk_roll, "");
-		broadcast_roll(target.name, "to resist shove", def_roll - def_mod, def_mod, def_roll, "");
+		broadcast_roll(target.name, save_type + " save vs Shove (DC " + shove_dc + ")", save_roll, best_save, save_total, saved ? "Resisted!" : "Shoved!");
 
-		if (atk_roll >= def_roll) {
-			// Shove success: knock prone or push 5 feet.
+		if (!saved) {
 			bool knock_prone = true;
 			if (msg.exists("push") and bool(msg["push"])) knock_prone = false;
 
 			if (knock_prone) {
 				target.add_condition(COND_PRONE);
+				broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Prone"}});
 				broadcast_announce(c.name + " shoves " + target.name + " prone!");
 			} else {
-				// Push 5 feet away.
 				int push_dx = 0, push_dy = 0;
 				if (target.x > c.x) push_dx = 1;
 				else if (target.x < c.x) push_dx = -1;
@@ -4266,7 +4697,7 @@ class battle_manager {
 				broadcast_announce(c.name + " pushes " + target.name + " back 5 feet!");
 			}
 		} else {
-			broadcast_announce(c.name + " fails to shove " + target.name + ".");
+			broadcast_announce(target.name + " resists the shove from " + c.name + ".");
 		}
 		broadcast_state();
 	}
@@ -4285,27 +4716,33 @@ class battle_manager {
 		int dist = feet_distance(c.x, c.y, target.x, target.y);
 		if (dist > 5) { u.send({{"type", message_types::error}, {"text", "Target must be within 5 feet."}}); return; }
 
+		// 2024 PHB: Target can be no more than one size larger, and you need a free hand
+		if (target.size > c.size + 1) { u.send({{"type", message_types::error}, {"text", "That creature is too large to grapple."}}); return; }
+
 		c.has_action = false;
 		c.used_action = true;
 
-		// Contested: Athletics vs Athletics or Acrobatics.
-		int atk_mod = c.get_skill_bonus("Athletics", ABILITY_STR);
-		int def_athletics = target.get_skill_bonus("Athletics", ABILITY_STR);
-		int def_acrobatics = target.get_skill_bonus("Acrobatics", ABILITY_DEX);
-		int def_mod = def_athletics > def_acrobatics ? def_athletics : def_acrobatics;
+		// 2024 PHB: Grapple is part of Unarmed Strike. Target makes STR or DEX save (their choice).
+		// DC = 8 + attacker STR mod + proficiency bonus
+		int grapple_dc = 8 + c.get_ability_mod(ABILITY_STR) + c.proficiency;
+		int str_save = target.get_save_bonus(ABILITY_STR);
+		int dex_save = target.get_save_bonus(ABILITY_DEX);
+		int best_save = str_save > dex_save ? str_save : dex_save;
+		string save_type = str_save > dex_save ? "STR" : "DEX";
 
-		int atk_roll = random(1, 20) + atk_mod;
-		int def_roll = random(1, 20) + def_mod;
+		int save_roll = random(1, 20);
+		int save_total = save_roll + best_save;
+		bool saved = save_total >= grapple_dc;
 
-		broadcast_roll(c.name, "Athletics to grapple " + target.name, atk_roll - atk_mod, atk_mod, atk_roll, "");
-		broadcast_roll(target.name, "to resist grapple", def_roll - def_mod, def_mod, def_roll, "");
+		broadcast_roll(target.name, save_type + " save vs Grapple (DC " + grapple_dc + ")", save_roll, best_save, save_total, saved ? "Escaped!" : "Grappled!");
 
-		if (atk_roll >= def_roll) {
+		if (!saved) {
 			target.add_condition(COND_GRAPPLED);
 			target.grapple_source_id = c.id;
+			broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Grappled"}});
 			broadcast_announce(c.name + " grapples " + target.name + "!");
 		} else {
-			broadcast_announce(c.name + " fails to grapple " + target.name + ".");
+			broadcast_announce(target.name + " breaks free from " + c.name + "'s grapple attempt.");
 		}
 		broadcast_state();
 	}
@@ -5130,6 +5567,123 @@ class battle_manager {
 					target.add_condition(COND_INCAPACITATED);
 					broadcast_announce(target.name + " is banished to a harmless demiplane!", true);
 				}
+			}
+			else if (spell.id == "charm_person" and @target != null) {
+				int save_roll = random(1, 20);
+				int save_bonus = target.get_save_bonus(ABILITY_WIS);
+				int bless_bonus = roll_bless_bonus(target);
+				int save_total = save_roll + save_bonus + bless_bonus;
+				bool saved = save_total >= save_dc;
+				if (bless_bonus > 0) broadcast_announce(target.name + "'s Bless adds " + bless_bonus + " to the save.", false);
+				broadcast_roll(target.name, "WIS save vs Charm Person", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Charmed!");
+				if (!saved) {
+					target.add_condition(COND_CHARMED);
+					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Charmed"}});
+					broadcast_announce(target.name + " is charmed by " + c.name + "!", true);
+				}
+			}
+			else if (spell.id == "sleep") {
+				// 2024 PHB: WIS save or Incapacitated, repeat save at end of turn -> Unconscious on second fail
+				// 5-foot radius Sphere, Concentration up to 1 minute
+				combatant@[] targets_hit;
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (t.is_player == c.is_player and combat.mode != "pvp") continue;
+					int dist = @target != null ? feet_distance(target.x, target.y, t.x, t.y) : feet_distance(c.x, c.y, t.x, t.y);
+					if (dist <= 5) targets_hit.insert_last(t);
+				}
+				if (targets_hit.length() == 0 and @target != null) targets_hit.insert_last(target);
+				for (uint ti = 0; ti < targets_hit.length(); ti++) {
+					combatant@ t = targets_hit[ti];
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_WIS);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					if (bless_bonus > 0) broadcast_announce(t.name + "'s Bless adds " + bless_bonus + " to the save.", false);
+					broadcast_roll(t.name, "WIS save vs Sleep", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Incapacitated!");
+					if (!saved) {
+						t.add_condition(COND_INCAPACITATED);
+						broadcast_to_battle({{"type", message_types::condition_applied}, {"target", t.name}, {"condition", "Incapacitated"}});
+						broadcast_announce(t.name + " is lulled by Sleep! Must save again at end of turn or fall Unconscious.", false);
+					}
+				}
+			}
+			else if (spell.id == "color_spray") {
+				// 2024 PHB: 15-foot Cone, CON save or Blinded until end of caster's next turn
+				combatant@[] targets_hit;
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (t.is_player == c.is_player and combat.mode != "pvp") continue;
+					if (feet_distance(c.x, c.y, t.x, t.y) <= 15) targets_hit.insert_last(t);
+				}
+				for (uint ti = 0; ti < targets_hit.length(); ti++) {
+					combatant@ t = targets_hit[ti];
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_CON);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					if (bless_bonus > 0) broadcast_announce(t.name + "'s Bless adds " + bless_bonus + " to the save.", false);
+					broadcast_roll(t.name, "CON save vs Color Spray", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Blinded!");
+					if (!saved) {
+						t.add_condition(COND_BLINDED);
+						broadcast_to_battle({{"type", message_types::condition_applied}, {"target", t.name}, {"condition", "Blinded"}});
+					}
+				}
+			}
+			else if (spell.id == "tashas_hideous_laughter" and @target != null) {
+				int save_roll = random(1, 20);
+				int save_bonus = target.get_save_bonus(ABILITY_WIS);
+				int bless_bonus = roll_bless_bonus(target);
+				int save_total = save_roll + save_bonus + bless_bonus;
+				bool saved = save_total >= save_dc;
+				if (bless_bonus > 0) broadcast_announce(target.name + "'s Bless adds " + bless_bonus + " to the save.", false);
+				broadcast_roll(target.name, "WIS save vs Tasha's Hideous Laughter", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Incapacitated!");
+				if (!saved) {
+					target.add_condition(COND_PRONE);
+					target.add_condition(COND_INCAPACITATED);
+					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Prone"}});
+					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Incapacitated"}});
+					broadcast_announce(target.name + " falls prone laughing uncontrollably!", true);
+				}
+			}
+			else if (spell.id == "ensnaring_strike") {
+				// 2024 PHB: Bonus Action cast IMMEDIATELY after hitting with a weapon.
+				// Grasping vines appear on the target — STR save or Restrained.
+				// Large+ creatures have advantage. 1d6 piercing/turn while restrained.
+				// Since this triggers on a hit that just happened, apply immediately to current target.
+				if (@target != null and !target.is_dead) {
+					bool adv_save = (target.size >= SIZE_LARGE);
+					int save_roll = random(1, 20);
+					if (adv_save) {
+						int save_roll2 = random(1, 20);
+						if (save_roll2 > save_roll) save_roll = save_roll2;
+					}
+					int save_bonus = target.get_save_bonus(ABILITY_STR);
+					int bless_bonus = roll_bless_bonus(target);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					string adv_text = adv_save ? " (with advantage)" : "";
+					if (bless_bonus > 0) broadcast_announce(target.name + "'s Bless adds " + bless_bonus + " to the save.", false);
+					broadcast_roll(target.name, "STR save vs Ensnaring Strike" + adv_text, save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Restrained!");
+					if (!saved) {
+						target.add_condition(COND_RESTRAINED);
+						broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Restrained"}});
+						broadcast_announce(target.name + " is restrained by grasping vines!", true);
+					} else {
+						broadcast_announce("The vines shrivel away.", false);
+					}
+				}
+			}
+			else if (spell.id == "sanctuary" and @target != null) {
+				if (@target == null) @target = c;
+				target.sanctuary_active = true;
+				target.sanctuary_dc = save_dc;
+				target.sanctuary_source_id = c.id;
+				broadcast_announce(target.name + " is protected by Sanctuary. Attackers must make a Wisdom save to target them.", true);
 			}
 			else {
 				broadcast_announce(c.name + " casts " + spell.name + ".", false);

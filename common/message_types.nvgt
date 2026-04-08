@@ -75,6 +75,10 @@ namespace message_types
 	const string reaction_opportunity = "reaction_opp";       // Server triggers opportunity attack.
 	const string reaction_spell = "reaction_spell";           // Client uses a reaction spell.
 	const string reaction_ready_trigger = "reaction_ready";   // Server triggers readied action.
+	const string smite_prompt = "smite_prompt";               // Server asks Paladin if they want to Divine Smite after melee hit.
+	const string smite_response = "smite_response";           // Client responds to Divine Smite prompt.
+	const string reaction_prompt = "reaction_prompt";         // Server offers defender reaction options before attack resolves.
+	const string reaction_response = "reaction_response";     // Client responds to reaction prompt.
 
 	// Combat feedback
 	const string damage_dealt = "damage_dealt";               // Server announces damage to all.

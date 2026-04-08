@@ -37,6 +37,8 @@ class character_sheet {
     bool weapon_is_ranged = false;
     bool has_unarmored_defense = false;
     bool has_heroic_inspiration = false;
+    string armor_type = "none"; // none, leather, studded_leather, hide, chain_shirt, scale_mail, breastplate, half_plate, ring_mail, chain_mail, splint, plate
+    bool has_shield = false;
     string[] feats;
     string[] skill_proficiencies;
     string[] tool_proficiencies;
@@ -77,6 +79,7 @@ void apply_class_defaults(character_sheet@ cs) {
     if (c == "Barbarian") {
         cs.hit_die = 12; cs.save_profs = {1,0,1,0,0,0}; // STR, CON
         cs.has_unarmored_defense = true;
+        cs.armor_type = "none"; // Uses Unarmored Defense
         cs.rage_count = 2; cs.rage_damage = 2;
         if (cs.level >= 3) cs.rage_count = 3;
         if (cs.level >= 6) cs.rage_count = 4;
@@ -88,6 +91,7 @@ void apply_class_defaults(character_sheet@ cs) {
     } else if (c == "Bard") {
         cs.hit_die = 8; cs.save_profs = {0,1,0,0,0,1}; // DEX, CHA
         cs.is_caster = true; cs.spellcasting_ability = ABILITY_CHA;
+        cs.armor_type = "leather"; // Light armor
         cs.bardic_inspiration_uses = ability_modifier(cs.charisma);
         if (cs.bardic_inspiration_uses < 1) cs.bardic_inspiration_uses = 1;
         cs.bardic_inspiration_die = bardic_inspiration_die_for_level(cs.level);
@@ -95,6 +99,7 @@ void apply_class_defaults(character_sheet@ cs) {
     } else if (c == "Cleric") {
         cs.hit_die = 8; cs.save_profs = {0,0,0,0,1,1}; // WIS, CHA
         cs.is_caster = true; cs.spellcasting_ability = ABILITY_WIS;
+        cs.armor_type = "chain_mail"; cs.has_shield = true; // Heavy armor + shield
         cs.channel_divinity_uses = 1;
         if (cs.level >= 6) cs.channel_divinity_uses = 2;
         if (cs.level >= 18) cs.channel_divinity_uses = 3;
@@ -102,15 +107,16 @@ void apply_class_defaults(character_sheet@ cs) {
     } else if (c == "Druid") {
         cs.hit_die = 8; cs.save_profs = {0,0,0,1,1,0}; // INT, WIS
         cs.is_caster = true; cs.spellcasting_ability = ABILITY_WIS;
+        cs.armor_type = "leather"; cs.has_shield = true; // Leather + shield (no metal)
         apply_full_caster_slots(cs);
     } else if (c == "Fighter") {
         cs.hit_die = 10; cs.save_profs = {1,0,1,0,0,0}; // STR, CON
+        cs.armor_type = "chain_mail"; cs.has_shield = true; // Heavy armor + shield
         cs.action_surge_uses = 1;
         if (cs.level >= 17) cs.action_surge_uses = 2;
         if (cs.level >= 5) cs.extra_attacks = 1;
         if (cs.level >= 11) cs.extra_attacks = 2;
         if (cs.level >= 17) cs.extra_attacks = 3;
-        if (cs.level >= 20) cs.extra_attacks = 4;
         if (cs.subclass == "Eldritch Knight") {
             cs.is_caster = true; cs.spellcasting_ability = ABILITY_INT;
             apply_third_caster_slots(cs);
@@ -118,21 +124,25 @@ void apply_class_defaults(character_sheet@ cs) {
     } else if (c == "Monk") {
         cs.hit_die = 8; cs.save_profs = {1,1,0,0,0,0}; // STR, DEX
         cs.has_unarmored_defense = true;
+        cs.armor_type = "none"; // Uses Unarmored Defense
         cs.ki_points = cs.level >= 2 ? cs.level : 0;
         if (cs.level >= 5) cs.extra_attacks = 1;
     } else if (c == "Paladin") {
         cs.hit_die = 10; cs.save_profs = {0,0,0,0,1,1}; // WIS, CHA
         cs.is_caster = true; cs.spellcasting_ability = ABILITY_CHA;
+        cs.armor_type = "chain_mail"; cs.has_shield = true; // Heavy armor + shield
         cs.lay_on_hands_pool = cs.level * 5;
         if (cs.level >= 5) cs.extra_attacks = 1;
         apply_half_caster_slots(cs);
     } else if (c == "Ranger") {
-        cs.hit_die = 10; cs.save_profs = {1,1,0,0,0,0}; // STR, DEX
+        cs.hit_die = 10; cs.save_profs = {0,1,0,0,1,0}; // DEX, WIS (2024 PHB)
         cs.is_caster = true; cs.spellcasting_ability = ABILITY_WIS;
+        cs.armor_type = "scale_mail"; // Medium armor
         if (cs.level >= 5) cs.extra_attacks = 1;
         apply_half_caster_slots(cs);
     } else if (c == "Rogue") {
         cs.hit_die = 8; cs.save_profs = {0,1,0,1,0,0}; // DEX, INT
+        cs.armor_type = "leather"; // Light armor
         cs.sneak_attack_dice = (cs.level + 1) / 2;
         if (cs.subclass == "Arcane Trickster") {
             cs.is_caster = true; cs.spellcasting_ability = ABILITY_INT;
@@ -141,19 +151,23 @@ void apply_class_defaults(character_sheet@ cs) {
     } else if (c == "Sorcerer") {
         cs.hit_die = 6; cs.save_profs = {0,0,1,0,0,1}; // CON, CHA
         cs.is_caster = true; cs.spellcasting_ability = ABILITY_CHA;
+        cs.armor_type = "none"; // No armor proficiency
         cs.sorcery_points = cs.level >= 2 ? cs.level : 0;
         apply_full_caster_slots(cs);
     } else if (c == "Warlock") {
         cs.hit_die = 8; cs.save_profs = {0,0,0,0,1,1}; // WIS, CHA
         cs.is_caster = true; cs.spellcasting_ability = ABILITY_CHA;
+        cs.armor_type = "leather"; // Light armor
         apply_warlock_slots(cs);
     } else if (c == "Wizard") {
         cs.hit_die = 6; cs.save_profs = {0,0,0,1,1,0}; // INT, WIS
         cs.is_caster = true; cs.spellcasting_ability = ABILITY_INT;
+        cs.armor_type = "none"; // No armor proficiency
         apply_full_caster_slots(cs);
     } else if (c == "Artificer") {
         cs.hit_die = 8; cs.save_profs = {0,0,1,1,0,0}; // CON, INT
         cs.is_caster = true; cs.spellcasting_ability = ABILITY_INT;
+        cs.armor_type = "scale_mail"; cs.has_shield = true; // Medium armor + shield
         apply_half_caster_slots(cs);
     }
 }
@@ -273,20 +287,40 @@ void calculate_hp(character_sheet@ cs) {
 
 void calculate_ac(character_sheet@ cs) {
     int dex_mod = ability_modifier(cs.dexterity);
+    int base_ac = 10 + dex_mod; // Unarmored default
+
+    // Natural AC overrides (species)
     if (cs.natural_ac_override > 0) {
-        if (cs.race == "Tortle") cs.armor_class = 17; // flat, no DEX
-        else if (cs.race == "Lizardfolk") cs.armor_class = 13 + dex_mod;
-    } else if (cs.has_unarmored_defense) {
-        if (cs.class_name == "Barbarian") {
-            cs.armor_class = 10 + dex_mod + ability_modifier(cs.constitution);
-        } else if (cs.class_name == "Monk") {
-            cs.armor_class = 10 + dex_mod + ability_modifier(cs.wisdom);
-        }
-    } else if (cs.class_name == "Sorcerer" and cs.subclass == "Draconic Sorcery") {
-        cs.armor_class = 13 + dex_mod;
-    } else {
-        cs.armor_class = 10 + dex_mod; // No armor default
+        if (cs.race == "Tortle") base_ac = 17; // flat, no DEX
+        else if (cs.race == "Lizardfolk") base_ac = 13 + dex_mod;
     }
+    // Unarmored Defense (class feature, uses best option)
+    else if (cs.has_unarmored_defense and cs.armor_type == "none") {
+        if (cs.class_name == "Barbarian") {
+            base_ac = 10 + dex_mod + ability_modifier(cs.constitution);
+        } else if (cs.class_name == "Monk") {
+            base_ac = 10 + dex_mod + ability_modifier(cs.wisdom);
+        }
+    }
+    // Draconic Resilience (Sorcerer feature, only when unarmored)
+    else if (cs.class_name == "Sorcerer" and cs.subclass == "Draconic Sorcery" and cs.armor_type == "none") {
+        base_ac = 13 + dex_mod;
+    }
+    // Actual armor types (D&D 5e 2024 PHB)
+    else if (cs.armor_type == "leather") { base_ac = 11 + dex_mod; }
+    else if (cs.armor_type == "studded_leather") { base_ac = 12 + dex_mod; }
+    else if (cs.armor_type == "hide") { base_ac = 12 + (dex_mod > 2 ? 2 : dex_mod); }
+    else if (cs.armor_type == "chain_shirt") { base_ac = 13 + (dex_mod > 2 ? 2 : dex_mod); }
+    else if (cs.armor_type == "scale_mail") { base_ac = 14 + (dex_mod > 2 ? 2 : dex_mod); }
+    else if (cs.armor_type == "breastplate") { base_ac = 14 + (dex_mod > 2 ? 2 : dex_mod); }
+    else if (cs.armor_type == "half_plate") { base_ac = 15 + (dex_mod > 2 ? 2 : dex_mod); }
+    else if (cs.armor_type == "ring_mail") { base_ac = 14; }
+    else if (cs.armor_type == "chain_mail") { base_ac = 16; }
+    else if (cs.armor_type == "splint") { base_ac = 17; }
+    else if (cs.armor_type == "plate") { base_ac = 18; }
+
+    cs.armor_class = base_ac;
+    if (cs.has_shield) cs.armor_class += 2;
     if (cs.race == "Warforged") cs.armor_class += 1;
     if (character_sheet_has_feat(cs, "defense")) cs.armor_class += 1;
 }

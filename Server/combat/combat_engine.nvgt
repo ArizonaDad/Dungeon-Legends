@@ -178,6 +178,11 @@ class combatant {
 	string[] free_cast_spells;
 	int[] free_cast_uses_remaining;
 	uint grapple_source_id = 0;
+	bool ensnaring_strike_pending = false; // Next weapon hit restrains target
+	int ensnaring_strike_dc = 0;
+	bool sanctuary_active = false;         // Attackers must WIS save to target
+	int sanctuary_dc = 0;
+	uint sanctuary_source_id = 0;
 	bool savage_attacker_used = false;
 	bool combat_prowess_used = false;
 	bool tavern_brawler_push_used = false;

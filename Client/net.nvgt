@@ -268,6 +268,21 @@ void handle_message(json_object@ msg)
 		string text = msg.exists("text") ? string(msg["text"]) : "Use Heroic Inspiration to reroll? Press H to use or Escape to save.";
 		prompt_heroic_choice(text);
 	}
+	else if (msg_type == message_types::smite_prompt) {
+		string slots = msg.exists("slots") ? string(msg["slots"]) : "";
+		bool is_crit = msg.exists("is_crit") ? bool(msg["is_crit"]) : false;
+		string target_name = msg.exists("target") ? string(msg["target"]) : "the target";
+		string text = "You hit " + target_name + "! Divine Smite? " + slots + ". Press 1 through 5 for slot level, or Escape to skip.";
+		if (is_crit) text = "Critical hit on " + target_name + "! Divine Smite? (dice doubled!) " + slots + ". Press 1 through 5 for slot level, or Escape to skip.";
+		prompt_smite_choice(text, slots);
+	}
+	else if (msg_type == message_types::reaction_prompt) {
+		string attacker = msg.exists("attacker") ? string(msg["attacker"]) : "an enemy";
+		string options = msg.exists("options") ? string(msg["options"]) : "";
+		string csv = msg.exists("options_csv") ? string(msg["options_csv"]) : "";
+		string text = attacker + " is about to hit you! Use a reaction? " + options + ". Press the number for your choice, or Escape to skip.";
+		prompt_reaction_choice(text, csv);
+	}
 	else if (msg_type == message_types::roll_result) {
 		// Server broadcasts roll results to ALL players - spoken via TTS
 		int natural_roll = msg.exists("natural") ? int(msg["natural"]) : 0;
