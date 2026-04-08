@@ -857,6 +857,8 @@ void show_bonus_action_menu() {
 	int summon_primal_companion_opt = -1;
 	int summon_steel_defender_opt = -1;
 	int summon_drake_companion_opt = -1;
+	int summon_wildfire_spirit_opt = -1;
+	int create_eldritch_cannon_opt = -1;
 	int reckless_attack_opt = -1;
 	int magic_coin_opt = -1;
 	int create_void_opt = -1;
@@ -1165,6 +1167,12 @@ void show_bonus_action_menu() {
 	}
 	if (lc == "ranger" and subclass == "Drakewarden" and level >= 3) {
 		summon_drake_companion_opt = m.add_item("Summon Drake Companion. Bonus action. HP 5+5*level, AC 14+PB, 1d6+PB elemental damage.");
+	}
+	if (lc == "druid" and subclass == "Circle of Wildfire" and level >= 2) {
+		summon_wildfire_spirit_opt = m.add_item("Summon Wildfire Spirit. Action, expends Wild Shape. HP 5+5*level, AC 13, 1d6+PB fire ranged attack.");
+	}
+	if (lc == "artificer" and subclass == "Artillerist" and level >= 3) {
+		create_eldritch_cannon_opt = m.add_item("Create Eldritch Cannon. Action. HP 5*level, AC 18, 2d8 force ranged attack (Force Ballista mode).");
 	}
 	// Barbarian L2 Reckless Attack (PHB 2024 base class feature)
 	if (lc == "barbarian" and level >= 2) {
@@ -1656,6 +1664,14 @@ void show_bonus_action_menu() {
 	else if (summon_drake_companion_opt >= 0 and res == summon_drake_companion_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "summon_drake_companion"}});
 		speak("Summoning Drake Companion.", true);
+	}
+	else if (summon_wildfire_spirit_opt >= 0 and res == summon_wildfire_spirit_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "summon_wildfire_spirit"}});
+		speak("Summoning Wildfire Spirit.", true);
+	}
+	else if (create_eldritch_cannon_opt >= 0 and res == create_eldritch_cannon_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "create_eldritch_cannon"}});
+		speak("Creating Eldritch Cannon.", true);
 	}
 	else if (reckless_attack_opt >= 0 and res == reckless_attack_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "reckless_attack"}});

@@ -2805,6 +2805,48 @@ void handle_user_message(user@ u, json_object@ msg)
 				u.room.bm.broadcast_announce(c.name + " activates their Steel Defender! HP " + defender_hp + ", AC 15.", true);
 			}
 		}
+		else if (feature == "summon_wildfire_spirit") {
+			// Tasha's Cauldron Circle of Wildfire Druid L2: "you can summon the primal
+			// spirit bound to your soul. As an action, you can expend one use of your Wild
+			// Shape feature to summon your Wildfire Spirit, rather than assuming a Beast
+			// form." Stat block per Tasha's: HP = 5 + 5*druid level, AC = 13, speed 30,
+			// Flame Seed ranged attack +PB+WIS to hit, 1d6+PB fire damage.
+			if (c.class_name != "Druid" or c.subclass != "Circle of Wildfire") { u.send({{"type", message_types::announce}, {"text", "Only Wildfire druids can summon a Wildfire Spirit."}, {"interrupt", true}}); return; }
+			if (!c.has_action) { u.send({{"type", message_types::announce}, {"text", "You've already used your action."}, {"interrupt", true}}); return; }
+			if (c.wild_shape_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Wild Shape uses remaining."}, {"interrupt", true}}); return; }
+			c.has_action = false;
+			c.used_action = true;
+			c.wild_shape_uses--;
+			int spirit_hp = 5 + 5 * c.level;
+			int wis_mod_wf = c.get_ability_mod(ABILITY_WIS);
+			int spirit_attack = c.proficiency + wis_mod_wf;
+			combatant@ spirit = u.room.bm.spawn_companion(c, "wildfire_spirit", c.name + "'s Wildfire Spirit", spirit_hp, 13, 30, spirit_attack, 1, 6, c.proficiency, DMG_FIRE, 0);
+			if (@spirit != null) {
+				u.room.bm.broadcast_announce(c.name + " summons their Wildfire Spirit! HP " + spirit_hp + ", AC 13, ranged Flame Seed attack.", true);
+			}
+		}
+		else if (feature == "create_eldritch_cannon") {
+			// Tasha's Cauldron Artillerist Artificer L3: "Using woodcarver's tools or
+			// smith's tools, you can take a Magic action to magically create a Small or
+			// Tiny Eldritch Cannon in an unoccupied space on a horizontal surface within
+			// 5 feet of you." Stat block per Tasha's: HP = 5 * artificer level, AC = 18,
+			// speed 15. Three modes: Flamethrower, Force Ballista, Protector. Default to
+			// Force Ballista (1d8 force, 120 ft).
+			if (c.class_name != "Artificer" or c.subclass != "Artillerist") { u.send({{"type", message_types::announce}, {"text", "Only Artillerist artificers can build an Eldritch Cannon."}, {"interrupt", true}}); return; }
+			if (!c.has_action) { u.send({{"type", message_types::announce}, {"text", "You've already used your action."}, {"interrupt", true}}); return; }
+			if (c.eldritch_cannon_active) { u.send({{"type", message_types::announce}, {"text", "Your Eldritch Cannon is already deployed."}, {"interrupt", true}}); return; }
+			c.has_action = false;
+			c.used_action = true;
+			int cannon_hp = 5 * c.level;
+			int int_mod_art = c.get_ability_mod(ABILITY_INT);
+			int cannon_attack = c.proficiency + int_mod_art;
+			combatant@ cannon = u.room.bm.spawn_companion(c, "artillerist_cannon", c.name + "'s Eldritch Cannon", cannon_hp, 18, 15, cannon_attack, 2, 8, 0, DMG_FORCE, 0);
+			if (@cannon != null) {
+				c.eldritch_cannon_active = true;
+				c.eldritch_cannon_hp = cannon_hp;
+				u.room.bm.broadcast_announce(c.name + " constructs an Eldritch Cannon (Force Ballista mode)! HP " + cannon_hp + ", AC 18, 2d8 force ranged attack.", true);
+			}
+		}
 		else if (feature == "summon_drake_companion") {
 			// Fizban's Drakewarden Ranger L3 Drake Companion: HP = 5 + 5*ranger level (matches
 			// existing drake_max_hp init). AC = 14 + PB, speed 40. Bite attack +PB+WIS,
