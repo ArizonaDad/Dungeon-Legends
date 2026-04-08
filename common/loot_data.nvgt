@@ -319,6 +319,13 @@ void init_item_catalog() {
 	add_item("tasha_armor_of_bone", "Cloak of Many Fashions", SLOT_ARMOR, RARITY_COMMON, "While wearing this cloak, you can use a Bonus Action to change the style, color, and apparent quality of the cloak.", 0, 0, 0, 0, 0, 0, 0, 0);
 	add_item("tasha_clockwork_amulet", "Clockwork Amulet", SLOT_AMULET, RARITY_COMMON, "This copper amulet contains tiny interlocking gears. While wearing it, you can forgo rolling the d20 for an attack roll you make to get a 10 on the die instead. Once used, this property can't be used again until the next dawn.", 0, 0, 0, 0, 0, 0, 0, 0);
 	add_item("tasha_charlatans_die", "Charlatan's Die", SLOT_AMULET, RARITY_COMMON, "Whenever you roll this loaded d6, you can choose what number it lands on as long as no creature observes you using it.", 0, 0, 0, 0, 0, 0, 0, 0);
+
+	// Tasha's More Items
+	add_item("tasha_eldritch_claw_tattoo", "Eldritch Claw Tattoo", SLOT_AMULET, RARITY_UNCOMMON, "While the tattoo is on your skin, your unarmed strikes are considered magical for the purpose of overcoming resistance and immunity to nonmagical attacks. The tattoo also grants three charges of Eldritch Maul.", 0, 2, 0, 0, 0, 0, 0, 0);
+	add_item("tasha_blast_scepter", "Blast Scepter", SLOT_WEAPON, RARITY_RARE, "While holding this scepter, you can cast Thunderwave from it (save DC 15). Once you cast the spell, you can't do so again until the next dawn.", 0, 1, 0, 1, 0, 0, 0, 0);
+	add_item("tasha_demon_armor", "Demon Armor", SLOT_ARMOR, RARITY_EPIC, "While wearing this armor, you gain a +1 bonus to AC, and you can speak Abyssal. The armor's clawed gauntlets turn unarmed strikes with your hands into magic weapons that deal 1d8 slashing damage on a hit, plus an extra 1d8 slashing damage if the target is wearing armor.", 1, 3, 0, 0, 0, 0, 0, 0);
+	add_item("tasha_giant_slayer", "Giant Slayer", SLOT_WEAPON, RARITY_RARE, "You gain a +1 bonus to attack and damage rolls made with this magic weapon. When you hit a creature of the Giant type with it, that creature takes an extra 2d6 damage of the weapon's type.", 0, 3, 0, 0, 0, 0, 0, 0);
+	add_item("tasha_helm_brilliance", "Helm of Brilliance (Variant)", SLOT_ARMOR, RARITY_EPIC, "Set with diamonds, rubies, fire opals, and opals. Cast Daylight, Detect Magic, Fireball, and Prismatic Spray from the helm.", 1, 0, 5, 2, 0, 0, 0, 0);
 }
 
 // ---- LOOT GENERATION ----
