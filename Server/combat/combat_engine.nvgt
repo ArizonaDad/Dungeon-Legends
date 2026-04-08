@@ -84,6 +84,9 @@ class combatant {
 	bool globe_of_invulnerability_active = false; // Globe of Invulnerability: blocks lower-level spells
 	int globe_of_invulnerability_level = 5;  // Highest spell level the globe blocks
 	bool holy_aura_active = false;       // Holy Aura: 30 ft aura, allies adv on saves, enemies disadv to attack
+	bool stoneskin_active = false;       // Stoneskin spell: B/P/S resistance flag (cleared by Dispel Magic)
+	bool fly_active = false;             // Fly spell: flag for Dispel Magic to clear flying_speed
+	bool counterspell_pending = false;   // Counterspell readied as a reaction (intercept the next enemy spell)
 	uint bless_source_id = 0;
 	bool guiding_bolt_advantage = false;
 	uint guiding_bolt_source_id = 0;

@@ -7340,6 +7340,53 @@ class battle_manager {
 				check_battle_end();
 				return;
 			}
+			else if (spell.id == "counterspell") {
+				// Basic Rules para 12677: "You attempt to interrupt a creature in the
+				// process of casting a spell. The creature makes a Constitution saving
+				// throw. On a failed save, the spell dissipates with no effect, and the
+				// action, Bonus Action, or Reaction used to cast it is wasted."
+				// Cast as a reaction; combat does not currently track in-progress spells,
+				// so this is a noted-but-no-effect spell that can be queued for the next
+				// enemy spell. Marked with a flag for future intercept logic.
+				c.counterspell_pending = true;
+				broadcast_announce(c.name + " readies Counterspell. The next enemy spell within 60 feet may be interrupted.", true);
+			}
+			else if (spell.id == "dispel_magic" and @target != null) {
+				// Basic Rules para 12904: "Choose one creature, object, or magical effect
+				// within range. Any ongoing spell of level 3 or lower on the target ends.
+				// For each ongoing spell of level 4 or higher on the target, make an
+				// ability check using your spellcasting ability."
+				// Approximation: clears all buff/debuff flags up to level 3 on the target.
+				int max_dispel_level = 3 + upcast_levels;
+				int dispelled = 0;
+				if (target.blessed) { clear_bless_effect(target, true); dispelled++; }
+				if (target.hasted) { clear_haste_effect(target, false, true); dispelled++; }
+				if (target.heroism_source_id != 0) { clear_heroism_effect(target, true); dispelled++; }
+				if (target.baned) { target.baned = false; dispelled++; }
+				if (target.shield_active) { clear_shield_effect(target, true); dispelled++; }
+				if (target.stoneskin_active) { target.stoneskin_active = false; dispelled++; }
+				if (target.fly_active) { target.fly_active = false; target.flying_speed = 0; dispelled++; }
+				if (target.is_concentrating) {
+					string ended = target.concentration_spell;
+					clear_concentration_effects(target);
+					target.is_concentrating = false;
+					target.remove_condition(COND_CONCENTRATING);
+					target.concentration_spell = "";
+					broadcast_announce(c.name + "'s Dispel Magic ends " + target.name + "'s concentration on " + ended + "!", true);
+					dispelled++;
+				}
+				if (dispelled > 0) {
+					broadcast_announce(c.name + "'s Dispel Magic strips " + dispelled + " magical effect" + (dispelled == 1 ? "" : "s") + " from " + target.name + "!", true);
+				} else {
+					broadcast_announce(c.name + "'s Dispel Magic finds no magic to dispel on " + target.name + ".", false);
+				}
+			}
+			else if (spell.id == "tongues" and @target != null) {
+				// Basic Rules para 15428: "This spell grants the creature you touch the
+				// ability to understand any spoken or signed language that it hears or sees."
+				// Mostly out-of-combat utility; flagged for future use.
+				broadcast_announce(c.name + " grants " + target.name + " the gift of Tongues for 1 hour.", true);
+			}
 			else if (spell.id == "vicious_mockery" and @target != null) {
 				// Basic Rules para 15527: "You unleash a string of insults laced with
 				// subtle enchantments at one creature you can see or hear within range.
