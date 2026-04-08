@@ -264,7 +264,7 @@ true_strike, spiritual_weapon, revivify, heal, ice_storm, finger_of_death, power
 
 **True Strike** (2024) — new version is a melee weapon attack with a spellcasting ability modifier. Source text has been implemented but needs re-verification.
 
-**Estimated custom-handler gap: ~60-80 spells** out of 367+ currently in `spell_data.nvgt`, plus probably ~150+ more spells not yet added to the catalog (Basic Rules has 300+ descriptions, Griffon's Saddlebag + Book of Ebon Tides + Valda's add hundreds more).
+**Estimated custom-handler gap: ~30-40 spells** out of 367+ currently in `spell_data.nvgt`, plus probably ~150+ more spells not yet added to the catalog (Basic Rules has 300+ descriptions, Griffon's Saddlebag + Book of Ebon Tides + Valda's add hundreds more). Custom handler count was ~42 at session start (2026-04-08), now ~129 after batches 1A-34.
 
 ---
 
