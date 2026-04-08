@@ -718,6 +718,11 @@ void show_bonus_action_menu() {
 	int scout_skirmish_opt = -1;
 	int unsettling_words_opt = -1;
 	int orders_demand_opt = -1;
+	int deadeye_stance_opt = -1;
+	int liars_dice_opt = -1;
+	int license_to_kill_opt = -1;
+	int trick_shot_ricochet_opt = -1;
+	int white_hat_protect_opt = -1;
 
 	if (lc == "barbarian" and !my_is_raging and my_rage_uses_remaining > 0) rage_opt = m.add_item("Rage. Bonus action. Uses left: " + my_rage_uses_remaining + ". Damage bonus: " + my_rage_damage_bonus + ".");
 	if (lc == "fighter" and my_second_wind_available) second_wind_opt = m.add_item("Second Wind. Bonus action. Heal 1d10 plus fighter level.");
@@ -926,6 +931,22 @@ void show_bonus_action_menu() {
 	}
 	if (lc == "cleric" and subclass == "Order Domain") {
 		orders_demand_opt = m.add_item("Order's Demand. Bonus action. Channel Divinity to charm a target.");
+	}
+	// Gunslinger subclass features
+	if (lc == "gunslinger" and subclass == "Deadeye" and level >= 3) {
+		deadeye_stance_opt = m.add_item("Sharpshooter's Stance. Bonus action. Toggle precise stance.");
+	}
+	if (lc == "gunslinger" and subclass == "High Roller" and level >= 3) {
+		liars_dice_opt = m.add_item("Liar's Dice. Bonus action. Gamble for temp HP and damage bonus.");
+	}
+	if (lc == "gunslinger" and subclass == "Secret Agent" and level >= 3) {
+		license_to_kill_opt = m.add_item("License to Kill. Bonus action. Mark a target for bonus damage on first hit.");
+	}
+	if (lc == "gunslinger" and subclass == "Trick Shot" and level >= 3) {
+		trick_shot_ricochet_opt = m.add_item("Ricochet. Bonus action. Prepare a bullet that bounces to a second target.");
+	}
+	if (lc == "gunslinger" and subclass == "White Hat" and level >= 3) {
+		white_hat_protect_opt = m.add_item("Protect Ally. Bonus action. Stand ready to take a hit for an ally.");
 	}
 	// Gunslinger class features
 	if (lc == "gunslinger") {
@@ -1377,6 +1398,34 @@ void show_bonus_action_menu() {
 		}
 		send({{"type", message_types::bonus_action}, {"feature", "orders_demand"}, {"target_id", current_target_id}});
 		speak("Order's Demand issued.", true);
+	}
+	else if (deadeye_stance_opt >= 0 and res == deadeye_stance_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "deadeye_stance"}});
+		speak("Sharpshooter's Stance toggled.", true);
+	}
+	else if (liars_dice_opt >= 0 and res == liars_dice_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "liars_dice"}});
+		speak("Liar's Dice rolled.", true);
+	}
+	else if (license_to_kill_opt >= 0 and res == license_to_kill_opt) {
+		if (current_target_id == 0) {
+			speak("No target selected.", true);
+			return;
+		}
+		send({{"type", message_types::bonus_action}, {"feature", "license_to_kill"}, {"target_id", current_target_id}});
+		speak("License to Kill issued.", true);
+	}
+	else if (trick_shot_ricochet_opt >= 0 and res == trick_shot_ricochet_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "trick_shot_ricochet"}});
+		speak("Ricochet bullet prepared.", true);
+	}
+	else if (white_hat_protect_opt >= 0 and res == white_hat_protect_opt) {
+		if (current_target_id == 0) {
+			speak("Select an ally to protect.", true);
+			return;
+		}
+		send({{"type", message_types::bonus_action}, {"feature", "white_hat_protect"}, {"target_id", current_target_id}});
+		speak("Standing ready to protect.", true);
 	}
 }
 

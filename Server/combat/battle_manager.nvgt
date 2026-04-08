@@ -3471,6 +3471,31 @@ class battle_manager {
 			broadcast_announce(attacker.name + "'s Gut Shot adds " + gut_dmg + " damage!", false);
 		}
 
+		// Deadeye Gunslinger: Sharpshooter's Stance — +PROF damage when in stance
+		if (attacker.class_name == "Gunslinger" and attacker.subclass == "Deadeye" and attacker.deadeye_stance_active and is_weapon_attack and attacker.main_hand_is_ranged) {
+			bonus += attacker.proficiency;
+			broadcast_announce(attacker.name + "'s Sharpshooter Stance adds " + attacker.proficiency + " damage!", false);
+		}
+
+		// High Roller Gunslinger: Liar's Dice gamble bonus
+		if (attacker.class_name == "Gunslinger" and attacker.subclass == "High Roller" and attacker.high_roller_gamble and is_weapon_attack) {
+			int gamble_dmg = random(1, 8);
+			bonus += gamble_dmg;
+			attacker.high_roller_gamble = false;
+			broadcast_announce(attacker.name + "'s Liar's Dice gamble adds " + gamble_dmg + " damage!", false);
+		}
+
+		// Secret Agent Gunslinger: License to Kill — extra damage on first hit vs marked target
+		if (attacker.class_name == "Gunslinger" and attacker.subclass == "Secret Agent" and attacker.secret_agent_license and attacker.secret_agent_target == target.id and is_weapon_attack) {
+			int license_dmg = random(1, 8) + attacker.proficiency;
+			bonus += license_dmg;
+			attacker.secret_agent_license = false;
+			broadcast_announce(attacker.name + "'s License to Kill adds " + license_dmg + " damage!", false);
+		}
+
+		// Trick Shot Gunslinger: Ricochet — bullet bounces to a second target after this hit
+		// (handled after damage application below)
+
 		// Inquisitive Rogue: Insightful Fighting — sneak attack without advantage vs studied target
 		if (attacker.class_name == "Rogue" and attacker.subclass == "Inquisitive" and attacker.inquisitive_target == target.id and attacker.is_first_hit_this_turn and is_weapon_attack) {
 			int dice = (attacker.level + 1) / 2;

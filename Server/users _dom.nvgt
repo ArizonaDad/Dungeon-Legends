@@ -2731,6 +2731,73 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.room.bm.broadcast_announce(c.name + " uses Skirmisher to move half their speed as a reaction!", false);
 		}
 
+		else if (feature == "deadeye_stance") {
+			// Deadeye Gunslinger: enter Sharpshooter's Stance - ignore long range disadvantage, +PROF damage
+			if (c.class_name != "Gunslinger" or c.subclass != "Deadeye") { u.send({{"type", message_types::announce}, {"text", "Only Deadeye Gunslingers can use Sharpshooter's Stance."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.deadeye_stance_active = !c.deadeye_stance_active;
+			u.room.bm.broadcast_announce(c.name + (c.deadeye_stance_active ? " enters Sharpshooter's Stance!" : " leaves Sharpshooter's Stance."), true);
+		}
+		else if (feature == "liars_dice") {
+			// High Roller Gunslinger: gamble - on success gain temp HP and damage bonus, on failure take psychic damage
+			if (c.class_name != "Gunslinger" or c.subclass != "High Roller") { u.send({{"type", message_types::announce}, {"text", "Only High Roller Gunslingers can play Liar's Dice."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			if (c.high_roller_dice <= 0) { u.send({{"type", message_types::announce}, {"text", "No Liar's Dice remaining."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.high_roller_dice--;
+			int gamble = random(1, 6);
+			if (gamble >= 4) {
+				c.high_roller_gamble = true;
+				c.emboldening_bond_active = true; // reuse for damage bonus
+				int temp = random(1, 8) + c.proficiency;
+				if (c.temp_hp < temp) c.temp_hp = temp;
+				u.room.bm.broadcast_announce(c.name + " rolls Liar's Dice and wins! Gains " + temp + " temp HP and bonus damage on next attack.", true);
+			} else {
+				int psychic = random(1, 8);
+				u.room.bm.combat.apply_damage(c, psychic, DMG_PSYCHIC, c);
+				u.room.bm.broadcast_announce(c.name + " rolls Liar's Dice and loses, taking " + psychic + " psychic damage from the gamble.", true);
+			}
+		}
+		else if (feature == "license_to_kill") {
+			// Secret Agent Gunslinger: mark target for license to kill - first hit deals extra PROF damage
+			if (c.class_name != "Gunslinger" or c.subclass != "Secret Agent") { u.send({{"type", message_types::announce}, {"text", "Only Secret Agent Gunslingers have a License to Kill."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			if (target_id == 0) { u.send({{"type", message_types::announce}, {"text", "No target selected."}, {"interrupt", true}}); return; }
+			combatant@ tgt = u.room.bm.combat.get_combatant(target_id);
+			if (@tgt == null or tgt.is_dead) { u.send({{"type", message_types::announce}, {"text", "Invalid target."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.secret_agent_license = true;
+			c.secret_agent_target = tgt.id;
+			u.room.bm.broadcast_announce(c.name + " marks " + tgt.name + " with a License to Kill.", true);
+		}
+		else if (feature == "trick_shot_ricochet") {
+			// Trick Shot Gunslinger: prepare a ricochet bullet (next attack hits a second target)
+			if (c.class_name != "Gunslinger" or c.subclass != "Trick Shot") { u.send({{"type", message_types::announce}, {"text", "Only Trick Shot Gunslingers can ricochet bullets."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			if (c.trick_shot_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Trick Shot uses remaining."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.trick_shot_uses--;
+			c.trick_shot_ricochet_pending = true;
+			u.room.bm.broadcast_announce(c.name + " prepares a ricochet bullet!", true);
+		}
+		else if (feature == "white_hat_protect") {
+			// White Hat Gunslinger: mark an ally for protection - next attack against them, the gunslinger takes the hit
+			if (c.class_name != "Gunslinger" or c.subclass != "White Hat") { u.send({{"type", message_types::announce}, {"text", "Only White Hat Gunslingers can protect allies."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			if (target_id == 0) { u.send({{"type", message_types::announce}, {"text", "Select an ally to protect."}, {"interrupt", true}}); return; }
+			combatant@ ally = u.room.bm.combat.get_combatant(target_id);
+			if (@ally == null or ally.is_dead or ally.is_player != c.is_player) { u.send({{"type", message_types::announce}, {"text", "That is not an ally."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.white_hat_protection_active = true;
+			c.white_hat_ally = ally.id;
+			u.room.bm.broadcast_announce(c.name + " stands ready to protect " + ally.name + "!", true);
+		}
 		else if (feature == "unsettling_words") {
 			// College of Eloquence Bard: spend Bardic Inspiration to subtract from a creature's next save
 			if (c.class_name != "Bard" or c.subclass != "College of Eloquence") { u.send({{"type", message_types::announce}, {"text", "Only Eloquence Bards can use Unsettling Words."}, {"interrupt", true}}); return; }

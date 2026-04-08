@@ -878,6 +878,30 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         c.chronal_shift_uses = 2;
     }
 
+    // Gunslinger subclasses (Valda's)
+    if (cs.class_name == "Gunslinger" and cs.level >= 3) {
+        if (cs.subclass == "Deadeye") {
+            // Sharpshooter's Stance: ignore long range disadvantage
+            c.deadeye_stance_active = false; // toggled in combat
+        }
+        if (cs.subclass == "High Roller") {
+            // Liar's Dice: bonus dice pool used for risk taking
+            c.high_roller_dice = proficiency_bonus(cs.level);
+        }
+        if (cs.subclass == "Secret Agent") {
+            // License to Kill: extra damage on first hit each turn vs marked target
+            c.secret_agent_license = false;
+        }
+        if (cs.subclass == "Trick Shot") {
+            // Ricochet: bullet bounces to extra target
+            c.trick_shot_uses = proficiency_bonus(cs.level);
+        }
+        if (cs.subclass == "White Hat") {
+            // Protect: redirect attack to self
+            c.white_hat_protection_active = false;
+        }
+    }
+
     // Gunslinger: Risk Dice pool + Critical Shot uses
     if (cs.class_name == "Gunslinger") {
         // Quick Draw: advantage on initiative (applied to bonus)

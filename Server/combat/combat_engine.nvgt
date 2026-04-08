@@ -206,6 +206,16 @@ class combatant {
 	bool orders_demand_used = false; // Order Domain Cleric Channel Divinity
 	bool wizardly_quill_active = false; // Order of Scribes Wizard
 	int awakened_spellbook_changes = 0; // Order of Scribes - replace damage type
+	// Gunslinger subclasses
+	bool deadeye_stance_active = false; // Deadeye - sharpshooter stance
+	int high_roller_dice = 0; // High Roller - Liar's Dice pool
+	bool high_roller_gamble = false; // pending bet result
+	bool secret_agent_license = false; // Secret Agent - license to kill bonus damage on first hit
+	uint secret_agent_target = 0;
+	bool trick_shot_ricochet_pending = false; // Trick Shot - bouncing bullet
+	int trick_shot_uses = 0;
+	bool white_hat_protection_active = false; // White Hat - protect ally from harm
+	uint white_hat_ally = 0;
 	// Gunslinger class
 	int risk_dice_current = 0;
 	int risk_dice_max = 0;
