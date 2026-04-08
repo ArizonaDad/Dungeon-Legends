@@ -2753,6 +2753,65 @@ void handle_user_message(user@ u, json_object@ msg)
 			c.mark_of_heretic_target = tgt.id;
 			u.room.bm.broadcast_announce(c.name + " marks " + tgt.name + " with the Mark of the Heretic! Crit on 19+ and reactions.", true);
 		}
+		else if (feature == "turn_undead") {
+			// PHB 2024 Cleric L2 Channel Divinity para 4211: "As a Magic action, you
+			// present your Holy Symbol and censure Undead creatures. Each Undead of your
+			// choice within 30 feet of you must make a Wisdom saving throw. If the creature
+			// fails its save, it has the Frightened and Incapacitated conditions for 1
+			// minute or until it takes any damage."
+			// L5 Sear Undead: also deal WIS-mod d8 radiant damage to any undead that fails
+			// the save.
+			if (c.class_name != "Cleric") { u.send({{"type", message_types::announce}, {"text", "Only Clerics can Turn Undead."}, {"interrupt", true}}); return; }
+			if (!c.has_action) { u.send({{"type", message_types::announce}, {"text", "You've already used your action."}, {"interrupt", true}}); return; }
+			if (c.channel_divinity_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Channel Divinity remaining."}, {"interrupt", true}}); return; }
+			c.has_action = false;
+			c.used_action = true;
+			c.channel_divinity_uses--;
+			int turn_dc = 8 + c.proficiency + c.get_ability_mod(ABILITY_WIS);
+			int turned = 0;
+			int sear_count = 0;
+			int wis_mod_tu = c.get_ability_mod(ABILITY_WIS);
+			if (wis_mod_tu < 1) wis_mod_tu = 1;
+			for (uint ti = 0; ti < u.room.bm.combat.combatants.length(); ti++) {
+				combatant@ undead = u.room.bm.combat.combatants[ti];
+				if (@undead == null or undead.is_dead) continue;
+				if (undead.id == c.id) continue;
+				// Detect undead by name keywords (since the game doesn't track creature type yet).
+				string nm_lower = undead.name;
+				bool is_undead = false;
+				if (nm_lower.find("Skeleton") >= 0 or nm_lower.find("skeleton") >= 0) is_undead = true;
+				if (nm_lower.find("Zombie") >= 0 or nm_lower.find("zombie") >= 0) is_undead = true;
+				if (nm_lower.find("Ghoul") >= 0 or nm_lower.find("ghoul") >= 0) is_undead = true;
+				if (nm_lower.find("Wight") >= 0 or nm_lower.find("wight") >= 0) is_undead = true;
+				if (nm_lower.find("Lich") >= 0 or nm_lower.find("lich") >= 0) is_undead = true;
+				if (nm_lower.find("Vampire") >= 0 or nm_lower.find("vampire") >= 0) is_undead = true;
+				if (nm_lower.find("Wraith") >= 0 or nm_lower.find("wraith") >= 0) is_undead = true;
+				if (nm_lower.find("Mummy") >= 0 or nm_lower.find("mummy") >= 0) is_undead = true;
+				if (nm_lower.find("Specter") >= 0 or nm_lower.find("specter") >= 0) is_undead = true;
+				if (nm_lower.find("Shadow") >= 0 or nm_lower.find("shadow") >= 0) is_undead = true;
+				if (!is_undead) continue;
+				if (feet_distance(c.x, c.y, undead.x, undead.y) > 30) continue;
+				int save_roll = random(1, 20) + undead.get_save_bonus(ABILITY_WIS);
+				if (save_roll < turn_dc) {
+					undead.add_condition(COND_FRIGHTENED);
+					undead.add_condition(COND_INCAPACITATED);
+					turned++;
+					// L5 Sear Undead damage
+					if (c.level >= 5) {
+						int sear_dmg = 0;
+						for (int sd = 0; sd < wis_mod_tu; sd++) sear_dmg += random(1, 8);
+						u.room.bm.combat.apply_damage(undead, sear_dmg, DMG_RADIANT, c);
+						sear_count++;
+						u.room.bm.broadcast_announce(undead.name + " is turned and seared for " + sear_dmg + " radiant damage!", false);
+					} else {
+						u.room.bm.broadcast_announce(undead.name + " is turned and flees in fear!", false);
+					}
+				} else {
+					u.room.bm.broadcast_announce(undead.name + " resists being turned. (save " + save_roll + " vs DC " + turn_dc + ")", false);
+				}
+			}
+			u.room.bm.broadcast_announce(c.name + " channels divine energy to Turn Undead — " + turned + " creature" + (turned == 1 ? "" : "s") + " turned.", true);
+		}
 		else if (feature == "arcane_recovery") {
 			// PHB 2024 Wizard L1 Arcane Recovery: "Once per day when you finish a Short
 			// Rest, you can choose expended spell slots to recover. The slots can have a

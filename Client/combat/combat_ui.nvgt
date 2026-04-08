@@ -861,6 +861,7 @@ void show_bonus_action_menu() {
 	int create_eldritch_cannon_opt = -1;
 	int reckless_attack_opt = -1;
 	int arcane_recovery_opt = -1;
+	int turn_undead_opt = -1;
 	int magic_coin_opt = -1;
 	int create_void_opt = -1;
 	int breath_of_dragon_opt = -1;
@@ -1182,6 +1183,10 @@ void show_bonus_action_menu() {
 	// Wizard L1 Arcane Recovery (PHB 2024 base class feature)
 	if (lc == "wizard") {
 		arcane_recovery_opt = m.add_item("Arcane Recovery. Bonus action, 1/day. Recover spell slots totaling up to half your level (rounded up), no slots of L6+.");
+	}
+	// Cleric L2 Channel Divinity Turn Undead (PHB 2024 base class feature)
+	if (lc == "cleric" and level >= 2) {
+		turn_undead_opt = m.add_item("Turn Undead. Channel Divinity action. Each undead within 30 ft makes WIS save or is Frightened + Incapacitated 1 minute (or until damaged). At L5+ also deals WIS-mod d8 radiant damage.");
 	}
 	if (lc == "bard" and subclass == "College of Mercantile" and level >= 3) {
 		magic_coin_opt = m.add_item("Magic Coin. Action. Fling a coin at target for 1d12 thunder damage (scales).");
@@ -1685,6 +1690,10 @@ void show_bonus_action_menu() {
 	else if (arcane_recovery_opt >= 0 and res == arcane_recovery_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "arcane_recovery"}});
 		speak("Arcane Recovery.", true);
+	}
+	else if (turn_undead_opt >= 0 and res == turn_undead_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "turn_undead"}});
+		speak("Turning undead.", true);
 	}
 	else if (magic_coin_opt >= 0 and res == magic_coin_opt) {
 		if (current_target_id == 0) { speak("No target selected.", true); return; }
