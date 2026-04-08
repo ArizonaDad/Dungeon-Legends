@@ -965,6 +965,22 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         if (cs.subclass == "College of Requiems" and cs.level >= 3) {
             c.college_of_requiems_active = true;
         }
+        if (cs.subclass == "College of Choreography" and cs.level >= 3) {
+            c.college_choreography_active = true;
+        }
+        if (cs.subclass == "College of Mercantile" and cs.level >= 3) {
+            c.college_mercantile_active = true;
+        }
+    }
+    if (cs.class_name == "Cleric") {
+        if (cs.subclass == "Trickery Domain" and cs.level >= 1) {
+            c.trickery_domain_active = true;
+        }
+    }
+    if (cs.class_name == "Druid") {
+        if (cs.subclass == "Circle of the Shepherd" and cs.level >= 2) {
+            c.shepherd_circle_active = true;
+        }
     }
     if (cs.class_name == "Monk") {
         if (cs.subclass == "Warrior of the Celestial" and cs.level >= 3) {

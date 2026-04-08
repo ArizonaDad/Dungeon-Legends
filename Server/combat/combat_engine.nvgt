@@ -257,6 +257,12 @@ class combatant {
 	bool path_of_infernal_active = false; // Barbarian Path of the Infernal
 	bool college_of_dance_active = false; // Bard College of Dance
 	bool college_of_requiems_active = false; // Bard College of Requiems
+	bool trickery_domain_active = false; // Trickery Domain Cleric - duplicate self
+	bool shepherd_circle_active = false; // Circle of the Shepherd Druid - spirit totems
+	int shepherd_totem_type = 0; // 0=bear (HP), 1=hawk (perception), 2=wolf (advantage)
+	bool college_choreography_active = false; // College of Choreography Bard
+	bool college_mercantile_active = false; // College of Mercantile Bard
+	bool blade_breaker_armor_crush = false; // armor reduction tracking
 	// Gunslinger class
 	int risk_dice_current = 0;
 	int risk_dice_max = 0;

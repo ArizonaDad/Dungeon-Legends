@@ -2731,6 +2731,36 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.room.bm.broadcast_announce(c.name + " uses Skirmisher to move half their speed as a reaction!", false);
 		}
 
+		else if (feature == "blessing_of_trickery") {
+			// Trickery Domain Cleric: bless ally with advantage on stealth (uses Channel Divinity)
+			if (c.class_name != "Cleric" or c.subclass != "Trickery Domain") { u.send({{"type", message_types::announce}, {"text", "Only Trickery Clerics can grant this blessing."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			if (c.channel_divinity_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Channel Divinity remaining."}, {"interrupt", true}}); return; }
+			combatant@ ally = target_id != 0 ? u.room.bm.combat.get_combatant(target_id) : c;
+			if (@ally == null or ally.is_dead) { u.send({{"type", message_types::announce}, {"text", "Invalid target."}, {"interrupt", true}}); return; }
+			if (ally.is_player != c.is_player and ally.id != c.id) { u.send({{"type", message_types::announce}, {"text", "Target an ally or yourself."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.channel_divinity_uses--;
+			ally.is_hidden = true;
+			u.room.bm.broadcast_announce(c.name + " grants Blessing of Trickery to " + ally.name + ", who becomes hidden!", true);
+		}
+		else if (feature == "spirit_totem_bear") {
+			// Circle of the Shepherd Druid: Bear Totem - temp HP and damage resistance for nearby allies
+			if (c.class_name != "Druid" or c.subclass != "Circle of the Shepherd") { u.send({{"type", message_types::announce}, {"text", "Only Shepherd Druids can summon spirit totems."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.shepherd_totem_type = 0;
+			int bear_temp = 5 + c.level;
+			for (uint sti = 0; sti < u.room.bm.combat.combatants.length(); sti++) {
+				combatant@ ally = u.room.bm.combat.combatants[sti];
+				if (@ally == null or ally.is_dead or ally.is_player != c.is_player) continue;
+				if (feet_distance(c.x, c.y, ally.x, ally.y) > 30) continue;
+				if (ally.temp_hp < bear_temp) ally.temp_hp = bear_temp;
+			}
+			u.room.bm.broadcast_announce(c.name + " summons the Bear Spirit Totem! Allies within 30ft gain " + bear_temp + " temp HP.", true);
+		}
 		else if (feature == "polearm_master_attack") {
 			// Polearm Master: bonus action attack with the opposite end of the weapon (1d4)
 			if (!c.has_feat("polearm_master")) { u.send({{"type", message_types::announce}, {"text", "You don't have the Polearm Master feat."}, {"interrupt", true}}); return; }
