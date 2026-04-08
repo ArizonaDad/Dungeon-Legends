@@ -7364,6 +7364,73 @@ class battle_manager {
 				check_battle_end();
 				return;
 			}
+			else if (spell.id == "raise_dead" and @target != null) {
+				// Basic Rules para 14695: "With a touch, you revive a dead creature if it
+				// has been dead no longer than 10 days... The creature returns to life
+				// with 1 Hit Point."
+				if (target.is_dead) {
+					target.is_dead = false;
+					target.current_hp = 1;
+					target.death_save_successes = 0;
+					target.death_save_failures = 0;
+					target.is_stable = false;
+					target.remove_condition(COND_UNCONSCIOUS);
+					broadcast_announce(c.name + " casts Raise Dead — " + target.name + " returns to life with 1 hit point!", true);
+				} else {
+					broadcast_announce(c.name + " casts Raise Dead, but " + target.name + " isn't dead.", false);
+				}
+			}
+			else if (spell.id == "resurrection" and @target != null) {
+				// Basic Rules para 14797: "The creature returns to life with all its Hit
+				// Points. This spell also neutralizes any poisons that affected the creature
+				// at the time of death. This spell closes all mortal wounds and restores
+				// any missing body parts."
+				if (target.is_dead) {
+					target.is_dead = false;
+					target.current_hp = target.max_hp;
+					target.death_save_successes = 0;
+					target.death_save_failures = 0;
+					target.is_stable = false;
+					target.remove_condition(COND_UNCONSCIOUS);
+					target.remove_condition(COND_POISONED);
+					broadcast_announce(c.name + " casts Resurrection — " + target.name + " is fully restored to life with " + target.max_hp + " HP!", true);
+				} else {
+					broadcast_announce(c.name + " casts Resurrection, but " + target.name + " isn't dead.", false);
+				}
+			}
+			else if (spell.id == "true_resurrection" and @target != null) {
+				// Basic Rules para 15469: "You touch a creature that has been dead for no
+				// longer than 200 years and that died for any reason except old age. The
+				// creature is revived with all its Hit Points."
+				if (target.is_dead) {
+					target.is_dead = false;
+					target.current_hp = target.max_hp;
+					target.death_save_successes = 0;
+					target.death_save_failures = 0;
+					target.is_stable = false;
+					target.remove_condition(COND_UNCONSCIOUS);
+					target.remove_condition(COND_POISONED);
+					target.remove_condition(COND_BLINDED);
+					target.remove_condition(COND_DEAFENED);
+					broadcast_announce(c.name + " casts True Resurrection — " + target.name + " is perfectly restored, free of all afflictions!", true);
+				} else {
+					broadcast_announce(c.name + " casts True Resurrection, but " + target.name + " isn't dead.", false);
+				}
+			}
+			else if (spell.id == "reincarnate" and @target != null) {
+				// Basic Rules para 14749: "You touch a dead Humanoid or a piece of one. If
+				// the creature has been dead no longer than 10 days, the spell forms a new
+				// body for it and calls the soul to enter that body."
+				if (target.is_dead) {
+					target.is_dead = false;
+					target.current_hp = target.max_hp / 2;
+					target.death_save_successes = 0;
+					target.death_save_failures = 0;
+					target.is_stable = false;
+					target.remove_condition(COND_UNCONSCIOUS);
+					broadcast_announce(c.name + " casts Reincarnate — " + target.name + " is reborn in a new body with " + target.current_hp + " HP!", true);
+				}
+			}
 			else if (spell.id == "mordenkainens_sword") {
 				// Basic Rules paras 14361-14362: "You create a spectral sword that hovers
 				// within range. It lasts for the duration. When the sword appears, you
