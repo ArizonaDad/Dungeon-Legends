@@ -948,6 +948,23 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         if (cs.subclass == "Path of the Carrion Raven" and cs.level >= 3) {
             c.carrion_raven_focus = true;
         }
+        if (cs.subclass == "Path of the Glacier" and cs.level >= 3) {
+            c.path_of_glacier_active = true;
+            c.cold_resistance = true;
+        }
+        if (cs.subclass == "Path of the Infernal" and cs.level >= 3) {
+            c.path_of_infernal_active = true;
+            c.fire_resistance = true;
+        }
+    }
+    if (cs.class_name == "Bard") {
+        if (cs.subclass == "College of Dance" and cs.level >= 3) {
+            c.college_of_dance_active = true;
+            c.armor_class += 1; // Mobile and graceful
+        }
+        if (cs.subclass == "College of Requiems" and cs.level >= 3) {
+            c.college_of_requiems_active = true;
+        }
     }
     if (cs.class_name == "Monk") {
         if (cs.subclass == "Warrior of the Celestial" and cs.level >= 3) {

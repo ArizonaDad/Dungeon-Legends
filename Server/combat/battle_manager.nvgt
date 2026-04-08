@@ -3651,6 +3651,27 @@ class battle_manager {
 			broadcast_announce(attacker.name + "'s Cartographer's Map adds " + cart_dmg + " damage!", false);
 		}
 
+		// Path of the Glacier Barbarian: cold damage on rage strikes
+		if (attacker.class_name == "Barbarian" and attacker.subclass == "Path of the Glacier" and attacker.raging and is_weapon_attack) {
+			int glacier_dmg = random(1, 6);
+			bonus += glacier_dmg;
+			broadcast_announce(attacker.name + "'s Glacier Strike adds " + glacier_dmg + " cold damage!", false);
+		}
+
+		// Path of the Infernal Barbarian: fire damage on rage strikes
+		if (attacker.class_name == "Barbarian" and attacker.subclass == "Path of the Infernal" and attacker.raging and is_weapon_attack) {
+			int infernal_dmg = random(1, 6);
+			bonus += infernal_dmg;
+			broadcast_announce(attacker.name + "'s Hellfire adds " + infernal_dmg + " fire damage!", false);
+		}
+
+		// College of Requiems Bard: necrotic damage from death magic
+		if (attacker.class_name == "Bard" and attacker.subclass == "College of Requiems" and is_weapon_attack) {
+			int requiem_dmg = random(1, 4);
+			bonus += requiem_dmg;
+			broadcast_announce(attacker.name + "'s Requiem adds " + requiem_dmg + " necrotic damage!", false);
+		}
+
 		// Inquisitive Rogue: Insightful Fighting — sneak attack without advantage vs studied target
 		if (attacker.class_name == "Rogue" and attacker.subclass == "Inquisitive" and attacker.inquisitive_target == target.id and attacker.is_first_hit_this_turn and is_weapon_attack) {
 			int dice = (attacker.level + 1) / 2;
@@ -5617,23 +5638,55 @@ class battle_manager {
 			if (@target == null) @target = c; // heal self if no target
 			int healing_dice_count = spell.healing_count;
 			if (spell.upcast_extra_dice > 0 and upcast_levels > 0) healing_dice_count += upcast_levels * spell.upcast_extra_dice;
-			int heal_amount = 0;
-			for (int d = 0; d < healing_dice_count; d++) {
-				int die_roll = random(1, spell.healing_dice);
-				if (c.has_feat("healer") and die_roll == 1) die_roll = random(1, spell.healing_dice);
-				heal_amount += die_roll;
+
+			// AoE healing (Mass Cure Wounds, Mass Healing Word)
+			if (spell.is_aoe and spell.max_targets > 1) {
+				combatant@[] heal_targets;
+				int center_x = target.x;
+				int center_y = target.y;
+				for (uint hi = 0; hi < combat.combatants.length() and heal_targets.length() < uint(spell.max_targets); hi++) {
+					combatant@ ht = combat.combatants[hi];
+					if (@ht == null or ht.is_dead) continue;
+					if (ht.is_player != c.is_player) continue;
+					if (feet_distance(center_x, center_y, ht.x, ht.y) > spell.aoe_radius) continue;
+					heal_targets.insert_last(ht);
+				}
+				int heal_amount = 0;
+				for (int d = 0; d < healing_dice_count; d++) {
+					int die_roll = random(1, spell.healing_dice);
+					if (c.has_feat("healer") and die_roll == 1) die_roll = random(1, spell.healing_dice);
+					heal_amount += die_roll;
+				}
+				heal_amount += spell_mod;
+				heal_amount += healing_bonus;
+				if (heal_amount < 1) heal_amount = 1;
+				broadcast_roll(c.name, spell.name + " healing", heal_amount, spell_mod, heal_amount, "");
+				for (uint hi = 0; hi < heal_targets.length(); hi++) {
+					combatant@ ht = heal_targets[hi];
+					int eff = combat.apply_healing(ht, heal_amount);
+					record_effective_healing(c.player_username, eff);
+					broadcast_to_battle({{"type", message_types::healing_done}, {"source", c.name}, {"target", ht.name}, {"amount", heal_amount}});
+					broadcast_announce(ht.name + " healed for " + heal_amount + ". Now at " + ht.current_hp + " of " + ht.max_hp + " HP.", false);
+				}
+			} else {
+				int heal_amount = 0;
+				for (int d = 0; d < healing_dice_count; d++) {
+					int die_roll = random(1, spell.healing_dice);
+					if (c.has_feat("healer") and die_roll == 1) die_roll = random(1, spell.healing_dice);
+					heal_amount += die_roll;
+				}
+				heal_amount += spell_mod;
+				heal_amount += healing_bonus;
+				if (heal_amount < 1) heal_amount = 1;
+				int effective_heal = combat.apply_healing(target, heal_amount);
+				record_effective_healing(c.player_username, effective_heal);
+				if (healing_bonus > 0) {
+					broadcast_announce(c.name + "'s Life Domain adds " + healing_bonus + " extra healing.", false);
+				}
+				broadcast_roll(c.name, spell.name + " healing", heal_amount, spell_mod, heal_amount, "");
+				broadcast_to_battle({{"type", message_types::healing_done}, {"source", c.name}, {"target", target.name}, {"amount", heal_amount}});
+				broadcast_announce(target.name + " healed for " + heal_amount + ". Now at " + target.current_hp + " of " + target.max_hp + " HP.", false);
 			}
-			heal_amount += spell_mod;
-			heal_amount += healing_bonus;
-			if (heal_amount < 1) heal_amount = 1;
-			int effective_heal = combat.apply_healing(target, heal_amount);
-			record_effective_healing(c.player_username, effective_heal);
-			if (healing_bonus > 0) {
-				broadcast_announce(c.name + "'s Life Domain adds " + healing_bonus + " extra healing.", false);
-			}
-			broadcast_roll(c.name, spell.name + " healing", heal_amount, spell_mod, heal_amount, "");
-			broadcast_to_battle({{"type", message_types::healing_done}, {"source", c.name}, {"target", target.name}, {"amount", heal_amount}});
-			broadcast_announce(target.name + " healed for " + heal_amount + ". Now at " + target.current_hp + " of " + target.max_hp + " HP.", false);
 		}
 		// Revivify special case
 		else if (spell.id == "revivify" and @target != null and (target.is_dead or target.current_hp == 0)) {
