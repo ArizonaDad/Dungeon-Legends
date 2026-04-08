@@ -2684,6 +2684,53 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.room.bm.broadcast_announce(c.name + " uses Blindfire! Next ranged attack ignores disadvantage.", false);
 		}
 
+		else if (feature == "open_hand_technique") {
+			// Warrior of the Open Hand: expend focus points on a Flurry hit to push/prone/no-reaction
+			if (c.class_name != "Monk" or c.subclass != "Warrior of the Open Hand") { u.send({{"type", message_types::announce}, {"text", "Only Open Hand monks can use this technique."}, {"interrupt", true}}); return; }
+			c.open_hand_ki_used = true;
+			string effect = msg.exists("effect") ? string(msg["effect"]) : "prone";
+			combatant@ tgt = target_id != 0 ? u.room.bm.combat.get_combatant(target_id) : null;
+			if (@tgt != null and !tgt.is_dead) {
+				if (effect == "prone") {
+					tgt.add_condition(COND_PRONE);
+					u.room.bm.broadcast_announce(c.name + "'s Open Hand Technique knocks " + tgt.name + " prone!", true);
+				} else if (effect == "push") {
+					int push_dx = 0, push_dy = 0;
+					if (tgt.x > c.x) push_dx = 3;
+					else if (tgt.x < c.x) push_dx = -3;
+					if (tgt.y > c.y) push_dy = 3;
+					else if (tgt.y < c.y) push_dy = -3;
+					tgt.x += push_dx;
+					tgt.y += push_dy;
+					u.room.bm.broadcast_announce(c.name + "'s Open Hand Technique pushes " + tgt.name + " 15 feet away!", true);
+				} else {
+					// No reactions until end of turn
+					tgt.has_reaction = false;
+					u.room.bm.broadcast_announce(c.name + "'s Open Hand Technique prevents " + tgt.name + " from taking reactions!", true);
+				}
+			}
+		}
+
+		else if (feature == "mage_hand_legerdemain") {
+			// Arcane Trickster Rogue: use Mage Hand for sneak attack or bonus action actions
+			if (c.class_name != "Rogue" or c.subclass != "Arcane Trickster") { u.send({{"type", message_types::announce}, {"text", "Only Arcane Tricksters can use Mage Hand Legerdemain."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.arcane_trickster_mage_hand = target_id;
+			u.room.bm.broadcast_announce(c.name + " commands a magical Mage Hand!", false);
+		}
+
+		else if (feature == "scout_skirmish") {
+			// Scout Rogue: Skirmisher — half speed move as reaction when enemy ends turn nearby
+			if (c.class_name != "Rogue" or c.subclass != "Scout") { u.send({{"type", message_types::announce}, {"text", "Only Scouts can skirmish."}, {"interrupt", true}}); return; }
+			if (!c.has_reaction) { u.send({{"type", message_types::announce}, {"text", "No reaction available."}, {"interrupt", true}}); return; }
+			c.has_reaction = false;
+			c.scout_skirmisher = true;
+			c.movement_remaining += c.speed / 2;
+			u.room.bm.broadcast_announce(c.name + " uses Skirmisher to move half their speed as a reaction!", false);
+		}
+
 		else if (feature == "experimental_elixir") {
 			// Alchemist Artificer: create an experimental elixir (random effect)
 			if (c.class_name != "Artificer" or c.subclass != "Alchemist") { u.send({{"type", message_types::announce}, {"text", "Only Alchemists can create Experimental Elixirs."}, {"interrupt", true}}); return; }

@@ -713,6 +713,9 @@ void show_bonus_action_menu() {
 	int gut_shot_opt = -1;
 	int dodge_roll_opt = -1;
 	int blindfire_opt = -1;
+	int open_hand_opt = -1;
+	int mage_hand_legerdemain_opt = -1;
+	int scout_skirmish_opt = -1;
 
 	if (lc == "barbarian" and !my_is_raging and my_rage_uses_remaining > 0) rage_opt = m.add_item("Rage. Bonus action. Uses left: " + my_rage_uses_remaining + ". Damage bonus: " + my_rage_damage_bonus + ".");
 	if (lc == "fighter" and my_second_wind_available) second_wind_opt = m.add_item("Second Wind. Bonus action. Heal 1d10 plus fighter level.");
@@ -906,6 +909,15 @@ void show_bonus_action_menu() {
 	}
 	if (lc == "wizard" and subclass == "Chronurgy Magic") {
 		chronal_shift_opt = m.add_item("Chronal Shift. Force a roll to be rerolled.");
+	}
+	if (lc == "monk" and subclass == "Warrior of the Open Hand") {
+		open_hand_opt = m.add_item("Open Hand Technique. Use on Flurry hit to push, knock prone, or prevent reactions.");
+	}
+	if (lc == "rogue" and subclass == "Arcane Trickster") {
+		mage_hand_legerdemain_opt = m.add_item("Mage Hand Legerdemain. Bonus action. Command an invisible Mage Hand.");
+	}
+	if (lc == "rogue" and subclass == "Scout") {
+		scout_skirmish_opt = m.add_item("Skirmisher. Reaction. Move half speed when enemy ends turn near you.");
 	}
 	// Gunslinger class features
 	if (lc == "gunslinger") {
@@ -1317,6 +1329,30 @@ void show_bonus_action_menu() {
 	else if (blindfire_opt >= 0 and res == blindfire_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "blindfire"}});
 		speak("Blindfire readied.", true);
+	}
+	else if (open_hand_opt >= 0 and res == open_hand_opt) {
+		menu@ oh = setup_sub_menu("Choose Open Hand Technique effect:");
+		oh.add_item("Knock Prone.");
+		oh.add_item("Push target 15 feet.");
+		oh.add_item("Prevent reactions until end of turn.");
+		int ohr = oh.run();
+		string effect = "prone";
+		if (ohr == 1) effect = "push";
+		else if (ohr == 2) effect = "no_reaction";
+		if (current_target_id == 0) {
+			speak("No target selected.", true);
+			return;
+		}
+		send({{"type", message_types::bonus_action}, {"feature", "open_hand_technique"}, {"target_id", current_target_id}, {"effect", effect}});
+		speak("Open Hand Technique: " + effect, true);
+	}
+	else if (mage_hand_legerdemain_opt >= 0 and res == mage_hand_legerdemain_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "mage_hand_legerdemain"}, {"target_id", current_target_id}});
+		speak("Mage Hand Legerdemain commanded.", true);
+	}
+	else if (scout_skirmish_opt >= 0 and res == scout_skirmish_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "scout_skirmish"}});
+		speak("Skirmisher movement.", true);
 	}
 }
 
