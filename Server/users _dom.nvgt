@@ -2753,6 +2753,72 @@ void handle_user_message(user@ u, json_object@ msg)
 			c.mark_of_heretic_target = tgt.id;
 			u.room.bm.broadcast_announce(c.name + " marks " + tgt.name + " with the Mark of the Heretic! Crit on 19+ and reactions.", true);
 		}
+		else if (feature == "summon_primal_companion") {
+			// Tasha's Beast Master Ranger L3 Primal Companion: bonus action summon a Land/
+			// Sea/Sky beast companion. Source stat block: HP = 5 + 5*ranger level, AC =
+			// 13 + ranger PB, attack bonus = ranger PB + WIS mod, damage = 1d8 + ranger PB.
+			// Default to Land beast (slashing damage); the Tasha's source has 3 variants.
+			if (c.class_name != "Ranger" or c.subclass != "Beast Master") { u.send({{"type", message_types::announce}, {"text", "Only Beast Master rangers can summon a Primal Companion."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			if (c.beast_companion_id != 0) { u.send({{"type", message_types::announce}, {"text", "Your Primal Companion is already in the field."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			int companion_hp = 5 + 5 * c.level;
+			int companion_ac = 13 + c.proficiency;
+			int wis_mod_bm = c.get_ability_mod(ABILITY_WIS);
+			int companion_attack = c.proficiency + wis_mod_bm;
+			int companion_dmg_mod = c.proficiency;
+			combatant@ pet = u.room.bm.spawn_companion(c, "beast_master_land", c.name + "'s Land Beast", companion_hp, companion_ac, 40, companion_attack, 1, 8, companion_dmg_mod, DMG_SLASHING, 0);
+			if (@pet != null) {
+				c.beast_companion_id = pet.id;
+				c.beast_companion_active = true;
+				u.room.bm.broadcast_announce(c.name + " summons their Primal Land Beast! HP " + companion_hp + ", AC " + companion_ac + ".", true);
+			}
+		}
+		else if (feature == "summon_steel_defender") {
+			// Tasha's Battle Smith Artificer L3 Steel Defender: full stat block construct.
+			// HP = 2 + 5*artificer level + INT mod (per Tasha's), AC = 15, speed 40.
+			// Attack: rend, +PB+INT to hit, 1d8+PB force damage.
+			if (c.class_name != "Artificer" or c.subclass != "Battle Smith") { u.send({{"type", message_types::announce}, {"text", "Only Battle Smith artificers can summon a Steel Defender."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			if (c.steel_defender_active) { u.send({{"type", message_types::announce}, {"text", "Your Steel Defender is already active."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			int int_mod_bs = c.get_ability_mod(ABILITY_INT);
+			int defender_hp = 2 + 5 * c.level + int_mod_bs;
+			int defender_attack = c.proficiency + int_mod_bs;
+			combatant@ defender = u.room.bm.spawn_companion(c, "battle_smith", c.name + "'s Steel Defender", defender_hp, 15, 40, defender_attack, 1, 8, c.proficiency, DMG_FORCE, 0);
+			if (@defender != null) {
+				c.steel_defender_active = true;
+				u.room.bm.broadcast_announce(c.name + " activates their Steel Defender! HP " + defender_hp + ", AC 15.", true);
+			}
+		}
+		else if (feature == "summon_drake_companion") {
+			// Fizban's Drakewarden Ranger L3 Drake Companion: HP = 5 + 5*ranger level (matches
+			// existing drake_max_hp init). AC = 14 + PB, speed 40. Bite attack +PB+WIS,
+			// 1d6+PB damage of the chosen damage type (acid/cold/fire/lightning/poison).
+			if (c.class_name != "Ranger" or c.subclass != "Drakewarden") { u.send({{"type", message_types::announce}, {"text", "Only Drakewarden rangers can summon a Drake."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			if (c.drake_companion_active) { u.send({{"type", message_types::announce}, {"text", "Your Drake is already in the field."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			int drake_hp_now = c.drake_max_hp > 0 ? c.drake_max_hp : 5 + 5 * c.level;
+			int wis_mod_dk = c.get_ability_mod(ABILITY_WIS);
+			int drake_attack = c.proficiency + wis_mod_dk;
+			// Map drake_damage_type int to DMG_ constant: 0=acid 1=cold 2=fire 3=lightning 4=poison
+			int drake_dmg_type = DMG_FIRE;
+			if (c.drake_damage_type == 0) drake_dmg_type = DMG_ACID;
+			else if (c.drake_damage_type == 1) drake_dmg_type = DMG_COLD;
+			else if (c.drake_damage_type == 2) drake_dmg_type = DMG_FIRE;
+			else if (c.drake_damage_type == 3) drake_dmg_type = DMG_LIGHTNING;
+			else if (c.drake_damage_type == 4) drake_dmg_type = DMG_POISON;
+			combatant@ drake = u.room.bm.spawn_companion(c, "drakewarden", c.name + "'s Drake", drake_hp_now, 14 + c.proficiency, 40, drake_attack, 1, 6, c.proficiency, drake_dmg_type, 0);
+			if (@drake != null) {
+				c.drake_companion_active = true;
+				c.drake_hp = drake_hp_now;
+				u.room.bm.broadcast_announce(c.name + " summons their Drake Companion! HP " + drake_hp_now + ", AC " + (14 + c.proficiency) + ".", true);
+			}
+		}
 		else if (feature == "telekinetic_shove") {
 			// Telekinetic feat (PHB para 7813): "As a Bonus Action, you can telekinetically
 			// shove one creature you can see within 30 feet of yourself. When you do so,

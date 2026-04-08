@@ -854,6 +854,9 @@ void show_bonus_action_menu() {
 	int creeping_fog_opt = -1;
 	int consume_darkness_opt = -1;
 	int telekinetic_shove_opt = -1;
+	int summon_primal_companion_opt = -1;
+	int summon_steel_defender_opt = -1;
+	int summon_drake_companion_opt = -1;
 	int magic_coin_opt = -1;
 	int create_void_opt = -1;
 	int breath_of_dragon_opt = -1;
@@ -1151,6 +1154,16 @@ void show_bonus_action_menu() {
 	// Telekinetic feat (PHB para 7813) - bonus action shove available to anyone with the feat
 	if (feat_selected("telekinetic")) {
 		telekinetic_shove_opt = m.add_item("Telekinetic Shove. Bonus action. Push a creature within 30ft 5 feet (STR save vs DC 8 + PB + spellcasting mod).");
+	}
+	// Companion summoning bonus actions (TODO §7C: minimum viable implementation)
+	if (lc == "ranger" and subclass == "Beast Master" and level >= 3) {
+		summon_primal_companion_opt = m.add_item("Summon Primal Companion. Bonus action. Land beast: HP 5+5*level, AC 13+PB, 1d8+PB slashing.");
+	}
+	if (lc == "artificer" and subclass == "Battle Smith" and level >= 3) {
+		summon_steel_defender_opt = m.add_item("Activate Steel Defender. Bonus action. HP 2+5*level+INT, AC 15, 1d8+PB force.");
+	}
+	if (lc == "ranger" and subclass == "Drakewarden" and level >= 3) {
+		summon_drake_companion_opt = m.add_item("Summon Drake Companion. Bonus action. HP 5+5*level, AC 14+PB, 1d6+PB elemental damage.");
 	}
 	if (lc == "bard" and subclass == "College of Mercantile" and level >= 3) {
 		magic_coin_opt = m.add_item("Magic Coin. Action. Fling a coin at target for 1d12 thunder damage (scales).");
@@ -1626,6 +1639,18 @@ void show_bonus_action_menu() {
 		if (current_target_id == 0) { speak("No target selected.", true); return; }
 		send({{"type", message_types::bonus_action}, {"feature", "telekinetic_shove"}, {"target_id", current_target_id}});
 		speak("Telekinetic shove.", true);
+	}
+	else if (summon_primal_companion_opt >= 0 and res == summon_primal_companion_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "summon_primal_companion"}});
+		speak("Summoning Primal Companion.", true);
+	}
+	else if (summon_steel_defender_opt >= 0 and res == summon_steel_defender_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "summon_steel_defender"}});
+		speak("Activating Steel Defender.", true);
+	}
+	else if (summon_drake_companion_opt >= 0 and res == summon_drake_companion_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "summon_drake_companion"}});
+		speak("Summoning Drake Companion.", true);
 	}
 	else if (magic_coin_opt >= 0 and res == magic_coin_opt) {
 		if (current_target_id == 0) { speak("No target selected.", true); return; }

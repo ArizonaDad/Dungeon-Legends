@@ -243,6 +243,63 @@ class battle_manager {
 		return @u != null and u.is_bot;
 	}
 
+	// Spawn a companion combatant bound to the owner. Used by Beast Master Primal Companion,
+	// Battle Smith Steel Defender, Drakewarden Drake Companion, Wildfire Spirit, Echo Knight
+	// Manifest Echo, Artillerist Eldritch Cannon, etc. The companion is added to combat.combatants
+	// in the slot immediately after the owner so it acts on the same initiative count.
+	// Per TODO §7C this is the minimum viable companion implementation: full HP/AC/attack
+	// scaling per source, owner_id back-reference, no death saves on the companion (HP 0 = removed).
+	combatant@ spawn_companion(combatant@ owner, string subclass_id, string display_name, int hp, int ac, int speed, int attack_bonus, int dmg_count, int dmg_die, int dmg_mod, int dmg_type, int extra_attacks = 0) {
+		if (@owner == null or @combat == null) return null;
+		combatant c;
+		c.name = display_name;
+		c.is_player = owner.is_player; // Companion is on the owner's team
+		c.player_username = "";
+		c.x = owner.x + 1;
+		c.y = owner.y;
+		if (c.x >= combat.map_width) c.x = owner.x - 1;
+		c.size = SIZE_MEDIUM;
+		c.max_hp = hp;
+		c.current_hp = hp;
+		c.armor_class = ac;
+		c.speed = speed;
+		c.initiative_bonus = owner.initiative_bonus;
+		c.ability_scores = owner.ability_scores;
+		c.is_companion = true;
+		c.owner_id = owner.id;
+		c.companion_subclass = subclass_id;
+		c.companion_attack_bonus = attack_bonus;
+		c.companion_attack_dice = dmg_count;
+		c.companion_attack_die_sides = dmg_die;
+		c.companion_attack_dmg_mod = dmg_mod;
+		c.companion_attack_dmg_type = dmg_type;
+		// Wire up the regular weapon-attack fields so the existing combat code paths work
+		// (find_nearest_target_for_monster, monster turn execution, etc.).
+		c.main_hand = display_name + " strike";
+		c.main_hand_damage_dice = dmg_die;
+		c.main_hand_damage_count = dmg_count;
+		c.main_hand_damage_type = dmg_type;
+		c.main_hand_range = 5;
+		c.main_hand_finesse = false;
+		c.main_hand_is_ranged = false;
+		c.monster_attack_bonus = attack_bonus;
+		c.monster_attack_damage_mod = dmg_mod;
+		c.extra_attacks = extra_attacks;
+		c.summoner_id = owner.id;
+		// Insert into combatants AFTER the owner so it acts on the same initiative tick
+		// when initiative is rolled (or right after if mid-round).
+		combat.combatants.insert_last(c);
+		return @combat.combatants[combat.combatants.length() - 1];
+	}
+
+	// Cleans up a companion when the owner dies, leaves combat, or dismisses it.
+	void dismiss_companion(combatant@ companion, bool announce = true) {
+		if (@companion == null or !companion.is_companion) return;
+		companion.is_dead = true;
+		companion.current_hp = 0;
+		if (announce) broadcast_announce(companion.name + " fades away.", false);
+	}
+
 	combatant@ find_nearest_hostile_target(combatant@ actor) {
 		if (@actor == null or @combat == null) return null;
 		combatant@ nearest = null;

@@ -92,6 +92,18 @@ class combatant {
 	bool beacon_of_hope_active = false; // Beacon of Hope spell: max healing + adv on WIS/death saves
 	bool death_ward_active = false; // Death Ward spell: first 0 HP becomes 1 HP and ends spell
 	bool holy_weapon_active = false; // Xanathar's Holy Weapon: +2d8 radiant on weapon hits
+	// --- Companion / Summon System (TODO §7C) ---
+	// Companions are full combatants tracked in combat.combatants with their own initiative,
+	// HP, AC, attacks, and conditions. They're owned by another combatant via owner_id and
+	// scaled to the owner's level + proficiency bonus per source.
+	bool is_companion = false;          // True for Beast Master pet, Battle Smith Steel Defender, Drakewarden Drake, etc.
+	uint owner_id = 0;                  // The combatant this companion is bound to (death/exhaustion may dismiss)
+	string companion_subclass = "";     // "beast_master", "battle_smith", "drakewarden", "wildfire", "echo_knight", etc.
+	int companion_attack_bonus = 0;     // Cached attack roll modifier (owner_prof + relevant_ability_mod)
+	int companion_attack_dice = 0;      // Damage dice count
+	int companion_attack_die_sides = 0; // Damage die sides
+	int companion_attack_dmg_mod = 0;   // Damage flat modifier
+	int companion_attack_dmg_type = 0;  // Damage type ID
 	int lay_on_hands_pool = 0;
 	int bardic_inspiration_uses = 0;
 	int bardic_inspiration_grant_die = 0;
