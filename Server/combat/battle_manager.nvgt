@@ -4633,6 +4633,17 @@ class battle_manager {
 				total_damage += df_dmg;
 				broadcast_announce(c.name + "'s Divine Favor adds " + df_dmg + " radiant damage.", false);
 			}
+			// Searing Smite (Basic Rules para 14887): pending rider applied on the next
+			// melee weapon hit. The Searing Smite spell consumes itself and applies extra
+			// fire damage equal to (1+upcast)d6.
+			if (c.searing_smite_pending and !pr.is_spell_effect and pr.is_weapon_attack and !c.main_hand_is_ranged) {
+				int ss_dmg = 0;
+				for (int d = 0; d < c.searing_smite_dice; d++) ss_dmg += random(1, 6);
+				total_damage += ss_dmg;
+				c.searing_smite_pending = false;
+				c.searing_smite_dice = 0;
+				broadcast_announce(c.name + "'s Searing Smite ignites " + target.name + " for " + ss_dmg + " fire damage!", true);
+			}
 			// Mother of Sorrows Venomous Mark (Book of Ebon Tides para 1137):
 			// "Until the curse ends, you deal an extra 1d6 poison damage to the target
 			// whenever you hit it with a spell attack."
@@ -7339,6 +7350,42 @@ class battle_manager {
 				broadcast_state();
 				check_battle_end();
 				return;
+			}
+			else if (spell.id == "searing_smite") {
+				// Basic Rules para 14887: "As you hit the target, it takes an extra 1d6
+				// Fire damage from the attack. At the start of each of its turns until
+				// the spell ends, the target takes 1d6 Fire damage and then makes a
+				// Constitution saving throw."
+				// Marked as a pending smite rider; the next melee hit applies the damage.
+				c.searing_smite_pending = true;
+				c.searing_smite_dice = 1 + upcast_levels;
+				broadcast_announce(c.name + " casts Searing Smite — their next weapon hit deals +" + c.searing_smite_dice + "d6 fire damage.", true);
+			}
+			else if (spell.id == "hellish_rebuke" and @target != null) {
+				// Basic Rules para 13744: "The creature that damaged you is momentarily
+				// surrounded by green flames. It makes a Dexterity saving throw, taking
+				// 2d10 Fire damage on a failed save or half as much damage on a successful one."
+				int dice_count = 2 + upcast_levels;
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 10);
+				int save_roll = random(1, 20);
+				int save_bonus = target.get_save_bonus(ABILITY_DEX);
+				int bless_bonus = roll_bless_bonus(target);
+				int save_total = save_roll + save_bonus + bless_bonus;
+				bool saved = save_total >= save_dc;
+				int dmg = saved ? total_damage / 2 : total_damage;
+				if (dmg < 1) dmg = 1;
+				broadcast_roll(target.name, "DEX save vs Hellish Rebuke", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+				combat.apply_damage(target, dmg, DMG_FIRE, c);
+				broadcast_announce(c.name + "'s Hellish Rebuke surrounds " + target.name + " with green flames for " + dmg + " fire damage!", true);
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "detect_magic" or spell.id == "detect_evil_and_good") {
+				// Basic Rules paras 12815, 12824: divination utility spells with no
+				// combat effect. Announce-only.
+				broadcast_announce(c.name + " casts " + spell.name + " and senses their surroundings.", false);
 			}
 			else if (spell.id == "counterspell") {
 				// Basic Rules para 12677: "You attempt to interrupt a creature in the
