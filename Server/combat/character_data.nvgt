@@ -736,6 +736,65 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         for (uint si = 0; si < c.prepared_spells.length(); si++) if (c.prepared_spells[si] == "bless") { has_bless = true; break; }
         if (!has_bless) c.prepared_spells.insert_last("bless");
     }
+    // Feat: Actor (PHB para 7542) - "While you're disguised as a real or fictional person,
+    // you have Advantage on Charisma (Deception or Performance) checks to convince others
+    // that you are that person." Passive advantage on Deception and Performance.
+    if (character_sheet_has_feat(cs, "actor")) {
+        if (!c.has_skill_check_advantage("Deception")) c.skill_check_advantage.insert_last("Deception");
+        if (!c.has_skill_check_advantage("Performance")) c.skill_check_advantage.insert_last("Performance");
+    }
+    // Feat: Telepathic (PHB para 7820) - "You always have the Detect Thoughts spell
+    // prepared. You can cast it without a spell slot or spell components, and you must
+    // finish a Long Rest before you can cast it in this way again."
+    if (character_sheet_has_feat(cs, "telepathic")) {
+        bool has_dt = false;
+        for (uint si = 0; si < c.prepared_spells.length(); si++) if (c.prepared_spells[si] == "detect_thoughts") { has_dt = true; break; }
+        if (!has_dt) c.prepared_spells.insert_last("detect_thoughts");
+    }
+    // Feat: Skilled (PHB Origin) - "You gain proficiency in any combination of three
+    // skills or tools of your choice." Default: Perception, Investigation, Insight (the
+    // most useful in combat).
+    if (character_sheet_has_feat(cs, "skilled")) {
+        if (!c.has_skill_proficiency("Perception")) c.skill_proficiencies.insert_last("Perception");
+        if (!c.has_skill_proficiency("Investigation")) c.skill_proficiencies.insert_last("Investigation");
+        if (!c.has_skill_proficiency("Insight")) c.skill_proficiencies.insert_last("Insight");
+    }
+    // Feat: Keen Mind (PHB para 7654) - "You always know which way is north and the number
+    // of hours left until the next sunrise or sunset." Plus +1 INT and Investigation prof.
+    if (character_sheet_has_feat(cs, "keen_mind")) {
+        if (!c.has_skill_proficiency("Investigation")) c.skill_proficiencies.insert_last("Investigation");
+    }
+    // Feat: Magic Initiate (Cleric/Druid/Wizard variants) - PHB Origin: "You learn two
+    // cantrips of your choice from the [chosen] class spell list. In addition, choose one
+    // level 1 spell from that same list. You always have that spell prepared. You can cast
+    // it without expending a spell slot once per Long Rest."
+    // Defaults: Cleric -> sacred_flame + guidance + bless. Druid -> druidcraft + thorn_whip
+    // + entangle. Wizard -> fire_bolt + mage_hand + shield. (Many of these may not be in
+    // the catalog yet — guards prevent duplicates regardless.)
+    if (character_sheet_has_feat(cs, "magic_initiate_cleric")) {
+        bool h1 = false; for (uint si = 0; si < c.known_cantrips.length(); si++) if (c.known_cantrips[si] == "sacred_flame") { h1 = true; break; }
+        if (!h1) c.known_cantrips.insert_last("sacred_flame");
+        bool h2 = false; for (uint si = 0; si < c.known_cantrips.length(); si++) if (c.known_cantrips[si] == "guidance") { h2 = true; break; }
+        if (!h2) c.known_cantrips.insert_last("guidance");
+        bool h3 = false; for (uint si = 0; si < c.prepared_spells.length(); si++) if (c.prepared_spells[si] == "bless") { h3 = true; break; }
+        if (!h3) c.prepared_spells.insert_last("bless");
+    }
+    if (character_sheet_has_feat(cs, "magic_initiate_druid")) {
+        bool h1 = false; for (uint si = 0; si < c.known_cantrips.length(); si++) if (c.known_cantrips[si] == "thorn_whip") { h1 = true; break; }
+        if (!h1) c.known_cantrips.insert_last("thorn_whip");
+        bool h2 = false; for (uint si = 0; si < c.known_cantrips.length(); si++) if (c.known_cantrips[si] == "produce_flame") { h2 = true; break; }
+        if (!h2) c.known_cantrips.insert_last("produce_flame");
+        bool h3 = false; for (uint si = 0; si < c.prepared_spells.length(); si++) if (c.prepared_spells[si] == "longstrider") { h3 = true; break; }
+        if (!h3) c.prepared_spells.insert_last("longstrider");
+    }
+    if (character_sheet_has_feat(cs, "magic_initiate_wizard")) {
+        bool h1 = false; for (uint si = 0; si < c.known_cantrips.length(); si++) if (c.known_cantrips[si] == "fire_bolt") { h1 = true; break; }
+        if (!h1) c.known_cantrips.insert_last("fire_bolt");
+        bool h2 = false; for (uint si = 0; si < c.known_cantrips.length(); si++) if (c.known_cantrips[si] == "ray_of_frost") { h2 = true; break; }
+        if (!h2) c.known_cantrips.insert_last("ray_of_frost");
+        bool h3 = false; for (uint si = 0; si < c.prepared_spells.length(); si++) if (c.prepared_spells[si] == "shield") { h3 = true; break; }
+        if (!h3) c.prepared_spells.insert_last("shield");
+    }
     // Feat: Shadow Touched (PHB para 7753) - "Choose one level 1 spell from the Illusion
     // or Necromancy school of magic. You always have that spell and the Invisibility spell
     // prepared. You can cast each of these spells without expending a spell slot. Once you
