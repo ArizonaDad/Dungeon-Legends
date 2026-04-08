@@ -1,10 +1,27 @@
 # Dungeon Legends - D&D 5e Battle Simulator
 
+## STRICT SOURCE-ACCURACY MANDATE
 
+**All game content MUST come from the user's source files at `C:\Users\16239\Downloads\Sources_clean\Source Books and rules\`.** Never invent rules. Never approximate mechanics unless the required subsystem is genuinely missing, and in that case flag the approximation in `TODO_SOURCE_ACCURACY.md`.
+
+### Rules:
+1. **Before implementing any feature**, open the actual docx file and extract the exact source text.
+2. **Never choose for the player** when a spell, ability, or feature gives them a choice. If no prompt system exists, add a TODO and leave the feature unimplemented until the system exists.
+3. **If a rule is missing from the source files**, do NOT fill it in from memory or training data. Flag it in `TODO_SOURCE_ACCURACY.md` and ask the user.
+4. **Spell descriptions** come from `D&D BEYOND BASIC RULES.docx` (paragraphs ~11869-15661), NOT from the PHB file (which has gaps per Phase 1 breakdown).
+5. **All content from Part 1 (core rules + player options)** is always available. Part 2 (adventures/campaigns) will be progression-locked later — do NOT process adventure content for mechanics.
+6. **Item pricing:** Use source price if listed. Otherwise: Common 100gp, Uncommon 500gp, Rare 5000gp, Very Rare 20000gp, Legendary 50000gp, Above Legendary 100000gp.
+
+### Confirmed source-missing content (do NOT implement from memory):
+- **College of Spirits** (Van Richten's Guide to Ravenloft) — 0 matches in cleaned or uncleaned docx
+- **Undead Patron** (Van Richten's Guide to Ravenloft) — 0 matches in cleaned or uncleaned docx
+- **PHB subclass detail pages** for Paladin (Ancients, Glory, Vengeance), full Ranger subclasses, Rogue subclasses (Arcane Trickster, Assassin, Soulknife), Sorcerer (Aberrant, Clockwork, Wild Magic), Warlock (Archfey, Celestial, Great Old One), Wizard (Abjurer, Diviner, Evoker, Illusionist) — brief descriptions only in PHB; Basic Rules has 1 per class. Need to extract the 1-per-class from Basic Rules.
+
+See `TODO_SOURCE_ACCURACY.md` for the full list of gaps, approximations, and planned work.
 
 ## Project Overview
 
-Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (NonVisual Gaming Toolkit, AngelScript-like). Players create characters (67 species, 14 classes, 48 backgrounds, 138 subclasses, 77 feats, 38 weapons, 367 spells) and fight in turn-based combat with full TTS and HRTF spatial audio. Supports PvP Arena, Wave Survival, Boss Rush, and Endless Survival modes. Features 40+ achievements, glory shop, daily dungeons, leaderboards, loot system, trading, prestige, guilds, and multi-phase boss fights.
+Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (NonVisual Gaming Toolkit, AngelScript-like). Players create characters (67 species, 14 classes, 48 backgrounds, 147 subclasses, 77 feats, 38 weapons, 367 spells) and fight in turn-based combat with full TTS and HRTF spatial audio. Supports PvP Arena, Wave Survival, Boss Rush, and Endless Survival modes. Features 40+ achievements, glory shop, daily dungeons, leaderboards, loot system, trading, prestige, guilds, and multi-phase boss fights.
 
 
 
