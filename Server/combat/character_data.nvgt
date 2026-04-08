@@ -694,6 +694,82 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         else if (c.save_proficiencies[ABILITY_INT] == 0) c.save_proficiencies[ABILITY_INT] = 1;
         else if (c.save_proficiencies[ABILITY_CHA] == 0) c.save_proficiencies[ABILITY_CHA] = 1;
     }
+    // Eberron Dragonmarks (Eberron: Rising From the Last War paras 1470-1721).
+    // Each mark grants +1 to a relevant ability, a Wisdom/Intuition d4 bonus on certain
+    // skill checks (approximated as a skill_check_advantage flag), and bonus prepared spells.
+    // Per the source text quoted in batch 22 commit, each mark is technically a "subrace"
+    // that layers on top of an existing race. The game treats them as standalone race options.
+    if (cs.race == "Mark of Healing (Halfling)") {
+        c.ability_scores[ABILITY_WIS] += 1;
+        if (!c.has_skill_check_advantage("Medicine")) c.skill_check_advantage.insert_last("Medicine");
+        bool has_cure = false;
+        for (uint si = 0; si < c.prepared_spells.length(); si++) if (c.prepared_spells[si] == "cure_wounds") { has_cure = true; break; }
+        if (!has_cure) c.prepared_spells.insert_last("cure_wounds");
+    }
+    if (cs.race == "Mark of Detection (Half-Elf)") {
+        c.ability_scores[ABILITY_WIS] += 1;
+        if (!c.has_skill_check_advantage("Insight")) c.skill_check_advantage.insert_last("Insight");
+        if (!c.has_skill_check_advantage("Investigation")) c.skill_check_advantage.insert_last("Investigation");
+    }
+    if (cs.race == "Mark of Finding (Half-Orc/Human)") {
+        c.ability_scores[ABILITY_WIS] += 1;
+        if (!c.has_skill_check_advantage("Perception")) c.skill_check_advantage.insert_last("Perception");
+        if (!c.has_skill_check_advantage("Survival")) c.skill_check_advantage.insert_last("Survival");
+        bool has_hm = false;
+        for (uint si = 0; si < c.prepared_spells.length(); si++) if (c.prepared_spells[si] == "hunters_mark") { has_hm = true; break; }
+        if (!has_hm) c.prepared_spells.insert_last("hunters_mark");
+    }
+    if (cs.race == "Mark of Handling (Human)") {
+        c.ability_scores[ABILITY_WIS] += 1;
+        if (!c.has_skill_check_advantage("Animal Handling")) c.skill_check_advantage.insert_last("Animal Handling");
+    }
+    if (cs.race == "Mark of Hospitality (Halfling)") {
+        c.ability_scores[ABILITY_CHA] += 1;
+        if (!c.has_skill_check_advantage("Persuasion")) c.skill_check_advantage.insert_last("Persuasion");
+    }
+    if (cs.race == "Mark of Making (Human)") {
+        c.ability_scores[ABILITY_INT] += 1;
+        if (!c.has_skill_check_advantage("Arcana")) c.skill_check_advantage.insert_last("Arcana");
+        bool has_mw = false;
+        for (uint si = 0; si < c.prepared_spells.length(); si++) if (c.prepared_spells[si] == "magic_weapon") { has_mw = true; break; }
+        if (!has_mw) c.prepared_spells.insert_last("magic_weapon");
+    }
+    if (cs.race == "Mark of Passage (Human)") {
+        c.ability_scores[ABILITY_DEX] += 1;
+        c.speed += 5;
+        bool has_ms = false;
+        for (uint si = 0; si < c.prepared_spells.length(); si++) if (c.prepared_spells[si] == "misty_step") { has_ms = true; break; }
+        if (!has_ms) c.prepared_spells.insert_last("misty_step");
+    }
+    if (cs.race == "Mark of Scribing (Gnome)") {
+        c.ability_scores[ABILITY_INT] += 1;
+        if (!c.has_skill_check_advantage("History")) c.skill_check_advantage.insert_last("History");
+        if (!c.has_skill_check_advantage("Arcana")) c.skill_check_advantage.insert_last("Arcana");
+    }
+    if (cs.race == "Mark of Sentinel (Human)") {
+        c.ability_scores[ABILITY_WIS] += 1;
+        bool has_shield = false;
+        for (uint si = 0; si < c.prepared_spells.length(); si++) if (c.prepared_spells[si] == "shield") { has_shield = true; break; }
+        if (!has_shield) c.prepared_spells.insert_last("shield");
+    }
+    if (cs.race == "Mark of Shadow (Elf)") {
+        c.ability_scores[ABILITY_CHA] += 1;
+        if (!c.has_skill_check_advantage("Stealth")) c.skill_check_advantage.insert_last("Stealth");
+        if (!c.has_skill_check_advantage("Performance")) c.skill_check_advantage.insert_last("Performance");
+    }
+    if (cs.race == "Mark of Storm (Half-Elf)") {
+        c.ability_scores[ABILITY_CHA] += 1;
+        c.lightning_resistance = true;
+        bool has_fog = false;
+        for (uint si = 0; si < c.prepared_spells.length(); si++) if (c.prepared_spells[si] == "fog_cloud") { has_fog = true; break; }
+        if (!has_fog) c.prepared_spells.insert_last("fog_cloud");
+    }
+    if (cs.race == "Mark of Warding (Dwarf)") {
+        c.ability_scores[ABILITY_INT] += 1;
+        bool has_ma = false;
+        for (uint si = 0; si < c.prepared_spells.length(); si++) if (c.prepared_spells[si] == "mage_armor") { has_ma = true; break; }
+        if (!has_ma) c.prepared_spells.insert_last("mage_armor");
+    }
     // Feat: Skill Expert (PHB paras 7774-7775) - one new skill proficiency + one expertise.
     // Defaults to Perception proficiency + expertise on the highest-value skill (Stealth)
     // since the source mandates the player choose.

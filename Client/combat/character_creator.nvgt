@@ -1366,7 +1366,15 @@ bool choose_race_step() {
         "Pallid Elf", "Ravenite Dragonborn", "Reborn", "Sable Elf",
         "Sea Elf", "Shadar-kai", "Shadow Goblin", "Simic Hybrid",
         "Stygian Shades", "The Disembodied", "Triton", "Vedalken",
-        "Wechselkind", "Yuan-ti"
+        "Wechselkind", "Yuan-ti",
+        // Eberron Dragonmarks (race-locked subraces - per source they layer on top of an
+        // existing race, but the game treats them as standalone race options for now)
+        "Mark of Detection (Half-Elf)", "Mark of Finding (Half-Orc/Human)",
+        "Mark of Handling (Human)", "Mark of Healing (Halfling)",
+        "Mark of Hospitality (Halfling)", "Mark of Making (Human)",
+        "Mark of Passage (Human)", "Mark of Scribing (Gnome)",
+        "Mark of Sentinel (Human)", "Mark of Shadow (Elf)",
+        "Mark of Storm (Half-Elf)", "Mark of Warding (Dwarf)"
     };
     string[] race_desc = {
         "Aasimar. Celestial heritage. Choose Necrotic Shroud, Radiant Consumption, or Radiant Soul.",
@@ -1436,7 +1444,19 @@ bool choose_race_step() {
         "Triton. Aquatic guardians. Swim speed 30. Control Air and Water. Cold resistance. (MotM)",
         "Vedalken. Blue-skinned scholars. Advantage on INT, WIS, CHA saves. Tireless Precision. (Ravnica)",
         "Wechselkind. Fey changelings. Shapeshifting. Fey Ancestry. (Grim Hollow)",
-        "Yuan-ti. Serpentine humanoids. Magic Resistance. Poison immunity. Darkvision. (MotM)"
+        "Yuan-ti. Serpentine humanoids. Magic Resistance. Poison immunity. Darkvision. (MotM)",
+        "Mark of Detection (Half-Elf). +1 WIS. Deductive Intuition (d4 to Insight/Investigation). Detect spells. (Eberron)",
+        "Mark of Finding (Half-Orc/Human). +1 WIS. Hunter's Intuition (d4 to Perception/Survival). Hunter's Mark, Locate Object. (Eberron)",
+        "Mark of Handling (Human). +1 WIS. The Best Friend (d4 to Animal Handling). Speak with Animals, beast cantrips. (Eberron)",
+        "Mark of Healing (Halfling). +1 WIS. Medical Intuition (d4 to Medicine). Cure Wounds, Lesser Restoration. (Eberron)",
+        "Mark of Hospitality (Halfling). +1 CHA. Ever Hospitable (d4 to Persuasion/cooking). Prestidigitation, Unseen Servant. (Eberron)",
+        "Mark of Making (Human). +1 INT. Artisan's Intuition (d4 to Arcana with smith/tinker tools). Magic Weapon, Identify. (Eberron)",
+        "Mark of Passage (Human). +1 DEX. Courier's Speed (+5 ft speed). Misty Step, Expeditious Retreat. (Eberron)",
+        "Mark of Scribing (Gnome). +1 INT. Gifted Scribe (d4 to History/Arcana with calligrapher's tools). Comprehend Languages, Magic Mouth. (Eberron)",
+        "Mark of Sentinel (Human). +1 WIS. Guardian's Shield (Shield spell as reaction). Compelled Duel, Warding Bond. (Eberron)",
+        "Mark of Shadow (Elf). +1 CHA. Cunning Intuition (d4 to Stealth/Performance). Minor Illusion, Disguise Self. (Eberron)",
+        "Mark of Storm (Half-Elf). +1 CHA. Storm's Boon (Resistance to Lightning + Thunder). Fog Cloud, Gust of Wind. (Eberron)",
+        "Mark of Warding (Dwarf). +1 INT. Warder's Intuition (d4 to thieves' tools). Alarm, Mage Armor. (Eberron)"
     };
     for (uint i = 0; i < races.length(); i++) race_menu.add_item(race_desc[i] + " " + (i + 1) + " of " + races.length());
     int race_pick = creation_menu_run(race_menu);
