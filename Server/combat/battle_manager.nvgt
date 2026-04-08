@@ -7340,6 +7340,35 @@ class battle_manager {
 				check_battle_end();
 				return;
 			}
+			else if (spell.id == "vicious_mockery" and @target != null) {
+				// Basic Rules para 15527: "You unleash a string of insults laced with
+				// subtle enchantments at one creature you can see or hear within range.
+				// The target must succeed on a Wisdom saving throw or take 1d6 Psychic
+				// damage and have Disadvantage on the next attack roll it makes before
+				// the end of its next turn."
+				// Cantrip scaling: 1d6/2d6/3d6/4d6 at 1/5/11/17.
+				int dice_count = 1;
+				if (c.level >= 17) dice_count = 4;
+				else if (c.level >= 11) dice_count = 3;
+				else if (c.level >= 5) dice_count = 2;
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 6);
+				int save_roll = random(1, 20);
+				int save_bonus = target.get_save_bonus(ABILITY_WIS);
+				int bless_bonus = roll_bless_bonus(target);
+				int save_total = save_roll + save_bonus + bless_bonus;
+				bool saved = save_total >= save_dc;
+				broadcast_roll(target.name, "WIS save vs Vicious Mockery", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Mocked!");
+				if (!saved) {
+					combat.apply_damage(target, total_damage, DMG_PSYCHIC, c);
+					// Approximation: bane effect (-2 to next attack roll) for "disadvantage on the next attack roll"
+					target.baned = true;
+					broadcast_announce(c.name + "'s Vicious Mockery cuts " + target.name + " for " + total_damage + " psychic damage and shakes their composure!", true);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
 			else if (spell.id == "mirror_image") {
 				// Basic Rules paras 14259-14260: "Three illusory duplicates of yourself
 				// appear in your space. Until the spell ends, the duplicates move with you
