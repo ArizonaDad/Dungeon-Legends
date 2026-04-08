@@ -7306,6 +7306,117 @@ class battle_manager {
 				check_battle_end();
 				return;
 			}
+			else if (spell.id == "lightning_bolt") {
+				// Basic Rules para 13996: "A stroke of lightning forming a 100-foot-long,
+				// 5-foot-wide Line blasts out from you in a direction you choose. Each
+				// creature in the Line makes a Dexterity saving throw, taking 8d6
+				// Lightning damage on a failed save or half as much damage on a
+				// successful one."
+				int dice_count = 8 + upcast_levels;
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 6);
+				broadcast_announce(c.name + " unleashes a Lightning Bolt — a 100-foot stroke of electricity!", true);
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (feet_distance(c.x, c.y, t.x, t.y) > 100) continue;
+					if (!combat.can_see(c, t)) continue;
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_DEX);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					int dmg = saved ? total_damage / 2 : total_damage;
+					if (dmg < 1) dmg = 1;
+					broadcast_roll(t.name, "DEX save vs Lightning Bolt", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+					combat.apply_damage(t, dmg, DMG_LIGHTNING, c);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "thunderwave") {
+				// Basic Rules para 15409: "Each creature in a 15-foot Cube originating
+				// from you makes a Constitution saving throw. On a failed save, a creature
+				// takes 2d8 Thunder damage and is pushed 10 feet away from you."
+				int dice_count = 2 + upcast_levels;
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 8);
+				broadcast_announce(c.name + " unleashes Thunderwave — a thunderous boom in a 15-foot cube!", true);
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (feet_distance(c.x, c.y, t.x, t.y) > 15) continue;
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_CON);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					int dmg = saved ? total_damage / 2 : total_damage;
+					if (dmg < 1) dmg = 1;
+					broadcast_roll(t.name, "CON save vs Thunderwave", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Pushed!");
+					combat.apply_damage(t, dmg, DMG_THUNDER, c);
+					if (!saved) {
+						// Push 10 ft (2 tiles) directly away from caster
+						int dx = 0;
+						int dy = 0;
+						if (t.x > c.x) dx = 2;
+						else if (t.x < c.x) dx = -2;
+						if (t.y > c.y) dy = 2;
+						else if (t.y < c.y) dy = -2;
+						int new_x = t.x + dx;
+						int new_y = t.y + dy;
+						if (new_x >= 0 and new_x < combat.map_width and new_y >= 0 and new_y < combat.map_height) {
+							t.x = new_x;
+							t.y = new_y;
+						}
+					}
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "cure_wounds" and @target != null) {
+				// Basic Rules para 12738: "A creature you touch regains a number of Hit
+				// Points equal to 2d8 plus your spellcasting ability modifier."
+				int dice_count = 2 + (upcast_levels * 2);
+				int heal = 0;
+				for (int d = 0; d < dice_count; d++) heal += random(1, 8);
+				heal += get_spellcasting_ability_mod(c);
+				heal += get_life_domain_healing_bonus(c, spell, cast_slot_level);
+				if (heal < 1) heal = 1;
+				int effective = combat.apply_healing(target, heal);
+				record_effective_healing(c.player_username, effective);
+				broadcast_announce(c.name + " heals " + target.name + " for " + heal + " HP with Cure Wounds.", true);
+			}
+			else if (spell.id == "fireball") {
+				// Basic Rules para 13302: "Each creature in a 20-foot-radius Sphere
+				// centered on that point makes a Dexterity saving throw, taking 8d6 Fire
+				// damage on a failed save or half as much damage on a successful one."
+				int dice_count = 8 + upcast_levels;
+				int center_x = @target != null ? target.x : c.x;
+				int center_y = @target != null ? target.y : c.y;
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 6);
+				broadcast_announce(c.name + " hurls a Fireball into a 20-foot sphere!", true);
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (feet_distance(center_x, center_y, t.x, t.y) > 20) continue;
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_DEX);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					int dmg = saved ? total_damage / 2 : total_damage;
+					if (dmg < 1) dmg = 1;
+					broadcast_roll(t.name, "DEX save vs Fireball", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+					combat.apply_damage(t, dmg, DMG_FIRE, c);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
 			else if (spell.id == "dissonant_whispers" and @target != null) {
 				// Basic Rules para 12895: "One creature of your choice that you can see
 				// within range hears a discordant melody in its mind. The target makes a
