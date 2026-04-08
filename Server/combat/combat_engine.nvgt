@@ -91,6 +91,29 @@ class combatant {
 	int rage_uses_remaining = 0;
 	int rage_damage_bonus = 0;
 	bool raging = false;
+	// Species/feat resistances and immunities
+	bool fire_resistance = false;
+	bool cold_resistance = false;
+	bool necrotic_resistance = false;
+	bool psychic_resistance = false;
+	bool acid_resistance = false;
+	bool lightning_resistance = false;
+	bool piercing_resistance = false;
+	bool poison_resistance = false;
+	bool poison_immunity = false;
+	bool magic_resistance = false;
+	// Armor (used for Heavy Armor Master check)
+	string armor_type = "none";
+	bool has_shield = false;
+	// Species traits
+	bool darkvision = false;
+	int darkvision_range = 0;
+	int flying_speed = 0;
+	int swim_speed = 0;
+	// Feat once-per-turn flags
+	bool crusher_used_this_turn = false;
+	bool slasher_used_this_turn = false;
+	bool piercer_reroll_used_this_turn = false;
 	int rage_turns_remaining = 0;
 	int action_surge_uses_remaining = 0;
 	bool second_wind_available = false;
@@ -474,6 +497,9 @@ class battle {
 		c.hunter_colossus_used = false;
 		c.is_first_hit_this_turn = true;
 		c.dread_ambusher_used = false;
+		c.crusher_used_this_turn = false;
+		c.slasher_used_this_turn = false;
+		c.piercer_reroll_used_this_turn = false;
 		c.trip_attack_pending = false;
 		c.precision_attack_pending = false;
 
@@ -535,6 +561,25 @@ class battle {
 		if (target.raging and (damage_type == DMG_BLUDGEONING or damage_type == DMG_PIERCING or damage_type == DMG_SLASHING)) {
 			amount = (amount + 1) / 2;
 		}
+
+		// Heavy Armor Master: reduce B/P/S damage by Proficiency Bonus when wearing heavy armor
+		if (target.has_feat("heavy_armor_master") and (damage_type == DMG_BLUDGEONING or damage_type == DMG_PIERCING or damage_type == DMG_SLASHING)) {
+			if (target.armor_type == "chain_mail" or target.armor_type == "splint" or target.armor_type == "plate" or target.armor_type == "ring_mail") {
+				amount -= target.proficiency;
+				if (amount < 1) amount = 1;
+			}
+		}
+
+		// Species/feat resistances and immunities
+		if (damage_type == DMG_COLD and target.cold_resistance) amount = (amount + 1) / 2;
+		if (damage_type == DMG_NECROTIC and target.necrotic_resistance) amount = (amount + 1) / 2;
+		if (damage_type == DMG_PSYCHIC and target.psychic_resistance) amount = (amount + 1) / 2;
+		if (damage_type == DMG_ACID and target.acid_resistance) amount = (amount + 1) / 2;
+		if (damage_type == DMG_LIGHTNING and target.lightning_resistance) amount = (amount + 1) / 2;
+		if (damage_type == DMG_PIERCING and target.piercing_resistance) amount = (amount + 1) / 2;
+		if (damage_type == DMG_FIRE and target.fire_resistance) amount = (amount + 1) / 2;
+		if (damage_type == DMG_POISON and target.poison_resistance and !target.poison_immunity) amount = (amount + 1) / 2;
+		if (damage_type == DMG_POISON and target.poison_immunity) amount = 0;
 
 		// Arcane Ward absorbs damage for Abjurer Wizards
 		if (target.arcane_ward_hp > 0 and target.class_name == "Wizard" and target.subclass == "Abjurer") {

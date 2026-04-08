@@ -53,6 +53,13 @@ class character_sheet {
     bool magic_resistance = false;
     bool poison_resistance = false;
     bool fire_resistance = false;
+    bool cold_resistance = false;
+    bool necrotic_resistance = false;
+    bool psychic_resistance = false;
+    bool acid_resistance = false;
+    bool lightning_resistance = false;
+    bool piercing_resistance = false;
+    bool poison_immunity = false;
 }
 
 int bardic_inspiration_die_for_level(int level) {
@@ -291,6 +298,9 @@ void calculate_hp(character_sheet@ cs) {
     if (character_sheet_has_feat(cs, "tough")) {
         cs.max_hp += cs.level * 2;
     }
+    if (character_sheet_has_feat(cs, "boon_of_fortitude")) {
+        cs.max_hp += 40;
+    }
     if (cs.max_hp < 1) cs.max_hp = 1;
 }
 
@@ -302,6 +312,7 @@ void calculate_ac(character_sheet@ cs) {
     if (cs.natural_ac_override > 0) {
         if (cs.race == "Tortle") base_ac = 17; // flat, no DEX
         else if (cs.race == "Lizardfolk") base_ac = 13 + dex_mod;
+        else if (cs.race == "Loxodon") base_ac = 12 + ability_modifier(cs.constitution); // Natural Armor: 12 + CON
     }
     // Unarmored Defense (class feature, uses best option)
     else if (cs.has_unarmored_defense and cs.armor_type == "none") {
@@ -368,10 +379,93 @@ void apply_racial_bonuses(character_sheet@ cs) {
     } else if (r == "Tortle") {
         cs.natural_ac_override = 17;
     }
-    // Species without innate mechanical traits (Aasimar, Dragonborn, Goliath,
-    // Halfling, Orc, Bugbear, Changeling, Firbolg, Genasi Air/Earth/Fire,
-    // Githyanki, Githzerai, Goblin, Hobgoblin, Kenku, Kobold, Minotaur,
-    // Shifter, Tabaxi, Warforged) have no passive stat changes.
+    // === MotM Species ===
+    else if (r == "Deep Gnome") {
+        cs.darkvision = true; cs.darkvision_range = 120;
+        cs.magic_resistance = true;
+    } else if (r == "Duergar") {
+        cs.darkvision = true; cs.darkvision_range = 120;
+    } else if (r == "Eladrin") {
+        cs.darkvision = true; cs.darkvision_range = 60;
+    } else if (r == "Fairy") {
+        cs.flying_speed = 30;
+    } else if (r == "Harengon") {
+        // Lucky Footwork: +Prof to initiative (applied in create_player_combatant)
+    } else if (r == "Sea Elf") {
+        cs.darkvision = true; cs.darkvision_range = 60;
+        cs.swim_speed = 30;
+    } else if (r == "Shadar-kai") {
+        cs.darkvision = true; cs.darkvision_range = 60;
+        cs.necrotic_resistance = true;
+    } else if (r == "Triton") {
+        cs.darkvision = true; cs.darkvision_range = 60;
+        cs.swim_speed = 30;
+        cs.cold_resistance = true;
+    } else if (r == "Yuan-ti") {
+        cs.darkvision = true; cs.darkvision_range = 60;
+        cs.magic_resistance = true;
+        cs.poison_immunity = true;
+    }
+    // === Ravenloft Lineages ===
+    else if (r == "Dhampir") {
+        cs.darkvision = true; cs.darkvision_range = 60;
+        cs.speed = 35;
+    } else if (r == "Hexblood") {
+        cs.darkvision = true; cs.darkvision_range = 60;
+    } else if (r == "Reborn") {
+        cs.darkvision = true; cs.darkvision_range = 60;
+        cs.poison_resistance = true;
+    }
+    // === Eberron Species ===
+    else if (r == "Kalashtar") {
+        cs.psychic_resistance = true;
+    }
+    // === Theros Species ===
+    else if (r == "Leonin") {
+        cs.darkvision = true; cs.darkvision_range = 60;
+    }
+    // === Ravnica Species ===
+    else if (r == "Loxodon") {
+        cs.natural_ac_override = 12; // 12 + CON mod (handled in calculate_ac)
+    } else if (r == "Vedalken") {
+        cs.magic_resistance = true; // Advantage on INT/WIS/CHA saves
+    } else if (r == "Simic Hybrid") {
+        cs.darkvision = true; cs.darkvision_range = 60;
+    }
+    // === Wildemount Species ===
+    else if (r == "Pallid Elf") {
+        cs.darkvision = true; cs.darkvision_range = 60;
+    } else if (r == "Draconblood Dragonborn" or r == "Ravenite Dragonborn") {
+        cs.darkvision = true; cs.darkvision_range = 60;
+    }
+    // === Ebon Tides Species ===
+    else if (r == "Bearfolk") {
+        cs.darkvision = true; cs.darkvision_range = 60;
+    } else if (r == "Darakhul") {
+        cs.darkvision = true; cs.darkvision_range = 60;
+        cs.poison_resistance = true;
+    } else if (r == "Sable Elf") {
+        cs.darkvision = true; cs.darkvision_range = 120;
+    } else if (r == "Shadow Goblin") {
+        cs.darkvision = true; cs.darkvision_range = 120;
+    } else if (r == "Molefolk") {
+        cs.darkvision = true; cs.darkvision_range = 60;
+    } else if (r == "Erina") {
+        cs.piercing_resistance = true;
+    } else if (r == "Stygian Shades") {
+        cs.necrotic_resistance = true;
+    }
+    // === Third-party Species ===
+    else if (r == "Wechselkind") {
+        cs.darkvision = true; cs.darkvision_range = 60;
+    } else if (r == "The Disembodied") {
+        cs.darkvision = true; cs.darkvision_range = 60;
+    } else if (r == "Etherean") {
+        cs.darkvision = true; cs.darkvision_range = 60;
+    } else if (r == "Geleton") {
+        cs.acid_resistance = true;
+    }
+    // Lotusden Halfling, Ghostwise Halfling, Hollow One: no additional passive traits beyond base
 }
 
 void apply_weapon(character_sheet@ cs, string weapon) {
@@ -552,6 +646,32 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
     c.free_cast_uses_remaining.resize(cs.free_cast_spells.length());
     for (uint fi = 0; fi < c.free_cast_uses_remaining.length(); fi++) c.free_cast_uses_remaining[fi] = 1;
     if (character_sheet_has_feat(cs, "alert")) c.initiative_bonus += c.proficiency;
+    if (cs.race == "Harengon") c.initiative_bonus += c.proficiency; // Lucky Footwork
+    // Feat: Speedy (+10ft speed)
+    if (character_sheet_has_feat(cs, "speedy")) c.speed += 10;
+    // Epic Boon: Speed (+30ft)
+    if (character_sheet_has_feat(cs, "boon_of_speed")) c.speed += 30;
+    // Feat: Skulker (Darkvision 60ft)
+    if (character_sheet_has_feat(cs, "skulker")) { c.darkvision = true; c.darkvision_range = 60; }
+    // Epic Boon: Night Spirit (Darkvision 300ft)
+    if (character_sheet_has_feat(cs, "boon_of_the_night_spirit")) { c.darkvision = true; c.darkvision_range = 300; }
+    // Transfer species traits from character sheet to combatant
+    if (cs.darkvision) { c.darkvision = true; if (cs.darkvision_range > c.darkvision_range) c.darkvision_range = cs.darkvision_range; }
+    c.flying_speed = cs.flying_speed;
+    c.swim_speed = cs.swim_speed;
+    c.fire_resistance = cs.fire_resistance;
+    c.cold_resistance = cs.cold_resistance;
+    c.necrotic_resistance = cs.necrotic_resistance;
+    c.psychic_resistance = cs.psychic_resistance;
+    c.acid_resistance = cs.acid_resistance;
+    c.lightning_resistance = cs.lightning_resistance;
+    c.piercing_resistance = cs.piercing_resistance;
+    c.poison_resistance = cs.poison_resistance;
+    c.poison_immunity = cs.poison_immunity;
+    c.magic_resistance = cs.magic_resistance;
+    c.armor_type = cs.armor_type;
+    c.has_shield = cs.has_shield;
+    c.has_heroic_inspiration = cs.has_heroic_inspiration;
     c.extra_attacks = cs.extra_attacks;
     c.main_hand = cs.weapon_name;
     c.main_hand_damage_dice = cs.weapon_damage_dice;

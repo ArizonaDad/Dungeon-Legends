@@ -1498,7 +1498,8 @@ class battle_manager {
 		if (target.has_condition(COND_INVISIBLE) and !can_ignore_invisible) disadv = true;
 		if (target.has_condition(COND_RESTRAINED)) adv = true;
 		if (attacker.is_hidden and combat.are_hostile(attacker, target)) adv = true;
-		if (attack_is_ranged and has_hostile_within_5_feet(attacker)) disadv = true;
+		// Crossbow Expert: no disadvantage on ranged attacks within 5ft
+		if (attack_is_ranged and has_hostile_within_5_feet(attacker) and !attacker.has_feat("crossbow_expert")) disadv = true;
 		if (attacker.has_feat("grappler") and target.grapple_source_id == attacker.id and target.has_condition(COND_GRAPPLED)) adv = true;
 		if (target.guiding_bolt_advantage) {
 			adv = true;
@@ -1555,6 +1556,10 @@ class battle_manager {
 		if (!attacker.is_player or attacker.wild_shape_active) return use_secondary ? attacker.monster_attack2_mod : attacker.monster_attack_damage_mod;
 		int mod = get_weapon_damage_ability_mod(attacker);
 		if (attacker.raging and !attacker.main_hand_is_ranged) mod += attacker.rage_damage_bonus;
+		// Fighting Style: Dueling (+2 damage with one-handed melee, no second weapon)
+		if (attacker.has_feat("dueling") and !attacker.main_hand_is_ranged and attacker.main_hand_range <= 5) mod += 2;
+		// Fighting Style: Thrown Weapon Fighting (+2 damage with thrown weapons)
+		if (attacker.has_feat("thrown_weapon_fighting") and attacker.main_hand_is_ranged and attacker.main_hand_range <= 60) mod += 2;
 		return mod;
 	}
 
@@ -3684,6 +3689,31 @@ class battle_manager {
 				int boon_damage = random(1, 10) + random(1, 10);
 				total_damage += boon_damage;
 				broadcast_announce(c.name + "'s Boon of Irresistible Offense adds " + boon_damage + " extra damage!", false);
+			}
+			// Feat: Piercer — extra damage die on crits with piercing damage
+			if (pr.is_crit and c.has_feat("piercer") and pr.damage_type == DMG_PIERCING) {
+				int extra = random(1, pr.damage_dice_sides);
+				total_damage += extra;
+				broadcast_announce(c.name + "'s Piercer adds " + extra + " extra piercing damage on the crit!", false);
+			}
+			// Feat: Crusher — push target 5ft on bludgeoning damage (once per turn)
+			if (c.has_feat("crusher") and pr.damage_type == DMG_BLUDGEONING and !c.crusher_used_this_turn) {
+				c.crusher_used_this_turn = true;
+				int push_dx = 0, push_dy = 0;
+				if (target.x > c.x) push_dx = 1;
+				else if (target.x < c.x) push_dx = -1;
+				if (target.y > c.y) push_dy = 1;
+				else if (target.y < c.y) push_dy = -1;
+				target.x += push_dx;
+				target.y += push_dy;
+				broadcast_announce(c.name + "'s Crusher pushes " + target.name + " back 5 feet!", false);
+			}
+			// Feat: Slasher — reduce target speed by 10 on slashing damage (once per turn)
+			if (c.has_feat("slasher") and pr.damage_type == DMG_SLASHING and !c.slasher_used_this_turn) {
+				c.slasher_used_this_turn = true;
+				target.speed -= 10;
+				if (target.speed < 0) target.speed = 0;
+				broadcast_announce(c.name + "'s Slasher reduces " + target.name + "'s speed by 10 feet!", false);
 			}
 
 			int hunter_damage = 0;
