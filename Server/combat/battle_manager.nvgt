@@ -3046,6 +3046,8 @@ class battle_manager {
 		c.shield_bash_used_this_turn = false;
 		// Reset Way of the Prophet Righteous Strike (1/turn)
 		c.righteous_strike_used_this_turn = false;
+		// Reset Stunning Strike (PHB 2024 Monk L5: "Once per turn")
+		c.stunning_strike_available = true;
 		// Reckless Attack ends at the start of the barbarian's next turn (PHB 2024 para 2785).
 		c.reckless_attack_active = false;
 
@@ -4172,6 +4174,28 @@ class battle_manager {
 			int sb_dmg = attacker.proficiency;
 			bonus += sb_dmg;
 			broadcast_announce(attacker.name + "'s Shadow Bind adds " + sb_dmg + " cold damage.", false);
+		}
+
+		// PHB 2024 Monk L5 Stunning Strike (para 6470): "Once per turn when you hit a
+		// creature with a Monk weapon or an Unarmed Strike, you can expend 1 Focus Point
+		// to attempt a stunning strike. The target must make a Constitution saving throw.
+		// On a failed save, the target has the Stunned condition until the end of your
+		// next turn. The Stunned target makes a Constitution saving throw at the end of
+		// each of its turns, ending the effect on itself on a success."
+		// Auto-fires on the first weapon hit per turn for Monks L5+ if they have focus
+		// points and haven't used Stunning Strike this turn. Defaults to ON since the
+		// alternative would require a per-attack toggle prompt.
+		if (attacker.class_name == "Monk" and attacker.level >= 5 and attacker.stunning_strike_available and attacker.focus_points > 0 and is_weapon_attack and (attack_name_is_unarmed(attacker.main_hand) or attacker.main_hand_damage_dice <= 6)) {
+			attacker.stunning_strike_available = false;
+			attacker.focus_points--;
+			int ss_dc = 8 + attacker.proficiency + attacker.get_ability_mod(ABILITY_WIS);
+			int ss_save = random(1, 20) + target.get_save_bonus(ABILITY_CON);
+			if (ss_save < ss_dc) {
+				target.add_condition(COND_STUNNED);
+				broadcast_announce(attacker.name + "'s Stunning Strike stuns " + target.name + "! (CON save " + ss_save + " vs DC " + ss_dc + ", 1 focus spent)", true);
+			} else {
+				broadcast_announce(target.name + " resists " + attacker.name + "'s Stunning Strike. (CON save " + ss_save + " vs DC " + ss_dc + ", 1 focus spent)", false);
+			}
 		}
 
 		// Way of the Prophet Monk L6 - Righteous Strike (Book of Ebon Tides para 1231):
