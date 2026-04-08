@@ -321,13 +321,13 @@ Currently a single-minded stub exists (Beast Master `beast_companion_active` fla
 ## 8. Items and Shop TODOs
 
 Phase 1 identifies massive item catalogs:
-- DMG 2024: paragraphs 6632-10570 (~4000 paras of magic items alphabetically)
-- Griffon's Saddlebag Book One + Two: hundreds of items
-- Tasha's Ch 3, Fizban's, Book of Many Things, Wildemount, Theros, Ravnica, Ravenloft — all have setting-specific items
-- Grim Hollow Player Pack: 10+ items
-- Valda's Gunslinger: 15 firearms across 3 eras
+- DMG 2024: paragraphs 6632-10570 (~4000 paras of magic items alphabetically) — IN PROGRESS, ~84 items extracted across batches 17B-24B
+- Griffon's Saddlebag Book One + Two: hundreds of items. PENDING.
+- Tasha's Ch 3, Fizban's, Book of Many Things, Wildemount, Theros, Ravnica, Ravenloft — all have setting-specific items. PENDING.
+- Grim Hollow Player Pack: 10+ items. PENDING.
+- Valda's Gunslinger: 15 firearms across 3 eras. PENDING.
 
-Current catalog size in game: TBD. Needs a pass against each source file.
+Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 
 **Pricing rule:** Use source price. If missing, use rarity defaults: Common 100gp, Uncommon 500gp, Rare 5000gp, Very Rare 20000gp, Legendary 50000gp, Above Legendary 100000gp.
 
@@ -335,19 +335,19 @@ Current catalog size in game: TBD. Needs a pass against each source file.
 
 ## 9. Other Systems From Phase 1 Not Yet Implemented
 
-- **Dragonmarks** (Eberron Rising, Wayfinder's, Forge of Artificer) — 12-13 marks with subrace-style benefits
-- **Piety system** (Theros) — 15 gods with devotion tracks
-- **Supernatural Gifts** (Theros) — 10 gifts (Anvilwrought, Heroic Destiny, Iconoclast, Inscrutable, Lucky, Mythic Companion, Nyxborn, Oracle, Pious, Unscarred)
-- **Dark Gifts** (Ravenloft) — source missing
-- **Vestiges of Divergence** (Wildemount) — 3-tier evolving legendary items
-- **Heroic Chronicle** (Wildemount) — backstory tables
-- **Transformations** (Grim Hollow) — 7 types × 4 levels = 28 progression tracks (Aberrant/Celestial/Fiendish/Fey/Lich/Lycanthrope/Vampire)
-- **Shadow Roads** (Book of Ebon Tides) — planar travel
-- **Fey Courts** (Book of Ebon Tides) — Golden Oak / Midnight Teeth / Fallen Courts
-- **Guild Membership** (Ravnica) — renown and rank advancement
-- **Faction Tracks** (Grim Hollow) — faction reward progression
-- **Bastions** (DMG 2024 + Forge of Artificer) — player-owned strongholds with facilities
-- **Group Patrons** (Tasha's, Eberron Rising) — party-level patron benefits
+- **Dragonmarks** (Eberron Rising, Wayfinder's, Forge of Artificer) — SHIPPED 2026-04-08 batch 22. 12 marks live as race options with +1 ability, skill_check_advantage flags, and bonus prepared spells. Layered "subrace on top of base race" model is approximated as standalone race options.
+- **Supernatural Gifts** (Theros) — SHIPPED 2026-04-08 batch 23. 8 of 10 gifts live as race options (Anvilwrought, Heroic Destiny, Iconoclast, Inscrutable, Nyxborn, Oracle, Pious, Unscarred). Lucky and Mythic Companion deferred — Lucky is the same as the Lucky feat which is already implemented; Mythic Companion needs a custom companion type.
+- **Piety system** (Theros) — 15 gods with devotion tracks. PENDING.
+- **Dark Gifts** (Ravenloft) — source missing per earlier extraction confirmation.
+- **Vestiges of Divergence** (Wildemount) — 3-tier evolving legendary items. PENDING.
+- **Heroic Chronicle** (Wildemount) — backstory tables. PENDING.
+- **Transformations** (Grim Hollow) — 7 types × 4 levels = 28 progression tracks (Aberrant/Celestial/Fiendish/Fey/Lich/Lycanthrope/Vampire). PENDING.
+- **Shadow Roads** (Book of Ebon Tides) — planar travel. PENDING.
+- **Fey Courts** (Book of Ebon Tides) — Golden Oak / Midnight Teeth / Fallen Courts. PENDING.
+- **Guild Membership** (Ravnica) — renown and rank advancement. PENDING.
+- **Faction Tracks** (Grim Hollow) — faction reward progression. PENDING.
+- **Bastions** (DMG 2024 + Forge of Artificer) — player-owned strongholds with facilities. PENDING.
+- **Group Patrons** (Tasha's, Eberron Rising) — party-level patron benefits. PENDING.
 
 These are large systems. None should be built from memory — each needs a full source extraction pass before coding.
 
