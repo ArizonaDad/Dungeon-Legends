@@ -3601,16 +3601,22 @@ class battle_manager {
 		}
 
 		// Inquisition Domain Cleric (Grim Hollow): Witch Hunter's Strike L1 — +1d8 force (+2d8 vs concentrating)
-		// Limited to WIS-mod uses per long rest (tracked loosely via once-per-turn first hit)
-		if (attacker.class_name == "Cleric" and attacker.subclass == "Inquisition Domain" and attacker.is_first_hit_this_turn and is_weapon_attack) {
-			int inq_dmg = random(1, 8);
-			if (target.is_concentrating) {
-				inq_dmg += random(1, 8);
-				broadcast_announce(attacker.name + "'s Witch Hunter's Strike adds " + inq_dmg + " force damage (double vs concentrating target)!", false);
-			} else {
-				broadcast_announce(attacker.name + "'s Witch Hunter's Strike adds " + inq_dmg + " force damage!", false);
-			}
+		// Limited to WIS-mod uses per long rest. At L14, doubles to 2d8/3d8.
+		if (attacker.class_name == "Cleric" and attacker.subclass == "Inquisition Domain" and attacker.witch_hunter_strikes_remaining > 0 and is_weapon_attack) {
+			int base_dice = attacker.level >= 14 ? 2 : 1;
+			int concentrating_bonus_dice = attacker.level >= 14 ? 3 : 2;
+			int inq_dice = target.is_concentrating ? concentrating_bonus_dice : base_dice;
+			int inq_dmg = 0;
+			for (int id2 = 0; id2 < inq_dice; id2++) inq_dmg += random(1, 8);
 			bonus += inq_dmg;
+			attacker.witch_hunter_strikes_remaining--;
+			// On concentration break, grant temp HP equal to extra damage
+			if (target.is_concentrating) {
+				broadcast_announce(attacker.name + "'s Witch Hunter's Strike deals " + inq_dmg + " force damage vs concentration!", false);
+				if (attacker.temp_hp < inq_dmg) attacker.temp_hp = inq_dmg;
+			} else {
+				broadcast_announce(attacker.name + "'s Witch Hunter's Strike deals " + inq_dmg + " force damage!", false);
+			}
 		}
 
 		// Astral Domain Cleric: psychic damage on weapon strikes

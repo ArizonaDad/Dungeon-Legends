@@ -246,6 +246,9 @@ class combatant {
 	uint misfortune_jinx_target = 0;
 	bool carrion_raven_focus = false; // Path of Carrion Raven - beast focus
 	bool inquisition_anti_magic = false; // Inquisition Domain Cleric
+	int witch_hunter_strikes_remaining = 0; // Inquisition Domain L1 - WIS-mod uses per long rest
+	bool mark_of_heretic_active = false; // Oath of Zeal L3 Channel Divinity
+	uint mark_of_heretic_target = 0; // Target with crit range 19+
 	bool astral_domain_active = false; // Astral Domain Cleric
 	bool warrior_celestial_radiant = false; // Warrior of the Celestial Monk
 	bool way_of_aether_active = false; // Way of the Aether Monk
