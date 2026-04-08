@@ -216,6 +216,11 @@ class combatant {
 	int trick_shot_uses = 0;
 	bool white_hat_protection_active = false; // White Hat - protect ally from harm
 	uint white_hat_ally = 0;
+	// Spell tracking (Batch 19)
+	bool spirit_guardians_active = false;
+	int spirit_guardians_slot_level = 0;
+	bool fog_cloud_active = false;
+	bool darkness_active = false;
 	// Setting subclasses (Batch 17)
 	bool sea_circle_active = false; // Circle of the Sea Druid - Wrath of the Sea
 	int sea_wrath_dice = 0;

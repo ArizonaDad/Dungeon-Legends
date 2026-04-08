@@ -2589,6 +2589,32 @@ class battle_manager {
 			if (healed > 0) broadcast_announce(c.name + " heals " + healed + " HP from Blessed Grounds.", false);
 		}
 
+		// Spirit Guardians: damage enemies starting their turn within 15ft of caster
+		for (uint sgi = 0; sgi < combat.combatants.length(); sgi++) {
+			combatant@ sg_caster = combat.combatants[sgi];
+			if (@sg_caster == null or sg_caster.is_dead or !sg_caster.spirit_guardians_active) continue;
+			if (sg_caster.id == c.id) continue;
+			if (sg_caster.is_player == c.is_player) continue;
+			int sg_dist = feet_distance(sg_caster.x, sg_caster.y, c.x, c.y);
+			if (sg_dist <= 15) {
+				int sg_dice = 3 + (sg_caster.spirit_guardians_slot_level - 3);
+				if (sg_dice < 3) sg_dice = 3;
+				int sg_save_roll = random(1, 20);
+				int sg_save_bonus = c.get_save_bonus(ABILITY_WIS);
+				int sg_dc = spell_save_dc(sg_caster, "spirit_guardians");
+				bool sg_saved = (sg_save_roll + sg_save_bonus) >= sg_dc;
+				int sg_dmg = 0;
+				for (int sd = 0; sd < sg_dice; sd++) sg_dmg += random(1, 8);
+				if (sg_saved) sg_dmg /= 2;
+				if (sg_dmg < 1) sg_dmg = 1;
+				combat.apply_damage(c, sg_dmg, DMG_RADIANT, sg_caster);
+				broadcast_announce(c.name + " takes " + sg_dmg + " radiant damage from " + sg_caster.name + "'s Spirit Guardians!", true);
+				// Half movement speed within aura
+				c.speed = c.speed / 2 > 5 ? c.speed / 2 : 5;
+				break;
+			}
+		}
+
 		// ---- Subclass turn-start effects ----
 
 		// Berserker Frenzy: announce bonus action melee attack available while raging
@@ -6175,6 +6201,63 @@ class battle_manager {
 				target.sanctuary_dc = save_dc;
 				target.sanctuary_source_id = c.id;
 				broadcast_announce(target.name + " is protected by Sanctuary. Attackers must make a Wisdom save to target them.", true);
+			}
+			else if (spell.id == "aid") {
+				// Aid: +5 max HP and current HP per target (up to 3 targets within range)
+				int aid_bonus = 5 + (cast_slot_level - 2) * 5;
+				if (@target == null) @target = c;
+				target.max_hp += aid_bonus;
+				target.current_hp += aid_bonus;
+				broadcast_announce(c.name + "'s Aid grants " + target.name + " " + aid_bonus + " bonus HP.", true);
+				// Apply to nearby allies as well
+				int affected = 1;
+				for (uint ai = 0; ai < combat.combatants.length() and affected < 3; ai++) {
+					combatant@ ally = combat.combatants[ai];
+					if (@ally == null or ally.is_dead or ally.id == target.id or ally.id == c.id) continue;
+					if (ally.is_player != c.is_player) continue;
+					if (feet_distance(c.x, c.y, ally.x, ally.y) > 30) continue;
+					ally.max_hp += aid_bonus;
+					ally.current_hp += aid_bonus;
+					broadcast_announce(c.name + "'s Aid grants " + ally.name + " " + aid_bonus + " bonus HP.", false);
+					affected++;
+				}
+			}
+			else if (spell.id == "stoneskin") {
+				// Stoneskin: resistance to bludgeoning, piercing, slashing
+				if (@target == null) @target = c;
+				target.piercing_resistance = true;
+				broadcast_announce(target.name + "'s skin turns to stone, gaining resistance to mundane physical damage!", true);
+			}
+			else if (spell.id == "greater_invisibility" and @target != null) {
+				target.add_condition(COND_INVISIBLE);
+				target.is_hidden = true;
+				broadcast_announce(target.name + " becomes Greater Invisible! They remain invisible even after attacking.", true);
+			}
+			else if (spell.id == "fly" and @target != null) {
+				target.flying_speed = 60;
+				broadcast_announce(target.name + " gains a flying speed of 60 feet!", true);
+			}
+			else if (spell.id == "fire_shield") {
+				// Fire Shield: damage reflection on melee attackers
+				c.fire_resistance = true; // warm shield variant
+				broadcast_announce(c.name + " is wreathed in flames! Melee attackers will take fire damage.", true);
+			}
+			else if (spell.id == "spirit_guardians") {
+				// Spirit Guardians: 15ft aura, 3d8 radiant on enter/start of turn
+				// Mark caster as having spirit guardians active for end-of-turn damage
+				c.spirit_guardians_active = true;
+				c.spirit_guardians_slot_level = cast_slot_level;
+				broadcast_announce(c.name + " is surrounded by Spirit Guardians! Enemies entering 15ft take radiant damage.", true);
+			}
+			else if (spell.id == "fog_cloud") {
+				// Fog Cloud: blocks line of sight in 20ft radius
+				c.fog_cloud_active = true;
+				broadcast_announce(c.name + " conjures a Fog Cloud, obscuring vision in a 20-foot radius!", true);
+			}
+			else if (spell.id == "darkness") {
+				// Darkness: heavily obscures area
+				c.darkness_active = true;
+				broadcast_announce(c.name + " conjures magical Darkness in a 15-foot radius.", true);
 			}
 			else {
 				broadcast_announce(c.name + " casts " + spell.name + ".", false);
