@@ -7306,6 +7306,102 @@ class battle_manager {
 				check_battle_end();
 				return;
 			}
+			else if (spell.id == "dissonant_whispers" and @target != null) {
+				// Basic Rules para 12895: "One creature of your choice that you can see
+				// within range hears a discordant melody in its mind. The target makes a
+				// Wisdom saving throw. On a failed save, it takes 3d6 Psychic damage and
+				// must immediately use its Reaction, if available, to move as far as its
+				// Speed allows away from you."
+				int dice_count = 3 + upcast_levels;
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 6);
+				int save_roll = random(1, 20);
+				int save_bonus = target.get_save_bonus(ABILITY_WIS);
+				int bless_bonus = roll_bless_bonus(target);
+				int save_total = save_roll + save_bonus + bless_bonus;
+				bool saved = save_total >= save_dc;
+				int dmg = saved ? total_damage / 2 : total_damage;
+				if (dmg < 1) dmg = 1;
+				broadcast_roll(target.name, "WIS save vs Dissonant Whispers", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Half damage + flee!");
+				combat.apply_damage(target, dmg, DMG_PSYCHIC, c);
+				if (!saved and target.has_reaction) {
+					// Move target away from caster up to its speed
+					target.has_reaction = false;
+					int dx = 0;
+					int dy = 0;
+					if (target.x > c.x) dx = 1;
+					else if (target.x < c.x) dx = -1;
+					if (target.y > c.y) dy = 1;
+					else if (target.y < c.y) dy = -1;
+					int move_distance = target.speed / 5; // tiles
+					target.x += dx * move_distance;
+					target.y += dy * move_distance;
+					if (target.x < 0) target.x = 0;
+					if (target.y < 0) target.y = 0;
+					if (target.x >= combat.map_width) target.x = combat.map_width - 1;
+					if (target.y >= combat.map_height) target.y = combat.map_height - 1;
+					broadcast_announce(target.name + " uses their reaction to flee " + target.speed + " feet away from " + c.name + "!", true);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "false_life") {
+				// Basic Rules para 13176: "You gain 2d4 + 4 Temporary Hit Points."
+				int temp = 4;
+				for (int d = 0; d < 2; d++) temp += random(1, 4);
+				temp += 5 * upcast_levels;
+				if (c.temp_hp < temp) c.temp_hp = temp;
+				broadcast_announce(c.name + " casts False Life — gains " + temp + " temporary hit points.", true);
+			}
+			else if (spell.id == "inflict_wounds" and @target != null) {
+				// Basic Rules para 13890: "A creature you touch makes a Constitution
+				// saving throw, taking 2d10 Necrotic damage on a failed save or half as
+				// much damage on a successful one."
+				int dice_count = 2 + upcast_levels;
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 10);
+				int save_roll = random(1, 20);
+				int save_bonus = target.get_save_bonus(ABILITY_CON);
+				int bless_bonus = roll_bless_bonus(target);
+				int save_total = save_roll + save_bonus + bless_bonus;
+				bool saved = save_total >= save_dc;
+				int dmg = saved ? total_damage / 2 : total_damage;
+				if (dmg < 1) dmg = 1;
+				broadcast_roll(target.name, "CON save vs Inflict Wounds", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+				combat.apply_damage(target, dmg, DMG_NECROTIC, c);
+				broadcast_announce(c.name + "'s Inflict Wounds deals " + dmg + " necrotic damage to " + target.name + ".", true);
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "burning_hands") {
+				// Basic Rules para 12301: "A thin sheet of flames shoots forth from you.
+				// Each creature in a 15-foot Cone makes a Dexterity saving throw, taking
+				// 3d6 Fire damage on a failed save or half as much damage on a successful one."
+				int dice_count = 3 + upcast_levels;
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 6);
+				broadcast_announce(c.name + " unleashes Burning Hands — a 15-foot cone of fire!", true);
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (feet_distance(c.x, c.y, t.x, t.y) > 15) continue;
+					if (!combat.can_see(c, t)) continue;
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_DEX);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					int dmg = saved ? total_damage / 2 : total_damage;
+					if (dmg < 1) dmg = 1;
+					broadcast_roll(t.name, "DEX save vs Burning Hands", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+					combat.apply_damage(t, dmg, DMG_FIRE, c);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
 			else if (spell.id == "phantasmal_killer" and @target != null) {
 				// Basic Rules paras 14448-14449: "The target makes a Wisdom saving throw.
 				// On a failed save, the target takes 4d10 Psychic damage and has the
