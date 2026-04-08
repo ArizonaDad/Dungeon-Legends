@@ -699,6 +699,11 @@ void show_bonus_action_menu() {
 	int starry_form_opt = -1;
 	int wildfire_opt = -1;
 	int echo_manifest_opt = -1;
+	int unleash_incarnation_opt = -1;
+	int adjust_density_opt = -1;
+	int event_horizon_opt = -1;
+	int momentary_stasis_opt = -1;
+	int mark_of_heretic_opt = -1;
 	int rebuke_violent_opt = -1;
 	int eldritch_cannon_opt = -1;
 	int cannon_fire_opt = -1;
@@ -897,7 +902,10 @@ void show_bonus_action_menu() {
 		wildfire_opt = m.add_item("Wildfire Spirit. Action. Summon a wildfire spirit companion.");
 	}
 	if (lc == "fighter" and subclass == "Echo Knight") {
-		echo_manifest_opt = m.add_item("Manifest Echo. Bonus action. Summon an echo from an alternate timeline.");
+		echo_manifest_opt = m.add_item("Manifest Echo. Bonus action. Summon an echo 15ft away (AC 14+prof, 1 HP).");
+		if (level >= 3) {
+			unleash_incarnation_opt = m.add_item("Unleash Incarnation. Bonus action after Attack, extra melee attack from echo's space.");
+		}
 	}
 	if (lc == "paladin" and subclass == "Oath of Redemption") {
 		rebuke_violent_opt = m.add_item("Rebuke the Violent. Channel Divinity. Reaction damage reflection.");
@@ -926,6 +934,18 @@ void show_bonus_action_menu() {
 	}
 	if (lc == "wizard" and subclass == "Chronurgy Magic") {
 		chronal_shift_opt = m.add_item("Chronal Shift. Force a roll to be rerolled.");
+		if (level >= 6) {
+			momentary_stasis_opt = m.add_item("Momentary Stasis. Action. CON save or Incapacitated. INT mod per long rest.");
+		}
+	}
+	if (lc == "wizard" and subclass == "Graviturgy Magic") {
+		adjust_density_opt = m.add_item("Adjust Density. Action. Halve or double target density within 30ft.");
+		if (level >= 14) {
+			event_horizon_opt = m.add_item("Event Horizon. Action. 30ft aura, STR save or 2d10 force + speed 0. 1/LR.");
+		}
+	}
+	if (lc == "paladin" and subclass == "Oath of Zeal" and level >= 3) {
+		mark_of_heretic_opt = m.add_item("Mark of the Heretic. Channel Divinity. Mark target for crit 19+ range.");
 	}
 	if (lc == "monk" and subclass == "Warrior of the Open Hand") {
 		open_hand_opt = m.add_item("Open Hand Technique. Use on Flurry hit to push, knock prone, or prevent reactions.");
@@ -1305,6 +1325,30 @@ void show_bonus_action_menu() {
 	else if (echo_manifest_opt >= 0 and res == echo_manifest_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "echo_knight_manifest"}});
 		speak("Manifesting echo.", true);
+	}
+	else if (unleash_incarnation_opt >= 0 and res == unleash_incarnation_opt) {
+		if (current_target_id == 0) { speak("No target selected.", true); return; }
+		send({{"type", message_types::bonus_action}, {"feature", "unleash_incarnation"}, {"target_id", current_target_id}});
+		speak("Unleash Incarnation.", true);
+	}
+	else if (adjust_density_opt >= 0 and res == adjust_density_opt) {
+		if (current_target_id == 0) { speak("No target selected.", true); return; }
+		send({{"type", message_types::bonus_action}, {"feature", "adjust_density"}, {"target_id", current_target_id}});
+		speak("Adjusting density.", true);
+	}
+	else if (event_horizon_opt >= 0 and res == event_horizon_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "event_horizon"}});
+		speak("Event Horizon active.", true);
+	}
+	else if (momentary_stasis_opt >= 0 and res == momentary_stasis_opt) {
+		if (current_target_id == 0) { speak("No target selected.", true); return; }
+		send({{"type", message_types::bonus_action}, {"feature", "momentary_stasis"}, {"target_id", current_target_id}});
+		speak("Momentary Stasis cast.", true);
+	}
+	else if (mark_of_heretic_opt >= 0 and res == mark_of_heretic_opt) {
+		if (current_target_id == 0) { speak("No target selected.", true); return; }
+		send({{"type", message_types::bonus_action}, {"feature", "mark_of_heretic"}, {"target_id", current_target_id}});
+		speak("Mark of the Heretic placed.", true);
 	}
 	else if (rebuke_violent_opt >= 0 and res == rebuke_violent_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "rebuke_violent"}});

@@ -196,8 +196,22 @@ class combatant {
 	int form_of_dread_rounds = 0;
 	bool genie_vessel_active = false; // Genie Warlock
 	bool swarmkeeper_swarm_active = false; // Swarmkeeper Ranger
-	int chronal_shift_uses = 0; // Chronurgy Wizard
-	bool adjust_density_active = false; // Graviturgy Wizard
+	int chronal_shift_uses = 0; // Chronurgy Wizard L2 reaction, 2/LR
+	int momentary_stasis_uses = 0; // Chronurgy L6 action, INT mod/LR
+	int convergent_future_uses = 0; // Chronurgy L14 (each use grants 1 exhaustion)
+	bool adjust_density_active = false; // Graviturgy Wizard L2 action, concentration
+	int adjust_density_mode = 0; // 0=halved, 1=doubled
+	int violent_attraction_uses = 0; // Graviturgy L10 reaction, INT mod/LR
+	bool event_horizon_active = false; // Graviturgy L14 action, 1/LR (or 3rd+ slot)
+	// Echo Knight (Fighter, Wildemount)
+	bool echo_active = false;
+	int echo_hp = 0;
+	int echo_x = 0;
+	int echo_y = 0;
+	int unleash_incarnation_uses = 0; // CON mod/LR
+	bool shadow_martyr_used = false; // 1/SR
+	int reclaim_potential_uses = 0; // CON mod/LR
+	int legion_of_one_echoes = 1; // 2 at L18
 	bool scribes_spellbook_active = false; // Order of Scribes Wizard
 	// Batch 15: Tasha remaining
 	bool silver_tongue_active = false; // College of Eloquence Bard - min 10 on persuade/deceive
@@ -263,7 +277,8 @@ class combatant {
 	bool pact_of_many_active = false; // Pact of the Many Warlock
 	bool materializer_object = false; // Materializer Wizard
 	bool wand_lore_focus = false; // Wand Lore Wizard
-	bool cartographer_marked = false; // Cartographer Artificer
+	bool cartographer_marked = false; // Cartographer Artificer - Adventurer's Atlas map holder
+	int illuminated_cartography_uses = 0; // Faerie Fire free casts, INT mod/LR
 	bool circle_unbroken_active = false; // Circle of the Unbroken
 	bool circle_dragons_form = false; // Circle of Dragons Druid
 	bool path_of_glacier_active = false; // Barbarian Path of the Glacier

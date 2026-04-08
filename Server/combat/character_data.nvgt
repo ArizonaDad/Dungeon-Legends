@@ -873,9 +873,43 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         c.form_of_dread_rounds = 0;
     }
 
-    // Chronurgy Wizard: Chronal Shift uses per rest (2 per long rest)
-    if (cs.class_name == "Wizard" and cs.subclass == "Chronurgy Magic" and cs.level >= 2) {
-        c.chronal_shift_uses = 2;
+    // Chronurgy Wizard (Wildemount): L2 Chronal Shift (2/LR) + Temporal Awareness (passive init bonus)
+    if (cs.class_name == "Wizard" and cs.subclass == "Chronurgy Magic") {
+        if (cs.level >= 2) {
+            c.chronal_shift_uses = 2;
+            int int_mod = (cs.intelligence - 10) / 2;
+            c.initiative_bonus += int_mod; // Temporal Awareness
+        }
+        if (cs.level >= 6) {
+            // Momentary Stasis: INT mod/LR
+            int int_mod = (cs.intelligence - 10) / 2;
+            c.momentary_stasis_uses = int_mod > 0 ? int_mod : 1;
+        }
+        if (cs.level >= 14) {
+            c.convergent_future_uses = 99; // limited by exhaustion, not count
+        }
+    }
+
+    // Graviturgy Wizard (Wildemount): L2 Adjust Density + L6 Gravity Well + L10 Violent Attraction + L14 Event Horizon
+    if (cs.class_name == "Wizard" and cs.subclass == "Graviturgy Magic") {
+        if (cs.level >= 10) {
+            int int_mod = (cs.intelligence - 10) / 2;
+            c.violent_attraction_uses = int_mod > 0 ? int_mod : 1;
+        }
+    }
+
+    // Echo Knight (Wildemount Fighter): Manifest Echo + Unleash Incarnation
+    if (cs.class_name == "Fighter" and cs.subclass == "Echo Knight") {
+        if (cs.level >= 3) {
+            int con_mod = (cs.constitution - 10) / 2;
+            c.unleash_incarnation_uses = con_mod > 0 ? con_mod : 1;
+        }
+        if (cs.level >= 10) c.shadow_martyr_used = false;
+        if (cs.level >= 15) {
+            int con_mod = (cs.constitution - 10) / 2;
+            c.reclaim_potential_uses = con_mod > 0 ? con_mod : 1;
+        }
+        if (cs.level >= 18) c.legion_of_one_echoes = 2;
     }
 
     // Setting subclasses (Batch 17) - initialize per-class
@@ -1039,7 +1073,11 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
     }
     if (cs.class_name == "Artificer") {
         if (cs.subclass == "Cartographer" and cs.level >= 3) {
-            c.cartographer_marked = false;
+            // Eberron Forge of the Artificer L3: Adventurer's Atlas map holders get +1d4 initiative
+            c.cartographer_marked = true;
+            int int_mod_cart = (cs.intelligence - 10) / 2;
+            c.illuminated_cartography_uses = int_mod_cart > 0 ? int_mod_cart : 1;
+            c.initiative_bonus += 2; // +1d4 initiative approximation (avg 2.5)
         }
     }
 

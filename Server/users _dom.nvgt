@@ -1476,6 +1476,11 @@ void handle_user_message(user@ u, json_object@ msg)
 				c.world_tree_temp_hp = true;
 				u.room.bm.broadcast_announce(c.name + "'s World Tree grants " + temp_hp + " temp HP!", false);
 			}
+			// Path of the Carrion Raven (Grim Hollow): Feral Celerity — free weapon attack on rage entry
+			if (c.subclass == "Path of the Carrion Raven" and c.level >= 3) {
+				u.room.bm.broadcast_announce(c.name + "'s Feral Celerity grants a free weapon attack on rage entry! Your next attack this turn doesn't use your action.", false);
+				c.attacks_remaining_this_turn++; // Grant one extra free attack
+			}
 			u.room.bm.broadcast_announce(c.name + " enters a Rage! Bonus damage and resistance to bludgeoning, piercing, and slashing. " + c.rage_uses_remaining + " use" + (c.rage_uses_remaining == 1 ? "" : "s") + " remain.", true);
 		}
 		else if (feature == "action_surge") {
@@ -2507,12 +2512,136 @@ void handle_user_message(user@ u, json_object@ msg)
 		}
 
 		else if (feature == "echo_knight_manifest") {
-			// Echo Knight Fighter: Manifest Echo — bonus action summon an echo
+			// Echo Knight (Wildemount): Manifest Echo — bonus action, echo in unoccupied space within 15ft
+			// Echo has 1 HP, AC = 14 + prof, immune to conditions, uses caster saves, same size as caster
 			if (c.class_name != "Fighter" or c.subclass != "Echo Knight") { u.send({{"type", message_types::announce}, {"text", "Only Echo Knights can manifest echoes."}, {"interrupt", true}}); return; }
 			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
 			c.has_bonus_action = false;
 			c.used_bonus_action = true;
-			u.room.bm.broadcast_announce(c.name + " manifests an Echo from an alternate timeline!", true);
+			c.echo_active = true;
+			c.echo_hp = 1;
+			// Place echo 5ft to the north (simplified)
+			c.echo_x = c.x;
+			c.echo_y = c.y + 5;
+			u.room.bm.broadcast_announce(c.name + " manifests an Echo 5ft north. Echo has AC " + (14 + c.proficiency) + " and 1 HP.", true);
+		}
+		else if (feature == "unleash_incarnation") {
+			// Echo Knight L3: after Attack action, bonus action for extra melee attack from echo's space
+			if (c.class_name != "Fighter" or c.subclass != "Echo Knight") { u.send({{"type", message_types::announce}, {"text", "Only Echo Knights can unleash incarnation."}, {"interrupt", true}}); return; }
+			if (!c.echo_active) { u.send({{"type", message_types::announce}, {"text", "You have no active echo."}, {"interrupt", true}}); return; }
+			if (!c.used_action) { u.send({{"type", message_types::announce}, {"text", "You must first take the Attack action."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			if (c.unleash_incarnation_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Unleash Incarnation uses remaining."}, {"interrupt", true}}); return; }
+			if (target_id == 0) { u.send({{"type", message_types::announce}, {"text", "No target selected."}, {"interrupt", true}}); return; }
+			combatant@ tgt = u.room.bm.combat.get_combatant(target_id);
+			if (@tgt == null or tgt.is_dead) { u.send({{"type", message_types::announce}, {"text", "Invalid target."}, {"interrupt", true}}); return; }
+			int dist_echo = feet_distance(c.echo_x, c.echo_y, tgt.x, tgt.y);
+			int weapon_reach = c.main_hand_range > 0 ? c.main_hand_range : 5;
+			if (dist_echo > weapon_reach) { u.send({{"type", message_types::announce}, {"text", "Target out of echo's reach."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.unleash_incarnation_uses--;
+			int atk_bonus = c.get_ability_mod(ABILITY_STR) + c.proficiency;
+			int roll = random(1, 20);
+			int total = roll + atk_bonus;
+			u.room.bm.broadcast_announce(c.name + "'s echo lunges at " + tgt.name + "!", true);
+			if (total >= tgt.armor_class or roll == 20) {
+				int dmg = random(1, c.main_hand_damage_dice);
+				if (roll == 20) dmg += random(1, c.main_hand_damage_dice);
+				dmg += c.get_ability_mod(ABILITY_STR);
+				if (dmg < 1) dmg = 1;
+				u.room.bm.combat.apply_damage(tgt, dmg, c.main_hand_damage_type, c);
+				u.room.bm.broadcast_announce("Echo hits " + tgt.name + " for " + dmg + " damage! Uses remaining: " + c.unleash_incarnation_uses, true);
+			} else {
+				u.room.bm.broadcast_announce("Echo's attack misses " + tgt.name + ".", false);
+			}
+		}
+		else if (feature == "adjust_density") {
+			// Graviturgy Wizard L2: Action - choose halved or doubled weight on target within 30ft
+			if (c.class_name != "Wizard" or c.subclass != "Graviturgy Magic") { u.send({{"type", message_types::announce}, {"text", "Only Graviturgy wizards can adjust density."}, {"interrupt", true}}); return; }
+			if (!c.has_action) { u.send({{"type", message_types::announce}, {"text", "You've already used your action."}, {"interrupt", true}}); return; }
+			if (target_id == 0) { u.send({{"type", message_types::announce}, {"text", "No target selected."}, {"interrupt", true}}); return; }
+			combatant@ tgt = u.room.bm.combat.get_combatant(target_id);
+			if (@tgt == null or tgt.is_dead) { u.send({{"type", message_types::announce}, {"text", "Invalid target."}, {"interrupt", true}}); return; }
+			if (feet_distance(c.x, c.y, tgt.x, tgt.y) > 30) { u.send({{"type", message_types::announce}, {"text", "Target out of range (30ft)."}, {"interrupt", true}}); return; }
+			c.has_action = false;
+			c.used_action = true;
+			c.adjust_density_active = true;
+			// Halve by default (to speed up an ally) - in full impl would prompt for choice
+			bool halved = tgt.is_player == c.is_player;
+			c.adjust_density_mode = halved ? 0 : 1;
+			if (halved) {
+				tgt.speed += 10;
+				u.room.bm.broadcast_announce(c.name + " halves " + tgt.name + "'s density! +10ft speed.", true);
+			} else {
+				tgt.speed = tgt.speed > 10 ? tgt.speed - 10 : 0;
+				u.room.bm.broadcast_announce(c.name + " doubles " + tgt.name + "'s density! -10ft speed, disadvantage on STR checks.", true);
+			}
+		}
+		else if (feature == "event_horizon") {
+			// Graviturgy Wizard L14: Action - 30ft aura, STR save or 2d10 force + speed 0, 1/LR
+			if (c.class_name != "Wizard" or c.subclass != "Graviturgy Magic") { u.send({{"type", message_types::announce}, {"text", "Only Graviturgy wizards can create an Event Horizon."}, {"interrupt", true}}); return; }
+			if (c.level < 14) { u.send({{"type", message_types::announce}, {"text", "Event Horizon unlocks at level 14."}, {"interrupt", true}}); return; }
+			if (!c.has_action) { u.send({{"type", message_types::announce}, {"text", "You've already used your action."}, {"interrupt", true}}); return; }
+			c.has_action = false;
+			c.used_action = true;
+			c.event_horizon_active = true;
+			int ev_dc = 8 + c.proficiency + c.get_ability_mod(ABILITY_INT);
+			for (uint evi = 0; evi < u.room.bm.combat.combatants.length(); evi++) {
+				combatant@ evt = u.room.bm.combat.combatants[evi];
+				if (@evt == null or evt.is_dead or evt.id == c.id) continue;
+				if (evt.is_player == c.is_player) continue;
+				if (feet_distance(c.x, c.y, evt.x, evt.y) > 30) continue;
+				int save = random(1, 20) + evt.get_save_bonus(ABILITY_STR);
+				int ev_dmg = random(1, 10) + random(1, 10);
+				if (save >= ev_dc) ev_dmg /= 2;
+				else evt.speed = 0;
+				u.room.bm.combat.apply_damage(evt, ev_dmg, DMG_FORCE, c);
+				u.room.bm.broadcast_announce(evt.name + (save >= ev_dc ? " resists" : " is crushed by") + " the Event Horizon: " + ev_dmg + " force damage.", true);
+			}
+		}
+		else if (feature == "mark_of_heretic") {
+			// Oath of Zeal (Grim Hollow) L3 Channel Divinity: mark target, crit 19-20 vs them for 1 min,
+			// reaction weapon attack at start of marked target's turn
+			if (c.class_name != "Paladin" or c.subclass != "Oath of Zeal") { u.send({{"type", message_types::announce}, {"text", "Only Oath of Zeal paladins can use Mark of the Heretic."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			if (c.channel_divinity_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Channel Divinity remaining."}, {"interrupt", true}}); return; }
+			if (target_id == 0) { u.send({{"type", message_types::announce}, {"text", "No target selected."}, {"interrupt", true}}); return; }
+			combatant@ tgt = u.room.bm.combat.get_combatant(target_id);
+			if (@tgt == null or tgt.is_dead) { u.send({{"type", message_types::announce}, {"text", "Invalid target."}, {"interrupt", true}}); return; }
+			if (feet_distance(c.x, c.y, tgt.x, tgt.y) > 30) { u.send({{"type", message_types::announce}, {"text", "Target out of range (30ft)."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.channel_divinity_uses--;
+			c.mark_of_heretic_active = true;
+			c.mark_of_heretic_target = tgt.id;
+			u.room.bm.broadcast_announce(c.name + " marks " + tgt.name + " with the Mark of the Heretic! Crit on 19+ and reactions.", true);
+		}
+		else if (feature == "feral_celerity_attack") {
+			// Placeholder (granted automatically on rage entry)
+		}
+		else if (feature == "momentary_stasis") {
+			// Chronurgy L6: Action, CON save, incapacitate + speed 0 until damage or end of next turn
+			if (c.class_name != "Wizard" or c.subclass != "Chronurgy Magic") { u.send({{"type", message_types::announce}, {"text", "Only Chronurgy wizards can cast Momentary Stasis."}, {"interrupt", true}}); return; }
+			if (c.level < 6) { u.send({{"type", message_types::announce}, {"text", "Momentary Stasis unlocks at level 6."}, {"interrupt", true}}); return; }
+			if (!c.has_action) { u.send({{"type", message_types::announce}, {"text", "You've already used your action."}, {"interrupt", true}}); return; }
+			if (c.momentary_stasis_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Momentary Stasis uses remaining."}, {"interrupt", true}}); return; }
+			if (target_id == 0) { u.send({{"type", message_types::announce}, {"text", "No target selected."}, {"interrupt", true}}); return; }
+			combatant@ tgt = u.room.bm.combat.get_combatant(target_id);
+			if (@tgt == null or tgt.is_dead) { u.send({{"type", message_types::announce}, {"text", "Invalid target."}, {"interrupt", true}}); return; }
+			if (feet_distance(c.x, c.y, tgt.x, tgt.y) > 60) { u.send({{"type", message_types::announce}, {"text", "Target out of range (60ft)."}, {"interrupt", true}}); return; }
+			c.has_action = false;
+			c.used_action = true;
+			c.momentary_stasis_uses--;
+			int ms_dc = 8 + c.proficiency + c.get_ability_mod(ABILITY_INT);
+			int save = random(1, 20) + tgt.get_save_bonus(ABILITY_CON);
+			if (save < ms_dc) {
+				tgt.add_condition(COND_INCAPACITATED);
+				tgt.speed = 0;
+				u.room.bm.broadcast_announce(c.name + "'s Momentary Stasis traps " + tgt.name + " in a field! (save " + save + " vs DC " + ms_dc + ")", true);
+			} else {
+				u.room.bm.broadcast_announce(tgt.name + " resists " + c.name + "'s Momentary Stasis (save " + save + " vs DC " + ms_dc + ").", true);
+			}
 		}
 
 		else if (feature == "rebuke_violent") {

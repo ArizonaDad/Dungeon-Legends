@@ -1131,6 +1131,10 @@ class battle_manager {
 		if (attacker.class_name == "Warlock" and attacker.subclass == "The Hexblade" and @pr != null and attacker.hexblade_curse_target == pr.target_id) {
 			return 19;
 		}
+		// Oath of Zeal (Grim Hollow) Mark of the Heretic: crit on 19+ vs marked target
+		if (attacker.class_name == "Paladin" and attacker.subclass == "Oath of Zeal" and attacker.mark_of_heretic_active and @pr != null and attacker.mark_of_heretic_target == pr.target_id) {
+			return 19;
+		}
 		return 20;
 	}
 
@@ -1493,6 +1497,15 @@ class battle_manager {
 				add_run_damage(caster.player_username, damage);
 			}
 			combat.apply_damage(t, damage, pr.damage_type, caster);
+			// Graviturgy Gravity Well: L6 — when a spell hits a creature and deals damage, move them 5ft
+			if (caster.class_name == "Wizard" and caster.subclass == "Graviturgy Magic" and caster.level >= 6 and !saved and damage > 0) {
+				// Move 5ft toward caster (simple pull)
+				if (t.x < caster.x) t.x += 5;
+				else if (t.x > caster.x) t.x -= 5;
+				else if (t.y < caster.y) t.y += 5;
+				else if (t.y > caster.y) t.y -= 5;
+				broadcast_announce(caster.name + "'s Gravity Well pulls " + t.name + " 5ft!", false);
+			}
 			broadcast_to_battle({{"type", message_types::damage_dealt}, {"attacker", caster.name}, {"target", t.name}, {"amount", damage}, {"damage_type", DAMAGE_TYPE_NAMES[pr.damage_type]}, {"is_crit", false}, {"is_spell", true}});
 			if (t.is_dead) {
 				broadcast_to_battle({{"type", message_types::creature_died}, {"name", t.name}, {"is_player", t.is_player}, {"killed_by", caster.name}, {"was_full_hp", aoe_target_was_full}, {"was_overkill", damage >= t.max_hp * 2}, {"was_stealth", aoe_caster_was_hidden}});
@@ -3634,11 +3647,33 @@ class battle_manager {
 			broadcast_announce(attacker.name + "'s Wrath of the Sea adds " + wave_dmg + " cold damage!", false);
 		}
 
-		// Cartographer Artificer: marked location bonus damage
-		if (attacker.class_name == "Artificer" and attacker.subclass == "Cartographer" and attacker.cartographer_marked and is_weapon_attack) {
-			int cart_dmg = attacker.proficiency;
-			bonus += cart_dmg;
-			broadcast_announce(attacker.name + "'s Cartographer's Map adds " + cart_dmg + " damage!", false);
+		// Cartographer Artificer: Guided Precision L5 — +INT mod on weapon attacks vs Faerie Fire target OR on cantrip/spell
+		// We approximate: +INT mod damage once per turn on any weapon hit
+		if (attacker.class_name == "Artificer" and attacker.subclass == "Cartographer" and attacker.level >= 5 and attacker.is_first_hit_this_turn and is_weapon_attack) {
+			int cart_dmg = attacker.get_ability_mod(ABILITY_INT);
+			if (cart_dmg > 0) {
+				bonus += cart_dmg;
+				broadcast_announce(attacker.name + "'s Guided Precision adds " + cart_dmg + " damage!", false);
+			}
+		}
+
+		// Graviturgy L10 Violent Attraction: any Graviturgy wizard within 60ft can add +1d10 weapon-type damage to a hit (reaction)
+		// Auto-trigger for AI clarity if uses available
+		for (uint vai = 0; vai < combat.combatants.length(); vai++) {
+			combatant@ va_wizard = combat.combatants[vai];
+			if (@va_wizard == null or va_wizard.is_dead) continue;
+			if (va_wizard.class_name != "Wizard" or va_wizard.subclass != "Graviturgy Magic") continue;
+			if (va_wizard.level < 10 or va_wizard.violent_attraction_uses <= 0) continue;
+			if (va_wizard.is_player == attacker.is_player and va_wizard.id != attacker.id) {
+				// Ally wizard within 60ft can boost this attacker's damage
+				if (feet_distance(va_wizard.x, va_wizard.y, attacker.x, attacker.y) <= 60 and is_weapon_attack) {
+					int va_dmg = random(1, 10);
+					bonus += va_dmg;
+					va_wizard.violent_attraction_uses--;
+					broadcast_announce(va_wizard.name + "'s Violent Attraction adds " + va_dmg + " damage!", false);
+					break;
+				}
+			}
 		}
 
 		// Path of the Glacier Barbarian: Frostbite adds 1d6/2d6/3d6 cold + 10ft speed reduction once per turn while raging
@@ -3664,9 +3699,15 @@ class battle_manager {
 			broadcast_announce(attacker.name + "'s Hellfire Claw adds " + infernal_dmg + " fire damage!", false);
 		}
 
-		// College of Requiems Bard (Grim Hollow): NO flat necrotic rider.
-		// Actual: expend Bardic Inspiration die on weapon hit for necrotic damage equal to die roll.
-		// This requires a prompt flow; removed the incorrect permanent +1d4 rider.
+		// College of Requiems Bard (Grim Hollow) Pluck the Heartstrings:
+		// Auto-expend a Bardic Inspiration die on weapon hit for necrotic damage equal to die roll.
+		if (attacker.class_name == "Bard" and attacker.subclass == "College of Requiems" and attacker.level >= 3 and attacker.bardic_inspiration_uses > 0 and is_weapon_attack) {
+			int bi_die = attacker.bardic_inspiration_die > 0 ? attacker.bardic_inspiration_die : 6;
+			int requiem_dmg = random(1, bi_die);
+			bonus += requiem_dmg;
+			attacker.bardic_inspiration_uses--;
+			broadcast_announce(attacker.name + " plucks the heartstrings, adding " + requiem_dmg + " necrotic damage! (1 Bardic Inspiration spent)", false);
+		}
 
 		// Inquisitive Rogue: Insightful Fighting — sneak attack without advantage vs studied target
 		if (attacker.class_name == "Rogue" and attacker.subclass == "Inquisitive" and attacker.inquisitive_target == target.id and attacker.is_first_hit_this_turn and is_weapon_attack) {
