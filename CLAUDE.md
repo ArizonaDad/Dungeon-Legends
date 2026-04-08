@@ -154,11 +154,11 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 
 ### Spell System
 
-- 68 spells fully resolved server-side via `handle_cast()`
+- 367 spells in catalog with 80+ fully resolved server-side via `handle_cast()`
 
 - Spell menu shows range and concentration status for each spell
 
-- Save-based damage (DEX/CON/WIS saves, half on success)
+- Save-based damage (DEX/CON/WIS saves, half on success) — generic system handles most damage spells
 
 - Attack-roll spells (spell attack bonus vs AC)
 
@@ -166,13 +166,17 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 
 - Healing spells with scaling
 
-- Utility spells (Shield, Hold Person, Haste, Banishment, Bless, Misty Step)
+- Buff spells (Shield, Bless, Heroism, Aid, Stoneskin, Greater Invisibility, Fly, Fire Shield, Mage Armor, Haste)
+
+- Utility spells (Hold Person, Banishment, Misty Step, Sleep, Polymorph, Web, Hypnotic Pattern, Sanctuary, Spirit Guardians)
 
 - Magic Missile auto-hit
 
 - Cantrip scaling at levels 5/11/17
 
 - Concentration management (drop old when casting new)
+
+- Spirit Guardians: 15ft aura, 3d8+ radiant damage on enemies starting turn within range, half their movement
 
 - Spell slot consumption (lowest available >= spell level)
 
@@ -224,33 +228,32 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 
 
 
-### Subclass Combat Features (138 subclasses, 50+ with full combat logic)
+### Subclass Combat Features (138 subclasses, 80+ with full combat logic)
 **Fully Implemented Subclasses with Combat Logic:**
-- **Barbarian**: Berserker, Wild Heart, World Tree, Zealot, Ancestral Guardian, Storm Herald
-- **Bard**: Glamour, Swords, Whispers, Creation, Lore, Valor
-- **Cleric**: Life, Light, War, Forge, Grave, Peace, Twilight
-- **Druid**: Moon, Spores, Dreams, Stars, Land, Wildfire
-- **Fighter**: Champion, Battle Master, Eldritch Knight, Psi Warrior, Samurai, Cavalier, Rune Knight, Arcane Archer, Echo Knight
-- **Monk**: Shadow, Mercy, Elements, Sun Soul, Kensei, Ascendant Dragon, Astral Self, Drunken Master
-- **Paladin**: Devotion, Glory, Ancients, Vengeance, Conquest, Watchers, Redemption
-- **Ranger**: Gloom Stalker, Fey Wanderer, Hunter, Horizon Walker
-- **Rogue**: Assassin, Soulknife, Inquisitive, Mastermind, Thief, Swashbuckler, Phantom
-- **Sorcerer**: Draconic, Shadow Magic, Wild Magic, Aberrant, Storm, Clockwork, Divine Soul
-- **Warlock**: Fiend, Celestial, Archfey, Hexblade, Great Old One, Fathomless, Genie, Undead
-- **Wizard**: Abjurer, Diviner, Bladesinging, War Magic
-- **Artificer**: Alchemist, Armorer, Artillerist, Battle Smith
+- **Barbarian**: Berserker, Wild Heart, World Tree, Zealot, Ancestral Guardian, Storm Herald, Path of the Carrion Raven
+- **Bard**: Glamour, Swords, Whispers, Creation, Lore, Valor, Eloquence, Spirits
+- **Cleric**: Life, Light, War, Forge, Grave, Peace, Twilight, Order, Festus, Inquisition, Astral
+- **Druid**: Moon, Spores, Dreams, Stars, Land, Wildfire, Sea, Unbroken, Dragons
+- **Fighter**: Champion, Battle Master, Eldritch Knight, Psi Warrior, Samurai, Cavalier, Rune Knight, Arcane Archer, Echo Knight, Couatl Herald, Steel Hawk, Blade Breaker
+- **Monk**: Shadow, Mercy, Elements, Sun Soul, Kensei, Ascendant Dragon, Astral Self, Drunken Master, Open Hand, Celestial, Aether
+- **Paladin**: Devotion, Glory, Ancients, Vengeance, Conquest, Watchers, Redemption, Hearth, Zeal
+- **Ranger**: Gloom Stalker, Fey Wanderer, Hunter, Horizon Walker, Winter Trapper, Rocborne
+- **Rogue**: Assassin, Soulknife, Inquisitive, Mastermind, Thief, Swashbuckler, Phantom, Arcane Trickster, Scout, Misfortune Bringer, Runetagger, Grim Surgeon
+- **Sorcerer**: Draconic, Shadow Magic, Wild Magic, Aberrant, Storm, Clockwork, Divine Soul, Frost, Desert Soul
+- **Warlock**: Fiend, Celestial, Archfey, Hexblade, Great Old One, Fathomless, Genie, Undead, Astral Griffon, Many
+- **Wizard**: Abjurer, Diviner, Bladesinging, War Magic, Evoker, Illusionist, Order of Scribes, Materializer, Wand Lore
+- **Artificer**: Alchemist, Armorer, Artillerist, Battle Smith, Cartographer
+- **Gunslinger**: Deadeye, High Roller, Secret Agent, Spellslinger, Trick Shot, White Hat
 
-**Key New Features:**
-- Grave Cleric Path to the Grave, Forge +1 AC, Peace Emboldening Bond, Twilight Sanctuary
-- Hexblade Curse (+Prof dmg, crit 19-20 vs target)
-- Samurai Fighting Spirit (advantage + temp HP)
-- Horizon Walker Planar Warrior (+1d8 force damage)
-- Storm Herald Storm Aura, Rune Knight Giant Might
-- Wild Magic Surge table with 8 effects
-- Sun Soul Radiant Sun Bolt, Ascendant Dragon Breath Weapon
-- Shadow Sorcerer Strength of the Grave
-- Tentacle of the Deeps, Form of Dread, Genie Vessel
-- Eldritch Cannon, Steel Defender, Experimental Elixir
+**Key Combat Features:**
+- Grave Cleric Path to the Grave, Forge +1 AC, Peace Emboldening Bond, Twilight Sanctuary, Order Voice of Authority
+- Hexblade Curse, Samurai Fighting Spirit, Horizon Walker Planar Warrior
+- Storm Herald Storm Aura, Rune Knight Giant Might, Wild Magic Surge table
+- Sun Soul Radiant Bolt, Ascendant Dragon Breath, Shadow Sorcerer Strength of the Grave
+- Tentacle of the Deeps, Form of Dread, Genie Vessel, Eldritch Cannon, Steel Defender, Experimental Elixir
+- College of Eloquence Unsettling Words (subtract Bardic die from save)
+- Gunslinger Sharpshooter Stance, Liar's Dice gamble, License to Kill, Ricochet Bullet
+- Setting subclass damage bonuses: Frost (cold), Desert (heat), Couatl (radiant), Carrion Raven (necrotic), Misfortune Bringer (jinx), Runetagger (force), Astral Domain (psychic), Inquisition vs casters
 
 ### Feats with Combat Logic
 Origin feats: alert, crafter, healer, lucky, magic_initiate, musician, savage_attacker, skilled, tavern_brawler, tough
