@@ -818,6 +818,57 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         c.mote_of_potential_active = true;
     }
 
+    // Aberrant Sorcery: Psionic Spells + Psychic Defenses (level 6: resistance to charm/frighten)
+    if (cs.class_name == "Sorcerer" and cs.subclass == "Aberrant Sorcery") {
+        if (cs.level >= 6) c.psionic_defenses_active = true;
+    }
+
+    // Great Old One Warlock: Awakened Mind (telepathy flavor) + level 6 Entropic Ward
+    if (cs.class_name == "Warlock" and cs.subclass == "Great Old One Patron") {
+        c.awakened_mind_active = true;
+        if (cs.level >= 6) c.entropic_ward_pending = true;
+    }
+
+    // Thief Rogue: Fast Hands (bonus action Use Object)
+    if (cs.class_name == "Rogue" and cs.subclass == "Thief" and cs.level >= 3) {
+        c.fast_hands_enabled = true;
+    }
+
+    // Wizard Evoker: Sculpt Spells (level 2+)
+    if (cs.class_name == "Wizard" and cs.subclass == "Evoker" and cs.level >= 2) {
+        c.sculpt_spells_active = true;
+    }
+
+    // Wizard Illusionist: Improved Illusions (level 2+)
+    if (cs.class_name == "Wizard" and cs.subclass == "Illusionist" and cs.level >= 2) {
+        c.improved_illusions = true;
+    }
+
+    // Wizard War Magic: Arcane Deflection reaction (level 2+)
+    if (cs.class_name == "Wizard" and cs.subclass == "War Magic" and cs.level >= 2) {
+        c.arcane_deflection_available = true;
+    }
+
+    // Circle of the Stars Druid: Starry Form (level 2+)
+    if (cs.class_name == "Druid" and cs.subclass == "Circle of the Stars" and cs.level >= 2) {
+        c.starry_form_type = "Chalice"; // default
+    }
+
+    // Monster Slayer Ranger: Slayer's Prey
+    if (cs.class_name == "Ranger" and cs.subclass == "Monster Slayer" and cs.level >= 3) {
+        c.monster_slayer_prey = true;
+    }
+
+    // Storm Sorcery: Tempestuous Magic (level 1+, bonus action fly 10ft after casting)
+    if (cs.class_name == "Sorcerer" and cs.subclass == "Storm Sorcery" and cs.level >= 1) {
+        c.tempestuous_magic_active = true;
+    }
+
+    // Undead Warlock: Form of Dread (level 1+, uses per rest)
+    if (cs.class_name == "Warlock" and cs.subclass == "The Undead" and cs.level >= 1) {
+        c.form_of_dread_rounds = 0;
+    }
+
     // Wizard subclasses
     if (cs.class_name == "Wizard") {
         if (cs.subclass == "Diviner" and cs.level >= 2) {

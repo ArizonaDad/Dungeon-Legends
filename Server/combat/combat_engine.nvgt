@@ -160,6 +160,36 @@ class combatant {
 	bool experimental_elixir_available = false; // Alchemist Artificer
 	bool tentacle_of_deeps_active = false; // Fathomless Warlock
 	bool wildfire_spirit_active = false; // Wildfire Druid
+	// PHB core remaining
+	string wild_heart_animal = ""; // Bear/Eagle/Wolf/Elk/Tiger
+	bool world_tree_temp_hp = false; // World Tree Barbarian
+	int wild_magic_surge_pending = 0; // Wild Magic Sorcerer
+	bool psionic_defenses_active = false; // Aberrant Sorcerer
+	bool awakened_mind_active = false; // Great Old One
+	bool entropic_ward_pending = false; // Great Old One
+	bool fast_hands_enabled = false; // Thief Rogue
+	uint arcane_trickster_mage_hand = 0; // Arcane Trickster
+	bool mastermind_help = false; // Mastermind Rogue
+	bool swashbuckler_fancy_footwork = false; // Swashbuckler Rogue
+	bool starry_form_active = false; // Circle of Stars Druid
+	string starry_form_type = ""; // Archer/Chalice/Dragon
+	bool land_stride_active = false; // Circle of the Land
+	bool open_hand_ki_used = false; // Way of the Open Hand
+	bool kensei_weapon_active = false; // Way of the Kensei
+	bool sun_bolt_ready = false; // Way of the Sun Soul
+	bool rebuke_violent_ready = false; // Oath of Redemption
+	bool beast_companion_active = false; // Beast Master Ranger
+	uint beast_companion_id = 0;
+	bool monster_slayer_prey = false; // Monster Slayer Ranger
+	uint monster_slayer_target = 0;
+	bool drake_companion_active = false; // Drakewarden Ranger
+	bool tempestuous_magic_active = false; // Storm Sorcery
+	bool sculpt_spells_active = false; // Evoker Wizard
+	bool improved_illusions = false; // Illusionist Wizard
+	bool arcane_deflection_available = false; // War Magic Wizard
+	bool form_of_dread_active = false; // Undead Warlock
+	int form_of_dread_rounds = 0;
+	bool genie_vessel_active = false; // Genie Warlock
 	int rage_turns_remaining = 0;
 	int action_surge_uses_remaining = 0;
 	bool second_wind_available = false;
@@ -629,6 +659,8 @@ class battle {
 		if (damage_type == DMG_COLD and target.cold_resistance) amount = (amount + 1) / 2;
 		if (damage_type == DMG_NECROTIC and target.necrotic_resistance) amount = (amount + 1) / 2;
 		if (damage_type == DMG_PSYCHIC and target.psychic_resistance) amount = (amount + 1) / 2;
+		// Aberrant Sorcery: Psychic Defenses — psychic resistance at level 6+
+		if (damage_type == DMG_PSYCHIC and target.psionic_defenses_active) amount = (amount + 1) / 2;
 		if (damage_type == DMG_ACID and target.acid_resistance) amount = (amount + 1) / 2;
 		if (damage_type == DMG_LIGHTNING and target.lightning_resistance) amount = (amount + 1) / 2;
 		if (damage_type == DMG_PIERCING and target.piercing_resistance) amount = (amount + 1) / 2;

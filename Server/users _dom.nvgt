@@ -1455,6 +1455,27 @@ void handle_user_message(user@ u, json_object@ msg)
 				c.storm_aura_active = true;
 				u.room.bm.broadcast_announce(c.name + "'s Storm Aura activates!", true);
 			}
+			// Wild Heart: Beast animal bonuses
+			if (c.subclass == "Wild Heart") {
+				// Default to Bear if not chosen: resistance to all damage except psychic
+				if (c.wild_heart_animal == "") c.wild_heart_animal = "Bear";
+				if (c.wild_heart_animal == "Bear") {
+					// Bear: resistance to all damage except psychic (approximation via multiple flags)
+					c.cold_resistance = true;
+					c.fire_resistance = true;
+					c.lightning_resistance = true;
+					c.necrotic_resistance = true;
+					c.acid_resistance = true;
+				}
+				u.room.bm.broadcast_announce(c.name + " channels the " + c.wild_heart_animal + " spirit!", false);
+			}
+			// World Tree: Gain temp HP on rage
+			if (c.subclass == "World Tree") {
+				int temp_hp = 1 + c.level;
+				if (c.temp_hp < temp_hp) c.temp_hp = temp_hp;
+				c.world_tree_temp_hp = true;
+				u.room.bm.broadcast_announce(c.name + "'s World Tree grants " + temp_hp + " temp HP!", false);
+			}
 			u.room.bm.broadcast_announce(c.name + " enters a Rage! Bonus damage and resistance to bludgeoning, piercing, and slashing. " + c.rage_uses_remaining + " use" + (c.rage_uses_remaining == 1 ? "" : "s") + " remain.", true);
 		}
 		else if (feature == "action_surge") {

@@ -3574,6 +3574,14 @@ class battle_manager {
 				if (target.class_name == "Barbarian" and target.subclass == "Ancestral Guardian" and target.raging and target.level >= 6) {
 					reaction_options.insert_last("spirit_shield");
 				}
+				// Great Old One Warlock: Entropic Ward — impose disadvantage on attack
+				if (target.class_name == "Warlock" and target.subclass == "Great Old One Patron" and target.entropic_ward_pending) {
+					reaction_options.insert_last("entropic_ward");
+				}
+				// War Magic Wizard: Arcane Deflection — reduce damage or save by 4
+				if (target.class_name == "Wizard" and target.subclass == "War Magic" and target.arcane_deflection_available) {
+					reaction_options.insert_last("arcane_deflection");
+				}
 
 				if (reaction_options.length() > 0) {
 					user@ def_user = find_user_for_combatant(target);
@@ -3602,6 +3610,8 @@ class battle_manager {
 							else if (reaction_options[oi] == "defensive_duelist") opts += "Defensive Duelist (+" + target.proficiency + " AC)";
 							else if (reaction_options[oi] == "restore_balance") opts += "Restore Balance (cancel advantage)";
 							else if (reaction_options[oi] == "spirit_shield") opts += "Spirit Shield (reduce damage by 2d6+)";
+							else if (reaction_options[oi] == "entropic_ward") opts += "Entropic Ward (force the hit to miss)";
+							else if (reaction_options[oi] == "arcane_deflection") opts += "Arcane Deflection (+4 AC)";
 						}
 						def_user.send({{"type", message_types::reaction_prompt}, {"attacker", c.name}, {"options", opts}, {"options_csv", opts_csv}});
 						return; // Pause — wait for reaction_response
@@ -4480,6 +4490,25 @@ class battle_manager {
 				broadcast_announce(defender.name + " summons Spirit Shield! Next damage reduced by " + reduction + ".", true);
 			}
 		}
+		else if (choice == "entropic_ward" and defender.is_player) {
+			// Great Old One: Entropic Ward — turn a hit into a miss
+			if (defender.class_name == "Warlock" and defender.subclass == "Great Old One Patron") {
+				defender.has_reaction = false;
+				defender.entropic_ward_pending = false;
+				// Force the attack to miss
+				rp.attack_total = 0;
+				broadcast_announce(defender.name + " invokes Entropic Ward! The attack misses.", true);
+			}
+		}
+		else if (choice == "arcane_deflection" and defender.is_player) {
+			// War Magic Wizard: Arcane Deflection — +4 AC vs this attack
+			if (defender.class_name == "Wizard" and defender.subclass == "War Magic") {
+				defender.has_reaction = false;
+				defender.armor_class += 4;
+				defender.temp_ac_bonus_this_attack = 4;
+				broadcast_announce(defender.name + " invokes Arcane Deflection! +4 AC against this attack.", true);
+			}
+		}
 
 		// Resume attack resolution with potentially modified attack total
 		// Re-check hit with updated values
@@ -5247,6 +5276,46 @@ class battle_manager {
 			reveal_hidden_combatant(c, "casting a spell");
 			if (used_free_cast) broadcast_announce(c.name + " casts " + spell.name + " using a free casting.", false);
 			else broadcast_announce(c.name + " casts " + spell.name + " using a level " + cast_slot_level + " spell slot.", false);
+
+			// Wild Magic Sorcerer: Wild Magic Surge (d20, on 1 trigger a random effect)
+			if (c.class_name == "Sorcerer" and c.subclass == "Wild Magic Sorcery" and spell.level >= 1) {
+				int surge_roll = random(1, 20);
+				if (surge_roll == 1) {
+					int surge = random(1, 8);
+					if (surge == 1) {
+						broadcast_announce("Wild Magic Surge! " + c.name + " is surrounded by a burst of fire damage to all within 10ft!", true);
+						for (uint wi = 0; wi < combat.combatants.length(); wi++) {
+							combatant@ wt = combat.combatants[wi];
+							if (@wt == null or wt.is_dead or wt.id == c.id) continue;
+							if (feet_distance(c.x, c.y, wt.x, wt.y) <= 10) {
+								int fire_dmg = random(1, 6) + random(1, 6);
+								combat.apply_damage(wt, fire_dmg, DMG_FIRE, c);
+							}
+						}
+					} else if (surge == 2) {
+						broadcast_announce("Wild Magic Surge! " + c.name + "'s skin changes color for 24 hours!", false);
+					} else if (surge == 3) {
+						c.temp_hp += c.level;
+						broadcast_announce("Wild Magic Surge! " + c.name + " gains " + c.level + " temporary hit points!", true);
+					} else if (surge == 4) {
+						int heal = random(1, 6) + 5;
+						combat.apply_healing(c, heal);
+						broadcast_announce("Wild Magic Surge! " + c.name + " is healed for " + heal + " HP!", true);
+					} else if (surge == 5) {
+						c.has_reaction = false;
+						c.has_bonus_action = false;
+						broadcast_announce("Wild Magic Surge! " + c.name + "'s magic disrupts their action economy!", false);
+					} else if (surge == 6) {
+						broadcast_announce("Wild Magic Surge! " + c.name + " becomes invisible until they attack!", true);
+						c.is_hidden = true;
+					} else if (surge == 7) {
+						broadcast_announce("Wild Magic Surge! " + c.name + " regains a level 1 spell slot!", true);
+						if (c.spell_slots_current[1] < c.spell_slots_max[1]) c.spell_slots_current[1]++;
+					} else {
+						broadcast_announce("Wild Magic Surge! A magical wind blows through the battle!", false);
+					}
+				}
+			}
 		} else {
 			reveal_hidden_combatant(c, "casting a spell");
 			broadcast_announce(c.name + " casts " + spell.name + ".", false);
