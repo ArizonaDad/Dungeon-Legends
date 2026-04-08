@@ -31,12 +31,12 @@ The rule remains: **NEVER choose for the player when a spell has a choice.** Bot
 |-------|--------|--------|--------------|
 | **Fire Shield** | Warm (cold resistance, reflects 2d8 fire) OR Chill (fire resistance, reflects 2d8 cold) | DONE 2026-04-08 | Basic Rules para 13322: "warm shield or a chill shield, as you choose" |
 | **Spirit Guardians** | Radiant (angelic/fey form) OR Necrotic (fiendish form) | DONE 2026-04-08 | Basic Rules para 15123-15124: alignment-based; game prompts caster since alignment is not tracked |
+| **Adjust Density** (Graviturgy L2 feature) | Halve (+10 ft speed, disadvantage STR) OR Double (-10 ft speed, advantage STR) | DONE 2026-04-08 | Wildemount p.5428: "halved or doubled for up to 1 minute or until your concentration ends". Also fixed a pre-existing bug where adjust_density flags lived on the caster instead of the target, with no concentration cleanup path. |
 
 ### Spells still needing migration:
 
 | Spell | Choice the player should make | Current behaviour |
 |-------|------------------------------|-------------------|
-| **Adjust Density** (Graviturgy L2 feature, not a spell) | Halve OR double the target's density | NO HANDLER YET — combatant flags exist but no action route. Batch 1B. |
 | **Spirit Totem** (Circle of the Shepherd) | Bear OR Hawk OR Unicorn spirit | Working — uses 3 separate bonus action menu entries (acceptable) |
 | **Starry Form** (Circle of the Stars) | Archer / Chalice / Dragon form | Working via bonus_action `form` field |
 | **Wild Shape / Elemental Wild Shape** | Which creature form | Partial |

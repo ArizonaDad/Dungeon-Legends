@@ -219,11 +219,12 @@ Server-side `pending_spell_choice` state on `battle_manager` pauses spell finali
 4. The client (`combat_ui.nvgt`) sets `waiting_for_spell_choice_prompt`, speaks the prompt, listens for keys 1..N to pick an option (Escape defaults to option 1), and sends back `spell_choice_response` with `{choice}`.
 5. The server's `handle_spell_choice_response` validates the choice against the offered keys, then dispatches to `apply_spell_choice(caster, sc, choice)` which finalises the chosen variant on the caster.
 
-**Spells currently using this system:**
+**Spells / features currently using this system:**
 - **Fire Shield** — warm shield (cold resistance, reflects 2d8 fire) vs chill shield (fire resistance, reflects 2d8 cold). Source: Basic Rules para 13322.
 - **Spirit Guardians** — angelic/fey form (radiant damage) vs fiendish form (necrotic damage). Source: Basic Rules para 15123-15124. The 2024 PHB ties this to alignment, but the game does not track alignment, so the player declares their spirit form at cast time.
+- **Adjust Density** (Graviturgy Wizard L2 action) — halve density (+10 ft speed, disadvantage on Strength) vs double density (-10 ft speed, advantage on Strength). Source: Wildemount p.5428. Concentration; flags live on the AFFECTED creature with `adjust_density_caster_id` back-reference for cleanup. The previous implementation auto-picked halve for allies and double for enemies and put the flags on the wrong combatant — both bugs are fixed.
 
-Adding a new prompted spell: in `handle_cast`, build a `pending_spell_choice`, call `send_spell_choice_prompt`, then add the per-spell branch to `apply_spell_choice` in `battle_manager.nvgt`.
+Adding a new prompted spell or feature: in `handle_cast` (or the relevant action handler in `users _dom.nvgt` for class features), build a `pending_spell_choice`, set `caster_id` and `primary_target_id`, call `bm.send_spell_choice_prompt`, then add the per-spell branch to `apply_spell_choice` in `battle_manager.nvgt`. If the effect is a concentration effect, also add a `clear_X` helper and hook it into `clear_concentration_effects`.
 
 
 

@@ -199,8 +199,10 @@ class combatant {
 	int chronal_shift_uses = 0; // Chronurgy Wizard L2 reaction, 2/LR
 	int momentary_stasis_uses = 0; // Chronurgy L6 action, INT mod/LR
 	int convergent_future_uses = 0; // Chronurgy L14 (each use grants 1 exhaustion)
-	bool adjust_density_active = false; // Graviturgy Wizard L2 action, concentration
+	bool adjust_density_active = false; // Graviturgy Wizard L2 action, concentration (lives on the AFFECTED creature, not the caster)
 	int adjust_density_mode = 0; // 0=halved, 1=doubled
+	uint adjust_density_caster_id = 0; // Back-reference for concentration cleanup
+	int adjust_density_speed_delta = 0; // Speed change applied so we can reverse it on cleanup
 	int violent_attraction_uses = 0; // Graviturgy L10 reaction, INT mod/LR
 	bool event_horizon_active = false; // Graviturgy L14 action, 1/LR (or 3rd+ slot)
 	// Echo Knight (Fighter, Wildemount)

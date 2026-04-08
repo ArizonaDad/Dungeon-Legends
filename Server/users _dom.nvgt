@@ -2578,26 +2578,31 @@ void handle_user_message(user@ u, json_object@ msg)
 			}
 		}
 		else if (feature == "adjust_density") {
-			// Graviturgy Wizard L2: Action - choose halved or doubled weight on target within 30ft
+			// Wildemount p.5428: "As an action, you can magically alter the weight of one
+			// object or creature you can see within 30 feet of you. The object or creature
+			// must be Large or smaller. The target's weight is halved or doubled for up to
+			// 1 minute or until your concentration ends." At L10 the size cap raises to Huge.
+			// The choice (halve vs double) is the player's — never auto-pick.
 			if (c.class_name != "Wizard" or c.subclass != "Graviturgy Magic") { u.send({{"type", message_types::announce}, {"text", "Only Graviturgy wizards can adjust density."}, {"interrupt", true}}); return; }
 			if (!c.has_action) { u.send({{"type", message_types::announce}, {"text", "You've already used your action."}, {"interrupt", true}}); return; }
 			if (target_id == 0) { u.send({{"type", message_types::announce}, {"text", "No target selected."}, {"interrupt", true}}); return; }
 			combatant@ tgt = u.room.bm.combat.get_combatant(target_id);
 			if (@tgt == null or tgt.is_dead) { u.send({{"type", message_types::announce}, {"text", "Invalid target."}, {"interrupt", true}}); return; }
-			if (feet_distance(c.x, c.y, tgt.x, tgt.y) > 30) { u.send({{"type", message_types::announce}, {"text", "Target out of range (30ft)."}, {"interrupt", true}}); return; }
+			if (feet_distance(c.x, c.y, tgt.x, tgt.y) > 30) { u.send({{"type", message_types::announce}, {"text", "Target out of range (30 feet)."}, {"interrupt", true}}); return; }
+			// Adjust Density is concentration. Drop any prior concentration before establishing new.
+			u.room.bm.clear_concentration_effects(c);
 			c.has_action = false;
 			c.used_action = true;
-			c.adjust_density_active = true;
-			// Halve by default (to speed up an ally) - in full impl would prompt for choice
-			bool halved = tgt.is_player == c.is_player;
-			c.adjust_density_mode = halved ? 0 : 1;
-			if (halved) {
-				tgt.speed += 10;
-				u.room.bm.broadcast_announce(c.name + " halves " + tgt.name + "'s density! +10ft speed.", true);
-			} else {
-				tgt.speed = tgt.speed > 10 ? tgt.speed - 10 : 0;
-				u.room.bm.broadcast_announce(c.name + " doubles " + tgt.name + "'s density! -10ft speed, disadvantage on STR checks.", true);
-			}
+			pending_spell_choice sc;
+			sc.player_username = c.player_username;
+			sc.caster_id = c.id;
+			sc.spell_id = "adjust_density";
+			sc.cast_slot_level = 0;
+			sc.primary_target_id = tgt.id;
+			sc.option_keys = {"halve", "double"};
+			sc.option_labels = {"Halve density (+10 ft speed, disadvantage on STR)", "Double density (-10 ft speed, advantage on STR)"};
+			sc.prompt_text = "Adjust Density on " + tgt.name + ": press 1 to halve their density (+10 feet speed, disadvantage on Strength checks and saves), or 2 to double their density (-10 feet speed, advantage on Strength checks and saves).";
+			u.room.bm.send_spell_choice_prompt(c, sc);
 		}
 		else if (feature == "event_horizon") {
 			// Graviturgy Wizard L14: Action - 30ft aura, STR save or 2d10 force + speed 0, 1/LR

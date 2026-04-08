@@ -2126,6 +2126,9 @@ class battle_manager {
 			if (target.pass_without_trace_source_id == caster.id) {
 				clear_pass_without_trace_effect(target, true);
 			}
+			if (target.adjust_density_active and target.adjust_density_caster_id == caster.id) {
+				clear_adjust_density(target, true);
+			}
 		}
 		caster.hunters_mark_target_id = 0;
 		caster.hex_target_id = 0;
@@ -5078,6 +5081,40 @@ class battle_manager {
 			string form = c.spirit_guardians_necrotic ? "fiendish" : "angelic";
 			broadcast_announce(c.name + " is surrounded by " + form + " Spirit Guardians! Enemies within 15 feet take " + dtype + " damage and have their speed halved.", true);
 		}
+		else if (sc.spell_id == "adjust_density") {
+			// Wildemount p.5428: target's weight is halved (+10 ft speed, disadvantage on
+			// STR) or doubled (-10 ft speed, advantage on STR) for up to 1 minute or until
+			// concentration ends. The flags live on the AFFECTED creature, not the caster,
+			// with a back-reference (adjust_density_caster_id) for concentration cleanup.
+			combatant@ tgt = combat.get_combatant(sc.primary_target_id);
+			if (@tgt == null or tgt.is_dead) return;
+			if (tgt.adjust_density_active) clear_adjust_density(tgt, false);
+			tgt.adjust_density_active = true;
+			tgt.adjust_density_mode = (choice == "double") ? 1 : 0;
+			tgt.adjust_density_caster_id = c.id;
+			if (tgt.adjust_density_mode == 0) {
+				tgt.speed += 10;
+				tgt.adjust_density_speed_delta = 10;
+				broadcast_announce(c.name + " halves " + tgt.name + "'s density. Speed increases by 10 feet; disadvantage on Strength checks and saves.", true);
+			} else {
+				int reduce = tgt.speed >= 10 ? 10 : tgt.speed;
+				tgt.speed -= reduce;
+				tgt.adjust_density_speed_delta = -reduce;
+				broadcast_announce(c.name + " doubles " + tgt.name + "'s density. Speed decreases by " + reduce + " feet; advantage on Strength checks and saves.", true);
+			}
+		}
+	}
+
+	void clear_adjust_density(combatant@ target, bool announce = false) {
+		if (@target == null or !target.adjust_density_active) return;
+		// Reverse the speed change so concentration drop returns the creature to baseline.
+		target.speed -= target.adjust_density_speed_delta;
+		if (target.speed < 0) target.speed = 0;
+		target.adjust_density_speed_delta = 0;
+		target.adjust_density_active = false;
+		target.adjust_density_mode = 0;
+		target.adjust_density_caster_id = 0;
+		if (announce) broadcast_announce(target.name + "'s density returns to normal.", false);
 	}
 
 	// ---- Action Handlers ----
