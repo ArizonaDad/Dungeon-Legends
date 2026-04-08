@@ -1731,6 +1731,29 @@ class battle_manager {
 			}
 			// (2024 Mage Slayer does not grant advantage on saves; removed wrong 2014 effect)
 			// Mind Domain Gestalt Anchor: +2 to INT/WIS/CHA saves if a Mind Domain cleric is within 10ft
+			// Paladin Aura of Protection (PHB 2024 Paladin L7): "You and creatures of
+			// your choice within 10 feet of you have a bonus to saving throws equal to
+			// your Charisma modifier (with a minimum bonus of +1)." At L18 the range
+			// becomes 30 feet.
+			// Scan for ANY paladin with aura_of_protection_bonus within 10 ft (or 30 ft
+			// at L18+) and apply the best bonus found.
+			int best_aura_bonus = 0;
+			for (uint gi = 0; gi < combat.combatants.length(); gi++) {
+				combatant@ pal = combat.combatants[gi];
+				if (@pal == null or pal.is_dead) continue;
+				if (pal.aura_of_protection_bonus <= 0) continue;
+				if (pal.is_player != t.is_player) continue; // allies only
+				int aura_range = pal.level >= 18 ? 30 : 10;
+				if (feet_distance(pal.x, pal.y, t.x, t.y) > aura_range) continue;
+				if (pal.aura_of_protection_bonus > best_aura_bonus) best_aura_bonus = pal.aura_of_protection_bonus;
+			}
+			if (best_aura_bonus > 0 and t.aura_of_protection_bonus == 0) {
+				// Apply only if the target isn't the paladin themselves (who already
+				// has the bonus baked into get_save_bonus). save_bonus is added to
+				// save_total later in this block.
+				save_bonus += best_aura_bonus;
+				broadcast_announce(t.name + " gains +" + best_aura_bonus + " to the save from a nearby paladin's Aura of Protection.", false);
+			}
 			if (pr.spell_save_type == ABILITY_INT or pr.spell_save_type == ABILITY_WIS or pr.spell_save_type == ABILITY_CHA) {
 				for (uint gi = 0; gi < combat.combatants.length(); gi++) {
 					combatant@ ga_cleric = combat.combatants[gi];
