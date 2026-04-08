@@ -110,6 +110,19 @@ class combatant {
 	bool reliable_talent_active = false;   // L11: treat d20 <=9 as 10 on checks using proficient skills
 	// Wizard PHB 2024 base class features
 	int arcane_recovery_charges = 0;       // L1: recover slots on short rest
+	// Druid PHB 2024 base class features
+	bool wild_companion_active = false;    // L2: cast Find Familiar via Wild Shape
+	bool elemental_fury_active = false;    // L7: damage type swap on Wild Shape attacks
+	// Sorcerer PHB 2024 base class features
+	bool metamagic_quickened_active = false; // L3 Metamagic - Quickened Spell pending toggle
+	bool metamagic_twinned_active = false;   // L3 Metamagic - Twinned Spell pending toggle
+	bool metamagic_subtle_active = false;    // L3 Metamagic - Subtle Spell pending toggle
+	// Warlock PHB 2024 base class features
+	int eldritch_invocations_known = 0;    // L1+: scales by level
+	bool pact_of_the_blade = false;        // Pact Boon variants
+	bool pact_of_the_chain = false;
+	bool pact_of_the_tome = false;
+	bool pact_of_the_talisman = false;
 	// --- Companion / Summon System (TODO §7C) ---
 	// Companions are full combatants tracked in combat.combatants with their own initiative,
 	// HP, AC, attacks, and conditions. They're owned by another combatant via owner_id and

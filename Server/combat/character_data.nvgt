@@ -1090,6 +1090,9 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
             c.fire_resistance = true;
         }
     }
+    // PHB 2024 Sorcerer L1 Innate Sorcery + L2 Font of Magic + L3 Metamagic
+    // Font of Magic already gives sorcery_points = level. Metamagic options at L3+ are
+    // toggle flags the player activates before casting; defaults all off.
     if (cs.class_name == "Sorcerer") {
         if (cs.subclass == "Frost Sorcerer") {
             c.frost_sorcerer_aura = true;
@@ -1349,6 +1352,10 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         }
     }
     if (cs.class_name == "Druid") {
+        // PHB 2024 Druid L2 Wild Companion: cast Find Familiar via Wild Shape
+        if (cs.level >= 2) c.wild_companion_active = true;
+        // PHB 2024 Druid L7 Elemental Fury: choose damage type swap on Wild Shape attacks
+        if (cs.level >= 7) c.elemental_fury_active = true;
         if (cs.subclass == "Circle of the Shepherd" and cs.level >= 2) {
             c.shepherd_circle_active = true;
         }
@@ -1611,6 +1618,22 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
     if (cs.class_name == "Warlock") {
         if (cs.subclass == "Celestial Patron") {
             c.healing_light_dice = 1 + cs.level;
+        }
+        // PHB 2024 Warlock Eldritch Invocations: known count scales by level.
+        // L1: 0, L2: 2, L5: 3, L7: 4, L9: 5, L12: 6, L15: 7, L18: 8.
+        int inv_count = 0;
+        if (cs.level >= 2) inv_count = 2;
+        if (cs.level >= 5) inv_count = 3;
+        if (cs.level >= 7) inv_count = 4;
+        if (cs.level >= 9) inv_count = 5;
+        if (cs.level >= 12) inv_count = 6;
+        if (cs.level >= 15) inv_count = 7;
+        if (cs.level >= 18) inv_count = 8;
+        c.eldritch_invocations_known = inv_count;
+        // PHB 2024 Warlock L3 Pact Boon: 4 options (Blade/Chain/Tome/Talisman). Default
+        // to Pact of the Tome (broadest utility) since the source mandates a player choice.
+        if (cs.level >= 3) {
+            c.pact_of_the_tome = true;
         }
     }
 
