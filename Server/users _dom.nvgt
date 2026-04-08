@@ -2533,18 +2533,30 @@ void handle_user_message(user@ u, json_object@ msg)
 		}
 
 		else if (feature == "echo_knight_manifest") {
-			// Echo Knight (Wildemount): Manifest Echo — bonus action, echo in unoccupied space within 15ft
-			// Echo has 1 HP, AC = 14 + prof, immune to conditions, uses caster saves, same size as caster
+			// Wildemount paras 5370-5375 (Echo Knight L3 Manifest Echo):
+			// "You can use a bonus action to magically manifest an echo of yourself in
+			// an unoccupied space you can see within 15 feet of you. This echo is a
+			// magical, translucent, gray image of you that lasts until it is destroyed,
+			// until you dismiss it as a bonus action, until you manifest another echo,
+			// or until you're more than 30 feet away from it... Your echo has AC 14 +
+			// your proficiency bonus, 1 hit point, and immunity to all conditions."
 			if (c.class_name != "Fighter" or c.subclass != "Echo Knight") { u.send({{"type", message_types::announce}, {"text", "Only Echo Knights can manifest echoes."}, {"interrupt", true}}); return; }
 			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
 			c.has_bonus_action = false;
 			c.used_bonus_action = true;
-			c.echo_active = true;
-			c.echo_hp = 1;
-			// Place echo 5ft to the north (simplified)
-			c.echo_x = c.x;
-			c.echo_y = c.y + 5;
-			u.room.bm.broadcast_announce(c.name + " manifests an Echo 5ft north. Echo has AC " + (14 + c.proficiency) + " and 1 HP.", true);
+			// Spawn the echo as a real companion entity so it gets initiative, can be
+			// attacked, and properly resolves opportunity attacks. The echo uses the
+			// caster's weapon stats since attacks "originate from your space or the
+			// echo's space" (the player can choose either when taking the Attack action).
+			int echo_attack = c.get_ability_mod(ABILITY_STR) + c.proficiency;
+			combatant@ echo = u.room.bm.spawn_companion(c, "echo_knight", c.name + "'s Echo", 1, 14 + c.proficiency, c.speed, echo_attack, c.main_hand_damage_count, c.main_hand_damage_dice, c.get_ability_mod(ABILITY_STR), c.main_hand_damage_type, 0);
+			if (@echo != null) {
+				c.echo_active = true;
+				c.echo_hp = 1;
+				c.echo_x = echo.x;
+				c.echo_y = echo.y;
+				u.room.bm.broadcast_announce(c.name + " manifests an Echo of themselves! AC " + (14 + c.proficiency) + ", 1 HP, immune to conditions. Lasts until destroyed or dismissed.", true);
+			}
 		}
 		else if (feature == "unleash_incarnation") {
 			// Echo Knight L3: after Attack action, bonus action for extra melee attack from echo's space
