@@ -7202,6 +7202,147 @@ class battle_manager {
 				check_battle_end();
 				return;
 			}
+			else if (spell.id == "mass_heal") {
+				// Basic Rules para 14137: "A flood of healing energy flows from you into
+				// creatures around you. You restore up to 700 Hit Points, divided as you
+				// choose among any number of creatures that you can see within range.
+				// Creatures healed by this spell also have the Blinded, Deafened, and
+				// Poisoned conditions removed."
+				// Approximation: 700 HP pool split evenly among visible ally targets
+				// within 60 ft who are below max HP (prioritising those most hurt).
+				int pool = 700;
+				combatant@[] wounded;
+				for (uint mi = 0; mi < combat.combatants.length(); mi++) {
+					combatant@ ally = combat.combatants[mi];
+					if (@ally == null or ally.is_dead) continue;
+					if (ally.is_player != c.is_player and ally.id != c.id) continue;
+					if (feet_distance(c.x, c.y, ally.x, ally.y) > 60) continue;
+					if (ally.current_hp < ally.max_hp) wounded.insert_last(ally);
+				}
+				broadcast_announce(c.name + " unleashes Mass Heal — 700 HP of divine energy!", true);
+				while (pool > 0 and wounded.length() > 0) {
+					combatant@ most_hurt = wounded[0];
+					uint most_hurt_idx = 0;
+					for (uint wi = 1; wi < wounded.length(); wi++) {
+						int a_deficit = wounded[wi].max_hp - wounded[wi].current_hp;
+						int b_deficit = most_hurt.max_hp - most_hurt.current_hp;
+						if (a_deficit > b_deficit) { @most_hurt = wounded[wi]; most_hurt_idx = wi; }
+					}
+					int needed = most_hurt.max_hp - most_hurt.current_hp;
+					int granted = needed < pool ? needed : pool;
+					int effective = combat.apply_healing(most_hurt, granted);
+					record_effective_healing(c.player_username, effective);
+					pool -= granted;
+					most_hurt.remove_condition(COND_BLINDED);
+					most_hurt.remove_condition(COND_DEAFENED);
+					most_hurt.remove_condition(COND_POISONED);
+					broadcast_announce(most_hurt.name + " heals for " + granted + " HP.", false);
+					wounded.remove_at(most_hurt_idx);
+				}
+				broadcast_state();
+				return;
+			}
+			else if (spell.id == "slow") {
+				// Basic Rules paras 15047-15049: "You alter time around up to six creatures
+				// of your choice in a 40-foot Cube within range. Each target must succeed
+				// on a Wisdom saving throw or be affected by this spell for the duration.
+				// An affected target's Speed is halved, it takes a -2 penalty to AC and
+				// Dexterity saving throws, and it can't take Reactions."
+				int center_x = @target != null ? target.x : c.x;
+				int center_y = @target != null ? target.y : c.y;
+				int affected = 0;
+				for (uint ti = 0; ti < combat.combatants.length() and affected < 6; ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (feet_distance(center_x, center_y, t.x, t.y) > 20) continue;
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_WIS);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					broadcast_roll(t.name, "WIS save vs Slow", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Slowed!");
+					if (!saved) {
+						t.speed = t.speed / 2;
+						t.armor_class -= 2;
+						t.has_reaction = false;
+						affected++;
+					}
+				}
+				broadcast_announce(c.name + " slows " + affected + " creature" + (affected == 1 ? "" : "s") + " with the flow of time.", true);
+				broadcast_state();
+				return;
+			}
+			else if (spell.id == "power_word_kill" and @target != null) {
+				// Basic Rules para 14536: "You compel one creature you can see within range
+				// to die. If the target has 100 Hit Points or fewer, it dies. Otherwise,
+				// it takes 12d12 Psychic damage."
+				if (target.current_hp <= 100) {
+					broadcast_announce(c.name + "'s Power Word Kill slays " + target.name + "!", true);
+					combat.apply_damage(target, target.current_hp + 999, DMG_PSYCHIC, c);
+				} else {
+					int pwk_dmg = 0;
+					for (int d = 0; d < 12; d++) pwk_dmg += random(1, 12);
+					combat.apply_damage(target, pwk_dmg, DMG_PSYCHIC, c);
+					broadcast_announce(c.name + "'s Power Word Kill deals " + pwk_dmg + " psychic damage to " + target.name + ".", true);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "earthquake") {
+				// Basic Rules paras 13033-13034: "an intense tremor rips through the
+				// ground in a 100-foot-radius circle centered on that point. The ground
+				// there is Difficult Terrain. When you cast this spell and at the end of
+				// each of your turns for the duration, each creature on the ground in the
+				// area makes a Dexterity saving throw. On a failed save, a creature has
+				// the Prone condition, and its Concentration is broken."
+				int center_x = @target != null ? target.x : c.x;
+				int center_y = @target != null ? target.y : c.y;
+				int affected = 0;
+				broadcast_announce(c.name + " triggers a massive Earthquake in a 100-foot radius!", true);
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (feet_distance(center_x, center_y, t.x, t.y) > 100) continue;
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_DEX);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					broadcast_roll(t.name, "DEX save vs Earthquake", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Prone!");
+					if (!saved) {
+						t.add_condition(COND_PRONE);
+						if (t.is_concentrating) {
+							clear_concentration_effects(t);
+							t.is_concentrating = false;
+							t.remove_condition(COND_CONCENTRATING);
+							broadcast_announce(t.name + "'s concentration is broken by the quake.", false);
+						}
+						affected++;
+					}
+				}
+				broadcast_state();
+				return;
+			}
+			else if (spell.id == "guardian_of_faith") {
+				// Basic Rules paras 13614-13615: "A Large spectral guardian appears and
+				// hovers for the duration in an unoccupied space that you can see within
+				// range. The guardian occupies that space and is invulnerable... Any enemy
+				// that moves to a space within 10 feet of the guardian for the first time
+				// on a turn or starts its turn there makes a Dexterity saving throw,
+				// taking 20 Radiant damage on a failed save or half as much damage on a
+				// successful one."
+				// Spawned as a companion entity with very high HP (invulnerable proxy)
+				// and a radiant aura encoded as its attack.
+				int guardian_x = @target != null ? target.x : c.x;
+				int guardian_y = @target != null ? target.y : c.y;
+				combatant@ guardian = spawn_companion(c, "guardian_of_faith", c.name + "'s Guardian of Faith", 9999, 20, 0, c.proficiency + get_spellcasting_ability_mod(c), 0, 0, 20, DMG_RADIANT, 0);
+				if (@guardian != null) {
+					guardian.x = guardian_x;
+					guardian.y = guardian_y;
+					broadcast_announce(c.name + " summons a spectral Guardian of Faith! Enemies within 10 feet take 20 radiant damage.", true);
+				}
+			}
 			else if (spell.id == "bigbys_hand") {
 				// Basic Rules para 12232: "You create a Large hand of shimmering magical
 				// energy in an unoccupied space that you can see within range. The hand
