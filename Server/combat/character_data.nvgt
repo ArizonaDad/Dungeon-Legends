@@ -107,9 +107,10 @@ void apply_class_defaults(character_sheet@ cs) {
         cs.hit_die = 8; cs.save_profs = {0,0,0,0,1,1}; // WIS, CHA
         cs.is_caster = true; cs.spellcasting_ability = ABILITY_WIS;
         cs.armor_type = "chain_mail"; cs.has_shield = true; // Heavy armor + shield
-        cs.channel_divinity_uses = 1;
-        if (cs.level >= 6) cs.channel_divinity_uses = 2;
-        if (cs.level >= 18) cs.channel_divinity_uses = 3;
+        // PHB 2024 Cleric class table: 2 uses at L2, 3 at L6, 4 at L18 (was 1/2/3 in 2014).
+        cs.channel_divinity_uses = 2;
+        if (cs.level >= 6) cs.channel_divinity_uses = 3;
+        if (cs.level >= 18) cs.channel_divinity_uses = 4;
         apply_full_caster_slots(cs);
     } else if (c == "Druid") {
         cs.hit_die = 8; cs.save_profs = {0,0,0,1,1,0}; // INT, WIS
@@ -1196,6 +1197,12 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
             c.shadow_bind_choice = 2; // Default to cold damage rider; player can re-ritual on long rest
             if (cs.level >= 13) c.black_magic_darkness_uses = 3;
         }
+    }
+    // Bard L2 Jack of All Trades (PHB Bard class feature): "you can add half your
+    // Proficiency Bonus, rounded down, to any ability check you make that doesn't already
+    // include your Proficiency Bonus."
+    if (cs.class_name == "Bard" and cs.level >= 2) {
+        c.jack_of_all_trades = true;
     }
     if (cs.class_name == "Barbarian") {
         // PHB 2024 base class feature: Danger Sense at L2+ (always-on advantage on DEX saves)
