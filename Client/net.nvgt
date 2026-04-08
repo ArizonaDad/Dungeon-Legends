@@ -283,6 +283,26 @@ void handle_message(json_object@ msg)
 		string text = attacker + " is about to hit you! Use a reaction? " + options + ". Press the number for your choice, or Escape to skip.";
 		prompt_reaction_choice(text, csv);
 	}
+	else if (msg_type == message_types::spell_choice_prompt) {
+		string text = msg.exists("text") ? string(msg["text"]) : "Choose an option for your spell.";
+		string spell_id = msg.exists("spell") ? string(msg["spell"]) : "";
+		string[] keys;
+		string[] labels;
+		if (msg.exists("options")) {
+			json_array@ opts = cast<json_array@>(msg["options"]);
+			if (@opts != null) {
+				for (uint oi = 0; oi < opts.size(); oi++) {
+					json_object@ opt = cast<json_object@>(opts[oi]);
+					if (@opt == null) continue;
+					string k = opt.exists("key") ? string(opt["key"]) : "";
+					string l = opt.exists("label") ? string(opt["label"]) : k;
+					keys.insert_last(k);
+					labels.insert_last(l);
+				}
+			}
+		}
+		prompt_spell_choice(text, spell_id, keys, labels);
+	}
 	else if (msg_type == message_types::roll_result) {
 		// Server broadcasts roll results to ALL players - spoken via TTS
 		int natural_roll = msg.exists("natural") ? int(msg["natural"]) : 0;

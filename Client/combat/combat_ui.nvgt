@@ -127,6 +127,13 @@ bool waiting_for_reaction_prompt = false;
 string reaction_prompt_text = "";
 string reaction_options_csv = "";
 uint64 next_reaction_prompt_reminder = 0;
+// Generic mid-spell choice prompt (Fire Shield warm/chill, Spirit Guardians radiant/necrotic, etc.)
+bool waiting_for_spell_choice_prompt = false;
+string spell_choice_prompt_text = "";
+string[] spell_choice_option_keys;
+string[] spell_choice_option_labels;
+string spell_choice_spell_id = "";
+uint64 next_spell_choice_reminder = 0;
 
 // Targeting
 uint current_target_id = 0;
@@ -336,6 +343,22 @@ void prompt_reaction_choice(string text, string csv) {
 	speak(text, true);
 }
 
+void prompt_spell_choice(string text, string spell_id, string[]@ keys, string[]@ labels) {
+	waiting_for_spell_choice_prompt = true;
+	spell_choice_prompt_text = text;
+	spell_choice_spell_id = spell_id;
+	spell_choice_option_keys.resize(0);
+	spell_choice_option_labels.resize(0);
+	if (@keys != null) {
+		for (uint i = 0; i < keys.length(); i++) spell_choice_option_keys.insert_last(keys[i]);
+	}
+	if (@labels != null) {
+		for (uint i = 0; i < labels.length(); i++) spell_choice_option_labels.insert_last(labels[i]);
+	}
+	next_spell_choice_reminder = ticks() + 4000;
+	speak(text, true);
+}
+
 bool check_roll_input() {
 	if (!waiting_for_roll) return false;
 	if (key_pressed(KEY_R) or key_pressed(KEY_RETURN)) {
@@ -433,6 +456,39 @@ bool check_smite_prompt_input() {
 	if (next_smite_prompt_reminder > 0 and ticks() >= next_smite_prompt_reminder) {
 		speak(smite_prompt_text, true);
 		next_smite_prompt_reminder = ticks() + 5000;
+	}
+	return false;
+}
+
+bool check_spell_choice_prompt_input() {
+	if (!waiting_for_spell_choice_prompt) return false;
+	// Number keys 1..N pick the corresponding option key.
+	uint count = spell_choice_option_keys.length();
+	if (count > 9) count = 9;
+	for (uint oi = 0; oi < count; oi++) {
+		if (key_pressed(KEY_1 + oi)) {
+			waiting_for_spell_choice_prompt = false;
+			next_spell_choice_reminder = 0;
+			string chosen_key = spell_choice_option_keys[oi];
+			string chosen_label = (oi < spell_choice_option_labels.length()) ? spell_choice_option_labels[oi] : chosen_key;
+			send({{"type", message_types::spell_choice_response}, {"choice", chosen_key}, {"spell", spell_choice_spell_id}});
+			speak("Chose " + chosen_label + ".", true);
+			return true;
+		}
+	}
+	if (key_pressed(KEY_ESCAPE)) {
+		// No-skip: defaulting to the first option keeps the spell from being lost.
+		waiting_for_spell_choice_prompt = false;
+		next_spell_choice_reminder = 0;
+		string default_key = spell_choice_option_keys.length() > 0 ? spell_choice_option_keys[0] : "";
+		string default_label = spell_choice_option_labels.length() > 0 ? spell_choice_option_labels[0] : default_key;
+		send({{"type", message_types::spell_choice_response}, {"choice", default_key}, {"spell", spell_choice_spell_id}});
+		speak("Defaulted to " + default_label + ".", true);
+		return true;
+	}
+	if (next_spell_choice_reminder > 0 and ticks() >= next_spell_choice_reminder) {
+		speak(spell_choice_prompt_text, true);
+		next_spell_choice_reminder = ticks() + 5000;
 	}
 	return false;
 }
@@ -2586,6 +2642,10 @@ void combat_game_loop() {
 		}
 		if (waiting_for_reaction_prompt) {
 			check_reaction_prompt_input();
+			continue;
+		}
+		if (waiting_for_spell_choice_prompt) {
+			check_spell_choice_prompt_input();
 			continue;
 		}
 		// Process chat/history form only when focus is on chat or history.

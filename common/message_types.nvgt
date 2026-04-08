@@ -79,6 +79,8 @@ namespace message_types
 	const string smite_response = "smite_response";           // Client responds to Divine Smite prompt.
 	const string reaction_prompt = "reaction_prompt";         // Server offers defender reaction options before attack resolves.
 	const string reaction_response = "reaction_response";     // Client responds to reaction prompt.
+	const string spell_choice_prompt = "spell_choice_prompt";   // Server asks caster to pick a mid-spell variant (e.g., Fire Shield warm/chill, Spirit Guardians radiant/necrotic, Adjust Density halve/double).
+	const string spell_choice_response = "spell_choice_response"; // Client responds with their selected option key.
 
 	// Combat feedback
 	const string damage_dealt = "damage_dealt";               // Server announces damage to all.

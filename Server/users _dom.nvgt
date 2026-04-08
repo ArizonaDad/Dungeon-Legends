@@ -3236,6 +3236,9 @@ void handle_user_message(user@ u, json_object@ msg)
 	else if (msg_type == message_types::reaction_response) {
 		if (@u.room != null and @u.room.bm != null) u.room.bm.handle_reaction_response(u, msg);
 	}
+	else if (msg_type == message_types::spell_choice_response) {
+		if (@u.room != null and @u.room.bm != null) u.room.bm.handle_spell_choice_response(u, msg);
+	}
 	else if (msg_type == message_types::action_cast) {
 		if (@u.room != null and @u.room.bm != null) {
 			u.room.bm.handle_cast(u, msg);

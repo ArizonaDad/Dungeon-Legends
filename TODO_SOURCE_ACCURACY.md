@@ -21,27 +21,32 @@ Combat currently has no skill check resolution. Some features need this to funct
 
 ## 2. Mid-Spell Player Choice System
 
-When a spell lets the player choose an option during resolution, the current code auto-picks. The rule the user gave is: **NEVER choose for the player when a spell has a choice.**
+**Infrastructure status (RESOLVED 2026-04-08):** The `pending_spell_choice` state, `send_spell_choice_prompt`, `handle_spell_choice_response`, and `apply_spell_choice` dispatcher are now in `battle_manager.nvgt`. Client-side `prompt_spell_choice` + `check_spell_choice_prompt_input` + game-loop wiring + `net.nvgt` routing are in place. New `spell_choice_prompt` and `spell_choice_response` message types live in `common/message_types.nvgt`. See CLAUDE.md "Mid-Spell Player Choice System" section for the canonical pattern.
 
-Required plumbing: a `pending_spell_choice` state on the battle_manager that pauses spell resolution, sends a choice prompt to the client, and waits for a response message. Pattern exists for `bardic_response`, `lucky_response`, `smite_response`, `reaction_response` — extend the same pattern for spell choices.
+The rule remains: **NEVER choose for the player when a spell has a choice.** Bots and NPC casters auto-pick the first option deterministically so combat keeps moving.
 
-### Known spells that auto-choose and need proper prompts:
+### Spells migrated to the new system:
 
-| Spell | Choice the player should make | Current auto-pick |
+| Spell | Choice | Status | Source quote |
+|-------|--------|--------|--------------|
+| **Fire Shield** | Warm (cold resistance, reflects 2d8 fire) OR Chill (fire resistance, reflects 2d8 cold) | DONE 2026-04-08 | Basic Rules para 13322: "warm shield or a chill shield, as you choose" |
+| **Spirit Guardians** | Radiant (angelic/fey form) OR Necrotic (fiendish form) | DONE 2026-04-08 | Basic Rules para 15123-15124: alignment-based; game prompts caster since alignment is not tracked |
+
+### Spells still needing migration:
+
+| Spell | Choice the player should make | Current behaviour |
 |-------|------------------------------|-------------------|
-| **Fire Shield** | Warm (cold resistance, reflects fire) OR Chill (fire resistance, reflects cold) | Hardcoded warm |
-| **Adjust Density** (Graviturgy L2) | Halve OR double the target's density | Auto-halves allies, auto-doubles enemies |
-| **Spirit Guardians** | Radiant (good/neutral) OR Necrotic (evil) damage type | Hardcoded radiant |
-| **Spirit Totem** (Circle of the Shepherd) | Bear OR Hawk OR Unicorn spirit | Currently has 3 separate menu entries — this one IS working |
-| **Starry Form** (Circle of the Stars) | Archer / Chalice / Dragon form | This one IS working via sub-menu |
+| **Adjust Density** (Graviturgy L2 feature, not a spell) | Halve OR double the target's density | NO HANDLER YET — combatant flags exist but no action route. Batch 1B. |
+| **Spirit Totem** (Circle of the Shepherd) | Bear OR Hawk OR Unicorn spirit | Working — uses 3 separate bonus action menu entries (acceptable) |
+| **Starry Form** (Circle of the Stars) | Archer / Chalice / Dragon form | Working via bonus_action `form` field |
 | **Wild Shape / Elemental Wild Shape** | Which creature form | Partial |
-| **Elemental Adept feat** | Damage type chosen at feat pickup | Should be prompted at character creation, not combat |
+| **Elemental Adept feat** | Damage type chosen at feat pickup | Should be at character creation, not combat |
 | **Channel Divinity Order's Demand** | Optional "drop held items" rider | Not implemented |
-| **Wall of Stone / Wall of Fire** | Shape and orientation | Not implemented (walls not in combat grid)|
+| **Wall of Stone / Wall of Fire** | Shape and orientation | Not implemented (walls not in combat grid) |
 | **Polymorph** | Target beast form | Limited — uses a fixed stat block |
-| **Scorching Ray** | Ray distribution across targets | Auto-distributes |
-| **Magic Missile** | Dart distribution | Auto-distributes evenly |
-| **Eldritch Blast** | Beam distribution | Auto-distributes |
+| **Scorching Ray** | Ray distribution across targets | Auto-distributes. Batch 1C. |
+| **Magic Missile** | Dart distribution | Auto-distributes evenly. Batch 1C. |
+| **Eldritch Blast** | Beam distribution | Auto-distributes. Batch 1C. |
 | **Telekinesis** | Object vs creature, movement direction | Not implemented |
 | **Bigby's Hand** | Hand action each turn (punch/grapple/push/interpose) | Not implemented |
 | **Conjure X spells** | Which creature type to summon | Not implemented |

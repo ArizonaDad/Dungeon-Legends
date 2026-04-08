@@ -209,6 +209,22 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 
 - **Prompt chain order**: Bardic Inspiration (additive) -> Lucky (reroll with advantage) -> Heroic Inspiration (reroll)
 
+### Mid-Spell Player Choice System
+
+Server-side `pending_spell_choice` state on `battle_manager` pauses spell finalisation when a spell offers the caster a mechanical choice the source quote requires (e.g., Fire Shield warm/chill, Spirit Guardians radiant/necrotic). The pattern mirrors `pending_smite_prompt`:
+
+1. The cast handler in `handle_cast` builds a `pending_spell_choice` struct (caster, spell id, slot level, option_keys, option_labels, prompt text) and calls `send_spell_choice_prompt(caster, sc)`.
+2. For player casters, the server stores the prompt in `current_spell_choice` and emits a `spell_choice_prompt` message with `{spell, text, options[{key,label}]}`.
+3. For bots/NPCs the prompt is auto-resolved to the first option deterministically so combat keeps moving.
+4. The client (`combat_ui.nvgt`) sets `waiting_for_spell_choice_prompt`, speaks the prompt, listens for keys 1..N to pick an option (Escape defaults to option 1), and sends back `spell_choice_response` with `{choice}`.
+5. The server's `handle_spell_choice_response` validates the choice against the offered keys, then dispatches to `apply_spell_choice(caster, sc, choice)` which finalises the chosen variant on the caster.
+
+**Spells currently using this system:**
+- **Fire Shield** — warm shield (cold resistance, reflects 2d8 fire) vs chill shield (fire resistance, reflects 2d8 cold). Source: Basic Rules para 13322.
+- **Spirit Guardians** — angelic/fey form (radiant damage) vs fiendish form (necrotic damage). Source: Basic Rules para 15123-15124. The 2024 PHB ties this to alignment, but the game does not track alignment, so the player declares their spirit form at cast time.
+
+Adding a new prompted spell: in `handle_cast`, build a `pending_spell_choice`, call `send_spell_choice_prompt`, then add the per-spell branch to `apply_spell_choice` in `battle_manager.nvgt`.
+
 
 
 ### Action Menu (F key)

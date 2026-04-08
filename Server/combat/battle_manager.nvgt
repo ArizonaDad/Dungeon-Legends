@@ -99,6 +99,20 @@ class pending_reaction_prompt {
 	int reported_modifier;
 }
 
+// Generic mid-spell player choice (Fire Shield warm/chill, Spirit Guardians radiant/necrotic,
+// Adjust Density halve/double, future spell variants). Pauses spell finalisation, prompts
+// the caster, and resumes via handle_spell_choice_response -> apply_spell_choice dispatch.
+class pending_spell_choice {
+	string player_username;
+	uint caster_id;
+	string spell_id;                 // e.g., "fire_shield", "spirit_guardians", "adjust_density"
+	int cast_slot_level;             // Slot level the spell was cast at (for upcast scaling)
+	uint primary_target_id;          // For target-affecting spells (e.g., Adjust Density)
+	string[] option_keys;            // Internal choice keys, e.g., ["warm", "chill"]
+	string[] option_labels;          // Display labels, e.g., ["Warm shield", "Chill shield"]
+	string prompt_text;              // Human-readable prompt for TTS
+}
+
 class achievement_notice {
 	string id;
 	string name;
@@ -117,6 +131,7 @@ class battle_manager {
 	pending_heroic_prompt@ current_heroic_prompt;
 	pending_smite_prompt@ current_smite_prompt;
 	pending_reaction_prompt@ current_reaction_prompt;
+	pending_spell_choice@ current_spell_choice;
 	bool initiative_phase = false;
 	uint initiative_index = 0;
 	uint64 initiative_delay_until = 0;
@@ -145,6 +160,9 @@ class battle_manager {
 		@current_bardic_prompt = null;
 		@current_lucky_prompt = null;
 		@current_heroic_prompt = null;
+		@current_smite_prompt = null;
+		@current_reaction_prompt = null;
+		@current_spell_choice = null;
 		reset_progression_tracking();
 	}
 
@@ -4979,6 +4997,89 @@ class battle_manager {
 		}
 	}
 
+	// ---- Mid-Spell Player Choice (warm/chill, radiant/necrotic, halve/double, ...) ----
+	// Pauses spell finalisation, prompts the caster, and dispatches to apply_spell_choice
+	// when the response arrives. Bots auto-pick the first option so combat keeps moving.
+	bool has_pending_spell_choice() {
+		return @current_spell_choice != null;
+	}
+
+	void send_spell_choice_prompt(combatant@ c, pending_spell_choice@ sc) {
+		if (@c == null or @sc == null) return;
+		user@ pu = find_user_for_combatant(c);
+		// Bots and NPC casters auto-pick the first option (deterministic, keeps combat moving).
+		if (@pu == null or pu.is_bot or !c.is_player) {
+			string default_key = sc.option_keys.length() > 0 ? sc.option_keys[0] : "";
+			apply_spell_choice(c, sc, default_key);
+			broadcast_state();
+			check_battle_end();
+			return;
+		}
+		@current_spell_choice = sc;
+		json_object payload;
+		payload["type"] = message_types::spell_choice_prompt;
+		payload["text"] = sc.prompt_text;
+		payload["spell"] = sc.spell_id;
+		json_array opts;
+		for (uint i = 0; i < sc.option_keys.length() and i < sc.option_labels.length(); i++) {
+			json_object o;
+			o["key"] = sc.option_keys[i];
+			o["label"] = sc.option_labels[i];
+			opts.add(o);
+		}
+		payload["options"] = opts;
+		try { pu.send(payload); } catch {}
+	}
+
+	void handle_spell_choice_response(user@ u, json_object@ msg) {
+		if (@current_spell_choice == null or @u == null) return;
+		if (current_spell_choice.player_username != u.username) return;
+		pending_spell_choice@ sc = current_spell_choice;
+		@current_spell_choice = null;
+		combatant@ c = combat.get_combatant(sc.caster_id);
+		if (@c == null) return;
+		string choice = msg.exists("choice") ? string(msg["choice"]) : "";
+		// Validate the choice is one of the offered keys; fall back to first option if not.
+		bool valid = false;
+		for (uint i = 0; i < sc.option_keys.length(); i++) {
+			if (sc.option_keys[i] == choice) { valid = true; break; }
+		}
+		if (!valid and sc.option_keys.length() > 0) choice = sc.option_keys[0];
+		apply_spell_choice(c, sc, choice);
+		broadcast_state();
+		check_battle_end();
+	}
+
+	void apply_spell_choice(combatant@ c, pending_spell_choice@ sc, string choice) {
+		if (@c == null or @sc == null) return;
+		// Per-spell finalisation. Each branch sets the chosen variant on the caster (or
+		// target) and broadcasts a source-accurate announcement.
+		if (sc.spell_id == "fire_shield") {
+			// PHB Basic Rules para 13322: "The flames provide you with a warm shield or a
+			// chill shield, as you choose. The warm shield grants you Resistance to Cold
+			// damage, and the chill shield grants you Resistance to Fire damage."
+			c.fire_shield_active = true;
+			c.fire_shield_warm = (choice == "warm");
+			if (c.fire_shield_warm) c.cold_resistance = true;
+			else c.fire_resistance = true;
+			string variant = c.fire_shield_warm ? "warm" : "chill";
+			string resist = c.fire_shield_warm ? "cold" : "fire";
+			string reflect = c.fire_shield_warm ? "fire" : "cold";
+			broadcast_announce(c.name + " is wreathed in " + variant + " flames! " + resist + " resistance gained. Melee attackers within 5 feet take 2d8 " + reflect + " damage.", true);
+		}
+		else if (sc.spell_id == "spirit_guardians") {
+			// PHB Basic Rules para 15123-15124: damage type is alignment-based (good/neutral
+			// = radiant, evil = necrotic). Game does not track alignment so we prompt the
+			// caster to declare which form their spirits take.
+			c.spirit_guardians_active = true;
+			c.spirit_guardians_slot_level = sc.cast_slot_level;
+			c.spirit_guardians_necrotic = (choice == "necrotic");
+			string dtype = c.spirit_guardians_necrotic ? "necrotic" : "radiant";
+			string form = c.spirit_guardians_necrotic ? "fiendish" : "angelic";
+			broadcast_announce(c.name + " is surrounded by " + form + " Spirit Guardians! Enemies within 15 feet take " + dtype + " damage and have their speed halved.", true);
+		}
+	}
+
 	// ---- Action Handlers ----
 
 	void handle_attack(user@ u, json_object@ msg) {
@@ -6403,19 +6504,31 @@ class battle_manager {
 				broadcast_announce(target.name + " gains a flying speed of 60 feet!", true);
 			}
 			else if (spell.id == "fire_shield") {
-				// Fire Shield: warm variant grants cold resistance + fire reflection (default);
-				// chill variant would grant fire resistance + cold reflection. 2d8 damage on melee hit within 5ft.
-				c.fire_shield_active = true;
-				c.fire_shield_warm = true; // default warm; TODO: prompt caster for choice
-				c.cold_resistance = true;
-				broadcast_announce(c.name + " is wreathed in flames! Cold resistance gained. Melee attackers within 5ft take 2d8 fire damage.", true);
+				// PHB Basic Rules para 13322: "The flames provide you with a warm shield or
+				// a chill shield, as you choose." Prompt the caster instead of auto-picking.
+				pending_spell_choice sc;
+				sc.player_username = c.player_username;
+				sc.caster_id = c.id;
+				sc.spell_id = "fire_shield";
+				sc.cast_slot_level = cast_slot_level;
+				sc.option_keys = {"warm", "chill"};
+				sc.option_labels = {"Warm shield (cold resistance, reflects fire)", "Chill shield (fire resistance, reflects cold)"};
+				sc.prompt_text = "Fire Shield: choose warm or chill. Press 1 for warm shield (cold resistance, reflects 2d8 fire), or 2 for chill shield (fire resistance, reflects 2d8 cold).";
+				send_spell_choice_prompt(c, sc);
 			}
 			else if (spell.id == "spirit_guardians") {
-				// Spirit Guardians: 15ft aura, 3d8 radiant on enter/start of turn
-				// Mark caster as having spirit guardians active for end-of-turn damage
-				c.spirit_guardians_active = true;
-				c.spirit_guardians_slot_level = cast_slot_level;
-				broadcast_announce(c.name + " is surrounded by Spirit Guardians! Enemies entering 15ft take radiant damage.", true);
+				// PHB Basic Rules para 15123-15124: damage type is alignment-based. Since
+				// the game does not track alignment, prompt the caster to declare which
+				// form their spirits manifest in.
+				pending_spell_choice sc;
+				sc.player_username = c.player_username;
+				sc.caster_id = c.id;
+				sc.spell_id = "spirit_guardians";
+				sc.cast_slot_level = cast_slot_level;
+				sc.option_keys = {"radiant", "necrotic"};
+				sc.option_labels = {"Angelic / fey spirits (radiant damage)", "Fiendish spirits (necrotic damage)"};
+				sc.prompt_text = "Spirit Guardians: which form do they take? Press 1 for angelic or fey (radiant damage), or 2 for fiendish (necrotic damage).";
+				send_spell_choice_prompt(c, sc);
 			}
 			else if (spell.id == "fog_cloud") {
 				// Fog Cloud: blocks line of sight in 20ft radius
