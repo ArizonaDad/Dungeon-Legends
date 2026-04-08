@@ -781,6 +781,11 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         c.balm_of_summer_pool = cs.level;
     }
 
+    // Rune Knight Fighter: Giant's Might uses per rest (Prof times)
+    if (cs.class_name == "Fighter" and cs.subclass == "Rune Knight" and cs.level >= 3) {
+        c.giants_might_uses = proficiency_bonus(cs.level);
+    }
+
     // Wizard subclasses
     if (cs.class_name == "Wizard") {
         if (cs.subclass == "Diviner" and cs.level >= 2) {

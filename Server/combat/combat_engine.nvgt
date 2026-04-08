@@ -134,6 +134,11 @@ class combatant {
 	int ancestral_protector_target = 0; // Path of the Ancestral Guardian
 	int summer_court_healing = 0; // Circle of Dreams Druid
 	int balm_of_summer_pool = 0;
+	bool guided_strike_pending = false; // Oath of Conquest Paladin
+	bool empowered_healing_active = false; // Divine Soul Sorcerer
+	bool giants_might_active = false; // Rune Knight Fighter
+	int giants_might_uses = 0;
+	bool wrath_of_storms_available = false; // Storm Sorcerer
 	int rage_turns_remaining = 0;
 	int action_surge_uses_remaining = 0;
 	bool second_wind_available = false;
@@ -638,6 +643,21 @@ class battle {
 
 		// Check for dropping to 0
 		if (target.current_hp <= 0) {
+			// Shadow Magic Sorcerer: Strength of the Grave — CHA save DC 5+damage to avoid drop
+			if (target.class_name == "Sorcerer" and target.subclass == "Shadow Magic" and !target.strength_of_the_grave_used and damage_type != DMG_RADIANT and !target.is_dead) {
+				int overflow_check = -target.current_hp;
+				if (overflow_check < target.max_hp) { // Not instant death
+					int save_roll = random(1, 20);
+					int save_bonus = target.get_ability_mod(ABILITY_CHA);
+					int save_dc = 5 + amount;
+					int save_total = save_roll + save_bonus;
+					if (save_total >= save_dc) {
+						target.current_hp = 1;
+						target.strength_of_the_grave_used = true;
+						return;
+					}
+				}
+			}
 			// Instant death check: remaining damage >= max HP
 			int overflow = -target.current_hp;
 			if (overflow >= target.max_hp) {

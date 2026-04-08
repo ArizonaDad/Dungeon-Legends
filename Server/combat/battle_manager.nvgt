@@ -3431,6 +3431,13 @@ class battle_manager {
 			broadcast_announce(attacker.name + "'s Cavalier Mark adds " + attacker.proficiency + " damage!", false);
 		}
 
+		// Rune Knight Fighter: Giant's Might — +1d6 damage while active
+		if (attacker.class_name == "Fighter" and attacker.subclass == "Rune Knight" and attacker.giants_might_active and is_weapon_attack) {
+			int giant_dmg = random(1, 6);
+			bonus += giant_dmg;
+			broadcast_announce(attacker.name + "'s Giant's Might adds " + giant_dmg + " damage!", false);
+		}
+
 		// Samurai: Fighting Spirit (advantage handled in advantage check; temp HP gained on activation)
 		// Handled via bonus action
 
@@ -3504,6 +3511,14 @@ class battle_manager {
 				c.superiority_dice--;
 				c.precision_attack_pending = false;
 				broadcast_announce(c.name + "'s Precision Attack adds " + precision_bonus + " to the attack roll! (" + c.superiority_dice + " superiority dice remain)", false);
+			}
+
+			// Oath of Conquest Paladin: Guided Strike — +10 to attack roll
+			if (c.guided_strike_pending) {
+				total += 10;
+				reported_modifier += 10;
+				c.guided_strike_pending = false;
+				broadcast_announce(c.name + "'s Guided Strike adds +10 to the attack roll!", false);
 			}
 
 			if (is_crit) {

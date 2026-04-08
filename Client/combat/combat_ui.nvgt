@@ -675,6 +675,9 @@ void show_bonus_action_menu() {
 	int psychic_blades_bard_opt = -1;
 	int cavalier_mark_opt = -1;
 	int balm_summer_opt = -1;
+	int guided_strike_opt = -1;
+	int giants_might_opt = -1;
+	int empowered_healing_opt = -1;
 
 	if (lc == "barbarian" and !my_is_raging and my_rage_uses_remaining > 0) rage_opt = m.add_item("Rage. Bonus action. Uses left: " + my_rage_uses_remaining + ". Damage bonus: " + my_rage_damage_bonus + ".");
 	if (lc == "fighter" and my_second_wind_available) second_wind_opt = m.add_item("Second Wind. Bonus action. Heal 1d10 plus fighter level.");
@@ -780,6 +783,15 @@ void show_bonus_action_menu() {
 	}
 	if (lc == "druid" and subclass == "Circle of Dreams") {
 		balm_summer_opt = m.add_item("Balm of the Summer Court. Bonus action. Heal a target from your pool.");
+	}
+	if (lc == "paladin" and subclass == "Oath of Conquest") {
+		guided_strike_opt = m.add_item("Guided Strike. Channel Divinity. Add +10 to next attack roll.");
+	}
+	if (lc == "fighter" and subclass == "Rune Knight") {
+		giants_might_opt = m.add_item("Giant's Might. Bonus action. Become Large with +1d6 damage.");
+	}
+	if (lc == "sorcerer" and subclass == "Divine Soul") {
+		empowered_healing_opt = m.add_item("Empowered Healing. Reroll dice on next healing spell.");
 	}
 
 	int options = 1;
@@ -1000,6 +1012,18 @@ void show_bonus_action_menu() {
 	else if (balm_summer_opt >= 0 and res == balm_summer_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "balm_of_summer_court"}, {"target_id", current_target_id}});
 		speak("Balm of the Summer Court. Channeling healing energy.", true);
+	}
+	else if (guided_strike_opt >= 0 and res == guided_strike_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "guided_strike"}});
+		speak("Guided Strike. Next attack gets +10.", true);
+	}
+	else if (giants_might_opt >= 0 and res == giants_might_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "giants_might"}});
+		speak("Giant's Might. Growing larger.", true);
+	}
+	else if (empowered_healing_opt >= 0 and res == empowered_healing_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "empowered_healing"}});
+		speak("Empowered Healing readied.", true);
 	}
 }
 

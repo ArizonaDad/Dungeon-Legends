@@ -2199,6 +2199,44 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.room.bm.broadcast_announce(c.name + " channels Balm of the Summer Court! " + tgt.name + " healed for " + heal + ".", true);
 		}
 
+		else if (feature == "guided_strike") {
+			// Oath of Conquest Paladin: Channel Divinity — +10 to one attack roll
+			if (c.class_name != "Paladin" or c.subclass != "Oath of Conquest") { u.send({{"type", message_types::announce}, {"text", "Only Oath of Conquest paladins can use Guided Strike."}, {"interrupt", true}}); return; }
+			if (c.channel_divinity_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Channel Divinity uses remaining."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.channel_divinity_uses--;
+			c.guided_strike_pending = true;
+			u.room.bm.broadcast_announce(c.name + " invokes Guided Strike! Next attack gets +10 bonus.", true);
+		}
+
+		else if (feature == "wrath_of_storms") {
+			// Storm Sorcerer: Wrath of the Storms - reaction - deal lightning/thunder damage when hit
+			// Implemented as on-hit passive (see damage application)
+			u.send({{"type", message_types::announce}, {"text", "Wrath of the Storms triggers automatically when hit by melee attack."}, {"interrupt", true}});
+		}
+
+		else if (feature == "empowered_healing") {
+			// Divine Soul: reroll healing dice
+			if (c.class_name != "Sorcerer" or c.subclass != "Divine Soul") { u.send({{"type", message_types::announce}, {"text", "Only Divine Souls can use Empowered Healing."}, {"interrupt", true}}); return; }
+			c.empowered_healing_active = true;
+			u.room.bm.broadcast_announce(c.name + " prepares Empowered Healing. Next healing spell can reroll dice.", false);
+		}
+
+		else if (feature == "giants_might") {
+			// Rune Knight Fighter: become Large, +1d6 damage, advantage on STR checks
+			if (c.class_name != "Fighter" or c.subclass != "Rune Knight") { u.send({{"type", message_types::announce}, {"text", "Only Rune Knights can use Giant's Might."}, {"interrupt", true}}); return; }
+			if (c.giants_might_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Giant's Might uses remaining."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.giants_might_uses--;
+			c.giants_might_active = true;
+			c.size = SIZE_LARGE;
+			u.room.bm.broadcast_announce(c.name + " grows with Giant's Might! Size increased to Large, +1d6 damage.", true);
+		}
+
 		else {
 			u.send({{"type", message_types::announce}, {"text", "That bonus action is not available to your character."}, {"interrupt", true}});
 			return;
