@@ -197,6 +197,17 @@ class combatant {
 	int chronal_shift_uses = 0; // Chronurgy Wizard
 	bool adjust_density_active = false; // Graviturgy Wizard
 	bool scribes_spellbook_active = false; // Order of Scribes Wizard
+	// Gunslinger class
+	int risk_dice_current = 0;
+	int risk_dice_max = 0;
+	int risk_die_size = 8;
+	int critical_shot_uses = 0;
+	int critical_shot_die_size = 6;
+	bool critical_shot_pending = false;
+	bool quick_draw_active = false; // Level 1: advantage on initiative
+	bool gut_shot_active = false; // Level 5
+	bool overkill_active = false; // Level 11
+	bool cheat_death_available = true; // Level 13: avoid a lethal blow once per short rest
 	int rage_turns_remaining = 0;
 	int action_surge_uses_remaining = 0;
 	bool second_wind_available = false;

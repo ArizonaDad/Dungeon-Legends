@@ -3441,6 +3441,22 @@ class battle_manager {
 			broadcast_announce(attacker.name + "'s Giant's Might adds " + giant_dmg + " damage!", false);
 		}
 
+		// Gunslinger: Critical Shot — extra damage on next hit
+		if (attacker.class_name == "Gunslinger" and attacker.critical_shot_pending and is_weapon_attack) {
+			int crit_dmg = random(1, attacker.critical_shot_die_size);
+			bonus += crit_dmg;
+			attacker.critical_shot_pending = false;
+			broadcast_announce(attacker.name + "'s Critical Shot adds " + crit_dmg + " damage!", false);
+		}
+
+		// Gunslinger: Gut Shot — Risk Die bonus damage
+		if (attacker.class_name == "Gunslinger" and attacker.gut_shot_active and is_weapon_attack) {
+			int gut_dmg = random(1, attacker.risk_die_size);
+			bonus += gut_dmg;
+			attacker.gut_shot_active = false;
+			broadcast_announce(attacker.name + "'s Gut Shot adds " + gut_dmg + " damage!", false);
+		}
+
 		// Inquisitive Rogue: Insightful Fighting — sneak attack without advantage vs studied target
 		if (attacker.class_name == "Rogue" and attacker.subclass == "Inquisitive" and attacker.inquisitive_target == target.id and attacker.is_first_hit_this_turn and is_weapon_attack) {
 			int dice = (attacker.level + 1) / 2;

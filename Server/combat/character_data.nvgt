@@ -180,6 +180,10 @@ void apply_class_defaults(character_sheet@ cs) {
         cs.hit_die = 8; cs.save_profs = {0,1,0,0,0,1}; // DEX, CHA
         cs.armor_type = "leather"; // Light armor
         if (cs.level >= 5) cs.extra_attacks = 1;
+        // Risk Dice pool and maneuvers
+        // Level 2: 2 d8 Risk Dice
+        // Level 10: 3 d10 Risk Dice
+        // Level 18: 4 d12 Risk Dice
         // Spellslinger subclass gets half-caster slots
         if (cs.subclass == "Spellslinger") {
             cs.is_caster = true; cs.spellcasting_ability = ABILITY_CHA;
@@ -872,6 +876,29 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
     // Chronurgy Wizard: Chronal Shift uses per rest (2 per long rest)
     if (cs.class_name == "Wizard" and cs.subclass == "Chronurgy Magic" and cs.level >= 2) {
         c.chronal_shift_uses = 2;
+    }
+
+    // Gunslinger: Risk Dice pool + Critical Shot uses
+    if (cs.class_name == "Gunslinger") {
+        // Quick Draw: advantage on initiative (applied to bonus)
+        if (cs.level >= 1) c.initiative_bonus += 2; // Quick Draw approximation
+        // Risk Dice at level 2
+        if (cs.level >= 2) {
+            c.risk_dice_max = 2;
+            c.risk_die_size = 8;
+        }
+        if (cs.level >= 10) { c.risk_dice_max = 3; c.risk_die_size = 10; }
+        if (cs.level >= 18) { c.risk_dice_max = 4; c.risk_die_size = 12; }
+        c.risk_dice_current = c.risk_dice_max;
+        // Critical Shot (level 2): 2 per rest
+        if (cs.level >= 2) {
+            c.critical_shot_uses = 2;
+            c.critical_shot_die_size = 6;
+        }
+        if (cs.level >= 9) c.critical_shot_die_size = 8;
+        if (cs.level >= 17) c.critical_shot_die_size = 10;
+        // Cheat Death at level 13
+        if (cs.level >= 13) c.cheat_death_available = true;
     }
 
     // Wizard subclasses

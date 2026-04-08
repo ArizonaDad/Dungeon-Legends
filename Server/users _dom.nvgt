@@ -2644,6 +2644,46 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.room.bm.broadcast_announce(c.name + " uses Chronal Shift to manipulate time!", true);
 		}
 
+		else if (feature == "critical_shot") {
+			// Gunslinger: Critical Shot — expend a use to add Risk Die damage to next hit
+			if (c.class_name != "Gunslinger") { u.send({{"type", message_types::announce}, {"text", "Only Gunslingers can use Critical Shot."}, {"interrupt", true}}); return; }
+			if (c.critical_shot_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Critical Shot uses remaining."}, {"interrupt", true}}); return; }
+			c.critical_shot_uses--;
+			c.critical_shot_pending = true;
+			u.room.bm.broadcast_announce(c.name + " readies a Critical Shot! Next hit deals bonus damage.", false);
+		}
+
+		else if (feature == "gut_shot") {
+			// Gunslinger: Gut Shot — spend a Risk Die to deal bonus damage
+			if (c.class_name != "Gunslinger") { u.send({{"type", message_types::announce}, {"text", "Only Gunslingers can use Gut Shot."}, {"interrupt", true}}); return; }
+			if (c.level < 5) { u.send({{"type", message_types::announce}, {"text", "Gut Shot unlocks at level 5."}, {"interrupt", true}}); return; }
+			if (c.risk_dice_current <= 0) { u.send({{"type", message_types::announce}, {"text", "No Risk Dice available."}, {"interrupt", true}}); return; }
+			c.risk_dice_current--;
+			c.gut_shot_active = true;
+			u.room.bm.broadcast_announce(c.name + " readies a Gut Shot! Next hit will deal a Risk Die of bonus damage.", false);
+		}
+
+		else if (feature == "dodge_roll") {
+			// Gunslinger maneuver: Dodge Roll — spend Risk Die, bonus action move half speed + Dodge
+			if (c.class_name != "Gunslinger") { u.send({{"type", message_types::announce}, {"text", "Only Gunslingers can Dodge Roll."}, {"interrupt", true}}); return; }
+			if (c.risk_dice_current <= 0) { u.send({{"type", message_types::announce}, {"text", "No Risk Dice available."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.risk_dice_current--;
+			c.is_dodging = true;
+			c.add_condition(COND_DODGING);
+			u.room.bm.broadcast_announce(c.name + " uses Dodge Roll! Takes Dodge action.", false);
+		}
+
+		else if (feature == "blindfire") {
+			// Gunslinger maneuver: Blindfire — ignore disadvantage on next ranged attack
+			if (c.class_name != "Gunslinger") { u.send({{"type", message_types::announce}, {"text", "Only Gunslingers can Blindfire."}, {"interrupt", true}}); return; }
+			if (c.risk_dice_current <= 0) { u.send({{"type", message_types::announce}, {"text", "No Risk Dice available."}, {"interrupt", true}}); return; }
+			c.risk_dice_current--;
+			u.room.bm.broadcast_announce(c.name + " uses Blindfire! Next ranged attack ignores disadvantage.", false);
+		}
+
 		else if (feature == "experimental_elixir") {
 			// Alchemist Artificer: create an experimental elixir (random effect)
 			if (c.class_name != "Artificer" or c.subclass != "Alchemist") { u.send({{"type", message_types::announce}, {"text", "Only Alchemists can create Experimental Elixirs."}, {"interrupt", true}}); return; }

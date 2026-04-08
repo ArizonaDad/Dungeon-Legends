@@ -709,6 +709,10 @@ void show_bonus_action_menu() {
 	int slayers_prey_opt = -1;
 	int swarmkeeper_opt = -1;
 	int chronal_shift_opt = -1;
+	int critical_shot_opt = -1;
+	int gut_shot_opt = -1;
+	int dodge_roll_opt = -1;
+	int blindfire_opt = -1;
 
 	if (lc == "barbarian" and !my_is_raging and my_rage_uses_remaining > 0) rage_opt = m.add_item("Rage. Bonus action. Uses left: " + my_rage_uses_remaining + ". Damage bonus: " + my_rage_damage_bonus + ".");
 	if (lc == "fighter" and my_second_wind_available) second_wind_opt = m.add_item("Second Wind. Bonus action. Heal 1d10 plus fighter level.");
@@ -902,6 +906,17 @@ void show_bonus_action_menu() {
 	}
 	if (lc == "wizard" and subclass == "Chronurgy Magic") {
 		chronal_shift_opt = m.add_item("Chronal Shift. Force a roll to be rerolled.");
+	}
+	// Gunslinger class features
+	if (lc == "gunslinger") {
+		if (level >= 2) {
+			critical_shot_opt = m.add_item("Critical Shot. Add bonus damage dice to your next weapon attack.");
+		}
+		if (level >= 5) {
+			gut_shot_opt = m.add_item("Gut Shot. Spend a Risk Die for bonus damage on next attack.");
+		}
+		dodge_roll_opt = m.add_item("Dodge Roll. Bonus action. Spend a Risk Die to Dodge.");
+		blindfire_opt = m.add_item("Blindfire. Spend a Risk Die to ignore disadvantage on next ranged attack.");
 	}
 
 	int options = 1;
@@ -1286,6 +1301,22 @@ void show_bonus_action_menu() {
 	else if (chronal_shift_opt >= 0 and res == chronal_shift_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "chronal_shift"}});
 		speak("Time shifted.", true);
+	}
+	else if (critical_shot_opt >= 0 and res == critical_shot_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "critical_shot"}});
+		speak("Critical Shot readied.", true);
+	}
+	else if (gut_shot_opt >= 0 and res == gut_shot_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "gut_shot"}});
+		speak("Gut Shot readied.", true);
+	}
+	else if (dodge_roll_opt >= 0 and res == dodge_roll_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "dodge_roll"}});
+		speak("Dodge Roll.", true);
+	}
+	else if (blindfire_opt >= 0 and res == blindfire_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "blindfire"}});
+		speak("Blindfire readied.", true);
 	}
 }
 
