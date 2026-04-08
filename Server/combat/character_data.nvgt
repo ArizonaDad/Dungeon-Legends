@@ -878,6 +878,127 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         c.chronal_shift_uses = 2;
     }
 
+    // Setting subclasses (Batch 17) - initialize per-class
+    if (cs.class_name == "Druid") {
+        if (cs.subclass == "Circle of the Sea" and cs.level >= 2) {
+            c.sea_circle_active = true;
+            c.sea_wrath_dice = 1 + (cs.level / 5); // 1d6 cold/lightning, scales with level
+        }
+        if (cs.subclass == "Circle of the Unbroken" and cs.level >= 2) {
+            c.circle_unbroken_active = true;
+            c.fire_resistance = true; // unbroken nature
+        }
+        if (cs.subclass == "Circle of Dragons" and cs.level >= 2) {
+            c.circle_dragons_form = true;
+            c.fire_resistance = true;
+        }
+    }
+    if (cs.class_name == "Sorcerer") {
+        if (cs.subclass == "Frost Sorcerer") {
+            c.frost_sorcerer_aura = true;
+            c.cold_resistance = true;
+        }
+        if (cs.subclass == "Desert Soul") {
+            c.desert_soul_heat = true;
+            c.fire_resistance = true;
+        }
+    }
+    if (cs.class_name == "Fighter") {
+        if (cs.subclass == "Couatl Herald" and cs.level >= 3) {
+            c.couatl_herald_mantle = true;
+        }
+        if (cs.subclass == "Steel Hawk" and cs.level >= 3) {
+            c.steel_hawk_flight = true;
+            c.flying_speed = 30;
+        }
+        if (cs.subclass == "Blade Breaker" and cs.level >= 3) {
+            c.blade_breaker_stance = false; // toggled
+        }
+    }
+    if (cs.class_name == "Cleric") {
+        if (cs.subclass == "Festus Domain" and cs.level >= 1) {
+            c.festus_blessing_active = false;
+        }
+        if (cs.subclass == "Inquisition Domain" and cs.level >= 1) {
+            c.inquisition_anti_magic = true;
+            c.magic_resistance = true;
+        }
+        if (cs.subclass == "Astral Domain" and cs.level >= 1) {
+            c.astral_domain_active = true;
+            c.psychic_resistance = true;
+        }
+    }
+    if (cs.class_name == "Bard") {
+        if (cs.subclass == "College of Spirits" and cs.level >= 3) {
+            c.college_spirits_tale = false;
+        }
+    }
+    if (cs.class_name == "Rogue") {
+        if (cs.subclass == "Misfortune Bringer" and cs.level >= 3) {
+            c.misfortune_jinx_active = false;
+        }
+        if (cs.subclass == "Runetagger" and cs.level >= 3) {
+            c.runetagger_marked = false;
+        }
+        if (cs.subclass == "Grim Surgeon" and cs.level >= 3) {
+            c.grim_surgeon_precision = false;
+        }
+    }
+    if (cs.class_name == "Barbarian") {
+        if (cs.subclass == "Path of the Carrion Raven" and cs.level >= 3) {
+            c.carrion_raven_focus = true;
+        }
+    }
+    if (cs.class_name == "Monk") {
+        if (cs.subclass == "Warrior of the Celestial" and cs.level >= 3) {
+            c.warrior_celestial_radiant = true;
+        }
+        if (cs.subclass == "Way of the Aether" and cs.level >= 3) {
+            c.way_of_aether_active = true;
+            c.psychic_resistance = true;
+        }
+    }
+    if (cs.class_name == "Paladin") {
+        if (cs.subclass == "Oath of the Hearth" and cs.level >= 3) {
+            c.oath_of_hearth_active = true;
+        }
+        if (cs.subclass == "Oath of Zeal" and cs.level >= 3) {
+            c.oath_of_zeal_active = true;
+        }
+    }
+    if (cs.class_name == "Ranger") {
+        if (cs.subclass == "Winter Trapper" and cs.level >= 3) {
+            c.winter_trapper_traps = true;
+            c.cold_resistance = true;
+        }
+        if (cs.subclass == "Rocborne" and cs.level >= 3) {
+            c.rocborne_mount = true;
+            c.flying_speed = 40;
+        }
+    }
+    if (cs.class_name == "Warlock") {
+        if (cs.subclass == "Pact of the Astral Griffon" and cs.level >= 1) {
+            c.astral_griffon_bond = true;
+            c.flying_speed = 30;
+        }
+        if (cs.subclass == "Pact of the Many" and cs.level >= 1) {
+            c.pact_of_many_active = true;
+        }
+    }
+    if (cs.class_name == "Wizard") {
+        if (cs.subclass == "Materializer" and cs.level >= 2) {
+            c.materializer_object = true;
+        }
+        if (cs.subclass == "Wand Lore" and cs.level >= 2) {
+            c.wand_lore_focus = true;
+        }
+    }
+    if (cs.class_name == "Artificer") {
+        if (cs.subclass == "Cartographer" and cs.level >= 3) {
+            c.cartographer_marked = false;
+        }
+    }
+
     // Gunslinger subclasses (Valda's)
     if (cs.class_name == "Gunslinger" and cs.level >= 3) {
         if (cs.subclass == "Deadeye") {

@@ -2731,6 +2731,61 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.room.bm.broadcast_announce(c.name + " uses Skirmisher to move half their speed as a reaction!", false);
 		}
 
+		else if (feature == "jinx_target") {
+			// Misfortune Bringer Rogue: jinx target for bonus damage
+			if (c.class_name != "Rogue" or c.subclass != "Misfortune Bringer") { u.send({{"type", message_types::announce}, {"text", "Only Misfortune Bringer Rogues can jinx targets."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			if (target_id == 0) { u.send({{"type", message_types::announce}, {"text", "No target selected."}, {"interrupt", true}}); return; }
+			combatant@ tgt = u.room.bm.combat.get_combatant(target_id);
+			if (@tgt == null or tgt.is_dead) { u.send({{"type", message_types::announce}, {"text", "Invalid target."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.misfortune_jinx_active = true;
+			c.misfortune_jinx_target = tgt.id;
+			u.room.bm.broadcast_announce(c.name + " curses " + tgt.name + " with a jinx of misfortune!", true);
+		}
+		else if (feature == "rune_tag") {
+			// Runetagger Rogue: mark target with magical rune
+			if (c.class_name != "Rogue" or c.subclass != "Runetagger") { u.send({{"type", message_types::announce}, {"text", "Only Runetagger Rogues can place runes."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			if (target_id == 0) { u.send({{"type", message_types::announce}, {"text", "No target selected."}, {"interrupt", true}}); return; }
+			combatant@ tgt = u.room.bm.combat.get_combatant(target_id);
+			if (@tgt == null or tgt.is_dead) { u.send({{"type", message_types::announce}, {"text", "Invalid target."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.runetagger_marked = true;
+			c.runetagger_target = tgt.id;
+			u.room.bm.broadcast_announce(c.name + " tags " + tgt.name + " with a magical rune!", true);
+		}
+		else if (feature == "blade_breaker_stance") {
+			// Blade Breaker Fighter: enter armor-crushing stance - reduce target AC on hit
+			if (c.class_name != "Fighter" or c.subclass != "Blade Breaker") { u.send({{"type", message_types::announce}, {"text", "Only Blade Breakers can enter this stance."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.blade_breaker_stance = !c.blade_breaker_stance;
+			u.room.bm.broadcast_announce(c.name + (c.blade_breaker_stance ? " enters Blade Breaker stance!" : " leaves Blade Breaker stance."), true);
+		}
+		else if (feature == "festus_blessing") {
+			// Festus Domain Cleric: bestow festive blessing on allies
+			if (c.class_name != "Cleric" or c.subclass != "Festus Domain") { u.send({{"type", message_types::announce}, {"text", "Only Festus Clerics can bless feasts."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			if (c.channel_divinity_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Channel Divinity remaining."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.channel_divinity_uses--;
+			c.festus_blessing_active = true;
+			c.festus_blessing_rounds = 3;
+			// Heal all allies within 30ft
+			for (uint fbi = 0; fbi < u.room.bm.combat.combatants.length(); fbi++) {
+				combatant@ ally = u.room.bm.combat.combatants[fbi];
+				if (@ally == null or ally.is_dead or ally.is_player != c.is_player) continue;
+				if (feet_distance(c.x, c.y, ally.x, ally.y) > 30) continue;
+				int heal = c.proficiency + c.get_ability_mod(ABILITY_WIS);
+				u.room.bm.combat.apply_healing(ally, heal);
+			}
+			u.room.bm.broadcast_announce(c.name + " grants the Festus Blessing! All nearby allies are healed.", true);
+		}
 		else if (feature == "deadeye_stance") {
 			// Deadeye Gunslinger: enter Sharpshooter's Stance - ignore long range disadvantage, +PROF damage
 			if (c.class_name != "Gunslinger" or c.subclass != "Deadeye") { u.send({{"type", message_types::announce}, {"text", "Only Deadeye Gunslingers can use Sharpshooter's Stance."}, {"interrupt", true}}); return; }

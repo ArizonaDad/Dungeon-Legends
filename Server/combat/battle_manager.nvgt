@@ -3496,6 +3496,127 @@ class battle_manager {
 		// Trick Shot Gunslinger: Ricochet — bullet bounces to a second target after this hit
 		// (handled after damage application below)
 
+		// === Setting subclass damage bonuses (Batch 17) ===
+
+		// Frost Sorcerer: bonus cold damage on cantrips/spells (handled in spell logic) — for melee/ranged: +1 cold
+		if (attacker.class_name == "Sorcerer" and attacker.subclass == "Frost Sorcerer" and is_weapon_attack) {
+			int frost_dmg = 1 + (attacker.level / 5);
+			bonus += frost_dmg;
+			broadcast_announce(attacker.name + "'s Frost Aura adds " + frost_dmg + " cold damage!", false);
+		}
+
+		// Desert Soul: heat damage on adjacent enemies and weapon attacks
+		if (attacker.class_name == "Sorcerer" and attacker.subclass == "Desert Soul" and is_weapon_attack) {
+			int heat_dmg = 1 + (attacker.level / 5);
+			bonus += heat_dmg;
+			broadcast_announce(attacker.name + "'s Desert Heat adds " + heat_dmg + " fire damage!", false);
+		}
+
+		// Couatl Herald Fighter: radiant strikes
+		if (attacker.class_name == "Fighter" and attacker.subclass == "Couatl Herald" and attacker.couatl_herald_mantle and is_weapon_attack) {
+			int radiant_dmg = random(1, 4);
+			bonus += radiant_dmg;
+			broadcast_announce(attacker.name + "'s Couatl Mantle adds " + radiant_dmg + " radiant damage!", false);
+		}
+
+		// Warrior of the Celestial Monk: radiant strikes
+		if (attacker.class_name == "Monk" and attacker.subclass == "Warrior of the Celestial" and is_weapon_attack) {
+			int radiant_dmg = random(1, 4);
+			bonus += radiant_dmg;
+			broadcast_announce(attacker.name + "'s Celestial Light adds " + radiant_dmg + " radiant damage!", false);
+		}
+
+		// Way of the Aether Monk: psychic damage on unarmed strikes
+		if (attacker.class_name == "Monk" and attacker.subclass == "Way of the Aether" and is_weapon_attack) {
+			int psy_dmg = random(1, 4);
+			bonus += psy_dmg;
+			broadcast_announce(attacker.name + "'s Aether Strike adds " + psy_dmg + " psychic damage!", false);
+		}
+
+		// Oath of the Hearth Paladin: defending nearby allies adds radiant damage
+		if (attacker.class_name == "Paladin" and attacker.subclass == "Oath of the Hearth" and attacker.oath_of_hearth_active and is_weapon_attack) {
+			// Bonus when an ally is within 10ft of attacker
+			bool ally_near = false;
+			for (uint hi = 0; hi < combat.combatants.length(); hi++) {
+				combatant@ ha = combat.combatants[hi];
+				if (@ha == null or ha.is_dead or ha.id == attacker.id or ha.is_player != attacker.is_player) continue;
+				if (feet_distance(attacker.x, attacker.y, ha.x, ha.y) <= 10) { ally_near = true; break; }
+			}
+			if (ally_near) {
+				int hearth_dmg = attacker.proficiency;
+				bonus += hearth_dmg;
+				broadcast_announce(attacker.name + "'s Hearth Defender adds " + hearth_dmg + " damage protecting allies!", false);
+			}
+		}
+
+		// Oath of Zeal Paladin: zealous attacks add radiant damage on first hit per turn
+		if (attacker.class_name == "Paladin" and attacker.subclass == "Oath of Zeal" and attacker.is_first_hit_this_turn and is_weapon_attack) {
+			int zeal_dmg = attacker.proficiency;
+			bonus += zeal_dmg;
+			broadcast_announce(attacker.name + "'s Zealous Strike adds " + zeal_dmg + " radiant damage!", false);
+		}
+
+		// Path of the Carrion Raven Barbarian: focus mark adds bonus damage
+		if (attacker.class_name == "Barbarian" and attacker.subclass == "Path of the Carrion Raven" and attacker.carrion_raven_focus and is_weapon_attack) {
+			int raven_dmg = random(1, 6);
+			bonus += raven_dmg;
+			broadcast_announce(attacker.name + "'s Raven's Focus adds " + raven_dmg + " necrotic damage!", false);
+		}
+
+		// Misfortune Bringer Rogue: jinxed target takes extra damage
+		if (attacker.class_name == "Rogue" and attacker.subclass == "Misfortune Bringer" and attacker.misfortune_jinx_active and attacker.misfortune_jinx_target == target.id and is_weapon_attack) {
+			int jinx_dmg = random(1, 6);
+			bonus += jinx_dmg;
+			broadcast_announce(attacker.name + "'s Jinx adds " + jinx_dmg + " misfortune damage!", false);
+		}
+
+		// Runetagger Rogue: marked target takes bonus damage
+		if (attacker.class_name == "Rogue" and attacker.subclass == "Runetagger" and attacker.runetagger_marked and attacker.runetagger_target == target.id and is_weapon_attack) {
+			int rune_dmg = random(1, 6);
+			bonus += rune_dmg;
+			broadcast_announce(attacker.name + "'s Rune Tag adds " + rune_dmg + " force damage!", false);
+		}
+
+		// Grim Surgeon Rogue: precision strikes deal bonus damage
+		if (attacker.class_name == "Rogue" and attacker.subclass == "Grim Surgeon" and attacker.is_first_hit_this_turn and is_weapon_attack) {
+			int surgery_dmg = random(1, 4);
+			bonus += surgery_dmg;
+			broadcast_announce(attacker.name + "'s Surgical Strike adds " + surgery_dmg + " damage!", false);
+		}
+
+		// Inquisition Domain Cleric: anti-magic strikes against spellcasters
+		if (attacker.class_name == "Cleric" and attacker.subclass == "Inquisition Domain" and is_weapon_attack) {
+			// Bonus damage if target is a caster (has spell slots)
+			bool target_is_caster = target.spell_slots_max[1] > 0 or target.spell_slots_max[2] > 0;
+			if (target_is_caster) {
+				int inq_dmg = attacker.proficiency;
+				bonus += inq_dmg;
+				broadcast_announce(attacker.name + "'s Inquisition adds " + inq_dmg + " damage to the caster!", false);
+			}
+		}
+
+		// Astral Domain Cleric: psychic damage on weapon strikes
+		if (attacker.class_name == "Cleric" and attacker.subclass == "Astral Domain" and attacker.astral_domain_active and is_weapon_attack) {
+			int astral_dmg = random(1, 4);
+			bonus += astral_dmg;
+			broadcast_announce(attacker.name + "'s Astral Power adds " + astral_dmg + " psychic damage!", false);
+		}
+
+		// Circle of Sea Druid: Wave Strike — cold/lightning bonus on weapon strikes
+		if (attacker.class_name == "Druid" and attacker.subclass == "Circle of the Sea" and attacker.sea_circle_active and is_weapon_attack) {
+			int wave_dmg = 0;
+			for (int wd = 0; wd < attacker.sea_wrath_dice; wd++) wave_dmg += random(1, 6);
+			bonus += wave_dmg;
+			broadcast_announce(attacker.name + "'s Wrath of the Sea adds " + wave_dmg + " cold damage!", false);
+		}
+
+		// Cartographer Artificer: marked location bonus damage
+		if (attacker.class_name == "Artificer" and attacker.subclass == "Cartographer" and attacker.cartographer_marked and is_weapon_attack) {
+			int cart_dmg = attacker.proficiency;
+			bonus += cart_dmg;
+			broadcast_announce(attacker.name + "'s Cartographer's Map adds " + cart_dmg + " damage!", false);
+		}
+
 		// Inquisitive Rogue: Insightful Fighting — sneak attack without advantage vs studied target
 		if (attacker.class_name == "Rogue" and attacker.subclass == "Inquisitive" and attacker.inquisitive_target == target.id and attacker.is_first_hit_this_turn and is_weapon_attack) {
 			int dice = (attacker.level + 1) / 2;

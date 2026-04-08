@@ -723,6 +723,10 @@ void show_bonus_action_menu() {
 	int license_to_kill_opt = -1;
 	int trick_shot_ricochet_opt = -1;
 	int white_hat_protect_opt = -1;
+	int jinx_target_opt = -1;
+	int rune_tag_opt = -1;
+	int blade_breaker_stance_opt = -1;
+	int festus_blessing_opt = -1;
 
 	if (lc == "barbarian" and !my_is_raging and my_rage_uses_remaining > 0) rage_opt = m.add_item("Rage. Bonus action. Uses left: " + my_rage_uses_remaining + ". Damage bonus: " + my_rage_damage_bonus + ".");
 	if (lc == "fighter" and my_second_wind_available) second_wind_opt = m.add_item("Second Wind. Bonus action. Heal 1d10 plus fighter level.");
@@ -947,6 +951,19 @@ void show_bonus_action_menu() {
 	}
 	if (lc == "gunslinger" and subclass == "White Hat" and level >= 3) {
 		white_hat_protect_opt = m.add_item("Protect Ally. Bonus action. Stand ready to take a hit for an ally.");
+	}
+	// Setting subclass bonus actions
+	if (lc == "rogue" and subclass == "Misfortune Bringer" and level >= 3) {
+		jinx_target_opt = m.add_item("Jinx Target. Bonus action. Curse target with bonus damage on next hits.");
+	}
+	if (lc == "rogue" and subclass == "Runetagger" and level >= 3) {
+		rune_tag_opt = m.add_item("Rune Tag. Bonus action. Mark target with magical rune for force damage.");
+	}
+	if (lc == "fighter" and subclass == "Blade Breaker" and level >= 3) {
+		blade_breaker_stance_opt = m.add_item("Blade Breaker Stance. Bonus action. Toggle armor-crushing stance.");
+	}
+	if (lc == "cleric" and subclass == "Festus Domain" and level >= 1) {
+		festus_blessing_opt = m.add_item("Festus Blessing. Bonus action. Channel Divinity to heal nearby allies.");
 	}
 	// Gunslinger class features
 	if (lc == "gunslinger") {
@@ -1426,6 +1443,30 @@ void show_bonus_action_menu() {
 		}
 		send({{"type", message_types::bonus_action}, {"feature", "white_hat_protect"}, {"target_id", current_target_id}});
 		speak("Standing ready to protect.", true);
+	}
+	else if (jinx_target_opt >= 0 and res == jinx_target_opt) {
+		if (current_target_id == 0) {
+			speak("No target selected.", true);
+			return;
+		}
+		send({{"type", message_types::bonus_action}, {"feature", "jinx_target"}, {"target_id", current_target_id}});
+		speak("Jinx placed.", true);
+	}
+	else if (rune_tag_opt >= 0 and res == rune_tag_opt) {
+		if (current_target_id == 0) {
+			speak("No target selected.", true);
+			return;
+		}
+		send({{"type", message_types::bonus_action}, {"feature", "rune_tag"}, {"target_id", current_target_id}});
+		speak("Rune tag placed.", true);
+	}
+	else if (blade_breaker_stance_opt >= 0 and res == blade_breaker_stance_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "blade_breaker_stance"}});
+		speak("Blade Breaker stance toggled.", true);
+	}
+	else if (festus_blessing_opt >= 0 and res == festus_blessing_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "festus_blessing"}});
+		speak("Festus Blessing granted.", true);
 	}
 }
 
