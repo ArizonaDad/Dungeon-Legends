@@ -209,6 +209,39 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 
 - **Prompt chain order**: Bardic Inspiration (additive) -> Lucky (reroll with advantage) -> Heroic Inspiration (reroll)
 
+### Companion / Summon System (TODO §7C foundation)
+
+Companions are full combatants tracked in `combat.combatants` with their own HP, AC, attack rolls, damage dice, conditions, and initiative slot. They are owned by another combatant via `owner_id` and scaled to the owner's level + proficiency bonus per source.
+
+**Key fields on `combatant`:**
+- `is_companion` (bool) — true for spawned companions
+- `owner_id` (uint) — back-reference to the owner combatant
+- `companion_subclass` (string) — tag for AI / scaling logic
+- `companion_attack_bonus`, `companion_attack_dice`, `companion_attack_die_sides`, `companion_attack_dmg_mod`, `companion_attack_dmg_type` — cached attack stats
+
+**API in `battle_manager.nvgt`:**
+- `spawn_companion(owner, subclass_id, name, hp, ac, speed, attack_bonus, dmg_count, dmg_die, dmg_mod, dmg_type, extra_attacks=0)` — creates the combatant, places it adjacent to owner, fills monster-style attack fields, inserts into combat, returns handle
+- `dismiss_companion(companion, announce)` — marks the companion dead and removes from combat
+
+**Subclasses with working companions:**
+- **Beast Master** (Ranger L3) — Primal Land Beast: HP=5+5*level, AC=13+PB, 1d8+PB slashing
+- **Battle Smith** (Artificer L3) — Steel Defender: HP=2+5*level+INT, AC=15, 1d8+PB force
+- **Drakewarden** (Ranger L3) — Drake Companion: HP=5+5*level, AC=14+PB, 1d6+PB elemental
+- **Circle of Wildfire** (Druid L2) — Wildfire Spirit: HP=5+5*level, AC=13, 1d6+PB fire (ranged)
+- **Artillerist** (Artificer L3) — Eldritch Cannon Force Ballista: HP=5*level, AC=18, 2d8 force
+
+**Spells with companion-style spawns:**
+- **Bigby's Hand** — spawned as a Large hand entity, HP=caster max, AC=20, 4d8 force (Clenched Fist mode)
+- **Animate Dead** — pre-existing skeleton minion spawn
+- **Insect Plague**, **Cloudkill** etc. — area effects, NOT companions
+
+**Deferred:**
+- Beast Master Sea/Sky variants (need a creature selection prompt)
+- Drakewarden damage type prompt (currently uses init default)
+- Echo Knight Manifest Echo (needs HP=1 dummy logic)
+- Bigby's Hand mode prompt (Clenched Fist / Forceful Hand / Grasping Hand / Interposing Hand)
+- Companion AI improvements (currently uses generic monster turn flow)
+
 ### Skill Check System
 
 Skill checks (Stealth, Persuasion, Investigation, etc.) flow through the standard `pending_roll` pipeline so they get reroll prompts (Bardic, Lucky, Heroic), advantage/disadvantage handling, and Silver Tongue clamping for free.
