@@ -1114,6 +1114,16 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         }
     }
     if (cs.class_name == "Fighter") {
+        // PHB 2024 Fighter L9 Indomitable: 1 use/LR, 2 at L13, 3 at L17 (failed save reroll)
+        if (cs.level >= 9) {
+            c.indomitable_uses = 1;
+            if (cs.level >= 13) c.indomitable_uses = 2;
+            if (cs.level >= 17) c.indomitable_uses = 3;
+        }
+        // PHB 2024 Fighter L13 Studied Attacks: passive flag
+        if (cs.level >= 13) {
+            c.studied_attacks_active = true;
+        }
         // Sword Coast: Purple Dragon Knight / Banneret
         if (cs.subclass == "Purple Dragon Knight" and cs.level >= 3) {
             c.purple_dragon_knight_active = true;

@@ -1791,6 +1791,13 @@ class battle_manager {
 		// against you have Advantage during that time."
 		if (attacker.reckless_attack_active and !attack_is_ranged) adv = true;
 		if (target.reckless_attack_active) adv = true; // Target attacked self recklessly: incoming gets advantage
+		// Fighter L13 Studied Attacks (PHB 2024 para 5983): "If you make an attack roll
+		// against a creature and miss, you have Advantage on your next attack roll against
+		// that creature before the end of your next turn."
+		if (attacker.studied_attacks_active and attacker.studied_attacks_target_id == target.id) {
+			adv = true;
+			attacker.studied_attacks_target_id = 0; // Consume the bonus
+		}
 		if (target.has_condition(COND_PRONE) and !attack_is_ranged and dist <= 5) adv = true;
 		if (target.has_condition(COND_PRONE) and (attack_is_ranged or dist > 5)) disadv = true;
 		if (target.has_condition(COND_PARALYZED) or target.has_condition(COND_STUNNED) or target.has_condition(COND_UNCONSCIOUS)) adv = true;
@@ -4249,6 +4256,12 @@ class battle_manager {
 				c.combat_prowess_used = true;
 				outcome = "Hit! Boon of Combat Prowess turns the miss into a hit.";
 			}
+			// Fighter L13 Studied Attacks (PHB 2024 para 5983): on miss, mark the target
+			// so the next attack roll against them gains advantage. The advantage flag is
+			// consumed in apply_attack_advantage_state on the next attack.
+			if (!hit and c.studied_attacks_active and pr.is_weapon_attack) {
+				c.studied_attacks_target_id = target.id;
+			}
 
 			string attack_reason = pr.attack_name != "" ? pr.attack_name + " attack against " + target.name : "to attack " + target.name;
 			broadcast_roll(c.name, attack_reason, natural_roll, reported_modifier, total, outcome);
@@ -4771,6 +4784,21 @@ class battle_manager {
 		else if (pr.roll_type == ROLL_CONCENTRATION) {
 			int dc = pr.dc > 0 ? pr.dc : int(pr.target_id);
 			bool success = total >= dc;
+			// Fighter L9 Indomitable (PHB 2024 paras 5976-5977): "If you fail a saving
+			// throw, you can reroll it with a bonus equal to your Fighter level. You must
+			// use the new roll, and you can't use this feature again until you finish a
+			// Long Rest."
+			// Auto-applies on a failed CON save vs concentration if the fighter has uses
+			// remaining and is a high-stakes save (concentration on a battle-defining spell).
+			if (!success and c.class_name == "Fighter" and c.indomitable_uses > 0) {
+				c.indomitable_uses--;
+				int reroll = random(1, 20) + pr.modifier + bless_bonus + c.level;
+				broadcast_announce(c.name + "'s Indomitable rerolls the failed save: " + reroll + " (used " + (c.indomitable_uses == 0 ? "last use" : "1 use, " + c.indomitable_uses + " remaining") + ").", true);
+				if (reroll >= dc) {
+					total = reroll;
+					success = true;
+				}
+			}
 			string outcome = success ? "Maintains concentration!" : "Concentration broken!";
 			broadcast_roll(c.name, "Constitution save (DC " + dc + ")", natural_roll, reported_modifier, total, outcome);
 
