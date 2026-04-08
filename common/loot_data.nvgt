@@ -287,6 +287,16 @@ void init_item_catalog() {
 	add_item("dmg_necklace_prayer_beads", "Necklace of Prayer Beads", SLOT_AMULET, RARITY_RARE, "This necklace has 1d4+2 magic beads. While wearing the necklace, you can use a Bonus Action to speak the prayer associated with one of the beads to cast its spell.", 0, 0, 0, 1, 0, 0, 0, 0);
 	add_item("dmg_ioun_stone_intellect", "Ioun Stone of Intellect", SLOT_AMULET, RARITY_RARE, "An Ioun Stone is a magical, dim-lit stone that orbits around your head when activated. While the stone orbits your head, your Intelligence score increases by 2, to a maximum of 20.", 0, 0, 0, 1, 0, 0, 0, 0);
 	add_item("dmg_ioun_stone_protection", "Ioun Stone of Protection", SLOT_AMULET, RARITY_RARE, "While the stone orbits your head, you gain a +1 bonus to AC.", 1, 0, 0, 0, 0, 0, 0, 0);
+
+	// DMG 2024 More Rings (paras 9550-9700+)
+	add_item("dmg_ring_free_action", "Ring of Free Action", SLOT_RING, RARITY_RARE, "While you wear this ring, Difficult Terrain doesn't cost you extra movement. In addition, magic can neither reduce any of your Speeds nor cause you to have the Paralyzed or Restrained condition.", 0, 0, 0, 0, 0, 5, 1, 0);
+	add_item("dmg_ring_mind_shielding", "Ring of Mind Shielding", SLOT_RING, RARITY_UNCOMMON, "While wearing this ring, you are immune to magic that allows other creatures to read your thoughts, determine whether you are lying, know your alignment, or know your creature type.", 0, 0, 0, 0, 0, 0, 1, 0);
+	add_item("dmg_ring_swimming", "Ring of Swimming", SLOT_RING, RARITY_UNCOMMON, "You have a Swim Speed of 40 feet while wearing this ring.", 0, 0, 0, 0, 0, 0, 0, 0);
+	add_item("dmg_ring_telekinesis", "Ring of Telekinesis", SLOT_RING, RARITY_EPIC, "While wearing this ring, you can cast Telekinesis from it.", 0, 0, 0, 1, 0, 0, 0, 0);
+	add_item("dmg_ring_water_walking", "Ring of Water Walking", SLOT_RING, RARITY_UNCOMMON, "While wearing this ring, you cast Water Walk from it, targeting only yourself.", 0, 0, 0, 0, 0, 0, 0, 0);
+	add_item("dmg_ring_xray_vision", "Ring of X-ray Vision", SLOT_RING, RARITY_RARE, "While wearing this ring, you can take a Magic action to gain X-ray vision with a range of 30 feet for 1 minute.", 0, 0, 0, 0, 1, 0, 0, 0);
+	add_item("dmg_ring_feather_falling", "Ring of Feather Falling", SLOT_RING, RARITY_RARE, "When you fall while wearing this ring, you descend 60 feet per round and take no damage from falling.", 0, 0, 5, 0, 0, 0, 0, 0);
+	add_item("dmg_ring_jumping", "Ring of Jumping", SLOT_RING, RARITY_UNCOMMON, "While wearing this ring, you can cast Jump from it, but can target only yourself when you do so.", 0, 0, 0, 0, 0, 5, 0, 0);
 }
 
 // ---- LOOT GENERATION ----
