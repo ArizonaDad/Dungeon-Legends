@@ -670,6 +670,11 @@ void show_bonus_action_menu() {
 	int path_to_grave_opt = -1;
 	int hexblades_curse_opt = -1;
 	int fighting_spirit_opt = -1;
+	int symbiotic_entity_opt = -1;
+	int blade_flourish_opt = -1;
+	int psychic_blades_bard_opt = -1;
+	int cavalier_mark_opt = -1;
+	int balm_summer_opt = -1;
 
 	if (lc == "barbarian" and !my_is_raging and my_rage_uses_remaining > 0) rage_opt = m.add_item("Rage. Bonus action. Uses left: " + my_rage_uses_remaining + ". Damage bonus: " + my_rage_damage_bonus + ".");
 	if (lc == "fighter" and my_second_wind_available) second_wind_opt = m.add_item("Second Wind. Bonus action. Heal 1d10 plus fighter level.");
@@ -760,6 +765,21 @@ void show_bonus_action_menu() {
 	}
 	if (lc == "fighter" and subclass == "Samurai") {
 		fighting_spirit_opt = m.add_item("Fighting Spirit. Bonus action. Advantage on attacks + temp HP.");
+	}
+	if (lc == "druid" and subclass == "Circle of Spores") {
+		symbiotic_entity_opt = m.add_item("Symbiotic Entity. Action. Gain temp HP and +1d6 necrotic on melee attacks.");
+	}
+	if (lc == "bard" and subclass == "College of Swords") {
+		blade_flourish_opt = m.add_item("Blade Flourish. Bonus action. Next weapon attack gets bonus damage.");
+	}
+	if (lc == "bard" and subclass == "College of Whispers") {
+		psychic_blades_bard_opt = m.add_item("Psychic Blades. Bonus action. Next weapon attack deals bonus psychic damage.");
+	}
+	if (lc == "fighter" and subclass == "Cavalier") {
+		cavalier_mark_opt = m.add_item("Cavalier Mark. Bonus action. Mark a target for extra damage.");
+	}
+	if (lc == "druid" and subclass == "Circle of Dreams") {
+		balm_summer_opt = m.add_item("Balm of the Summer Court. Bonus action. Heal a target from your pool.");
 	}
 
 	int options = 1;
@@ -956,6 +976,30 @@ void show_bonus_action_menu() {
 	else if (fighting_spirit_opt >= 0 and res == fighting_spirit_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "fighting_spirit"}});
 		speak("Fighting Spirit. Advantage on attacks and temporary HP.", true);
+	}
+	else if (symbiotic_entity_opt >= 0 and res == symbiotic_entity_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "symbiotic_entity"}});
+		speak("Symbiotic Entity. Gaining temporary HP and bonus necrotic damage.", true);
+	}
+	else if (blade_flourish_opt >= 0 and res == blade_flourish_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "blade_flourish"}});
+		speak("Blade Flourish prepared. Your next weapon attack gets bonus damage.", true);
+	}
+	else if (psychic_blades_bard_opt >= 0 and res == psychic_blades_bard_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "psychic_blades"}});
+		speak("Psychic Blades. Your next weapon attack deals bonus psychic damage.", true);
+	}
+	else if (cavalier_mark_opt >= 0 and res == cavalier_mark_opt) {
+		if (current_target_id == 0) {
+			speak("No target selected. Scan with I J K L and press Enter to lock a target.", true);
+			return;
+		}
+		send({{"type", message_types::bonus_action}, {"feature", "cavalier_mark"}, {"target_id", current_target_id}});
+		speak("Cavalier Mark applied to target.", true);
+	}
+	else if (balm_summer_opt >= 0 and res == balm_summer_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "balm_of_summer_court"}, {"target_id", current_target_id}});
+		speak("Balm of the Summer Court. Channeling healing energy.", true);
 	}
 }
 

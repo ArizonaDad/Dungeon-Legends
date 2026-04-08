@@ -126,6 +126,14 @@ class combatant {
 	int superiority_maneuvers_known = 0; // Battle Master
 	int drunken_master_advantage = 0; // Drunken Master Monk
 	int divine_soul_magic_used = 0; // Divine Soul sorcerer
+	bool symbiotic_entity_active = false; // Circle of Spores Druid
+	int symbiotic_entity_uses = 0;
+	bool blade_flourish_active = false; // College of Swords Bard
+	bool psychic_blades_pending = false; // College of Whispers Bard
+	bool strength_of_the_grave_used = false; // Shadow Magic Sorcerer
+	int ancestral_protector_target = 0; // Path of the Ancestral Guardian
+	int summer_court_healing = 0; // Circle of Dreams Druid
+	int balm_of_summer_pool = 0;
 	int rage_turns_remaining = 0;
 	int action_surge_uses_remaining = 0;
 	bool second_wind_available = false;

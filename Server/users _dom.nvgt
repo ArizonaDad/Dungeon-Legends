@@ -2134,6 +2134,71 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.room.bm.broadcast_announce(c.name + " invokes Fighting Spirit! Advantage on attacks this turn and " + temp_hp + " temp HP.", true);
 		}
 
+		else if (feature == "symbiotic_entity") {
+			// Circle of Spores Druid: expend Wild Shape use to gain +1d6 necrotic on attacks + temp HP
+			if (c.class_name != "Druid" or c.subclass != "Circle of Spores") { u.send({{"type", message_types::announce}, {"text", "Only Circle of Spores druids can use Symbiotic Entity."}, {"interrupt", true}}); return; }
+			if (c.symbiotic_entity_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Symbiotic Entity uses remaining."}, {"interrupt", true}}); return; }
+			if (!c.has_action) { u.send({{"type", message_types::announce}, {"text", "No action remaining."}, {"interrupt", true}}); return; }
+			c.has_action = false;
+			c.used_action = true;
+			c.symbiotic_entity_uses--;
+			c.symbiotic_entity_active = true;
+			int temp_hp = 4 * c.level;
+			if (c.temp_hp < temp_hp) c.temp_hp = temp_hp;
+			u.room.bm.broadcast_announce(c.name + " activates Symbiotic Entity! Gains " + temp_hp + " temp HP and +1d6 necrotic on melee attacks.", true);
+		}
+
+		else if (feature == "blade_flourish") {
+			// College of Swords Bard: next melee attack has a flourish effect
+			if (c.class_name != "Bard" or c.subclass != "College of Swords") { u.send({{"type", message_types::announce}, {"text", "Only College of Swords bards can use Blade Flourish."}, {"interrupt", true}}); return; }
+			if (c.bardic_inspiration_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Bardic Inspiration uses remaining."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.bardic_inspiration_uses--;
+			c.blade_flourish_active = true;
+			u.room.bm.broadcast_announce(c.name + " prepares a Blade Flourish! Next weapon attack gets bonus damage.", true);
+		}
+
+		else if (feature == "psychic_blades") {
+			// College of Whispers Bard: next weapon attack adds psychic damage
+			if (c.class_name != "Bard" or c.subclass != "College of Whispers") { u.send({{"type", message_types::announce}, {"text", "Only College of Whispers bards can use Psychic Blades."}, {"interrupt", true}}); return; }
+			if (c.bardic_inspiration_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Bardic Inspiration uses remaining."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.bardic_inspiration_uses--;
+			c.psychic_blades_pending = true;
+			u.room.bm.broadcast_announce(c.name + " readies Psychic Blades! Next weapon attack deals bonus psychic damage.", true);
+		}
+
+		else if (feature == "cavalier_mark") {
+			// Cavalier Fighter: mark a target for bonus damage
+			if (c.class_name != "Fighter" or c.subclass != "Cavalier") { u.send({{"type", message_types::announce}, {"text", "Only Cavaliers can use Mark."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.cavalier_mark_target = target_id;
+			c.cavalier_mark_active = true;
+			u.room.bm.broadcast_announce(c.name + " marks a target with Cavalier's Mark!", false);
+		}
+
+		else if (feature == "balm_of_summer_court") {
+			// Circle of Dreams Druid: heal from the Balm pool
+			if (c.class_name != "Druid" or c.subclass != "Circle of Dreams") { u.send({{"type", message_types::announce}, {"text", "Only Circle of Dreams druids can use Balm of the Summer Court."}, {"interrupt", true}}); return; }
+			if (c.balm_of_summer_pool <= 0) { u.send({{"type", message_types::announce}, {"text", "Your Balm pool is empty."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			combatant@ tgt = target_id != 0 ? u.room.bm.combat.get_combatant(target_id) : c;
+			if (@tgt == null or tgt.is_dead) { u.send({{"type", message_types::announce}, {"text", "Invalid target."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.balm_of_summer_pool--;
+			int heal = random(1, 6);
+			int effective = u.room.bm.combat.apply_healing(tgt, heal);
+			u.room.bm.record_effective_healing(c.player_username, effective);
+			u.room.bm.broadcast_announce(c.name + " channels Balm of the Summer Court! " + tgt.name + " healed for " + heal + ".", true);
+		}
+
 		else {
 			u.send({{"type", message_types::announce}, {"text", "That bonus action is not available to your character."}, {"interrupt", true}});
 			return;

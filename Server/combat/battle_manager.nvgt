@@ -3402,6 +3402,35 @@ class battle_manager {
 			broadcast_announce(attacker.name + "'s Hexblade's Curse adds " + attacker.proficiency + " damage!", false);
 		}
 
+		// Circle of Spores Druid: Symbiotic Entity — +1d6 necrotic on melee attacks
+		if (attacker.class_name == "Druid" and attacker.subclass == "Circle of Spores" and attacker.symbiotic_entity_active and is_weapon_attack and !attacker.main_hand_is_ranged) {
+			int spore_dmg = random(1, 6);
+			bonus += spore_dmg;
+			broadcast_announce(attacker.name + "'s Symbiotic Entity adds " + spore_dmg + " necrotic damage!", false);
+		}
+
+		// College of Swords Bard: Blade Flourish — bonus damage when active
+		if (attacker.class_name == "Bard" and attacker.subclass == "College of Swords" and attacker.blade_flourish_active and is_weapon_attack) {
+			int flourish_dmg = random(1, attacker.bardic_inspiration_grant_die);
+			bonus += flourish_dmg;
+			attacker.blade_flourish_active = false;
+			broadcast_announce(attacker.name + "'s Blade Flourish adds " + flourish_dmg + " damage!", false);
+		}
+
+		// College of Whispers Bard: Psychic Blades — bonus psychic damage when active
+		if (attacker.class_name == "Bard" and attacker.subclass == "College of Whispers" and attacker.psychic_blades_pending and is_weapon_attack) {
+			int psychic_dmg = random(1, 6) * ((attacker.level / 5) + 2);
+			bonus += psychic_dmg;
+			attacker.psychic_blades_pending = false;
+			broadcast_announce(attacker.name + "'s Psychic Blades add " + psychic_dmg + " psychic damage!", false);
+		}
+
+		// Cavalier Fighter: Marked target takes +Prof damage from marker
+		if (attacker.class_name == "Fighter" and attacker.subclass == "Cavalier" and attacker.cavalier_mark_target == target.id) {
+			bonus += attacker.proficiency;
+			broadcast_announce(attacker.name + "'s Cavalier Mark adds " + attacker.proficiency + " damage!", false);
+		}
+
 		// Samurai: Fighting Spirit (advantage handled in advantage check; temp HP gained on activation)
 		// Handled via bonus action
 

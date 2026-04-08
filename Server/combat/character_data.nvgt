@@ -770,6 +770,17 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         c.fighting_spirit_uses = proficiency_bonus(cs.level);
     }
 
+    // Circle of Spores Druid: Symbiotic Entity (uses Wild Shape slots)
+    if (cs.class_name == "Druid" and cs.subclass == "Circle of Spores" and cs.level >= 2) {
+        c.symbiotic_entity_uses = 2;
+        if (cs.level >= 6) c.symbiotic_entity_uses = 3;
+    }
+
+    // Circle of Dreams Druid: Balm of the Summer Court pool
+    if (cs.class_name == "Druid" and cs.subclass == "Circle of Dreams" and cs.level >= 2) {
+        c.balm_of_summer_pool = cs.level;
+    }
+
     // Wizard subclasses
     if (cs.class_name == "Wizard") {
         if (cs.subclass == "Diviner" and cs.level >= 2) {
