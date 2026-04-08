@@ -220,11 +220,27 @@ Server-side `pending_spell_choice` state on `battle_manager` pauses spell finali
 5. The server's `handle_spell_choice_response` validates the choice against the offered keys, then dispatches to `apply_spell_choice(caster, sc, choice)` which finalises the chosen variant on the caster.
 
 **Spells / features currently using this system:**
-- **Fire Shield** — warm shield (cold resistance, reflects 2d8 fire) vs chill shield (fire resistance, reflects 2d8 cold). Source: Basic Rules para 13322.
-- **Spirit Guardians** — angelic/fey form (radiant damage) vs fiendish form (necrotic damage). Source: Basic Rules para 15123-15124. The 2024 PHB ties this to alignment, but the game does not track alignment, so the player declares their spirit form at cast time.
-- **Adjust Density** (Graviturgy Wizard L2 action) — halve density (+10 ft speed, disadvantage on Strength) vs double density (-10 ft speed, advantage on Strength). Source: Wildemount p.5428. Concentration; flags live on the AFFECTED creature with `adjust_density_caster_id` back-reference for cleanup. The previous implementation auto-picked halve for allies and double for enemies and put the flags on the wrong combatant — both bugs are fixed.
+- **Fire Shield** — warm shield (cold resistance, reflects 2d8 fire) vs chill shield (fire resistance, reflects 2d8 cold). Source: Basic Rules para 13322. Choice kind: `binary`.
+- **Spirit Guardians** — angelic/fey form (radiant damage) vs fiendish form (necrotic damage). Source: Basic Rules para 15123-15124. Choice kind: `binary`.
+- **Adjust Density** (Graviturgy Wizard L2 action) — halve density (+10 ft speed, disadvantage on Strength) vs double density (-10 ft speed, advantage on Strength). Source: Wildemount p.5428. Concentration; flags live on the AFFECTED creature with `adjust_density_caster_id` back-reference for cleanup. Choice kind: `binary`.
+- **Magic Missile** — distribute N darts (3 base, +1 per upcast) among visible enemies; auto-hit, each dart deals 1d4+1 force damage independently per target. Source: Basic Rules para 14089. Choice kind: `distribution`.
+- **Scorching Ray** — distribute N rays (3 base, +1 per upcast) among visible enemies; each ray is a separate ranged spell attack for 2d6 fire damage. Source: Basic Rules para 14851. Choice kind: `distribution`.
+- **Eldritch Blast** — at L5+ distribute N beams (2 at L5, 3 at L11, 4 at L17) among visible enemies; each beam is a separate ranged spell attack for 1d10 force damage. Source: Basic Rules para 13047. Choice kind: `distribution` (only at L5+; L1-4 uses the standard single-target attack path).
 
-Adding a new prompted spell or feature: in `handle_cast` (or the relevant action handler in `users _dom.nvgt` for class features), build a `pending_spell_choice`, set `caster_id` and `primary_target_id`, call `bm.send_spell_choice_prompt`, then add the per-spell branch to `apply_spell_choice` in `battle_manager.nvgt`. If the effect is a concentration effect, also add a `clear_X` helper and hook it into `clear_concentration_effects`.
+**Two choice kinds are supported:**
+
+- **`binary`** — caster picks one option from a list of variants (warm vs chill, halve vs double, etc.). Single keypress resolves the prompt.
+- **`distribution`** — caster picks N targets from a list of visible hostile candidates (repeats allowed). Each keypress appends to the picks; the spell resolves after N picks. For attack-roll spells the first attack queues normally and the remaining target IDs are stored in `pending_roll.next_target_ids_csv`, which `start_followup_spell_attack` consumes front-to-back as the multi-attack chain advances. For auto-hit spells (Magic Missile) the server rolls per dart server-side and applies damage to each picked target.
+
+**Client UX for distribution:**
+- Server sends `spell_choice_prompt` with `kind=distribution`, `count=N`, and `options[{key,label}]` where `key` is the candidate combatant ID as a string and `label` is `"<name> (<dist> ft, HP <hp>)"`.
+- Client speaks the prompt + the full target list.
+- Player presses 1-9 to assign each projectile. Each press speaks "Pick M of N: <target>. <remaining> remaining."
+- Backspace undoes the last pick.
+- Escape pads the remaining picks with the first target so the spell still fires (defensive — don't lose the cast).
+- Final keypress sends `spell_choice_response` with `targets: [id1, id2, ...]`.
+
+Adding a new prompted spell or feature: in `handle_cast` (or the relevant action handler in `users _dom.nvgt` for class features), build a `pending_spell_choice`, set `caster_id` and `primary_target_id` (or `choice_kind=distribution` + `distribution_count` + dist fields), call `bm.send_spell_choice_prompt` or `bm.prompt_target_distribution`, then add the per-spell branch to `apply_spell_choice` (binary) or `apply_distribution_spell_choice` (distribution) in `battle_manager.nvgt`. If the effect is a concentration effect, also add a `clear_X` helper and hook it into `clear_concentration_effects`.
 
 
 

@@ -53,6 +53,10 @@ class pending_roll {
 	int first_natural = 0;
 	int savage_attacker_first_total = 0;
 	bool savage_attacker_reroll = false;
+	// Distribution chain: comma-separated list of remaining target IDs for spells like
+	// Scorching Ray and Eldritch Blast where each ray/beam may target a different creature.
+	// Consumed front-to-back by start_followup_spell_attack.
+	string next_target_ids_csv = "";
 }
 
 class pending_bardic_prompt {
@@ -100,17 +104,26 @@ class pending_reaction_prompt {
 }
 
 // Generic mid-spell player choice (Fire Shield warm/chill, Spirit Guardians radiant/necrotic,
-// Adjust Density halve/double, future spell variants). Pauses spell finalisation, prompts
-// the caster, and resumes via handle_spell_choice_response -> apply_spell_choice dispatch.
+// Adjust Density halve/double, Magic Missile/Scorching Ray/Eldritch Blast target distribution,
+// future spell variants). Pauses spell finalisation, prompts the caster, and resumes via
+// handle_spell_choice_response -> apply_spell_choice dispatch.
 class pending_spell_choice {
 	string player_username;
 	uint caster_id;
-	string spell_id;                 // e.g., "fire_shield", "spirit_guardians", "adjust_density"
+	string spell_id;                 // e.g., "fire_shield", "magic_missile", "scorching_ray"
 	int cast_slot_level;             // Slot level the spell was cast at (for upcast scaling)
-	uint primary_target_id;          // For target-affecting spells (e.g., Adjust Density)
-	string[] option_keys;            // Internal choice keys, e.g., ["warm", "chill"]
-	string[] option_labels;          // Display labels, e.g., ["Warm shield", "Chill shield"]
+	uint primary_target_id;          // For target-affecting binary spells (e.g., Adjust Density)
+	string[] option_keys;            // Binary: choice keys ["warm","chill"]; Distribution: candidate combatant IDs as strings
+	string[] option_labels;          // Display labels (binary: variant names; distribution: enemy names + distance)
 	string prompt_text;              // Human-readable prompt for TTS
+	string choice_kind = "binary";   // "binary" or "distribution"
+	int distribution_count = 0;      // Number of picks needed for distribution (e.g., 3 for Scorching Ray L2)
+	int dist_attack_bonus = 0;       // Spell attack bonus for distribution (Scorching Ray, Eldritch Blast)
+	int dist_damage_count = 0;       // Damage dice count per projectile
+	int dist_damage_sides = 0;       // Damage die sides per projectile
+	int dist_damage_modifier = 0;    // Flat damage modifier per projectile (e.g., +1 for Magic Missile)
+	int dist_damage_type = 0;        // Damage type ID (DMG_FORCE, DMG_FIRE, etc.)
+	bool dist_uses_attack_roll = false; // false for Magic Missile (auto-hit)
 }
 
 class achievement_notice {
@@ -985,6 +998,27 @@ class battle_manager {
 		return null;
 	}
 
+	int parse_nonnegative_int(string text) {
+		int value = 0;
+		for (uint i = 0; i < text.length(); i++) {
+			string ch = text.substr(i, 1);
+			int digit = -1;
+			if (ch == "0") digit = 0;
+			else if (ch == "1") digit = 1;
+			else if (ch == "2") digit = 2;
+			else if (ch == "3") digit = 3;
+			else if (ch == "4") digit = 4;
+			else if (ch == "5") digit = 5;
+			else if (ch == "6") digit = 6;
+			else if (ch == "7") digit = 7;
+			else if (ch == "8") digit = 8;
+			else if (ch == "9") digit = 9;
+			if (digit < 0) break;
+			value = value * 10 + digit;
+		}
+		return value;
+	}
+
 	void parse_csv_list(string csv, string[]@ out_list) {
 		out_list.resize(0);
 		if (csv == "") return;
@@ -1352,7 +1386,7 @@ class battle_manager {
 		return spell.damage_dice;
 	}
 
-	void queue_spell_attack_roll(user@ u, combatant@ caster, combatant@ target, spell_def@ spell, int attack_bonus, int damage_count, int damage_sides, int damage_modifier, int remaining_attacks, bool adv = false, bool disadv = false) {
+	void queue_spell_attack_roll(user@ u, combatant@ caster, combatant@ target, spell_def@ spell, int attack_bonus, int damage_count, int damage_sides, int damage_modifier, int remaining_attacks, bool adv = false, bool disadv = false, string next_target_ids_csv = "") {
 		if (@u == null or @caster == null or @target == null or @spell == null) return;
 		pending_roll pr;
 		pr.combatant_id = caster.id;
@@ -1374,6 +1408,7 @@ class battle_manager {
 		pr.spell_uses_attack_roll = true;
 		pr.spell_id = spell.id;
 		pr.spell_name = spell.name;
+		pr.next_target_ids_csv = next_target_ids_csv;
 		@current_roll = pr;
 		send_roll_request(u, pr);
 	}
@@ -1412,7 +1447,25 @@ class battle_manager {
 		if (@caster_user == null or caster_user.is_bot) return false;
 		spell_def@ spell = get_spell(pr.spell_id);
 		if (@spell == null) return false;
+		// Distribution chain: if next_target_ids_csv is non-empty, pop the next id from
+		// the front of the queue and target that creature instead of the preferred_target.
+		// This is how Magic Missile / Scorching Ray / Eldritch Blast send rays at different
+		// creatures across the multi-attack chain.
+		string remaining_csv = pr.next_target_ids_csv;
 		combatant@ target = preferred_target;
+		while (remaining_csv != "") {
+			int comma = remaining_csv.find(",");
+			string first_id_str;
+			if (comma < 0) { first_id_str = remaining_csv; remaining_csv = ""; }
+			else { first_id_str = remaining_csv.substr(0, comma); remaining_csv = remaining_csv.substr(comma + 1); }
+			uint next_id = uint(parse_nonnegative_int(first_id_str));
+			combatant@ candidate = combat.get_combatant(next_id);
+			if (@candidate != null and !candidate.is_dead and combat.are_hostile(caster, candidate) and combat.can_see(caster, candidate)) {
+				@target = candidate;
+				break;
+			}
+			// Skip dead/invisible targets — keep popping
+		}
 		if (@target == null or target.is_dead or !combat.are_hostile(caster, target)) @target = find_nearest_hostile_target(caster);
 		if (@target == null or target.is_dead) return false;
 		int effective_range = spell_effective_range(caster, spell);
@@ -1422,7 +1475,7 @@ class battle_manager {
 		bool adv = false;
 		bool disadv = false;
 		apply_attack_advantage_state(caster, target, dist, spell_attack_is_ranged(caster, spell, effective_range), adv, disadv);
-		queue_spell_attack_roll(caster_user, caster, target, spell, pr.modifier, pr.damage_dice_count, pr.damage_dice_sides, pr.damage_modifier, pr.attacks_remaining - 1, adv, disadv);
+		queue_spell_attack_roll(caster_user, caster, target, spell, pr.modifier, pr.damage_dice_count, pr.damage_dice_sides, pr.damage_modifier, pr.attacks_remaining - 1, adv, disadv, remaining_csv);
 		return true;
 	}
 
@@ -5012,8 +5065,17 @@ class battle_manager {
 		user@ pu = find_user_for_combatant(c);
 		// Bots and NPC casters auto-pick the first option (deterministic, keeps combat moving).
 		if (@pu == null or pu.is_bot or !c.is_player) {
-			string default_key = sc.option_keys.length() > 0 ? sc.option_keys[0] : "";
-			apply_spell_choice(c, sc, default_key);
+			if (sc.choice_kind == "distribution") {
+				// Bot fallback: send all projectiles at the first available target.
+				string[] bot_picks;
+				if (sc.option_keys.length() > 0) {
+					for (int i = 0; i < sc.distribution_count; i++) bot_picks.insert_last(sc.option_keys[0]);
+				}
+				apply_distribution_spell_choice(c, sc, bot_picks);
+			} else {
+				string default_key = sc.option_keys.length() > 0 ? sc.option_keys[0] : "";
+				apply_spell_choice(c, sc, default_key);
+			}
 			broadcast_state();
 			check_battle_end();
 			return;
@@ -5023,6 +5085,8 @@ class battle_manager {
 		payload["type"] = message_types::spell_choice_prompt;
 		payload["text"] = sc.prompt_text;
 		payload["spell"] = sc.spell_id;
+		payload["kind"] = sc.choice_kind;
+		payload["count"] = sc.distribution_count;
 		json_array opts;
 		for (uint i = 0; i < sc.option_keys.length() and i < sc.option_labels.length(); i++) {
 			json_object o;
@@ -5041,14 +5105,33 @@ class battle_manager {
 		@current_spell_choice = null;
 		combatant@ c = combat.get_combatant(sc.caster_id);
 		if (@c == null) return;
-		string choice = msg.exists("choice") ? string(msg["choice"]) : "";
-		// Validate the choice is one of the offered keys; fall back to first option if not.
-		bool valid = false;
-		for (uint i = 0; i < sc.option_keys.length(); i++) {
-			if (sc.option_keys[i] == choice) { valid = true; break; }
+		if (sc.choice_kind == "distribution") {
+			// Distribution: extract targets array from response. Pad with first option if
+			// the client sent fewer than required (defensive — keeps the spell from being lost).
+			string[] picks;
+			if (msg.exists("targets")) {
+				json_array@ arr = cast<json_array@>(msg["targets"]);
+				if (@arr != null) {
+					for (uint i = 0; i < arr.size(); i++) {
+						string pid = string(arr[i]);
+						picks.insert_last(pid);
+					}
+				}
+			}
+			while (int(picks.length()) < sc.distribution_count and sc.option_keys.length() > 0) {
+				picks.insert_last(sc.option_keys[0]);
+			}
+			apply_distribution_spell_choice(c, sc, picks);
+		} else {
+			string choice = msg.exists("choice") ? string(msg["choice"]) : "";
+			// Validate the choice is one of the offered keys; fall back to first option if not.
+			bool valid = false;
+			for (uint i = 0; i < sc.option_keys.length(); i++) {
+				if (sc.option_keys[i] == choice) { valid = true; break; }
+			}
+			if (!valid and sc.option_keys.length() > 0) choice = sc.option_keys[0];
+			apply_spell_choice(c, sc, choice);
 		}
-		if (!valid and sc.option_keys.length() > 0) choice = sc.option_keys[0];
-		apply_spell_choice(c, sc, choice);
 		broadcast_state();
 		check_battle_end();
 	}
@@ -5115,6 +5198,147 @@ class battle_manager {
 		target.adjust_density_mode = 0;
 		target.adjust_density_caster_id = 0;
 		if (announce) broadcast_announce(target.name + "'s density returns to normal.", false);
+	}
+
+	// Returns visible hostile combatants within max_range_feet of caster, sorted closest first.
+	// Used to populate the candidate list for distribution spell prompts.
+	combatant@[] visible_hostiles_within_range(combatant@ caster, int max_range_feet) {
+		combatant@[] hits;
+		if (@caster == null or @combat == null) return hits;
+		for (uint i = 0; i < combat.combatants.length(); i++) {
+			combatant@ other = combat.combatants[i];
+			if (@other == null or other.id == caster.id or other.is_dead) continue;
+			if (!combat.are_hostile(caster, other)) continue;
+			if (!combat.can_see(caster, other)) continue;
+			int dist = feet_distance(caster.x, caster.y, other.x, other.y);
+			if (max_range_feet > 0 and dist > max_range_feet) continue;
+			hits.insert_last(other);
+		}
+		// Insertion sort by distance — small list, simplicity over perf.
+		for (uint i = 1; i < hits.length(); i++) {
+			combatant@ key = hits[i];
+			int key_dist = feet_distance(caster.x, caster.y, key.x, key.y);
+			int j = int(i) - 1;
+			while (j >= 0 and feet_distance(caster.x, caster.y, hits[j].x, hits[j].y) > key_dist) {
+				@hits[j + 1] = hits[j];
+				j--;
+			}
+			@hits[j + 1] = key;
+		}
+		return hits;
+	}
+
+	// Build a distribution prompt for a multi-projectile spell. Caller specifies projectile
+	// count, attack/damage stats, and whether the spell uses an attack roll.
+	bool prompt_target_distribution(combatant@ caster, spell_def@ spell, int projectile_count, int max_range_feet,
+									int attack_bonus, int damage_count, int damage_sides, int damage_modifier,
+									int damage_type, bool uses_attack_roll, int cast_slot_level, string prompt_text) {
+		if (@caster == null or @spell == null) return false;
+		combatant@[] candidates = visible_hostiles_within_range(caster, max_range_feet);
+		if (candidates.length() == 0) return false;
+		pending_spell_choice sc;
+		sc.player_username = caster.player_username;
+		sc.caster_id = caster.id;
+		sc.spell_id = spell.id;
+		sc.cast_slot_level = cast_slot_level;
+		sc.choice_kind = "distribution";
+		sc.distribution_count = projectile_count;
+		sc.dist_attack_bonus = attack_bonus;
+		sc.dist_damage_count = damage_count;
+		sc.dist_damage_sides = damage_sides;
+		sc.dist_damage_modifier = damage_modifier;
+		sc.dist_damage_type = damage_type;
+		sc.dist_uses_attack_roll = uses_attack_roll;
+		uint cap = candidates.length();
+		if (cap > 9) cap = 9; // Client UI uses keys 1..9
+		for (uint i = 0; i < cap; i++) {
+			combatant@ cand = candidates[i];
+			int dist = feet_distance(caster.x, caster.y, cand.x, cand.y);
+			sc.option_keys.insert_last("" + cand.id);
+			sc.option_labels.insert_last(cand.name + " (" + dist + " ft, HP " + cand.current_hp + ")");
+		}
+		sc.prompt_text = prompt_text;
+		send_spell_choice_prompt(caster, sc);
+		return true;
+	}
+
+	void apply_distribution_spell_choice(combatant@ c, pending_spell_choice@ sc, string[]@ picks) {
+		if (@c == null or @sc == null or @picks == null) return;
+		if (picks.length() == 0) return;
+
+		// Magic Missile: auto-hit, each dart deals 1d4+1 force damage independently.
+		// Source (Basic Rules para 14089): "Each dart strikes a creature of your choice
+		// that you can see within range. A dart deals 1d4 + 1 Force damage to its target.
+		// The darts all strike simultaneously, and you can direct them to hit one creature
+		// or several."
+		if (sc.spell_id == "magic_missile") {
+			dictionary per_target_damage;
+			dictionary per_target_count;
+			for (uint i = 0; i < picks.length(); i++) {
+				string id_str = picks[i];
+				uint tid = uint(parse_nonnegative_int(id_str));
+				combatant@ tgt = combat.get_combatant(tid);
+				if (@tgt == null or tgt.is_dead) continue;
+				int dmg = random(1, sc.dist_damage_sides) + sc.dist_damage_modifier;
+				int existing = 0;
+				int existing_count = 0;
+				if (per_target_damage.exists(id_str)) per_target_damage.get(id_str, existing);
+				if (per_target_count.exists(id_str)) per_target_count.get(id_str, existing_count);
+				per_target_damage.set(id_str, existing + dmg);
+				per_target_count.set(id_str, existing_count + 1);
+			}
+			string[]@ keys = per_target_damage.get_keys();
+			for (uint i = 0; i < keys.length(); i++) {
+				string id_str = keys[i];
+				uint tid = uint(parse_nonnegative_int(id_str));
+				combatant@ tgt = combat.get_combatant(tid);
+				if (@tgt == null or tgt.is_dead) continue;
+				int total_dmg = 0;
+				int dart_count = 0;
+				per_target_damage.get(id_str, total_dmg);
+				per_target_count.get(id_str, dart_count);
+				combat.apply_damage(tgt, total_dmg, sc.dist_damage_type, c);
+				broadcast_announce(c.name + "'s Magic Missile strikes " + tgt.name + " with " + dart_count + " dart" + (dart_count == 1 ? "" : "s") + " for " + total_dmg + " force damage.", true);
+			}
+			return;
+		}
+
+		// Attack-roll distribution (Scorching Ray, Eldritch Blast). Queue the FIRST attack
+		// at picks[0] and stash the remaining IDs in next_target_ids_csv on the pending_roll.
+		// start_followup_spell_attack consumes the CSV front-to-back so each subsequent
+		// ray/beam targets the next id.
+		if (sc.dist_uses_attack_roll) {
+			spell_def@ spell = get_spell(sc.spell_id);
+			if (@spell == null) return;
+			user@ pu = find_user_for_combatant(c);
+			if (@pu == null) return;
+			// First target
+			uint first_id = uint(parse_nonnegative_int(picks[0]));
+			combatant@ first_target = combat.get_combatant(first_id);
+			if (@first_target == null or first_target.is_dead) {
+				// Skip dead — pull next from picks
+				for (uint p = 1; p < picks.length(); p++) {
+					uint pid = uint(parse_nonnegative_int(picks[p]));
+					combatant@ pt = combat.get_combatant(pid);
+					if (@pt != null and !pt.is_dead) { @first_target = pt; break; }
+				}
+			}
+			if (@first_target == null) return;
+			// Build the CSV of remaining target IDs (everything after picks[0])
+			string remaining_csv = "";
+			for (uint p = 1; p < picks.length(); p++) {
+				if (remaining_csv != "") remaining_csv += ",";
+				remaining_csv += picks[p];
+			}
+			int dist = feet_distance(c.x, c.y, first_target.x, first_target.y);
+			bool adv = false;
+			bool disadv = false;
+			apply_attack_advantage_state(c, first_target, dist, true, adv, disadv);
+			queue_spell_attack_roll(pu, c, first_target, spell, sc.dist_attack_bonus,
+									 sc.dist_damage_count, sc.dist_damage_sides, sc.dist_damage_modifier,
+									 int(picks.length()) - 1, adv, disadv, remaining_csv);
+			return;
+		}
 	}
 
 	// ---- Action Handlers ----
@@ -6052,11 +6276,21 @@ class battle_manager {
 			broadcast_state();
 			return;
 		}
-		// Magic Missile: auto-hit, no attack roll needed
-		else if (spell.id == "magic_missile" and @target != null and !target.is_dead) {
+		// Magic Missile: auto-hit, distribute darts among visible enemies. Source (Basic
+		// Rules para 14089): "You create three glowing darts of magical force. Each dart
+		// strikes a creature of your choice that you can see within range. A dart deals
+		// 1d4 + 1 Force damage to its target. The darts all strike simultaneously, and
+		// you can direct them to hit one creature or several. Using a Higher-Level Spell
+		// Slot: The spell creates one more dart for each spell slot level above 1."
+		else if (spell.id == "magic_missile") {
 			int darts = 3;
-			if (spell.upcast_extra_dice > 0 and upcast_levels > 0) darts += upcast_levels * spell.upcast_extra_dice;
-			queue_spell_damage_roll(u, c, target, spell, darts, 4, darts, false, -1, 0);
+			if (upcast_levels > 0) darts += upcast_levels;
+			int range = spell.range > 0 ? spell.range : 120;
+			string prompt = "Magic Missile: distribute " + darts + " dart" + (darts == 1 ? "" : "s") + ". Press 1-9 to assign each dart to a visible enemy (you may pick the same enemy multiple times). Each dart deals 1d4+1 force damage.";
+			if (!prompt_target_distribution(c, spell, darts, range, 0, 1, 4, 1, DMG_FORCE, false, cast_slot_level, prompt)) {
+				u.send({{"type", message_types::announce}, {"text", "No visible targets within range for Magic Missile."}, {"interrupt", true}});
+				return;
+			}
 			broadcast_state();
 			return;
 		}
@@ -6083,6 +6317,28 @@ class battle_manager {
 			int damage_count = get_spell_damage_dice_count_for_cast(spell, c, cast_slot_level);
 			int damage_sides = get_spell_damage_die_sides_for_cast(spell, target);
 			int attack_instances = get_spell_attack_instance_count(spell, c, cast_slot_level);
+
+			// Distribution intercept: Scorching Ray (always 3+ rays) and Eldritch Blast
+			// (2+ beams from L5+) let the caster pick a different target per ray/beam.
+			// Source (Scorching Ray, Basic Rules para 14851): "You hurl three fiery rays.
+			// You can hurl them at one target within range or at several. Make a ranged
+			// spell attack for each ray." Source (Eldritch Blast, Basic Rules para 13047):
+			// "You can direct the beams at the same target or at different ones. Make a
+			// separate attack roll for each beam."
+			if (attack_instances > 1 and (spell.id == "scorching_ray" or spell.id == "eldritch_blast")) {
+				string prompt;
+				if (spell.id == "scorching_ray") {
+					prompt = "Scorching Ray: distribute " + attack_instances + " ray" + (attack_instances == 1 ? "" : "s") + ". Press 1-9 to assign each ray to a visible enemy. Each ray deals " + damage_count + "d" + damage_sides + " fire damage on hit.";
+				} else {
+					prompt = "Eldritch Blast: distribute " + attack_instances + " beam" + (attack_instances == 1 ? "" : "s") + ". Press 1-9 to assign each beam to a visible enemy. Each beam deals " + damage_count + "d" + damage_sides + " force damage on hit.";
+				}
+				if (prompt_target_distribution(c, spell, attack_instances, effective_range, spell_atk, damage_count, damage_sides, 0, spell.damage_type, true, cast_slot_level, prompt)) {
+					broadcast_state();
+					return;
+				}
+				// Falls through to single-target attack if no candidates available.
+			}
+
 			bool adv = false;
 			bool disadv = false;
 			apply_attack_advantage_state(c, target, dist, spell_attack_is_ranged(c, spell, effective_range), adv, disadv);

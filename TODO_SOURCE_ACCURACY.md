@@ -32,6 +32,9 @@ The rule remains: **NEVER choose for the player when a spell has a choice.** Bot
 | **Fire Shield** | Warm (cold resistance, reflects 2d8 fire) OR Chill (fire resistance, reflects 2d8 cold) | DONE 2026-04-08 | Basic Rules para 13322: "warm shield or a chill shield, as you choose" |
 | **Spirit Guardians** | Radiant (angelic/fey form) OR Necrotic (fiendish form) | DONE 2026-04-08 | Basic Rules para 15123-15124: alignment-based; game prompts caster since alignment is not tracked |
 | **Adjust Density** (Graviturgy L2 feature) | Halve (+10 ft speed, disadvantage STR) OR Double (-10 ft speed, advantage STR) | DONE 2026-04-08 | Wildemount p.5428: "halved or doubled for up to 1 minute or until your concentration ends". Also fixed a pre-existing bug where adjust_density flags lived on the caster instead of the target, with no concentration cleanup path. |
+| **Magic Missile** | Distribute N darts among visible enemies (auto-hit, 1d4+1 force per dart) | DONE 2026-04-08 | Basic Rules para 14089: "Each dart strikes a creature of your choice... you can direct them to hit one creature or several." Distribution kind, server rolls per-dart server-side and groups damage per target. |
+| **Scorching Ray** | Distribute N rays among visible enemies (separate attack roll per ray, 2d6 fire on hit) | DONE 2026-04-08 | Basic Rules para 14851: "You can hurl them at one target within range or at several. Make a ranged spell attack for each ray." Distribution kind, multi-attack chain consumes `pending_roll.next_target_ids_csv`. |
+| **Eldritch Blast** (at caster L5+) | Distribute N beams among visible enemies (separate attack roll per beam, 1d10 force on hit) | DONE 2026-04-08 | Basic Rules para 13047: "You can direct the beams at the same target or at different ones. Make a separate attack roll for each beam." Distribution kind only triggers at L5+ when there are 2+ beams. |
 
 ### Spells still needing migration:
 
@@ -44,9 +47,6 @@ The rule remains: **NEVER choose for the player when a spell has a choice.** Bot
 | **Channel Divinity Order's Demand** | Optional "drop held items" rider | Not implemented |
 | **Wall of Stone / Wall of Fire** | Shape and orientation | Not implemented (walls not in combat grid) |
 | **Polymorph** | Target beast form | Limited — uses a fixed stat block |
-| **Scorching Ray** | Ray distribution across targets | Auto-distributes. Batch 1C. |
-| **Magic Missile** | Dart distribution | Auto-distributes evenly. Batch 1C. |
-| **Eldritch Blast** | Beam distribution | Auto-distributes. Batch 1C. |
 | **Telekinesis** | Object vs creature, movement direction | Not implemented |
 | **Bigby's Hand** | Hand action each turn (punch/grapple/push/interpose) | Not implemented |
 | **Conjure X spells** | Which creature type to summon | Not implemented |

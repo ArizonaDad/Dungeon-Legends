@@ -127,12 +127,16 @@ bool waiting_for_reaction_prompt = false;
 string reaction_prompt_text = "";
 string reaction_options_csv = "";
 uint64 next_reaction_prompt_reminder = 0;
-// Generic mid-spell choice prompt (Fire Shield warm/chill, Spirit Guardians radiant/necrotic, etc.)
+// Generic mid-spell choice prompt (Fire Shield warm/chill, Spirit Guardians radiant/necrotic,
+// Adjust Density halve/double, Magic Missile/Scorching Ray/Eldritch Blast target distribution)
 bool waiting_for_spell_choice_prompt = false;
 string spell_choice_prompt_text = "";
 string[] spell_choice_option_keys;
 string[] spell_choice_option_labels;
 string spell_choice_spell_id = "";
+string spell_choice_kind = "binary";       // "binary" or "distribution"
+int spell_choice_distribution_count = 0;   // For distribution: total picks needed
+string[] spell_choice_picks_collected;     // For distribution: target IDs picked so far
 uint64 next_spell_choice_reminder = 0;
 
 // Targeting
@@ -343,10 +347,13 @@ void prompt_reaction_choice(string text, string csv) {
 	speak(text, true);
 }
 
-void prompt_spell_choice(string text, string spell_id, string[]@ keys, string[]@ labels) {
+void prompt_spell_choice(string text, string spell_id, string[]@ keys, string[]@ labels, string kind = "binary", int distribution_count = 0) {
 	waiting_for_spell_choice_prompt = true;
 	spell_choice_prompt_text = text;
 	spell_choice_spell_id = spell_id;
+	spell_choice_kind = kind;
+	spell_choice_distribution_count = distribution_count;
+	spell_choice_picks_collected.resize(0);
 	spell_choice_option_keys.resize(0);
 	spell_choice_option_labels.resize(0);
 	if (@keys != null) {
@@ -356,7 +363,17 @@ void prompt_spell_choice(string text, string spell_id, string[]@ keys, string[]@
 		for (uint i = 0; i < labels.length(); i++) spell_choice_option_labels.insert_last(labels[i]);
 	}
 	next_spell_choice_reminder = ticks() + 4000;
+	// For distribution prompts, also speak the option list so the player knows which key
+	// maps to which target.
 	speak(text, true);
+	if (kind == "distribution" and spell_choice_option_labels.length() > 0) {
+		string list_text = "Targets: ";
+		for (uint i = 0; i < spell_choice_option_labels.length(); i++) {
+			list_text += (i + 1) + " is " + spell_choice_option_labels[i];
+			if (i < spell_choice_option_labels.length() - 1) list_text += ", ";
+		}
+		speak(list_text, false);
+	}
 }
 
 bool check_roll_input() {
@@ -462,9 +479,71 @@ bool check_smite_prompt_input() {
 
 bool check_spell_choice_prompt_input() {
 	if (!waiting_for_spell_choice_prompt) return false;
-	// Number keys 1..N pick the corresponding option key.
 	uint count = spell_choice_option_keys.length();
 	if (count > 9) count = 9;
+
+	// Distribution kind: each press appends to picks; spell resolves only after N picks.
+	if (spell_choice_kind == "distribution") {
+		for (uint oi = 0; oi < count; oi++) {
+			if (key_pressed(KEY_1 + oi)) {
+				string chosen_key = spell_choice_option_keys[oi];
+				string chosen_label = (oi < spell_choice_option_labels.length()) ? spell_choice_option_labels[oi] : chosen_key;
+				spell_choice_picks_collected.insert_last(chosen_key);
+				int picked = int(spell_choice_picks_collected.length());
+				int remaining = spell_choice_distribution_count - picked;
+				if (remaining > 0) {
+					speak("Pick " + picked + " of " + spell_choice_distribution_count + ": " + chosen_label + ". " + remaining + " remaining.", true);
+					next_spell_choice_reminder = ticks() + 5000;
+					return true;
+				}
+				// All picks collected — fire the response.
+				waiting_for_spell_choice_prompt = false;
+				next_spell_choice_reminder = 0;
+				json_array targets;
+				for (uint p = 0; p < spell_choice_picks_collected.length(); p++) {
+					targets.add(spell_choice_picks_collected[p]);
+				}
+				send({{"type", message_types::spell_choice_response}, {"targets", targets}, {"spell", spell_choice_spell_id}});
+				speak("Final pick: " + chosen_label + ". Resolving spell.", true);
+				return true;
+			}
+		}
+		if (key_pressed(KEY_BACK)) {
+			// Backspace: undo the last pick (in case the player misclicks).
+			if (spell_choice_picks_collected.length() > 0) {
+				spell_choice_picks_collected.resize(spell_choice_picks_collected.length() - 1);
+				int picked = int(spell_choice_picks_collected.length());
+				int remaining = spell_choice_distribution_count - picked;
+				speak("Removed last pick. " + remaining + " of " + spell_choice_distribution_count + " remaining.", true);
+				return true;
+			}
+		}
+		if (key_pressed(KEY_ESCAPE)) {
+			// Escape: pad remaining picks with the first target so the spell still fires.
+			waiting_for_spell_choice_prompt = false;
+			next_spell_choice_reminder = 0;
+			string default_key = spell_choice_option_keys.length() > 0 ? spell_choice_option_keys[0] : "";
+			while (int(spell_choice_picks_collected.length()) < spell_choice_distribution_count) {
+				spell_choice_picks_collected.insert_last(default_key);
+			}
+			json_array targets;
+			for (uint p = 0; p < spell_choice_picks_collected.length(); p++) {
+				targets.add(spell_choice_picks_collected[p]);
+			}
+			send({{"type", message_types::spell_choice_response}, {"targets", targets}, {"spell", spell_choice_spell_id}});
+			speak("Defaulted remaining picks to first target.", true);
+			return true;
+		}
+		if (next_spell_choice_reminder > 0 and ticks() >= next_spell_choice_reminder) {
+			int picked = int(spell_choice_picks_collected.length());
+			int remaining = spell_choice_distribution_count - picked;
+			speak("Still picking targets. " + remaining + " remaining. " + spell_choice_prompt_text, true);
+			next_spell_choice_reminder = ticks() + 6000;
+		}
+		return false;
+	}
+
+	// Binary kind: single press resolves.
 	for (uint oi = 0; oi < count; oi++) {
 		if (key_pressed(KEY_1 + oi)) {
 			waiting_for_spell_choice_prompt = false;

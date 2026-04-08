@@ -286,6 +286,8 @@ void handle_message(json_object@ msg)
 	else if (msg_type == message_types::spell_choice_prompt) {
 		string text = msg.exists("text") ? string(msg["text"]) : "Choose an option for your spell.";
 		string spell_id = msg.exists("spell") ? string(msg["spell"]) : "";
+		string kind = msg.exists("kind") ? string(msg["kind"]) : "binary";
+		int dist_count = msg.exists("count") ? int(msg["count"]) : 0;
 		string[] keys;
 		string[] labels;
 		if (msg.exists("options")) {
@@ -301,7 +303,7 @@ void handle_message(json_object@ msg)
 				}
 			}
 		}
-		prompt_spell_choice(text, spell_id, keys, labels);
+		prompt_spell_choice(text, spell_id, keys, labels, kind, dist_count);
 	}
 	else if (msg_type == message_types::roll_result) {
 		// Server broadcasts roll results to ALL players - spoken via TTS
