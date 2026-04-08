@@ -7202,6 +7202,47 @@ class battle_manager {
 				check_battle_end();
 				return;
 			}
+			else if (spell.id == "bigbys_hand") {
+				// Basic Rules para 12232: "You create a Large hand of shimmering magical
+				// energy in an unoccupied space that you can see within range. The hand
+				// lasts for the duration, and it moves at your command... The hand is an
+				// object that has AC 20 and Hit Points equal to your Hit Point maximum."
+				// Wired as a companion entity per source - the hand can clenched fist /
+				// forceful hand / grasping hand / interposing hand. Default to Clenched
+				// Fist (4d8 force damage at touch range).
+				combatant@ hand = spawn_companion(c, "bigbys_hand", c.name + "'s Bigby's Hand", c.max_hp, 20, 30, c.proficiency + get_spellcasting_ability_mod(c), 4, 8, 0, DMG_FORCE, 0);
+				if (@hand != null) {
+					broadcast_announce(c.name + " summons Bigby's Hand! AC 20, HP " + c.max_hp + ", 4d8 force damage on Clenched Fist.", true);
+				}
+			}
+			else if (spell.id == "tsunami") {
+				// Basic Rules para 15497: "When the wall appears, each creature in its
+				// area makes a Strength saving throw, taking 6d10 Bludgeoning damage on
+				// a failed save or half as much damage on a successful one."
+				int dice_count = 6;
+				int center_x = @target != null ? target.x : c.x;
+				int center_y = @target != null ? target.y : c.y;
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 10);
+				broadcast_announce(c.name + " summons a Tsunami! A 300-foot wall of water crashes down.", true);
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (feet_distance(center_x, center_y, t.x, t.y) > 60) continue;
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_STR);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					int dmg = saved ? total_damage / 2 : total_damage;
+					if (dmg < 1) dmg = 1;
+					broadcast_roll(t.name, "STR save vs Tsunami", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+					combat.apply_damage(t, dmg, DMG_BLUDGEONING, c);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
 			else if (spell.id == "death_ward" and @target != null) {
 				// Basic Rules para 12784: "You touch a creature and grant it a measure of
 				// protection from death. The first time the target would drop to 0 Hit
