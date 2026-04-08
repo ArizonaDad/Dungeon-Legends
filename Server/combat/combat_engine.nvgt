@@ -150,6 +150,16 @@ class combatant {
 	int twilight_sanctuary_rounds = 0;
 	bool abjure_extraplanar_active = false; // Oath of Watchers Paladin
 	int spirit_shield_reduction = 0; // Ancestral Guardian Barbarian reaction
+	bool storm_aura_active = false; // Storm Herald Barbarian
+	int storm_aura_damage_type = 0;
+	int wails_from_grave_uses = 0; // Phantom Rogue
+	bool mote_of_potential_active = false; // College of Creation Bard
+	bool steel_defender_active = false; // Battle Smith Artificer
+	bool eldritch_cannon_active = false; // Artillerist Artificer
+	int eldritch_cannon_hp = 0;
+	bool experimental_elixir_available = false; // Alchemist Artificer
+	bool tentacle_of_deeps_active = false; // Fathomless Warlock
+	bool wildfire_spirit_active = false; // Wildfire Druid
 	int rage_turns_remaining = 0;
 	int action_surge_uses_remaining = 0;
 	bool second_wind_available = false;

@@ -797,6 +797,27 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         c.restore_balance_ready = true;
     }
 
+    // Armorer Artificer: Arcane Armor grants +1 AC
+    if (cs.class_name == "Artificer" and cs.subclass == "Armorer" and cs.level >= 3) {
+        cs.armor_class += 1;
+    }
+
+    // Path of the Storm Herald: Storm Aura damage on rage
+    if (cs.class_name == "Barbarian" and cs.subclass == "Storm Herald" and cs.level >= 3) {
+        c.storm_aura_active = false;
+        c.storm_aura_damage_type = DMG_LIGHTNING; // default tundra
+    }
+
+    // Phantom Rogue: Wails from the Grave (once per short rest)
+    if (cs.class_name == "Rogue" and cs.subclass == "Phantom" and cs.level >= 9) {
+        c.wails_from_grave_uses = proficiency_bonus(cs.level) / 2;
+    }
+
+    // College of Creation Bard: Mote of Potential
+    if (cs.class_name == "Bard" and cs.subclass == "College of Creation" and cs.level >= 3) {
+        c.mote_of_potential_active = true;
+    }
+
     // Wizard subclasses
     if (cs.class_name == "Wizard") {
         if (cs.subclass == "Diviner" and cs.level >= 2) {

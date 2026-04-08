@@ -1450,6 +1450,11 @@ void handle_user_message(user@ u, json_object@ msg)
 			c.rage_uses_remaining--;
 			c.raging = true;
 			c.rage_turns_remaining = 10;
+			// Storm Herald: Activate Storm Aura
+			if (c.subclass == "Storm Herald") {
+				c.storm_aura_active = true;
+				u.room.bm.broadcast_announce(c.name + "'s Storm Aura activates!", true);
+			}
 			u.room.bm.broadcast_announce(c.name + " enters a Rage! Bonus damage and resistance to bludgeoning, piercing, and slashing. " + c.rage_uses_remaining + " use" + (c.rage_uses_remaining == 1 ? "" : "s") + " remain.", true);
 		}
 		else if (feature == "action_surge") {
