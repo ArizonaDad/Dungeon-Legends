@@ -7364,6 +7364,50 @@ class battle_manager {
 				check_battle_end();
 				return;
 			}
+			else if (spell.id == "mordenkainens_sword") {
+				// Basic Rules paras 14361-14362: "You create a spectral sword that hovers
+				// within range. It lasts for the duration. When the sword appears, you
+				// make a melee spell attack against a target within 5 feet of the sword.
+				// On a hit, the target takes Force damage equal to 4d12 plus your
+				// spellcasting ability modifier."
+				if (@target == null or target.is_dead) {
+					u.send({{"type", message_types::announce}, {"text", "No valid target."}, {"interrupt", true}});
+					return;
+				}
+				int mod = get_spellcasting_ability_mod(c);
+				int total_damage = mod;
+				for (int d = 0; d < 4; d++) total_damage += random(1, 12);
+				int atk_roll = random(1, 20);
+				int atk_total = atk_roll + spell_atk;
+				bool hit = atk_total >= target.armor_class;
+				broadcast_roll(c.name, "Mordenkainen's Sword attack roll", atk_roll, spell_atk, atk_total, hit ? "Hit!" : "Missed!");
+				if (hit) {
+					combat.apply_damage(target, total_damage, DMG_FORCE, c);
+					broadcast_announce(c.name + "'s spectral sword strikes " + target.name + " for " + total_damage + " force damage!", true);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "conjure_animals") {
+				// Basic Rules paras 12512-12513: "You conjure nature spirits that appear
+				// as a Large pack of spectral, intangible animals in an unoccupied space
+				// you can see within range... You have Advantage on Strength saving throws
+				// while you're within 5 feet of the pack, and when you move on your turn,
+				// you can also move the pack up to 30 feet to an unoccupied space."
+				// Spawn the pack as a companion entity acting on caster's turn.
+				int pack_hp = 5 * c.level;
+				int wis_mod_ca = c.get_ability_mod(ABILITY_WIS);
+				int pack_attack = c.proficiency + wis_mod_ca;
+				combatant@ pack = spawn_companion(c, "conjure_animals_pack", c.name + "'s Animal Pack", pack_hp, 13 + c.proficiency, 40, pack_attack, 2, 6, c.proficiency, DMG_PIERCING, 0);
+				if (@pack != null) {
+					broadcast_announce(c.name + " conjures a pack of spectral animals! HP " + pack_hp + ", AC " + (13 + c.proficiency) + ", 2d6+PB piercing.", true);
+				}
+			}
+			else if (spell.id == "detect_thoughts" or spell.id == "locate_object" or spell.id == "locate_creature") {
+				// Divination spells, no combat effect. Announce-only.
+				broadcast_announce(c.name + " casts " + spell.name + ".", false);
+			}
 			else if (spell.id == "ray_of_sickness" and @target != null) {
 				// Basic Rules para 14732: "You shoot a greenish ray at a creature within
 				// range. Make a ranged spell attack against the target. On a hit, the
