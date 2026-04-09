@@ -3029,7 +3029,7 @@ void show_loot_screen() {
 }
 
 void show_quick_keybinds() {
-	speak("Quick controls. F action menu. B bonus actions. C consumables. R roll dice. W A S D move. I J K L scan. Enter lock target. H status. O initiative. T whose turn. Tab switch focus. Page Up Down volume. Ctrl Page Up Down speech speed. Escape forfeit.", true);
+	speak("Quick controls. F action menu. B bonus actions. C consumables. Shift P Phase 1 sub-system config (Piety, Group Patron, Ravnica Guild, Transformation, Fey Court). R roll dice. W A S D move. I J K L scan. Enter lock target. H status. O initiative. T whose turn. Tab switch focus. Page Up Down volume. Ctrl Page Up Down speech speed. Escape forfeit.", true);
 }
 
 void combat_game_loop() {

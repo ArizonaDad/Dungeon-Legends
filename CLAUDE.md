@@ -367,7 +367,19 @@ All 9 Phase 1 sub-systems from the master directive are now implemented as data-
 - **Ebon Tides Shadow Roads & Fey Courts** (`ebon_tides_data.nvgt`) — Book of Ebon Tides: 14 source-listed fey courts with rulers/alignment/perks (Court of Golden Oaks, Pale Roses, Midnight Teeth, Witch Queen's Court, etc.). 7 named shadow roads (Mage's Road, Flower Road, Bridge of Lethe, Twin Roads of Corremel, etc.) with travel days and passphrase requirements. `shadow_road_lore_modifier(race)` applies -5 to non-elf Arcana checks per source para 2500.
 - **Transformations** (`transformations_data.nvgt`) — Grim Hollow para 2294-2306: 5-stage progression (Untransformed → Infected → Awakened → Ascended → Fallen → Full NPC). 6 paths: Vampirism (Crimson Court), Lycanthropy, Lichdom, Aberrant Horror, Demonic Pact, Seraphic Ascension (the only blessed path per para 2297). Helper: `transformation_active_effect()`.
 
-**Wiring status:** Data modules built and compiled. Per-character usage requires UI flow integration (character creation prompts, level-up unlocks, action menu entries) — deferred. Combatant fields exist for Piety and Group Patrons; Vestige/Bastion/Transformation tracking is per-account JSON only.
+**Wiring status:** Data modules built, compiled, and FULLY INTEGRATED into gameplay. All 9 systems have character_sheet + combatant fields, account JSON save/load, broadcast_state() serialization, client-side deserialization, and interactive configuration via the Shift+P Phase 1 menu. Piety Devotee trait and Group Assistance d4 are live as bonus actions in combat. Transformation stage resistances (necrotic/cold/psychic/fire by path) apply automatically at combatant init. Vestige effects (Hide of the Feral Guardian AC bonus, Stormgirdle lightning resistance) also apply automatically. Character creation flow integration (pre-combat choice of god/patron/guild) is deferred — players currently configure Phase 1 state via the Shift+P menu in their first combat session.
+
+**Bonus actions added** (accessible via B menu during combat):
+- `invoke_devotee_trait` — Casts the god's Devotee spell for free (one use per long rest, consumes bonus action). Visible when `piety_god != "" and piety_score >= 3 and piety_devotee_uses > 0`.
+- `group_assistance` — Grants +1d4 to next d20 roll (1/long rest, consumes bonus action). Visible when `group_patron != "" and !group_assistance_used_this_rest`.
+
+**Phase 1 config commands** (accessible via Shift+P menu, work at any time during combat):
+- `set_piety_god` — choose from 15 Theros gods
+- `set_group_patron` — choose from 8 Tasha's archetypes
+- `set_ravnica_guild` — choose from 10 Ravnica guilds
+- `set_transformation` — choose path + stage (1/5/10/15/20)
+- `set_fey_court` — choose from 14 Ebon Tides courts
+- `query_phase1` — show full Phase 1 status report
 
 ### Source Audit Status (2026-04-08) — Post-Audit Additions
 All batches 15-21 implementations were audited against actual source docx files in `C:\Users\16239\Downloads\Sources_clean\Source Books and rules\`. Additionally batches 22-25 added new subclasses extracted directly from the source files.
