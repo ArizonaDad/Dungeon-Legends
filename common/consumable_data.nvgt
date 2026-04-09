@@ -105,14 +105,14 @@ void init_consumable_catalog() {
 	add_consumable("oil", "Oil (Flask)", CONS_THROWABLE, CONS_ACTION_FULL, "Oil usually comes in a clay flask. As a Utilize action, you can splash the oil in this flask onto a creature within 5 feet of yourself or throw it up to 20 feet, breaking it on impact. After being struck by a fire source, the target takes 5 fire damage. (PHB 2024 para 8832)", 5);
 	@c = CONSUMABLE_CATALOG[CONSUMABLE_CATALOG.length() - 1]; c.damage_dice = 1; c.damage_count = 5; c.damage_type = DMG_FIRE; c.save_type = ABILITY_DEX; c.range = 20;
 
-	// Scrolls (action, one-use spells)
-	add_consumable("scroll_shield", "Scroll of Shield", CONS_SCROLL, CONS_ACTION_BONUS, "Plus 5 AC until start of next turn. Reaction.", 60);
+	// Scrolls (DMG 2024 Spell Scrolls — one-use, no slot consumed)
+	add_consumable("scroll_shield", "Scroll of Shield", CONS_SCROLL, CONS_ACTION_BONUS, "Cast as a Reaction when hit by an attack or targeted by Magic Missile. An imperceptible barrier of magical force protects you. Until the start of your next turn, you have a +5 bonus to AC, including against the triggering attack, and you take no damage from Magic Missile. (DMG 2024 Spell Scroll, 1st-level Abjuration; Basic Rules 2024, Shield)", 60);
 	@c = CONSUMABLE_CATALOG[CONSUMABLE_CATALOG.length() - 1]; c.spell_id = "shield"; c.buff_stat = "ac"; c.buff_value = 5; c.duration_rounds = 1;
 
-	add_consumable("scroll_misty_step", "Scroll of Misty Step", CONS_SCROLL, CONS_ACTION_BONUS, "Teleport up to 30 feet.", 75);
+	add_consumable("scroll_misty_step", "Scroll of Misty Step", CONS_SCROLL, CONS_ACTION_BONUS, "Briefly surrounded by silvery mist, you teleport up to 30 feet to an unoccupied space you can see. (DMG 2024 Spell Scroll, 2nd-level Conjuration; Basic Rules 2024, Misty Step)", 75);
 	@c = CONSUMABLE_CATALOG[CONSUMABLE_CATALOG.length() - 1]; c.spell_id = "misty_step"; c.range = 30;
 
-	add_consumable("scroll_fireball", "Scroll of Fireball", CONS_SCROLL, CONS_ACTION_FULL, "8d6 fire damage in a 20 foot radius. Dexterity save.", 150);
+	add_consumable("scroll_fireball", "Scroll of Fireball", CONS_SCROLL, CONS_ACTION_FULL, "A bright streak flashes from you to a point you choose within range and then blossoms with a low roar into a fiery explosion. Each creature in a 20-foot-radius Sphere centered on that point makes a Dexterity saving throw, taking 8d6 Fire damage on a failed save or half as much damage on a successful one. Flammable objects in the area that aren't being worn or carried start burning. (DMG 2024 Spell Scroll, 3rd-level Evocation; Basic Rules 2024, Fireball)", 150);
 	@c = CONSUMABLE_CATALOG[CONSUMABLE_CATALOG.length() - 1]; c.spell_id = "fireball"; c.damage_dice = 6; c.damage_count = 8; c.damage_type = DMG_FIRE; c.save_type = ABILITY_DEX; c.range = 150;
 }
 
