@@ -9826,6 +9826,628 @@ class battle_manager {
 			else if (spell.id == "true_polymorph") {
 				broadcast_announce(c.name + " casts True Polymorph.", true);
 			}
+			// ==== ADDITIONAL SPELL HANDLERS (batch 2026-04-08) ====
+			// Cantrips
+			else if (spell.id == "aundairs_silent_sanctum") {
+				broadcast_announce(c.name + " casts Aundair's Silent Sanctum, muffling sound in a 5-foot bubble.", true);
+			}
+			else if (spell.id == "bright_sparks" and @target != null) {
+				int dice_count = cantrip_dice_count(1, c.level);
+				int atk_roll = random(1, 20);
+				int atk_total = atk_roll + spell_atk;
+				bool hit = atk_total >= target.armor_class;
+				broadcast_roll(c.name, "Bright Sparks attack roll", atk_roll, spell_atk, atk_total, hit ? "Hit!" : "Missed!");
+				if (hit) {
+					int total_damage = 0;
+					for (int d = 0; d < dice_count; d++) total_damage += random(1, 6);
+					combat.apply_damage(target, total_damage, DMG_LIGHTNING, c);
+					broadcast_announce(c.name + "'s Bright Sparks zap " + target.name + " for " + total_damage + " lightning damage.", true);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "concealed_shot") {
+				broadcast_announce(c.name + " casts Concealed Shot, making their next ranged attack supernaturally subtle.", true);
+			}
+			else if (spell.id == "drizzle") {
+				int dice_count = cantrip_dice_count(1, c.level);
+				broadcast_announce(c.name + " casts Drizzle, summoning a chilling spray!", true);
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (t.is_player == c.is_player and combat.mode != "pvp") continue;
+					if (feet_distance(c.x, c.y, t.x, t.y) > 5) continue;
+					int total_damage = 0;
+					for (int d = 0; d < dice_count; d++) total_damage += random(1, 4);
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_DEX);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					int dmg = saved ? total_damage / 2 : total_damage;
+					if (dmg < 1) dmg = 1;
+					broadcast_roll(t.name, "DEX save vs Drizzle", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+					combat.apply_damage(t, dmg, DMG_COLD, c);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "elementalism") {
+				broadcast_announce(c.name + " casts Elementalism, creating a minor elemental effect.", true);
+			}
+			else if (spell.id == "finger_guns" and @target != null) {
+				int dice_count = cantrip_dice_count(1, c.level);
+				int atk_roll = random(1, 20);
+				int atk_total = atk_roll + spell_atk;
+				bool hit = atk_total >= target.armor_class;
+				broadcast_roll(c.name, "Finger Guns attack roll", atk_roll, spell_atk, atk_total, hit ? "Hit!" : "Missed!");
+				if (hit) {
+					int total_damage = 0;
+					for (int d = 0; d < dice_count; d++) total_damage += random(1, 6);
+					combat.apply_damage(target, total_damage, DMG_FORCE, c);
+					broadcast_announce(c.name + "'s Finger Guns blast " + target.name + " for " + total_damage + " force damage.", true);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "force_blast" and @target != null) {
+				int dice_count = cantrip_dice_count(1, c.level);
+				int atk_roll = random(1, 20);
+				int atk_total = atk_roll + spell_atk;
+				bool hit = atk_total >= target.armor_class;
+				broadcast_roll(c.name, "Force Blast attack roll", atk_roll, spell_atk, atk_total, hit ? "Hit!" : "Missed!");
+				if (hit) {
+					int total_damage = 0;
+					for (int d = 0; d < dice_count; d++) total_damage += random(1, 8);
+					combat.apply_damage(target, total_damage, DMG_FORCE, c);
+					broadcast_announce(c.name + "'s Force Blast hammers " + target.name + " for " + total_damage + " force damage.", true);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "holy_word" and @target != null) {
+				int dice_count = cantrip_dice_count(1, c.level);
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 6);
+				int save_roll = random(1, 20);
+				int save_bonus = target.get_save_bonus(ABILITY_WIS);
+				int bless_bonus = roll_bless_bonus(target);
+				int save_total = save_roll + save_bonus + bless_bonus;
+				bool saved = save_total >= save_dc;
+				broadcast_roll(target.name, "WIS save vs Holy Word", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Hit!");
+				if (!saved) {
+					combat.apply_damage(target, total_damage, DMG_RADIANT, c);
+					broadcast_announce(c.name + "'s Holy Word sears " + target.name + " for " + total_damage + " radiant damage.", true);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "magecraft") {
+				broadcast_announce(c.name + " casts Magecraft, channeling arcane talent through their tools.", true);
+			}
+			else if (spell.id == "mind_spike" and @target != null) {
+				int dice_count = cantrip_dice_count(1, c.level);
+				int atk_roll = random(1, 20);
+				int atk_total = atk_roll + spell_atk;
+				bool hit = atk_total >= target.armor_class;
+				broadcast_roll(c.name, "Mind Spike attack roll", atk_roll, spell_atk, atk_total, hit ? "Hit!" : "Missed!");
+				if (hit) {
+					int total_damage = 0;
+					for (int d = 0; d < dice_count; d++) total_damage += random(1, 6);
+					combat.apply_damage(target, total_damage, DMG_PSYCHIC, c);
+					broadcast_announce(c.name + "'s Mind Spike pierces " + target.name + "'s mind for " + total_damage + " psychic damage. They have a penalty on their next save.", true);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "obfuscate_object") {
+				broadcast_announce(c.name + " casts Obfuscate Object, hiding it from divination.", true);
+			}
+			else if (spell.id == "poison_spray" and @target != null) {
+				int dice_count = cantrip_dice_count(1, c.level);
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 12);
+				int save_roll = random(1, 20);
+				int save_bonus = target.get_save_bonus(ABILITY_CON);
+				int bless_bonus = roll_bless_bonus(target);
+				int save_total = save_roll + save_bonus + bless_bonus;
+				bool saved = save_total >= save_dc;
+				broadcast_roll(target.name, "CON save vs Poison Spray", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Hit!");
+				if (!saved) {
+					combat.apply_damage(target, total_damage, DMG_POISON, c);
+					broadcast_announce(c.name + "'s Poison Spray withers " + target.name + " for " + total_damage + " poison damage.", true);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "produce_flame" and @target != null) {
+				int dice_count = cantrip_dice_count(1, c.level);
+				int atk_roll = random(1, 20);
+				int atk_total = atk_roll + spell_atk;
+				bool hit = atk_total >= target.armor_class;
+				broadcast_roll(c.name, "Produce Flame attack roll", atk_roll, spell_atk, atk_total, hit ? "Hit!" : "Missed!");
+				if (hit) {
+					int total_damage = 0;
+					for (int d = 0; d < dice_count; d++) total_damage += random(1, 8);
+					combat.apply_damage(target, total_damage, DMG_FIRE, c);
+					broadcast_announce(c.name + "'s Produce Flame burns " + target.name + " for " + total_damage + " fire damage.", true);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "produce_flame") {
+				broadcast_announce(c.name + " conjures a Produce Flame in their hand, shedding light.", true);
+			}
+			else if (spell.id == "sacred_flame" and @target != null) {
+				int dice_count = cantrip_dice_count(1, c.level);
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 8);
+				int save_roll = random(1, 20);
+				int save_bonus = target.get_save_bonus(ABILITY_DEX);
+				int bless_bonus = roll_bless_bonus(target);
+				int save_total = save_roll + save_bonus + bless_bonus;
+				bool saved = save_total >= save_dc;
+				broadcast_roll(target.name, "DEX save vs Sacred Flame", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Hit!");
+				if (!saved) {
+					combat.apply_damage(target, total_damage, DMG_RADIANT, c);
+					broadcast_announce(c.name + "'s Sacred Flame engulfs " + target.name + " for " + total_damage + " radiant damage.", true);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "shillelagh") {
+				broadcast_announce(c.name + " casts Shillelagh, infusing their club or quarterstaff with magical force (1d8).", true);
+			}
+			// Level 1
+			else if (spell.id == "ballistic_smite") {
+				broadcast_announce(c.name + " casts Ballistic Smite. Their next attack will deal extra force damage.", true);
+			}
+			else if (spell.id == "concussive_burst") {
+				broadcast_announce(c.name + " casts Concussive Burst, releasing a pulse of force!", true);
+				int dice_count = 2;
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 4);
+				int center_x = @target != null ? target.x : c.x;
+				int center_y = @target != null ? target.y : c.y;
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (t.is_player == c.is_player and combat.mode != "pvp") continue;
+					if (feet_distance(center_x, center_y, t.x, t.y) > 5) continue;
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_STR);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					int dmg = saved ? total_damage / 2 : total_damage;
+					if (dmg < 1) dmg = 1;
+					broadcast_roll(t.name, "STR save vs Concussive Burst", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+					combat.apply_damage(t, dmg, DMG_FORCE, c);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "conjure_cover") {
+				broadcast_announce(c.name + " casts Conjure Cover, creating a low cobblestone wall.", true);
+			}
+			else if (spell.id == "divine_smite") {
+				broadcast_announce(c.name + " casts Divine Smite. Their next melee strike will deal radiant damage.", true);
+			}
+			else if (spell.id == "illusory_script") {
+				broadcast_announce(c.name + " casts Illusory Script, weaving an illusion onto written words.", true);
+			}
+			else if (spell.id == "perforating_shot") {
+				broadcast_announce(c.name + " casts Perforating Shot, transforming their next attack into a piercing line of energy.", true);
+			}
+			// Level 2
+			else if (spell.id == "animal_messenger") {
+				broadcast_announce(c.name + " casts Animal Messenger, dispatching a tiny beast with a message.", true);
+			}
+			else if (spell.id == "augury") {
+				broadcast_announce(c.name + " casts Augury, seeking an omen about the next 30 minutes.", true);
+			}
+			else if (spell.id == "enthrall" and @target != null) {
+				int save_roll = random(1, 20);
+				int save_bonus = target.get_save_bonus(ABILITY_WIS);
+				int bless_bonus = roll_bless_bonus(target);
+				int save_total = save_roll + save_bonus + bless_bonus;
+				bool saved = save_total >= save_dc;
+				broadcast_roll(target.name, "WIS save vs Enthrall", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Charmed!");
+				if (!saved) {
+					target.add_condition(COND_CHARMED);
+					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Charmed"}});
+					broadcast_announce(c.name + " enthralls " + target.name + " for 1 minute.", true);
+				}
+				broadcast_state();
+				return;
+			}
+			else if (spell.id == "flame_blade") {
+				broadcast_announce(c.name + " casts Flame Blade, evoking a fiery scimitar (3d6 fire).", true);
+			}
+			else if (spell.id == "homunculus_servant") {
+				broadcast_announce(c.name + " casts Homunculus Servant, summoning a tiny construct ally.", true);
+			}
+			else if (spell.id == "jam_weapon") {
+				broadcast_announce(c.name + " casts Jam Weapon, causing the target's weapon to malfunction.", true);
+			}
+			else if (spell.id == "jethros_instant_reload") {
+				broadcast_announce(c.name + " casts Jethro's Instant Reload, enchanting a ranged weapon to reload itself.", true);
+			}
+			else if (spell.id == "melfs_acid_arrow" and @target != null) {
+				int hit_dice = 4 + upcast_levels;
+				int miss_dice = 2 + upcast_levels;
+				int atk_roll = random(1, 20);
+				int atk_total = atk_roll + spell_atk;
+				bool hit = atk_total >= target.armor_class;
+				broadcast_roll(c.name, "Melf's Acid Arrow attack roll", atk_roll, spell_atk, atk_total, hit ? "Hit!" : "Missed!");
+				int total_damage = 0;
+				if (hit) {
+					int combined = hit_dice + miss_dice;
+					for (int d = 0; d < combined; d++) total_damage += random(1, 4);
+					combat.apply_damage(target, total_damage, DMG_ACID, c);
+					broadcast_announce(c.name + "'s Melf's Acid Arrow deals " + total_damage + " acid damage to " + target.name + ".", true);
+				} else {
+					for (int d = 0; d < miss_dice; d++) total_damage += random(1, 4);
+					combat.apply_damage(target, total_damage, DMG_ACID, c);
+					broadcast_announce(c.name + "'s Melf's Acid Arrow splashes " + target.name + " for " + total_damage + " acid damage.", true);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "nystuls_magic_aura") {
+				broadcast_announce(c.name + " casts Nystul's Magic Aura, masking the target's magical signature.", true);
+			}
+			else if (spell.id == "ray_of_enfeeblement" and @target != null) {
+				int atk_roll = random(1, 20);
+				int atk_total = atk_roll + spell_atk;
+				bool hit = atk_total >= target.armor_class;
+				broadcast_roll(c.name, "Ray of Enfeeblement attack roll", atk_roll, spell_atk, atk_total, hit ? "Hit!" : "Missed!");
+				if (hit) {
+					broadcast_announce(c.name + "'s Ray of Enfeeblement saps " + target.name + "'s strength. They deal half damage with strength-based attacks.", true);
+				}
+				broadcast_state();
+				return;
+			}
+			else if (spell.id == "shining_smite") {
+				broadcast_announce(c.name + " casts Shining Smite. Their next strike will radiate light and deal radiant damage.", true);
+			}
+			else if (spell.id == "warding_bond") {
+				broadcast_announce(c.name + " casts Warding Bond, linking with an ally to share damage and grant +1 AC.", true);
+			}
+			// Level 3
+			else if (spell.id == "conjure_cannonball") {
+				broadcast_announce(c.name + " casts Conjure Cannonball, summoning a streaking cannonball!", true);
+				int dice_count = 6 + upcast_levels;
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 10);
+				int center_x = @target != null ? target.x : c.x;
+				int center_y = @target != null ? target.y : c.y;
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (t.is_player == c.is_player and combat.mode != "pvp") continue;
+					if (feet_distance(center_x, center_y, t.x, t.y) > 20) continue;
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_DEX);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					int dmg = saved ? total_damage / 2 : total_damage;
+					if (dmg < 1) dmg = 1;
+					broadcast_roll(t.name, "DEX save vs Conjure Cannonball", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+					combat.apply_damage(t, dmg, DMG_BLUDGEONING, c);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "leomunds_tiny_hut") {
+				broadcast_announce(c.name + " casts Leomund's Tiny Hut, creating a 10-foot dome of force.", true);
+			}
+			else if (spell.id == "major_image") {
+				broadcast_announce(c.name + " casts Major Image, conjuring a vivid illusion.", true);
+			}
+			else if (spell.id == "speak_with_dead") {
+				broadcast_announce(c.name + " casts Speak with Dead, granting a corpse the semblance of life.", true);
+			}
+			else if (spell.id == "speak_with_plants") {
+				broadcast_announce(c.name + " casts Speak with Plants, communing with nearby plant life.", true);
+			}
+			// Level 4
+			else if (spell.id == "aura_of_life") {
+				broadcast_announce(c.name + " casts Aura of Life. Allies in a 30-foot aura have necrotic resistance and can recover from 0 HP.", true);
+			}
+			else if (spell.id == "charm_monster" and @target != null) {
+				int save_roll = random(1, 20);
+				int save_bonus = target.get_save_bonus(ABILITY_WIS);
+				int bless_bonus = roll_bless_bonus(target);
+				int save_total = save_roll + save_bonus + bless_bonus;
+				bool saved = save_total >= save_dc;
+				broadcast_roll(target.name, "WIS save vs Charm Monster", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Charmed!");
+				if (!saved) {
+					target.add_condition(COND_CHARMED);
+					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Charmed"}});
+					broadcast_announce(c.name + " charms " + target.name + " with Charm Monster.", true);
+				}
+				broadcast_state();
+				return;
+			}
+			else if (spell.id == "conjure_minor_elementals") {
+				broadcast_announce(c.name + " casts Conjure Minor Elementals, summoning elemental spirits to flit around them.", true);
+			}
+			else if (spell.id == "conjure_woodland_beings") {
+				broadcast_announce(c.name + " casts Conjure Woodland Beings, summoning fey nature spirits.", true);
+			}
+			else if (spell.id == "dominate_beast" and @target != null) {
+				int save_roll = random(1, 20);
+				int save_bonus = target.get_save_bonus(ABILITY_WIS);
+				int bless_bonus = roll_bless_bonus(target);
+				int save_total = save_roll + save_bonus + bless_bonus;
+				bool saved = save_total >= save_dc;
+				broadcast_roll(target.name, "WIS save vs Dominate Beast", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Charmed!");
+				if (!saved) {
+					target.add_condition(COND_CHARMED);
+					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Charmed"}});
+					broadcast_announce(c.name + " dominates " + target.name + " with Dominate Beast.", true);
+				}
+				broadcast_state();
+				return;
+			}
+			else if (spell.id == "fabricate") {
+				broadcast_announce(c.name + " casts Fabricate, transforming raw materials into a finished product.", true);
+			}
+			else if (spell.id == "giant_insect") {
+				broadcast_announce(c.name + " casts Giant Insect, summoning an enormous arthropod ally.", true);
+			}
+			else if (spell.id == "hallucinatory_terrain") {
+				broadcast_announce(c.name + " casts Hallucinatory Terrain, disguising the surrounding landscape.", true);
+			}
+			else if (spell.id == "leomunds_secret_chest") {
+				broadcast_announce(c.name + " casts Leomund's Secret Chest, hiding it on the Ethereal Plane.", true);
+			}
+			else if (spell.id == "mordenkainens_faithful_hound") {
+				int hound_hp = 60;
+				combatant@ hound = spawn_companion(c, "mordenkainens_faithful_hound", c.name + "'s Faithful Hound", hound_hp, 18, 30, c.proficiency + get_spellcasting_ability_mod(c), 4, 8, 0, DMG_FORCE, 0);
+				if (@hound != null) {
+					broadcast_announce(c.name + " summons a Faithful Hound! HP " + hound_hp + ", AC 18, 4d8 force bite.", true);
+				}
+			}
+			else if (spell.id == "mordenkainens_private_sanctum") {
+				broadcast_announce(c.name + " casts Mordenkainen's Private Sanctum, securing the area against intrusion.", true);
+			}
+			else if (spell.id == "otilukes_resilient_sphere" and @target != null) {
+				int save_roll = random(1, 20);
+				int save_bonus = target.get_save_bonus(ABILITY_DEX);
+				int bless_bonus = roll_bless_bonus(target);
+				int save_total = save_roll + save_bonus + bless_bonus;
+				bool saved = save_total >= save_dc;
+				broadcast_roll(target.name, "DEX save vs Otiluke's Resilient Sphere", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Trapped!");
+				if (!saved) {
+					target.add_condition(COND_RESTRAINED);
+					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Restrained"}});
+					broadcast_announce(c.name + " traps " + target.name + " in Otiluke's Resilient Sphere!", true);
+				}
+				broadcast_state();
+				return;
+			}
+			// Level 5
+			else if (spell.id == "antilife_shell") {
+				broadcast_announce(c.name + " casts Antilife Shell, creating a 10-foot aura that wards off living creatures.", true);
+			}
+			else if (spell.id == "awaken") {
+				broadcast_announce(c.name + " casts Awaken, granting sentience to a beast or plant.", true);
+			}
+			else if (spell.id == "conjure_elemental") {
+				int elem_hp = 50 + (5 * c.level);
+				int spell_mod_local = get_spellcasting_ability_mod(c);
+				int elem_attack = c.proficiency + spell_mod_local;
+				combatant@ elem = spawn_companion(c, "conjure_elemental", c.name + "'s Elemental", elem_hp, 14 + c.proficiency, 40, elem_attack, 2, 8, spell_mod_local, DMG_FORCE, 0);
+				if (@elem != null) {
+					broadcast_announce(c.name + " summons an Elemental! HP " + elem_hp + ", AC " + (14 + c.proficiency) + ", 2d8+mod force.", true);
+				}
+			}
+			else if (spell.id == "contact_other_plane" and @target != null) {
+				int save_roll = random(1, 20);
+				int save_bonus = target.get_save_bonus(ABILITY_INT);
+				int bless_bonus = roll_bless_bonus(target);
+				int save_total = save_roll + save_bonus + bless_bonus;
+				bool saved = save_total >= save_dc;
+				broadcast_roll(target.name, "INT save vs Contact Other Plane", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Hit!");
+				if (!saved) {
+					int total_damage = 0;
+					for (int d = 0; d < 6; d++) total_damage += random(1, 6);
+					combat.apply_damage(target, total_damage, DMG_PSYCHIC, c);
+					broadcast_announce(c.name + "'s Contact Other Plane shatters " + target.name + "'s mind for " + total_damage + " psychic damage.", true);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "dispel_evil_and_good") {
+				broadcast_announce(c.name + " casts Dispel Evil and Good, warding against celestials, fiends, and undead.", true);
+			}
+			else if (spell.id == "hallow") {
+				broadcast_announce(c.name + " casts Hallow, infusing an area with holy or unholy power.", true);
+			}
+			else if (spell.id == "rarys_telepathic_bond") {
+				broadcast_announce(c.name + " casts Rary's Telepathic Bond, linking allies psychically.", true);
+			}
+			else if (spell.id == "summon_dragon") {
+				int dragon_hp = 80 + (10 * c.level);
+				int spell_mod_local = get_spellcasting_ability_mod(c);
+				int dragon_attack = c.proficiency + spell_mod_local;
+				combatant@ dragon = spawn_companion(c, "summon_dragon", c.name + "'s Draconic Spirit", dragon_hp, 16 + c.proficiency, 40, dragon_attack, 3, 8, spell_mod_local, DMG_FIRE, 1);
+				if (@dragon != null) {
+					broadcast_announce(c.name + " summons a Draconic Spirit! HP " + dragon_hp + ", AC " + (16 + c.proficiency) + ", 3d8+mod fire bite (multiattack).", true);
+				}
+			}
+			// Level 6
+			else if (spell.id == "antiballistics_field") {
+				broadcast_announce(c.name + " casts Antiballistics Field, disrupting projectiles in a 40-foot aura.", true);
+			}
+			else if (spell.id == "conjure_fey") {
+				int fey_hp = 60 + (5 * c.level);
+				int spell_mod_local = get_spellcasting_ability_mod(c);
+				int fey_attack = c.proficiency + spell_mod_local;
+				combatant@ fey = spawn_companion(c, "conjure_fey", c.name + "'s Fey Spirit", fey_hp, 14 + c.proficiency, 40, fey_attack, 2, 10, spell_mod_local, DMG_PSYCHIC, 0);
+				if (@fey != null) {
+					broadcast_announce(c.name + " summons a Fey Spirit! HP " + fey_hp + ", AC " + (14 + c.proficiency) + ", 2d10+mod psychic.", true);
+				}
+			}
+			else if (spell.id == "contingency") {
+				broadcast_announce(c.name + " casts Contingency, storing a spell for later automatic activation.", true);
+			}
+			else if (spell.id == "create_undead") {
+				int undead_hp = 30 + (3 * c.level);
+				int spell_mod_local = get_spellcasting_ability_mod(c);
+				int undead_attack = c.proficiency + spell_mod_local;
+				combatant@ undead = spawn_companion(c, "create_undead", c.name + "'s Ghoul", undead_hp, 12 + c.proficiency, 30, undead_attack, 2, 6, spell_mod_local, DMG_PIERCING, 1);
+				if (@undead != null) {
+					broadcast_announce(c.name + " raises a Ghoul through Create Undead! HP " + undead_hp + ", AC " + (12 + c.proficiency) + ", 2d6+mod piercing claws (multiattack).", true);
+				}
+			}
+			else if (spell.id == "drawmijs_instant_summons") {
+				broadcast_announce(c.name + " casts Drawmij's Instant Summons, marking an object for instant recall.", true);
+			}
+			else if (spell.id == "flesh_to_stone" and @target != null) {
+				int save_roll = random(1, 20);
+				int save_bonus = target.get_save_bonus(ABILITY_CON);
+				int bless_bonus = roll_bless_bonus(target);
+				int save_total = save_roll + save_bonus + bless_bonus;
+				bool saved = save_total >= save_dc;
+				broadcast_roll(target.name, "CON save vs Flesh to Stone", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Petrifying!");
+				if (!saved) {
+					target.add_condition(COND_RESTRAINED);
+					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Restrained"}});
+					broadcast_announce(c.name + " begins petrifying " + target.name + " with Flesh to Stone!", true);
+				}
+				broadcast_state();
+				return;
+			}
+			else if (spell.id == "forbiddance") {
+				broadcast_announce(c.name + " casts Forbiddance, warding the area against magical travel.", true);
+			}
+			else if (spell.id == "ottos_irresistible_dance" and @target != null) {
+				int save_roll = random(1, 20);
+				int save_bonus = target.get_save_bonus(ABILITY_WIS);
+				int bless_bonus = roll_bless_bonus(target);
+				int save_total = save_roll + save_bonus + bless_bonus;
+				bool saved = save_total >= save_dc;
+				broadcast_roll(target.name, "WIS save vs Otto's Irresistible Dance", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Dancing!");
+				if (!saved) {
+					target.add_condition(COND_INCAPACITATED);
+					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Incapacitated"}});
+					broadcast_announce(c.name + " compels " + target.name + " to dance uncontrollably!", true);
+				}
+				broadcast_state();
+				return;
+			}
+			else if (spell.id == "planar_ally") {
+				broadcast_announce(c.name + " casts Planar Ally, beseeching an otherworldly entity for aid.", true);
+			}
+			else if (spell.id == "transport_via_plants") {
+				broadcast_announce(c.name + " casts Transport via Plants, opening a portal between two large plants.", true);
+			}
+			else if (spell.id == "wind_walk") {
+				broadcast_announce(c.name + " casts Wind Walk, transforming themselves and allies into wisps of cloud.", true);
+			}
+			// Level 7
+			else if (spell.id == "delayed_blast_fireball") {
+				broadcast_announce(c.name + " casts Delayed Blast Fireball, releasing a torrent of fire!", true);
+				int dice_count = 12 + upcast_levels;
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 6);
+				int center_x = @target != null ? target.x : c.x;
+				int center_y = @target != null ? target.y : c.y;
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (t.is_player == c.is_player and combat.mode != "pvp") continue;
+					if (feet_distance(center_x, center_y, t.x, t.y) > 20) continue;
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_DEX);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					int dmg = saved ? total_damage / 2 : total_damage;
+					if (dmg < 1) dmg = 1;
+					broadcast_roll(t.name, "DEX save vs Delayed Blast Fireball", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+					combat.apply_damage(t, dmg, DMG_FIRE, c);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "divine_word") {
+				broadcast_announce(c.name + " utters a Divine Word, smiting nearby enemies!", true);
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (t.is_player == c.is_player and combat.mode != "pvp") continue;
+					if (feet_distance(c.x, c.y, t.x, t.y) > 30) continue;
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_WIS);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					broadcast_roll(t.name, "WIS save vs Divine Word", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Struck down!");
+					if (!saved) {
+						if (t.current_hp < 30) {
+							t.add_condition(COND_BLINDED);
+							t.add_condition(COND_DEAFENED);
+							broadcast_to_battle({{"type", message_types::condition_applied}, {"target", t.name}, {"condition", "Blinded and Deafened"}});
+							broadcast_announce(t.name + " is blinded and deafened by Divine Word!", true);
+						} else if (t.current_hp < 50) {
+							t.add_condition(COND_STUNNED);
+							broadcast_to_battle({{"type", message_types::condition_applied}, {"target", t.name}, {"condition", "Stunned"}});
+							broadcast_announce(t.name + " is stunned by Divine Word!", true);
+						}
+					}
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "mordenkainens_magnificent_mansion") {
+				broadcast_announce(c.name + " casts Mordenkainen's Magnificent Mansion, conjuring a shimmering door to an extradimensional dwelling.", true);
+			}
+			// Level 8
+			else if (spell.id == "animal_shapes") {
+				broadcast_announce(c.name + " casts Animal Shapes, transforming willing allies into beasts.", true);
+			}
+			else if (spell.id == "befuddlement" and @target != null) {
+				int save_roll = random(1, 20);
+				int save_bonus = target.get_save_bonus(ABILITY_INT);
+				int bless_bonus = roll_bless_bonus(target);
+				int save_total = save_roll + save_bonus + bless_bonus;
+				bool saved = save_total >= save_dc;
+				broadcast_roll(target.name, "INT save vs Befuddlement", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Hit!");
+				if (!saved) {
+					int total_damage = 0;
+					for (int d = 0; d < 12; d++) total_damage += random(1, 6);
+					combat.apply_damage(target, total_damage, DMG_PSYCHIC, c);
+					broadcast_announce(c.name + "'s Befuddlement shatters " + target.name + "'s intellect for " + total_damage + " psychic damage.", true);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			// Level 9
+			else if (spell.id == "wish") {
+				broadcast_announce(c.name + " casts Wish, the mightiest spell a mortal can cast — altering reality itself.", true);
+			}
+			// ==== END ADDITIONAL SPELL HANDLERS ====
 			// ==== END UTILITY / BUFF SPELL HANDLERS ====
 			else if (spell.id == "acid_splash" and @target != null) {
 				// Basic Rules para 12067: DEX save, 1d6 acid. Scales at L5/11/17.
