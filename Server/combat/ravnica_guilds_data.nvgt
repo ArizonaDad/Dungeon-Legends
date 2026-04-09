@@ -1,0 +1,166 @@
+// Ravnica Guildmasters' Guide Guild Membership System
+// Source: Guildmasters' Guide to Ravnica, paragraphs 116-2000+
+//
+// Ravnica is dominated by ten guilds, each representing a unique combination
+// of two color philosophies. Per source para 116-134, the ten guilds are:
+// 1. Azorius Senate, 2. Boros Legion, 3. House Dimir, 4. Golgari Swarm,
+// 5. Gruul Clans, 6. Izzet League, 7. Orzhov Syndicate, 8. Cult of Rakdos,
+// 9. Selesnya Conclave, 10. Simic Combine
+//
+// Membership grants benefits from contacts, equipment, and lodging.
+
+class ravnica_guild_def {
+    string name;
+    string colors;          // Two-color combination (Magic flavor)
+    string title_holder;    // Guildmaster's title
+    string description;
+    string philosophy;
+    string typical_classes;
+    string contact_perk;
+    string equipment_perk;
+    string spell_perk;
+}
+
+ravnica_guild_def@[] RAVNICA_GUILDS;
+
+void add_ravnica_guild(string name, string colors, string title, string desc, string phil, string classes, string contact, string equip, string spells) {
+    ravnica_guild_def g;
+    g.name = name;
+    g.colors = colors;
+    g.title_holder = title;
+    g.description = desc;
+    g.philosophy = phil;
+    g.typical_classes = classes;
+    g.contact_perk = contact;
+    g.equipment_perk = equip;
+    g.spell_perk = spells;
+    RAVNICA_GUILDS.insert_last(g);
+}
+
+void init_ravnica_guilds() {
+    if (RAVNICA_GUILDS.length() > 0) return;
+
+    // Azorius Senate (White/Blue) - Source para 116
+    add_ravnica_guild("Azorius Senate",
+        "White/Blue (Order/Knowledge)",
+        "Grand Arbiter",
+        "The Azorius Senate is dedicated to creating a peaceful and structured society through law and order. They are the legal authority of Ravnica, drafting and enforcing laws. (Ravnica Guildmasters' Guide)",
+        "We seek the perfect order, the perfect peace, the perfect understanding of all things.",
+        "Wizard, Cleric, Paladin, Monk, Sorcerer",
+        "Senate Lawmage contact — gives you +5 reputation in legal disputes.",
+        "Standard arrest gear: silvered manacles, runic seals, +1 sword/mace as judiciary symbol.",
+        "Free castings of Detect Thoughts, Zone of Truth, and Hold Person.");
+
+    // Boros Legion (White/Red) - Source para 118
+    add_ravnica_guild("Boros Legion",
+        "White/Red (Order/Passion)",
+        "Parhelion Captain",
+        "The Boros Legion is the militant arm of justice in Ravnica. They are warriors and protectors who use force to enforce justice. (Ravnica Guildmasters' Guide)",
+        "Strength is justice. The strong protect the weak.",
+        "Fighter, Paladin, Sorcerer, Cleric, Barbarian",
+        "Boros Captain contact — military authority backing in any dispute.",
+        "Standard Boros equipment: +1 longsword, plate armor, lawmage's medallion.",
+        "Free castings of Bless, Searing Smite, and Aid.");
+
+    // House Dimir (Blue/Black) - Source para 120
+    add_ravnica_guild("House Dimir",
+        "Blue/Black (Knowledge/Death)",
+        "Hollow Master",
+        "House Dimir operates entirely in secret. They are spies, assassins, and mind-mages who manipulate Ravnica from the shadows. Few know they even exist. (Ravnica Guildmasters' Guide)",
+        "Information is the only true currency. Secrets are weapons.",
+        "Rogue, Wizard, Warlock, Sorcerer, Bard",
+        "Dimir handler contact — anonymous network of spies and informants.",
+        "Standard spy gear: poisoner's kit, disguise kit, hidden daggers, forged credentials.",
+        "Free castings of Disguise Self, Detect Thoughts, and Modify Memory.");
+
+    // Golgari Swarm (Black/Green) - Source para 122
+    add_ravnica_guild("Golgari Swarm",
+        "Black/Green (Death/Nature)",
+        "Sisters of Stone Death",
+        "The Golgari Swarm rules the undercity, the rot farms, and the cycle of decay. They believe in the necessity of decomposition and renewal. (Ravnica Guildmasters' Guide)",
+        "From rot, life. From death, rebirth. The cycle is eternal.",
+        "Druid, Cleric, Warlock, Ranger, Rogue",
+        "Golgari Reaper contact — knows the underways and the dead.",
+        "Standard Golgari gear: poisoned weapons, mushroom armor, fungal healing.",
+        "Free castings of Speak with Dead, Animate Dead, and Spike Growth.");
+
+    // Gruul Clans (Red/Green) - Source para 124
+    add_ravnica_guild("Gruul Clans",
+        "Red/Green (Passion/Nature)",
+        "Clan Chief",
+        "The Gruul Clans are barbarian tribes living in the ruined places between districts. They reject city life and seek to tear down the works of civilization. (Ravnica Guildmasters' Guide)",
+        "Civilization is a cage. Tear down the walls. Run free.",
+        "Barbarian, Druid, Ranger, Fighter, Sorcerer",
+        "Clan Chief contact — wild allies in any natural area.",
+        "Standard Gruul gear: greatclub, hide armor, war paint, totem of the wild.",
+        "Free castings of Thunderwave, Spike Growth, and Conjure Animals.");
+
+    // Izzet League (Blue/Red) - Source para 126
+    add_ravnica_guild("Izzet League",
+        "Blue/Red (Knowledge/Passion)",
+        "Firemind",
+        "The Izzet League are mad scientists, alchemists, and arcane researchers who experiment with magic and technology. They are both feared and admired for their inventions. (Ravnica Guildmasters' Guide)",
+        "Discovery is everything. The unknown beckons us forward!",
+        "Wizard, Sorcerer, Artificer, Bard",
+        "Izzet Magewright contact — access to experimental gadgets and new spells.",
+        "Standard Izzet gear: experimental flame thrower, magical goggles, mizzium tools.",
+        "Free castings of Fireball, Lightning Bolt, and Counterspell.");
+
+    // Orzhov Syndicate (White/Black) - Source para 128
+    add_ravnica_guild("Orzhov Syndicate",
+        "White/Black (Order/Death)",
+        "Obzedat (Council of Ghosts)",
+        "The Orzhov Syndicate is a religion-themed banking and crime cartel. They control most of Ravnica's wealth through indebtedness and obligation. (Ravnica Guildmasters' Guide)",
+        "All things have a price. All debts must be paid.",
+        "Cleric, Rogue, Warlock, Bard, Wizard",
+        "Orzhov Pontiff contact — financial leverage in any dispute.",
+        "Standard Orzhov gear: gilded weapons, cathedral robes, debt contracts, holy water.",
+        "Free castings of Command, Charm Person, and Hold Person.");
+
+    // Cult of Rakdos (Black/Red) - Source para 130
+    add_ravnica_guild("Cult of Rakdos",
+        "Black/Red (Death/Passion)",
+        "Defiler of the Demon Lord",
+        "The Cult of Rakdos is a chaotic guild of performers, executioners, and devotees of the demon Rakdos. They blend art, sadism, and entertainment. (Ravnica Guildmasters' Guide)",
+        "Pleasure is pain. Pain is pleasure. Live without limits.",
+        "Bard, Warlock, Rogue, Sorcerer, Barbarian",
+        "Rakdos Performer contact — chaos and entertainment connections.",
+        "Standard Rakdos gear: chains and whips, blood paint, alchemical fire, juggler's tools.",
+        "Free castings of Hellish Rebuke, Scorching Ray, and Phantasmal Killer.");
+
+    // Selesnya Conclave (Green/White) - Source para 132
+    add_ravnica_guild("Selesnya Conclave",
+        "Green/White (Nature/Order)",
+        "Living Saint",
+        "The Selesnya Conclave is a peaceful, communal guild devoted to the unity of all life through the worship of nature and community. They tend the gardens and parks of Ravnica. (Ravnica Guildmasters' Guide)",
+        "Many become one. The whole is greater than the parts.",
+        "Druid, Cleric, Ranger, Bard, Paladin",
+        "Selesnya Conclamator contact — peaceful dispute resolution and natural allies.",
+        "Standard Selesnya gear: living vine staff, mistletoe holy symbol, peace pipe.",
+        "Free castings of Healing Word, Goodberry, and Plant Growth.");
+
+    // Simic Combine (Green/Blue) - Source para 134
+    add_ravnica_guild("Simic Combine",
+        "Green/Blue (Nature/Knowledge)",
+        "Speaker",
+        "The Simic Combine are biomancers and biological researchers. They graft new traits onto creatures and seek the perfection of life through hybrid evolution. (Ravnica Guildmasters' Guide)",
+        "Adapt or perish. The future belongs to the evolved.",
+        "Druid, Wizard, Ranger, Cleric, Sorcerer",
+        "Simic Vedalken Researcher contact — biological augmentation and rare creatures.",
+        "Standard Simic gear: biomechanical implants, mutagens, jellyfish lantern.",
+        "Free castings of Enhance Ability, Polymorph, and Healing Word.");
+}
+
+ravnica_guild_def@ get_ravnica_guild(string name) {
+    init_ravnica_guilds();
+    for (uint i = 0; i < RAVNICA_GUILDS.length(); i++) {
+        if (RAVNICA_GUILDS[i].name == name) return RAVNICA_GUILDS[i];
+    }
+    return null;
+}
+
+const string[] RAVNICA_GUILD_NAMES = {
+    "Azorius Senate", "Boros Legion", "House Dimir", "Golgari Swarm",
+    "Gruul Clans", "Izzet League", "Orzhov Syndicate", "Cult of Rakdos",
+    "Selesnya Conclave", "Simic Combine"
+};

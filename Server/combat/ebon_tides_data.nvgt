@@ -1,0 +1,190 @@
+// Book of Ebon Tides Shadow Roads & Fey Courts System
+// Source: Book of Ebon Tides, paragraphs 209-2700+
+//
+// The Shadow Realm is connected by shadow roads (planar highways) to mortal
+// cities, and divided into fey courts (each ruled by a noble or monarch).
+// Per source para 2473: "The network of shadow roads grows, withers, and
+// changes over the years."
+
+class fey_court_def {
+    string name;
+    string description;
+    string ruler;
+    string court_type;       // "Major" or "Minor"
+    string court_alignment;  // "Seelie" / "Unseelie" / "Neutral"
+    string membership_perk;  // What courtiers gain
+}
+
+fey_court_def@[] FEY_COURTS;
+
+void add_fey_court(string name, string desc, string ruler, string court_type, string align, string perk) {
+    fey_court_def f;
+    f.name = name;
+    f.description = desc;
+    f.ruler = ruler;
+    f.court_type = court_type;
+    f.court_alignment = align;
+    f.membership_perk = perk;
+    FEY_COURTS.insert_last(f);
+}
+
+void init_fey_courts() {
+    if (FEY_COURTS.length() > 0) return;
+
+    // Source paras 2681-2697 — Major and notable fey courts
+    add_fey_court("Court of Golden Oaks",
+        "An ancient and stately court ruled by sable elves who guard the largest oak forest in the Shadow Realm. (Ebon Tides para 2681)",
+        "Unknown Sable Elf Patriarch", "Major", "Seelie",
+        "Access to the elven highways. Allies among sable elves and erina.");
+
+    add_fey_court("Court of Mice and Ravens",
+        "A whimsical court of small fey creatures and the ravens who serve them as messengers. One of two major chapterhouses for shadow road wardens. (Ebon Tides para 2682, 2477)",
+        "The Mouse King", "Major", "Neutral",
+        "Free shadow road passage as a guest. Raven messengers will carry words to anywhere in the Shadow Realm.");
+
+    add_fey_court("Court of Midnight Teeth",
+        "A dark court that takes its name from the predator-fey who serve it. Connected to the mage city of Bemmea via the Mage's Road. (Ebon Tides para 2683, 282)",
+        "The Toothed Queen", "Major", "Unseelie",
+        "Access to the Mage's Road to Bemmea. Predator allies grant +1d6 piercing damage on critical hits.");
+
+    add_fey_court("Court of Night and Magic",
+        "A magical court of night-themed fey casters. (Ebon Tides para 2685)",
+        "Lord of Shadows", "Major", "Unseelie",
+        "Free castings of darkness, invisibility, and dispel magic from court mages.");
+
+    add_fey_court("Court of One Million Stars",
+        "A vast court that meets only under the open sky and reads the future in the stars. (Ebon Tides para 2687)",
+        "The Starseer", "Major", "Neutral",
+        "Daily augury divination. Knowledge of one fated event each season.");
+
+    add_fey_court("Court of Pale Roses",
+        "A court ruled by elegant fey nobles who tend gardens of pale, ghost-flowered roses. Connected to Carnessa via the Flower Road. (Ebon Tides para 2689, 284)",
+        "Queen of Pale Roses", "Major", "Seelie",
+        "Access to the Flower Road to Carnessa. Healing potions infused with rose magic at half price.");
+
+    add_fey_court("Court of Sparrows",
+        "A small but proud court of fey who befriend birds and sing the morning songs. (Ebon Tides para 2690)",
+        "Sparrow Queen", "Minor", "Seelie",
+        "Allies among bird-fey. Cast speak with animals at will (birds only).");
+
+    add_fey_court("Court of the Moonlit King",
+        "A regal fey court that follows the phases of the moon and worships lunar deities. (Ebon Tides para 2691)",
+        "The Moonlit King", "Major", "Seelie",
+        "Cast moonbeam once per long rest. Resistance to radiant damage.");
+
+    add_fey_court("Court of Winter's Love",
+        "A bittersweet court of fey who love only what is dying or already dead. They tend the snow-fields. (Ebon Tides para 2692)",
+        "Winter's Heart", "Major", "Unseelie",
+        "Cast cold-themed spells with extra dice. Resistance to cold damage.");
+
+    add_fey_court("Dalliance",
+        "A court of pleasure and play. One of the major chapterhouses for shadow road wardens. (Ebon Tides para 2693, 2477)",
+        "Lord of Revels", "Major", "Seelie",
+        "Free shadow road passage. Inspiration die from any tavern within Dalliance.");
+
+    add_fey_court("Langmire's Court",
+        "A small court ruled by the eponymous fey lord, dedicated to memory and lore. (Ebon Tides para 2694)",
+        "Langmire", "Minor", "Neutral",
+        "Access to memory lore. Cast modify memory once per long rest.");
+
+    add_fey_court("Nightbrook",
+        "A court near the great River Lethe, ruled by water-fey who keep the secrets of the river. (Ebon Tides para 2695)",
+        "River Maiden of Nightbrook", "Minor", "Neutral",
+        "Free passage along the River Lethe. Swim speed equal to walking speed.");
+
+    add_fey_court("Tower of Horn and Gold",
+        "A solitary court ruled by an ancient fey who lives alone in a great tower built of unicorn horn and dragon gold. (Ebon Tides para 2696)",
+        "The Hornlord", "Minor", "Neutral",
+        "Single audience grants one boon: a unicorn horn dust (cures one curse), gold lump (worth 100 gp), or rare gem (worth 500 gp).");
+
+    add_fey_court("Witch Queen's Court",
+        "A dark and dangerous court of hags and witches who practice forbidden magic. (Ebon Tides para 2697)",
+        "The Witch Queen", "Major", "Unseelie",
+        "Access to forbidden lore and dark magic. Cast bestow curse and contagion once per long rest each (at price of one piety/karma point).");
+}
+
+fey_court_def@ get_fey_court(string name) {
+    init_fey_courts();
+    for (uint i = 0; i < FEY_COURTS.length(); i++) {
+        if (FEY_COURTS[i].name == name) return FEY_COURTS[i];
+    }
+    return null;
+}
+
+// Source paras 2473-2517 — Shadow Roads system
+
+class shadow_road_def {
+    string name;
+    string from_location;
+    string to_location;
+    string description;
+    int travel_days;          // 1-3 default per source para 2499
+    bool requires_passphrase; // Some roads need a key per para 2507
+}
+
+shadow_road_def@[] SHADOW_ROADS;
+
+void add_shadow_road(string name, string from_loc, string to_loc, string desc, int days, bool pass) {
+    shadow_road_def r;
+    r.name = name;
+    r.from_location = from_loc;
+    r.to_location = to_loc;
+    r.description = desc;
+    r.travel_days = days;
+    r.requires_passphrase = pass;
+    SHADOW_ROADS.insert_last(r);
+}
+
+void init_shadow_roads() {
+    if (SHADOW_ROADS.length() > 0) return;
+
+    // Source paras 282-295 — Named shadow roads
+    add_shadow_road("Mage's Road",
+        "Court of Midnight Teeth", "Bemmea (mage city)",
+        "An arcane shadow road connecting the predator-fey court to the great mage city of Bemmea. Used by wizards seeking forbidden knowledge. (Ebon Tides para 282)",
+        2, true);
+
+    add_shadow_road("Flower Road",
+        "Court of Pale Roses", "Carnessa",
+        "A garden-flanked shadow road that flowers eternally. Carries a sweet scent of pale roses. Travelers who linger may be charmed. (Ebon Tides para 284)",
+        1, false);
+
+    add_shadow_road("Bridge of Lethe",
+        "Corremel", "Mortal River Crossings",
+        "Corremel's central bridge serves as a shadow road crossing the River Lethe. Travelers cross from the Shadow Realm to mortal river ports. (Ebon Tides para 2728)",
+        1, false);
+
+    add_shadow_road("Twin Roads of Corremel",
+        "Corremel", "Zobeck (Clockwork City) and Nuria (City of Ale)",
+        "Corremel's wealth comes from its twin shadow roads connecting to two mortal cities of trade. (Ebon Tides para 2730-2732)",
+        2, false);
+
+    add_shadow_road("Northern Highway",
+        "Queen's Wood", "Nightbrook Court",
+        "The northern banks of the Styx host this well-warded shadow road, patrolled by the road warden Ambrosus Fairhand. (Ebon Tides para 2484)",
+        3, false);
+
+    add_shadow_road("Wraith Path",
+        "Fandeval", "Sable Sea ports",
+        "A treacherous shadow road haunted by river wraiths. Patrolled by the radiant-magic-using shadow goblin Gillyan the Sailor. (Ebon Tides para 2488)",
+        2, true);
+
+    add_shadow_road("Bearfolk Trails",
+        "Northern Shadow Realm", "Bearfolk Lands",
+        "A network of trails maintained by the gnomish druid Kei Greenleaf. Slow but safe. (Ebon Tides para 2490)",
+        3, false);
+}
+
+shadow_road_def@ get_shadow_road(string name) {
+    init_shadow_roads();
+    for (uint i = 0; i < SHADOW_ROADS.length(); i++) {
+        if (SHADOW_ROADS[i].name == name) return SHADOW_ROADS[i];
+    }
+    return null;
+}
+
+// Source para 2500 — Shadow Road Lore check (Intelligence Arcana, -5 for non-elves)
+int shadow_road_lore_modifier(string race) {
+    if (race == "Elf" or race == "Shadow Elf" or race == "Sable Elf" or race == "Shadow Fey") return 0;
+    return -5;  // Non-elves take -5 to Arcana check per source para 2500
+}
