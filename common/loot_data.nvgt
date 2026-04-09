@@ -73,75 +73,26 @@ string item_display(item_def@ item) {
 void init_item_catalog() {
 	if (ITEM_CATALOG.length() > 0) return;
 
-	// ---- COMMON WEAPONS ----
-	add_item("rusty_blade", "Rusty Enchanted Blade", SLOT_WEAPON, RARITY_COMMON, "A dull blade with a faint magical aura.", 0, 1, 0, 0, 0, 0, 0, 0);
-	add_item("hunting_bow", "Hunter's Bow", SLOT_WEAPON, RARITY_COMMON, "A well-crafted bow favored by rangers.", 0, 1, 0, 0, 1, 0, 0, 0);
-	add_item("apprentice_staff", "Apprentice Staff", SLOT_WEAPON, RARITY_COMMON, "A simple staff humming with minor arcane energy.", 0, 0, 0, 1, 0, 0, 0, 0);
+	// ============================================================
+	// AUDIT NOTE (2026-04-08): The original 31 pre-DMG-2024 items here
+	// were removed because they were entirely fabricated and not present in
+	// any source book. Per the strict source-accuracy mandate (CLAUDE.md),
+	// items must come from the user's source files at
+	// C:\Users\16239\Downloads\Sources_clean\Source Books and rules\.
+	//
+	// All items below this point are either:
+	// 1. Glory Shop exclusives (intentional in-game rewards, not source-derived)
+	// 2. Source-quoted DMG 2024 / Tasha's items added in batches 17B-41
+	//
+	// The original ids (rusty_blade, hunting_bow, etc.) are NOT preserved.
+	// Loot generation will fall back to the source-accurate items below.
+	// ============================================================
 
-	// ---- COMMON ARMOR ----
-	add_item("iron_buckler", "Iron Buckler", SLOT_ARMOR, RARITY_COMMON, "A small iron shield offering basic protection.", 1, 0, 0, 0, 0, 0, 0, 0);
-	add_item("padded_vest", "Padded Vest", SLOT_ARMOR, RARITY_COMMON, "Reinforced leather padding.", 1, 0, 5, 0, 0, 0, 0, 0);
-
-	// ---- COMMON RINGS ----
-	add_item("iron_ring", "Iron Ring", SLOT_RING, RARITY_COMMON, "A plain iron ring with minor warding.", 1, 0, 0, 0, 0, 0, 0, 0);
-	add_item("ring_of_vigor", "Ring of Vigor", SLOT_RING, RARITY_COMMON, "Fills the wearer with endurance.", 0, 0, 10, 0, 0, 0, 0, 0);
-
-	// ---- COMMON AMULETS ----
-	add_item("simple_charm", "Simple Charm", SLOT_AMULET, RARITY_COMMON, "A carved bone charm on a leather cord.", 0, 0, 0, 0, 2, 0, 0, 0);
-	add_item("travelers_pendant", "Traveler's Pendant", SLOT_AMULET, RARITY_COMMON, "Quickens the wearer's step.", 0, 0, 0, 0, 0, 5, 0, 0);
-
-	// ---- UNCOMMON WEAPONS ----
-	add_item("flaming_sword", "Flaming Sword", SLOT_WEAPON, RARITY_UNCOMMON, "The blade burns with magical fire.", 0, 3, 0, 0, 0, 0, 0, 0);
-	add_item("frost_bow", "Frost Bow", SLOT_WEAPON, RARITY_UNCOMMON, "Arrows from this bow trail ice crystals.", 0, 2, 0, 0, 2, 0, 0, 0);
-	add_item("wand_of_sparks", "Wand of Sparks", SLOT_WEAPON, RARITY_UNCOMMON, "A wand crackling with electric energy.", 0, 1, 0, 1, 0, 0, 0, 0);
-
-	// ---- UNCOMMON ARMOR ----
-	add_item("chainmail_fortitude", "Chainmail of Fortitude", SLOT_ARMOR, RARITY_UNCOMMON, "Enchanted chainmail that bolsters vitality.", 2, 0, 10, 0, 0, 0, 0, 0);
-	add_item("elven_leather", "Elven Leather", SLOT_ARMOR, RARITY_UNCOMMON, "Light elven-crafted armor that moves like cloth.", 2, 0, 0, 0, 1, 5, 0, 0);
-
-	// ---- UNCOMMON RINGS ----
-	add_item("ring_of_protection", "Ring of Protection", SLOT_RING, RARITY_UNCOMMON, "A silver ring engraved with protective runes.", 1, 0, 0, 0, 0, 0, 1, 0);
-	add_item("ring_of_striking", "Ring of Striking", SLOT_RING, RARITY_UNCOMMON, "Empowers the wearer's attacks.", 0, 2, 0, 0, 0, 0, 0, 0);
-
-	// ---- UNCOMMON AMULETS ----
-	add_item("amulet_of_health", "Amulet of Health", SLOT_AMULET, RARITY_UNCOMMON, "Radiates warmth and vitality.", 0, 0, 15, 0, 0, 0, 0, 0);
-	add_item("focus_pendant", "Pendant of Focus", SLOT_AMULET, RARITY_UNCOMMON, "Sharpens the mind for spellcasting.", 0, 0, 0, 1, 0, 0, 1, 0);
-
-	// ---- RARE WEAPONS ----
-	add_item("thunderstrike", "Thunderstrike", SLOT_WEAPON, RARITY_RARE, "A warhammer that cracks with thunder on impact.", 0, 4, 0, 0, 0, 0, 0, 0);
-	add_item("shadow_dagger", "Shadow Dagger", SLOT_WEAPON, RARITY_RARE, "A dagger that strikes from unexpected angles.", 0, 3, 0, 0, 3, 0, 0, 0);
-	add_item("staff_of_power", "Staff of Power", SLOT_WEAPON, RARITY_RARE, "A staff brimming with arcane might.", 0, 2, 0, 2, 0, 0, 0, 0);
-
-	// ---- RARE ARMOR ----
-	add_item("mithral_plate", "Mithral Plate", SLOT_ARMOR, RARITY_RARE, "Impossibly light plate armor forged from mithral.", 3, 0, 10, 0, 0, 0, 1, 0);
-	add_item("cloak_of_shadows", "Cloak of Shadows", SLOT_ARMOR, RARITY_RARE, "Wraps the wearer in shifting darkness.", 2, 0, 0, 0, 3, 5, 0, 0);
-
-	// ---- RARE RINGS/AMULETS ----
-	add_item("ring_of_spell_storing", "Ring of Spell Storing", SLOT_RING, RARITY_RARE, "Stores magical energy for later use.", 0, 0, 0, 2, 0, 0, 0, 0);
-	add_item("amulet_of_the_devout", "Amulet of the Devout", SLOT_AMULET, RARITY_RARE, "A holy symbol that amplifies divine magic.", 0, 0, 10, 2, 0, 0, 1, 0);
-
-	// ---- EPIC WEAPONS ----
-	add_item("vorpal_edge", "Vorpal Edge", SLOT_WEAPON, RARITY_EPIC, "A blade of legendary sharpness that seeks the throat.", 0, 5, 0, 0, 0, 0, 0, 1);
-	add_item("staff_of_the_archmage", "Staff of the Archmage", SLOT_WEAPON, RARITY_EPIC, "The pinnacle of arcane craftsmanship.", 0, 3, 0, 3, 0, 0, 0, 0);
-
-	// ---- EPIC ARMOR ----
-	add_item("dragonscale_armor", "Dragonscale Armor", SLOT_ARMOR, RARITY_EPIC, "Forged from the scales of a slain dragon.", 4, 0, 20, 0, 0, 0, 1, 0);
-
-	// ---- EPIC RINGS/AMULETS ----
-	add_item("ring_of_regeneration", "Ring of Regeneration", SLOT_RING, RARITY_EPIC, "Slowly mends wounds over time.", 0, 0, 25, 0, 0, 0, 2, 0);
-	add_item("amulet_of_proof_against_detection", "Amulet of Proof Against Detection", SLOT_AMULET, RARITY_EPIC, "The wearer cannot be targeted by divination or detected through magic.", 2, 0, 0, 0, 4, 0, 2, 0);
-
-	// ---- LEGENDARY ----
-	add_item("crown_of_the_lich", "Crown of the Lich King", SLOT_AMULET, RARITY_LEGENDARY, "A crown of dark iron that commands death itself.", 0, 0, 10, 3, 0, 0, 2, 0);
-	add_item("blade_of_legends", "Blade of Legends", SLOT_WEAPON, RARITY_LEGENDARY, "A weapon spoken of only in myths.", 0, 6, 10, 0, 2, 5, 0, 1);
-	add_item("adamantine_fortress", "Adamantine Fortress Plate", SLOT_ARMOR, RARITY_LEGENDARY, "Indestructible armor that turns critical hits into normal hits.", 5, 0, 30, 0, 0, 0, 2, 0);
-	add_item("ring_of_three_wishes", "Ring of Three Wishes", SLOT_RING, RARITY_LEGENDARY, "A ring of immense power that bends fate.", 1, 2, 15, 2, 3, 5, 2, 0);
-
-	// Glory Shop exclusive items
-	add_item("glory_blade", "Glory Blade", SLOT_WEAPON, RARITY_EPIC, "A weapon forged from pure glory. Radiates golden light.", 0, 5, 0, 0, 2, 0, 0, 0);
-	add_item("glory_shield", "Glory Shield", SLOT_ARMOR, RARITY_EPIC, "An impenetrable shield of radiant energy.", 4, 0, 15, 0, 0, 0, 0, 0);
-	add_item("ring_of_glory", "Ring of Glory", SLOT_RING, RARITY_RARE, "A ring pulsing with earned power.", 0, 0, 0, 0, 0, 0, 2, 0);
-	add_item("crown_of_glory", "Crown of Glory", SLOT_AMULET, RARITY_LEGENDARY, "The ultimate symbol of achievement.", 2, 0, 20, 3, 0, 0, 0, 0);
+	// Glory Shop exclusive items (in-game rewards, intentionally not from source)
+	add_item("glory_blade", "Glory Blade", SLOT_WEAPON, RARITY_EPIC, "A weapon forged from pure glory. Radiates golden light. (Glory Shop reward)", 0, 5, 0, 0, 2, 0, 0, 0);
+	add_item("glory_shield", "Glory Shield", SLOT_ARMOR, RARITY_EPIC, "An impenetrable shield of radiant energy. (Glory Shop reward)", 4, 0, 15, 0, 0, 0, 0, 0);
+	add_item("ring_of_glory", "Ring of Glory", SLOT_RING, RARITY_RARE, "A ring pulsing with earned power. (Glory Shop reward)", 0, 0, 0, 0, 0, 0, 2, 0);
+	add_item("crown_of_glory", "Crown of Glory", SLOT_AMULET, RARITY_LEGENDARY, "The ultimate symbol of achievement. (Glory Shop reward)", 2, 0, 20, 3, 0, 0, 0, 0);
 
 	// ============================================================
 	// DMG 2024 MAGIC ITEMS (extracted from source paragraphs 7290+)
@@ -260,6 +211,23 @@ void init_item_catalog() {
 	// Common consumable items mentioned by name in DMG 2024
 	add_item("dmg_potion_healing_greater", "Potion of Healing (Greater)", SLOT_AMULET, RARITY_UNCOMMON, "You regain 4d4+4 hit points when you drink this potion.", 0, 0, 0, 0, 0, 0, 0, 0);
 	add_item("dmg_potion_climbing", "Potion of Climbing", SLOT_AMULET, RARITY_COMMON, "When you drink this potion, you gain a Climb Speed equal to your walking Speed for 1 hour.", 0, 0, 0, 0, 0, 0, 0, 0);
+
+	// DMG 2024 Common Items (paras 7361-9300+) - source-quoted
+	add_item("dmg_armor_of_gleaming", "Armor of Gleaming", SLOT_ARMOR, RARITY_COMMON, "This armor never gets dirty.", 0, 0, 0, 0, 0, 0, 0, 0);
+	add_item("dmg_bead_of_nourishment", "Bead of Nourishment", SLOT_AMULET, RARITY_COMMON, "This flavorless, gelatinous bead dissolves on your tongue and provides as much nourishment as 1 day of Rations.", 0, 0, 0, 0, 0, 0, 0, 0);
+	add_item("dmg_cast_off_armor", "Cast-Off Armor", SLOT_ARMOR, RARITY_COMMON, "You can doff this armor as a Magic action.", 0, 0, 0, 0, 0, 0, 0, 0);
+	add_item("dmg_clothes_of_mending", "Clothes of Mending", SLOT_ARMOR, RARITY_COMMON, "This elegant outfit magically mends itself to counteract daily wear and tear. Pieces of the outfit that are destroyed can't be repaired in this way.", 0, 0, 0, 0, 0, 0, 0, 0);
+	add_item("dmg_dread_helm", "Dread Helm", SLOT_ARMOR, RARITY_COMMON, "While you're wearing this fearsome steel helm, your eyes glow red and the rest of your face is hidden in shadow.", 0, 0, 0, 0, 0, 0, 0, 0);
+	add_item("dmg_enduring_spellbook", "Enduring Spellbook", SLOT_AMULET, RARITY_COMMON, "This spellbook, along with anything written on its pages, can't be damaged by fire or water. In addition, the spellbook doesn't deteriorate with age.", 0, 0, 0, 0, 0, 0, 0, 0);
+	add_item("dmg_ersatz_eye", "Ersatz Eye", SLOT_AMULET, RARITY_COMMON, "This magical eye replaces a real one that was lost or removed. You can see through the orb as if you had a normal eye, including blindness, magic, and similar effects that target organic eyes.", 0, 0, 0, 0, 0, 0, 0, 0);
+	add_item("dmg_hat_of_wizardry", "Hat of Wizardry", SLOT_ARMOR, RARITY_COMMON, "This cone-shaped hat is adorned with moons and stars. While you are wearing it, you can use the hat as a spellcasting focus and gain Mage Hand cantrip.", 0, 0, 0, 1, 0, 0, 0, 0);
+	add_item("dmg_horn_of_silent_alarm", "Horn of Silent Alarm", SLOT_AMULET, RARITY_COMMON, "This horn has 4 charges and regains 1d4 expended charges daily at dawn. As a Magic action, you can blow the horn while expending 1 charge. One creature of your choice within 600 feet hears a single loud horn note.", 0, 0, 0, 0, 0, 0, 0, 0);
+	add_item("dmg_lock_of_trickery", "Lock of Trickery", SLOT_AMULET, RARITY_COMMON, "This lock appears to be an ordinary Lock and comes with a single key. The tumblers in this lock magically adjust to thwart burglars. Dexterity checks made to pick the lock have Disadvantage.", 0, 0, 0, 0, 0, 0, 0, 0);
+	add_item("dmg_moon_touched_sword", "Moon-Touched Sword", SLOT_WEAPON, RARITY_COMMON, "In Darkness, the unsheathed blade of this weapon sheds moonlight, creating Bright Light in a 15-foot radius and Dim Light for an additional 15 feet.", 0, 1, 0, 0, 0, 0, 0, 0);
+	add_item("dmg_orb_of_direction", "Orb of Direction", SLOT_AMULET, RARITY_COMMON, "This orb can be used as an Arcane Focus. While holding it, you can take a Magic action to determine which way is north.", 0, 0, 0, 1, 0, 0, 0, 0);
+	add_item("dmg_orb_of_time", "Orb of Time", SLOT_AMULET, RARITY_COMMON, "This orb can be used as an Arcane Focus. While holding it, you can take a Magic action to determine the time of day or the date.", 0, 0, 0, 1, 0, 0, 0, 0);
+	add_item("dmg_perfume_of_bewitching", "Perfume of Bewitching", SLOT_AMULET, RARITY_COMMON, "This tiny vial contains magic perfume, enough for one use. You can take a Magic action to apply the perfume to yourself, and its effect lasts 1 hour. For the duration, you have Advantage on Charisma checks directed at Humanoids of CR 1 or lower.", 0, 0, 0, 0, 0, 0, 0, 0);
+	add_item("dmg_charlatans_die", "Charlatan's Die (DMG)", SLOT_AMULET, RARITY_COMMON, "Whenever you roll this loaded d6, you can choose what number it lands on as long as no creature observes you using it.", 0, 0, 0, 0, 0, 0, 0, 0);
 
 	// DMG 2024 Tomes/Manuals (paras 9700-10300+) - permanent stat-boost books
 	add_item("dmg_pearl_of_power", "Pearl of Power", SLOT_AMULET, RARITY_UNCOMMON, "While this pearl is on your person, you can take a Magic action to regain one expended spell slot of level 3 or lower.", 0, 0, 0, 1, 0, 0, 0, 0);
