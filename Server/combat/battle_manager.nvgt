@@ -9263,6 +9263,722 @@ class battle_manager {
 				c.darkness_active = true;
 				broadcast_announce(c.name + " conjures magical Darkness in a 15-foot radius.", true);
 			}
+			else if (spell.id == "acid_splash" and @target != null) {
+				// Basic Rules para 12067: DEX save, 1d6 acid. Scales at L5/11/17.
+				int dice_count = cantrip_dice_count(1, c.level);
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 6);
+				int save_roll = random(1, 20);
+				int save_bonus = target.get_save_bonus(ABILITY_DEX);
+				int bless_bonus = roll_bless_bonus(target);
+				int save_total = save_roll + save_bonus + bless_bonus;
+				bool saved = save_total >= save_dc;
+				broadcast_roll(target.name, "DEX save vs Acid Splash", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Hit!");
+				if (!saved) {
+					combat.apply_damage(target, total_damage, DMG_ACID, c);
+					broadcast_announce(c.name + "'s Acid Splash deals " + total_damage + " acid damage to " + target.name + ".", true);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "mind_sliver" and @target != null) {
+				// Basic Rules para 14174: INT save, 1d6 psychic. Scales at L5/11/17.
+				// Next-save 1d4 penalty flavour is announced but not tracked.
+				int dice_count = cantrip_dice_count(1, c.level);
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 6);
+				int save_roll = random(1, 20);
+				int save_bonus = target.get_save_bonus(ABILITY_INT);
+				int bless_bonus = roll_bless_bonus(target);
+				int save_total = save_roll + save_bonus + bless_bonus;
+				bool saved = save_total >= save_dc;
+				broadcast_roll(target.name, "INT save vs Mind Sliver", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Hit!");
+				if (!saved) {
+					combat.apply_damage(target, total_damage, DMG_PSYCHIC, c);
+					broadcast_announce(c.name + "'s Mind Sliver deals " + total_damage + " psychic damage to " + target.name + ". Their mind is rattled.", true);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "thunderclap") {
+				// Basic Rules: CON save, 1d6 thunder, all creatures within 5 ft. Scales at L5/11/17.
+				int dice_count = cantrip_dice_count(1, c.level);
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 6);
+				broadcast_announce(c.name + " unleashes a Thunderclap!", true);
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (feet_distance(c.x, c.y, t.x, t.y) > 5) continue;
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_CON);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					broadcast_roll(t.name, "CON save vs Thunderclap", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Hit!");
+					if (!saved) combat.apply_damage(t, total_damage, DMG_THUNDER, c);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "word_of_radiance") {
+				// Basic Rules: CON save, 1d6 radiant, all creatures within 5 ft. Scales at L5/11/17.
+				int dice_count = cantrip_dice_count(1, c.level);
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 6);
+				broadcast_announce(c.name + " speaks a Word of Radiance!", true);
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (feet_distance(c.x, c.y, t.x, t.y) > 5) continue;
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_CON);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					broadcast_roll(t.name, "CON save vs Word of Radiance", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Hit!");
+					if (!saved) combat.apply_damage(t, total_damage, DMG_RADIANT, c);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "ice_knife" and @target != null) {
+				// Basic Rules: ranged spell attack, 1d10 piercing on primary target,
+				// then 2d6 cold AoE in 5 ft radius of impact on DEX save. Upcast +1d6 cold per level.
+				int atk_roll = random(1, 20);
+				int atk_total = atk_roll + spell_atk;
+				bool hit = atk_total >= target.armor_class;
+				int pierce_dmg = random(1, 10);
+				broadcast_roll(c.name, "Ice Knife attack roll", atk_roll, spell_atk, atk_total, hit ? "Hit!" : "Missed!");
+				if (hit) {
+					combat.apply_damage(target, pierce_dmg, DMG_PIERCING, c);
+					broadcast_announce(c.name + "'s Ice Knife pierces " + target.name + " for " + pierce_dmg + " piercing damage.", true);
+				}
+				int center_x = target.x;
+				int center_y = target.y;
+				int cold_dice = 2 + upcast_levels;
+				int cold_dmg = 0;
+				for (int d = 0; d < cold_dice; d++) cold_dmg += random(1, 6);
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (feet_distance(center_x, center_y, t.x, t.y) > 5) continue;
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_DEX);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					int dmg = saved ? cold_dmg / 2 : cold_dmg;
+					if (dmg < 1) dmg = 1;
+					broadcast_roll(t.name, "DEX save vs Ice Knife shatter", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+					combat.apply_damage(t, dmg, DMG_COLD, c);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "acid_arrow" and @target != null) {
+				// Basic Rules: ranged spell attack, 4d4 acid + 2d4 acid at end of target's next turn.
+				// Simplified: 6d4 acid on hit, 4d4 on miss. Upcast +1d4 per level.
+				int hit_dice = 4 + upcast_levels;
+				int miss_dice = 2 + upcast_levels;
+				int atk_roll = random(1, 20);
+				int atk_total = atk_roll + spell_atk;
+				bool hit = atk_total >= target.armor_class;
+				broadcast_roll(c.name, "Acid Arrow attack roll", atk_roll, spell_atk, atk_total, hit ? "Hit!" : "Missed!");
+				int total_damage = 0;
+				if (hit) {
+					int combined = hit_dice + miss_dice;
+					for (int d = 0; d < combined; d++) total_damage += random(1, 4);
+					combat.apply_damage(target, total_damage, DMG_ACID, c);
+					broadcast_announce(c.name + "'s Acid Arrow deals " + total_damage + " acid damage to " + target.name + ".", true);
+				} else {
+					for (int d = 0; d < miss_dice; d++) total_damage += random(1, 4);
+					combat.apply_damage(target, total_damage, DMG_ACID, c);
+					broadcast_announce(c.name + "'s Acid Arrow splashes " + target.name + " for " + total_damage + " acid damage.", true);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "flaming_sphere" and @target != null) {
+				// Basic Rules: 5 ft sphere, DEX save, 2d6 fire, half on success.
+				// Simplified: instant 2d6 fire on target. Upcast +1d6 per level.
+				int dice_count = 2 + upcast_levels;
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 6);
+				int save_roll = random(1, 20);
+				int save_bonus = target.get_save_bonus(ABILITY_DEX);
+				int bless_bonus = roll_bless_bonus(target);
+				int save_total = save_roll + save_bonus + bless_bonus;
+				bool saved = save_total >= save_dc;
+				int dmg = saved ? total_damage / 2 : total_damage;
+				if (dmg < 1) dmg = 1;
+				broadcast_roll(target.name, "DEX save vs Flaming Sphere", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+				combat.apply_damage(target, dmg, DMG_FIRE, c);
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "moonbeam" and @target != null) {
+				// Basic Rules: CON save, 2d10 radiant, half on success.
+				// Simplified: instant on target. Upcast +1d10 per level.
+				int dice_count = 2 + upcast_levels;
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 10);
+				int save_roll = random(1, 20);
+				int save_bonus = target.get_save_bonus(ABILITY_CON);
+				int bless_bonus = roll_bless_bonus(target);
+				int save_total = save_roll + save_bonus + bless_bonus;
+				bool saved = save_total >= save_dc;
+				int dmg = saved ? total_damage / 2 : total_damage;
+				if (dmg < 1) dmg = 1;
+				broadcast_roll(target.name, "CON save vs Moonbeam", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+				combat.apply_damage(target, dmg, DMG_RADIANT, c);
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "phantasmal_force" and @target != null) {
+				// Basic Rules: INT save, illusion deals 1d6 psychic per turn.
+				// Simplified: one-shot 3d8 psychic, INT save, half on success.
+				int total_damage = 0;
+				for (int d = 0; d < 3; d++) total_damage += random(1, 8);
+				int save_roll = random(1, 20);
+				int save_bonus = target.get_save_bonus(ABILITY_INT);
+				int bless_bonus = roll_bless_bonus(target);
+				int save_total = save_roll + save_bonus + bless_bonus;
+				bool saved = save_total >= save_dc;
+				int dmg = saved ? total_damage / 2 : total_damage;
+				if (dmg < 1) dmg = 1;
+				broadcast_roll(target.name, "INT save vs Phantasmal Force", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+				combat.apply_damage(target, dmg, DMG_PSYCHIC, c);
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "enlarge_reduce" and @target != null) {
+				// Basic Rules: if hostile target fails CON save, shrink (disadvantage on STR, -1d4 damage).
+				// Simplified: hostile -> CON save or take 2d6 psychic (flavour debuff);
+				// ally -> flat announcement buff (+1d4 damage flavour).
+				bool hostile = (target.is_player != c.is_player) or combat.mode == "pvp";
+				if (hostile) {
+					int save_roll = random(1, 20);
+					int save_bonus = target.get_save_bonus(ABILITY_CON);
+					int bless_bonus = roll_bless_bonus(target);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					broadcast_roll(target.name, "CON save vs Reduce", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Shrunk!");
+					if (!saved) {
+						int dmg = 0;
+						for (int d = 0; d < 2; d++) dmg += random(1, 6);
+						combat.apply_damage(target, dmg, DMG_PSYCHIC, c);
+						broadcast_announce(target.name + " shrinks under the Reduce spell, taking " + dmg + " psychic damage.", true);
+					}
+				} else {
+					broadcast_announce(c.name + " enlarges " + target.name + " with Enlarge/Reduce. Their weapons hit harder!", true);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "prayer_of_healing") {
+				// Basic Rules: heals up to 6 creatures for 2d8 + spellcasting mod.
+				// Simplified: all friendly within 30 ft get 2d8 + mod. Upcast +1d8 per level.
+				int dice_count = 2 + upcast_levels;
+				int heal = 0;
+				for (int d = 0; d < dice_count; d++) heal += random(1, 8);
+				heal += get_spellcasting_ability_mod(c);
+				heal += get_life_domain_healing_bonus(c, spell, cast_slot_level);
+				if (heal < 1) heal = 1;
+				int healed = 0;
+				for (uint mi = 0; mi < combat.combatants.length() and healed < 6; mi++) {
+					combatant@ ally = combat.combatants[mi];
+					if (@ally == null or ally.is_dead) continue;
+					if (ally.is_player != c.is_player and ally.id != c.id) continue;
+					if (feet_distance(c.x, c.y, ally.x, ally.y) > 30) continue;
+					int effective = combat.apply_healing(ally, heal);
+					record_effective_healing(c.player_username, effective);
+					healed++;
+				}
+				broadcast_announce(c.name + " casts Prayer of Healing, restoring " + heal + " HP to " + healed + " ally" + (healed == 1 ? "" : "ies") + ".", true);
+			}
+			else if (spell.id == "call_lightning") {
+				// Basic Rules: DEX save, 3d10 lightning in 5 ft radius of target. Upcast +1d10 per level.
+				int dice_count = 3 + upcast_levels;
+				int center_x = @target != null ? target.x : c.x;
+				int center_y = @target != null ? target.y : c.y;
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 10);
+				broadcast_announce(c.name + " calls a bolt of lightning from the storm!", true);
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (feet_distance(center_x, center_y, t.x, t.y) > 5) continue;
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_DEX);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					int dmg = saved ? total_damage / 2 : total_damage;
+					if (dmg < 1) dmg = 1;
+					broadcast_roll(t.name, "DEX save vs Call Lightning", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+					combat.apply_damage(t, dmg, DMG_LIGHTNING, c);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "blight" and @target != null) {
+				// Basic Rules: CON save, 8d8 necrotic on target, half on save. Upcast +1d8 per level.
+				int dice_count = 8 + upcast_levels;
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 8);
+				int save_roll = random(1, 20);
+				int save_bonus = target.get_save_bonus(ABILITY_CON);
+				int bless_bonus = roll_bless_bonus(target);
+				int save_total = save_roll + save_bonus + bless_bonus;
+				bool saved = save_total >= save_dc;
+				int dmg = saved ? total_damage / 2 : total_damage;
+				if (dmg < 1) dmg = 1;
+				broadcast_roll(target.name, "CON save vs Blight", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+				combat.apply_damage(target, dmg, DMG_NECROTIC, c);
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "vitriolic_sphere") {
+				// Basic Rules: DEX save, 10d4 acid + 5d4 next turn in 20 ft radius. Upcast +2d4 per level.
+				// Simplified: 15d4 acid AoE. Upcast +2d4 per level.
+				int dice_count = 15 + (upcast_levels * 2);
+				int center_x = @target != null ? target.x : c.x;
+				int center_y = @target != null ? target.y : c.y;
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 4);
+				broadcast_announce(c.name + " hurls a Vitriolic Sphere into a 20-foot radius!", true);
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (feet_distance(center_x, center_y, t.x, t.y) > 20) continue;
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_DEX);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					int dmg = saved ? total_damage / 2 : total_damage;
+					if (dmg < 1) dmg = 1;
+					broadcast_roll(t.name, "DEX save vs Vitriolic Sphere", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+					combat.apply_damage(t, dmg, DMG_ACID, c);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "evards_black_tentacles") {
+				// Basic Rules: DEX save, 3d6 bludgeoning and Restrained in 20 ft square.
+				int center_x = @target != null ? target.x : c.x;
+				int center_y = @target != null ? target.y : c.y;
+				broadcast_announce(c.name + " summons Evard's Black Tentacles!", true);
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (feet_distance(center_x, center_y, t.x, t.y) > 20) continue;
+					int dmg = 0;
+					for (int d = 0; d < 3; d++) dmg += random(1, 6);
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_DEX);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					broadcast_roll(t.name, "DEX save vs Black Tentacles", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Grabbed!");
+					combat.apply_damage(t, dmg, DMG_BLUDGEONING, c);
+					if (!saved) {
+						t.add_condition(COND_RESTRAINED);
+						broadcast_to_battle({{"type", message_types::condition_applied}, {"target", t.name}, {"condition", "Restrained"}});
+					}
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "flame_strike") {
+				// Basic Rules: DEX save, 4d6 fire + 4d6 radiant in 10 ft radius cylinder. Upcast +1d6 per type.
+				int dice_fire = 4 + upcast_levels;
+				int dice_rad = 4 + upcast_levels;
+				int center_x = @target != null ? target.x : c.x;
+				int center_y = @target != null ? target.y : c.y;
+				int fire_total = 0;
+				for (int d = 0; d < dice_fire; d++) fire_total += random(1, 6);
+				int rad_total = 0;
+				for (int d = 0; d < dice_rad; d++) rad_total += random(1, 6);
+				broadcast_announce(c.name + " calls down a pillar of divine Flame Strike!", true);
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (feet_distance(center_x, center_y, t.x, t.y) > 10) continue;
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_DEX);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					int fd = saved ? fire_total / 2 : fire_total;
+					int rd = saved ? rad_total / 2 : rad_total;
+					if (fd < 1) fd = 1;
+					if (rd < 1) rd = 1;
+					broadcast_roll(t.name, "DEX save vs Flame Strike", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+					combat.apply_damage(t, fd, DMG_FIRE, c);
+					combat.apply_damage(t, rd, DMG_RADIANT, c);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "contagion" and @target != null) {
+				// Basic Rules: melee spell attack, 3d8 necrotic + poisoned.
+				int atk_roll = random(1, 20);
+				int atk_total = atk_roll + spell_atk;
+				bool hit = atk_total >= target.armor_class;
+				broadcast_roll(c.name, "Contagion attack roll", atk_roll, spell_atk, atk_total, hit ? "Hit!" : "Missed!");
+				if (hit) {
+					int total_damage = 0;
+					for (int d = 0; d < 3; d++) total_damage += random(1, 8);
+					combat.apply_damage(target, total_damage, DMG_NECROTIC, c);
+					target.add_condition(COND_POISONED);
+					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Poisoned"}});
+					broadcast_announce(c.name + "'s Contagion deals " + total_damage + " necrotic damage to " + target.name + " and poisons them.", true);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "mass_cure_wounds") {
+				// Basic Rules: heal up to 6 creatures for 3d8 + mod. Upcast +1d8 per level.
+				int dice_count = 3 + upcast_levels;
+				int heal = 0;
+				for (int d = 0; d < dice_count; d++) heal += random(1, 8);
+				heal += get_spellcasting_ability_mod(c);
+				heal += get_life_domain_healing_bonus(c, spell, cast_slot_level);
+				if (heal < 1) heal = 1;
+				int healed = 0;
+				for (uint mi = 0; mi < combat.combatants.length() and healed < 6; mi++) {
+					combatant@ ally = combat.combatants[mi];
+					if (@ally == null or ally.is_dead) continue;
+					if (ally.is_player != c.is_player and ally.id != c.id) continue;
+					if (feet_distance(c.x, c.y, ally.x, ally.y) > 60) continue;
+					int effective = combat.apply_healing(ally, heal);
+					record_effective_healing(c.player_username, effective);
+					healed++;
+				}
+				broadcast_announce(c.name + " casts Mass Cure Wounds, restoring " + heal + " HP to " + healed + " ally" + (healed == 1 ? "" : "ies") + ".", true);
+			}
+			else if (spell.id == "circle_of_death") {
+				// Basic Rules: CON save, 8d6 necrotic in 60 ft sphere. Upcast +2d6 per level.
+				int dice_count = 8 + (upcast_levels * 2);
+				int center_x = @target != null ? target.x : c.x;
+				int center_y = @target != null ? target.y : c.y;
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 6);
+				broadcast_announce(c.name + " unleashes a Circle of Death in a 60-foot sphere!", true);
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (feet_distance(center_x, center_y, t.x, t.y) > 60) continue;
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_CON);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					int dmg = saved ? total_damage / 2 : total_damage;
+					if (dmg < 1) dmg = 1;
+					broadcast_roll(t.name, "CON save vs Circle of Death", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+					combat.apply_damage(t, dmg, DMG_NECROTIC, c);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "harm" and @target != null) {
+				// Basic Rules: CON save, 14d6 necrotic single target, half on save.
+				int dice_count = 14;
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 6);
+				int save_roll = random(1, 20);
+				int save_bonus = target.get_save_bonus(ABILITY_CON);
+				int bless_bonus = roll_bless_bonus(target);
+				int save_total = save_roll + save_bonus + bless_bonus;
+				bool saved = save_total >= save_dc;
+				int dmg = saved ? total_damage / 2 : total_damage;
+				if (dmg < 1) dmg = 1;
+				broadcast_roll(target.name, "CON save vs Harm", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+				combat.apply_damage(target, dmg, DMG_NECROTIC, c);
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "blade_barrier") {
+				// Basic Rules: DEX save, 6d10 slashing in wall area. Simplified as AoE around target.
+				int dice_count = 6;
+				int center_x = @target != null ? target.x : c.x;
+				int center_y = @target != null ? target.y : c.y;
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 10);
+				broadcast_announce(c.name + " conjures a Blade Barrier of whirling blades!", true);
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (feet_distance(center_x, center_y, t.x, t.y) > 10) continue;
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_DEX);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					int dmg = saved ? total_damage / 2 : total_damage;
+					if (dmg < 1) dmg = 1;
+					broadcast_roll(t.name, "DEX save vs Blade Barrier", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+					combat.apply_damage(t, dmg, DMG_SLASHING, c);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "otilukes_freezing_sphere") {
+				// Basic Rules: CON save, 10d6 cold in 60 ft radius. Upcast +3d6 per level.
+				int dice_count = 10 + (upcast_levels * 3);
+				int center_x = @target != null ? target.x : c.x;
+				int center_y = @target != null ? target.y : c.y;
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 6);
+				broadcast_announce(c.name + " hurls Otiluke's Freezing Sphere!", true);
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (feet_distance(center_x, center_y, t.x, t.y) > 60) continue;
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_CON);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					int dmg = saved ? total_damage / 2 : total_damage;
+					if (dmg < 1) dmg = 1;
+					broadcast_roll(t.name, "CON save vs Freezing Sphere", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+					combat.apply_damage(t, dmg, DMG_COLD, c);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "fire_storm") {
+				// Basic Rules: DEX save, 7d10 fire in ten 10 ft cubes. Simplified: 20 ft radius AoE.
+				int dice_count = 7;
+				int center_x = @target != null ? target.x : c.x;
+				int center_y = @target != null ? target.y : c.y;
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 10);
+				broadcast_announce(c.name + " unleashes a Fire Storm!", true);
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (feet_distance(center_x, center_y, t.x, t.y) > 20) continue;
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_DEX);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					int dmg = saved ? total_damage / 2 : total_damage;
+					if (dmg < 1) dmg = 1;
+					broadcast_roll(t.name, "DEX save vs Fire Storm", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+					combat.apply_damage(t, dmg, DMG_FIRE, c);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "prismatic_spray") {
+				// Basic Rules: DEX save, 10d6 damage of random type per target in 60 ft cone.
+				broadcast_announce(c.name + " unleashes a Prismatic Spray of eight colors!", true);
+				int[] prism_types = { DMG_FIRE, DMG_ACID, DMG_LIGHTNING, DMG_POISON, DMG_COLD, DMG_FORCE, DMG_RADIANT, DMG_NECROTIC };
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (feet_distance(c.x, c.y, t.x, t.y) > 60) continue;
+					int ray_dmg = 0;
+					for (int d = 0; d < 10; d++) ray_dmg += random(1, 6);
+					int dtype = prism_types[random(0, 7)];
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_DEX);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					int dmg = saved ? ray_dmg / 2 : ray_dmg;
+					if (dmg < 1) dmg = 1;
+					broadcast_roll(t.name, "DEX save vs Prismatic Spray", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+					combat.apply_damage(t, dmg, dtype, c);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "conjure_celestial") {
+				// Basic Rules: summon a celestial companion.
+				int cel_hp = 40 + (5 * c.level);
+				int cha_mod = c.get_ability_mod(ABILITY_CHA);
+				int cel_attack = c.proficiency + get_spellcasting_ability_mod(c);
+				combatant@ cel = spawn_companion(c, "conjure_celestial", c.name + "'s Celestial", cel_hp, 15 + c.proficiency, 40, cel_attack, 2, 10, cha_mod, DMG_RADIANT, 0);
+				if (@cel != null) {
+					broadcast_announce(c.name + " summons a radiant Celestial! HP " + cel_hp + ", AC " + (15 + c.proficiency) + ", 2d10+CHA radiant.", true);
+				}
+			}
+			else if (spell.id == "regenerate" and @target != null) {
+				// Basic Rules: heal 4d8 + 15, then 1 HP/round for 1 hour. Simplified: instant 4d8 + 15.
+				int heal = 15;
+				for (int d = 0; d < 4; d++) heal += random(1, 8);
+				heal += get_life_domain_healing_bonus(c, spell, cast_slot_level);
+				int effective = combat.apply_healing(target, heal);
+				record_effective_healing(c.player_username, effective);
+				broadcast_announce(c.name + " casts Regenerate on " + target.name + ", restoring " + heal + " HP.", true);
+			}
+			else if (spell.id == "symbol") {
+				// Basic Rules: triggered glyph, simplified as 10d10 necrotic in 60 ft sphere AoE.
+				int dice_count = 10;
+				int center_x = @target != null ? target.x : c.x;
+				int center_y = @target != null ? target.y : c.y;
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 10);
+				broadcast_announce(c.name + " triggers a deadly Symbol!", true);
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (feet_distance(center_x, center_y, t.x, t.y) > 60) continue;
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_CON);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					int dmg = saved ? total_damage / 2 : total_damage;
+					if (dmg < 1) dmg = 1;
+					broadcast_roll(t.name, "CON save vs Symbol", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+					combat.apply_damage(t, dmg, DMG_NECROTIC, c);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "incendiary_cloud") {
+				// Basic Rules: DEX save, 10d8 fire in 20 ft radius cloud.
+				int dice_count = 10;
+				int center_x = @target != null ? target.x : c.x;
+				int center_y = @target != null ? target.y : c.y;
+				int total_damage = 0;
+				for (int d = 0; d < dice_count; d++) total_damage += random(1, 8);
+				broadcast_announce(c.name + " conjures an Incendiary Cloud!", true);
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (feet_distance(center_x, center_y, t.x, t.y) > 20) continue;
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_DEX);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					int dmg = saved ? total_damage / 2 : total_damage;
+					if (dmg < 1) dmg = 1;
+					broadcast_roll(t.name, "DEX save vs Incendiary Cloud", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+					combat.apply_damage(t, dmg, DMG_FIRE, c);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "storm_of_vengeance") {
+				// Basic Rules: DEX save, 2d6 thunder + lightning in 360 ft radius AoE.
+				int thunder_dice = 2;
+				int lightning_dice = 4;
+				int thunder_total = 0;
+				int lightning_total = 0;
+				for (int d = 0; d < thunder_dice; d++) thunder_total += random(1, 6);
+				for (int d = 0; d < lightning_dice; d++) lightning_total += random(1, 10);
+				broadcast_announce(c.name + " summons a Storm of Vengeance! The sky erupts with thunder and lightning!", true);
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (feet_distance(c.x, c.y, t.x, t.y) > 360) continue;
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_DEX);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					int td = saved ? thunder_total / 2 : thunder_total;
+					int ld = saved ? lightning_total / 2 : lightning_total;
+					if (td < 1) td = 1;
+					if (ld < 1) ld = 1;
+					broadcast_roll(t.name, "DEX save vs Storm of Vengeance", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+					combat.apply_damage(t, td, DMG_THUNDER, c);
+					combat.apply_damage(t, ld, DMG_LIGHTNING, c);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "weird") {
+				// Basic Rules: WIS save, 4d10 psychic on each target in 30 ft radius + frightened.
+				int dice_count = 4;
+				int center_x = @target != null ? target.x : c.x;
+				int center_y = @target != null ? target.y : c.y;
+				broadcast_announce(c.name + " conjures phantasmal horrors with Weird!", true);
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (feet_distance(center_x, center_y, t.x, t.y) > 30) continue;
+					int dmg = 0;
+					for (int d = 0; d < dice_count; d++) dmg += random(1, 10);
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_WIS);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					broadcast_roll(t.name, "WIS save vs Weird", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Terrified!");
+					if (!saved) {
+						combat.apply_damage(t, dmg, DMG_PSYCHIC, c);
+						t.add_condition(COND_FRIGHTENED);
+						broadcast_to_battle({{"type", message_types::condition_applied}, {"target", t.name}, {"condition", "Frightened"}});
+					}
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
+			else if (spell.id == "prismatic_wall") {
+				// Basic Rules: DEX save, creatures nearby take multi-type damage from the wall.
+				broadcast_announce(c.name + " conjures a shimmering Prismatic Wall!", true);
+				int[] pw_types = { DMG_FIRE, DMG_COLD, DMG_LIGHTNING, DMG_POISON, DMG_ACID };
+				int center_x = @target != null ? target.x : c.x;
+				int center_y = @target != null ? target.y : c.y;
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (feet_distance(center_x, center_y, t.x, t.y) > 10) continue;
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_DEX);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					broadcast_roll(t.name, "DEX save vs Prismatic Wall", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+					for (uint pi = 0; pi < pw_types.length(); pi++) {
+						int layer_dmg = 0;
+						for (int d = 0; d < 2; d++) layer_dmg += random(1, 10);
+						int dmg = saved ? layer_dmg / 2 : layer_dmg;
+						if (dmg < 1) dmg = 1;
+						combat.apply_damage(t, dmg, pw_types[pi], c);
+					}
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
+			}
 			else {
 				broadcast_announce(c.name + " casts " + spell.name + ".", false);
 			}
