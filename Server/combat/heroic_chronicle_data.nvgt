@@ -1,0 +1,153 @@
+// Wildemount Heroic Chronicle System
+// Source: Explorer's Guide to Wildemount, paragraphs 5617-5900+
+//
+// The Heroic Chronicle is a backstory generator that roots a character's
+// history in the land of Wildemount, providing a Homeland, Background,
+// social status, family relationships, and three Prophecy goals.
+//
+// Per source para 5617: "The heroic chronicle is a system that allows
+// players and Dungeon Masters to work together to build a compelling
+// character story."
+
+class heroic_homeland {
+    string name;
+    string description;
+}
+
+heroic_homeland@[] HEROIC_HOMELANDS;
+
+void add_heroic_homeland(string name, string desc) {
+    heroic_homeland h;
+    h.name = name;
+    h.description = desc;
+    HEROIC_HOMELANDS.insert_last(h);
+}
+
+void init_heroic_homelands() {
+    if (HEROIC_HOMELANDS.length() > 0) return;
+    // Wildemount Homelands table, source para 5630-5639
+    add_heroic_homeland("Menagerie Coast",
+        "The lush, tropical western seaboard of Wildemount, ruled by the Clovis Concord (a federation of port cities) or worked by the Revelry pirates. (Wildemount para 5631)");
+    add_heroic_homeland("Marrow Valley",
+        "A cold, damp, forested valley in Western Wynandir, the heart of the Dwendalian Empire's farmland. Home to many small villages and the city of Trostenwald. (Wildemount para 5633)");
+    add_heroic_homeland("Zemni Fields",
+        "The northern reaches of Western Wynandir in the Dwendalian Empire, including the Empire's capital Rexxentrum. Cold winters and rolling farmland. (Wildemount para 5635)");
+    add_heroic_homeland("Greying Wildlands",
+        "The wild, untamed northern wilderness of Wildemount, home to the savage Tribes of Shadycreek Run or the dwarven and elven city of Uthodurn deep in the mountains. (Wildemount para 5637)");
+    add_heroic_homeland("Xhorhas",
+        "The blasted, twisted lands of Eastern Wynandir, home to the drow-led Kryn Dynasty or the warrior society of Xarzith Kitril. Endless storm-wracked wastelands. (Wildemount para 5639)");
+}
+
+class heroic_background {
+    string name;
+    string source_book;  // "PH" or "EGW"
+    string description;
+}
+
+heroic_background@[] HEROIC_BACKGROUNDS;
+
+void add_heroic_background(string name, string book, string desc) {
+    heroic_background b;
+    b.name = name;
+    b.source_book = book;
+    b.description = desc;
+    HEROIC_BACKGROUNDS.insert_last(b);
+}
+
+void init_heroic_backgrounds() {
+    if (HEROIC_BACKGROUNDS.length() > 0) return;
+    // Wildemount Backgrounds table, source para 5642-5700+
+    add_heroic_background("Acolyte", "PH", "A devoted servant of a deity, granted divine guidance through prayer and ritual.");
+    add_heroic_background("Acolyte (Luxonborn)", "EGW", "A devoted follower of the Luxon, the strange beacon-deity worshipped by the Kryn Dynasty.");
+    add_heroic_background("Charlatan", "PH", "A skilled deceiver who makes a living by tricking and manipulating others.");
+    add_heroic_background("Criminal", "PH", "A practiced lawbreaker with connections to the criminal underworld.");
+    add_heroic_background("Criminal (Myriad operative)", "EGW", "A member of the Myriad, a multi-continent criminal syndicate operating in secret.");
+    add_heroic_background("Entertainer", "PH", "A performer who makes a living delighting crowds with art, music, or feats of daring.");
+    add_heroic_background("Folk Hero", "PH", "A common-born hero who rose to defend their community from injustice.");
+    add_heroic_background("Grinner", "EGW", "A dangerous Cerberus Assembly spy whose smiling mask hides their dark deeds.");
+    add_heroic_background("Guild Artisan", "PH", "A skilled craftsperson and member of an artisans' guild.");
+    add_heroic_background("Hermit", "PH", "A solitary recluse who has spent years seeking knowledge or enlightenment apart from civilization.");
+    add_heroic_background("Noble", "PH", "A scion of an aristocratic family with wealth, social standing, and obligation.");
+    add_heroic_background("Outlander", "PH", "A wanderer of the wilds, comfortable far from any town or village.");
+    add_heroic_background("Sage", "PH", "A scholar dedicated to the pursuit of knowledge, often associated with a library or academy.");
+    add_heroic_background("Sage (Cobalt Scholar)", "EGW", "A member of the Cobalt Soul, scholarly monks and seekers of secret truths.");
+    add_heroic_background("Sailor", "PH", "A seasoned mariner who has crewed ships across many seas.");
+    add_heroic_background("Sailor (Revelry pirate)", "EGW", "A pirate of the Menagerie Coast who lives by plunder and the open sea.");
+    add_heroic_background("Soldier", "PH", "A trained combatant who has served in an army or military force.");
+    add_heroic_background("Spy (Augen Trust)", "EGW", "A spy of the Augen Trust, the secret intelligence service of the Clovis Concord.");
+    add_heroic_background("Urchin", "PH", "A street-wise survivor who grew up alone in a city's slums.");
+    add_heroic_background("Volstrucker Agent", "EGW", "A Scourger of the Volstrucker order — black-cloaked Cerberus Assembly assassins.");
+}
+
+class heroic_prophecy {
+    string text;
+}
+
+heroic_prophecy@[] HEROIC_PROPHECIES;
+
+void add_heroic_prophecy(string text) {
+    heroic_prophecy p;
+    p.text = text;
+    HEROIC_PROPHECIES.insert_last(p);
+}
+
+void init_heroic_prophecies() {
+    if (HEROIC_PROPHECIES.length() > 0) return;
+    // Wildemount Prophecy goals (source paras 5800-5900+)
+    // 20 sample prophecy outcomes - players can roll d20 or choose
+    add_heroic_prophecy("You will discover a long-lost relic of the Calamity that grants tremendous power.");
+    add_heroic_prophecy("You will be granted a vision by a god, setting you on a holy quest.");
+    add_heroic_prophecy("You will fall in love with a member of a rival faction or nation.");
+    add_heroic_prophecy("You will betray a close friend to save many strangers.");
+    add_heroic_prophecy("You will challenge a tyrant to single combat to save your homeland.");
+    add_heroic_prophecy("You will discover that one of your closest companions is not who they claim to be.");
+    add_heroic_prophecy("You will be given a choice between immortality and the lives of your loved ones.");
+    add_heroic_prophecy("You will lose a treasured heirloom — and find it in the hands of your sworn enemy.");
+    add_heroic_prophecy("You will travel to a place no living mortal has seen and return with knowledge no one else holds.");
+    add_heroic_prophecy("You will face a foe you cannot defeat, and only your wits will save you.");
+    add_heroic_prophecy("You will be falsely accused of a terrible crime and must clear your name.");
+    add_heroic_prophecy("You will become the patriarch or matriarch of a new noble house.");
+    add_heroic_prophecy("You will be chosen by an ancient dragon to bear its mark and serve its will.");
+    add_heroic_prophecy("You will be the cause of a war between nations — but also its end.");
+    add_heroic_prophecy("You will discover a hidden city beneath your feet that has slept for a thousand years.");
+    add_heroic_prophecy("You will commune with a being from another plane and bargain for forbidden lore.");
+    add_heroic_prophecy("You will be granted a single wish — but using it will demand a terrible price.");
+    add_heroic_prophecy("You will be the sole survivor of a battle that destroys an army.");
+    add_heroic_prophecy("You will discover a forbidden truth about the gods themselves.");
+    add_heroic_prophecy("You will become a legend — but the legend will outlive the truth.");
+}
+
+heroic_homeland@ random_homeland() {
+    init_heroic_homelands();
+    if (HEROIC_HOMELANDS.length() == 0) return null;
+    return HEROIC_HOMELANDS[random(0, int(HEROIC_HOMELANDS.length()) - 1)];
+}
+
+heroic_background@ random_background() {
+    init_heroic_backgrounds();
+    if (HEROIC_BACKGROUNDS.length() == 0) return null;
+    return HEROIC_BACKGROUNDS[random(0, int(HEROIC_BACKGROUNDS.length()) - 1)];
+}
+
+heroic_prophecy@ random_prophecy() {
+    init_heroic_prophecies();
+    if (HEROIC_PROPHECIES.length() == 0) return null;
+    return HEROIC_PROPHECIES[random(0, int(HEROIC_PROPHECIES.length()) - 1)];
+}
+
+string generate_heroic_chronicle() {
+    init_heroic_homelands();
+    init_heroic_backgrounds();
+    init_heroic_prophecies();
+    string s = "Heroic Chronicle:\n";
+    heroic_homeland@ home = random_homeland();
+    if (@home != null) s += "Homeland: " + home.name + " — " + home.description + "\n";
+    heroic_background@ bg = random_background();
+    if (@bg != null) s += "Background: " + bg.name + " (" + bg.source_book + ") — " + bg.description + "\n";
+    s += "Prophecies (3):\n";
+    for (int i = 0; i < 3; i++) {
+        heroic_prophecy@ p = random_prophecy();
+        if (@p != null) s += "  " + (i+1) + ". " + p.text + "\n";
+    }
+    return s;
+}

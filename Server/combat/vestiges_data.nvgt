@@ -1,0 +1,152 @@
+// Wildemount Vestiges of Divergence System
+// Source: Explorer's Guide to Wildemount, paragraphs 9058-9219
+//
+// Vestiges of Divergence are legendary items that evolve with their wielder
+// across three states: Dormant (always available), Awakened (typically L9-15),
+// and Exalted (typically L16-20). Each item has different properties at each
+// awakening tier.
+//
+// Per source para 9071: "A Vestige of Divergence typically remains dormant
+// until its wielder achieves 9th level. It becomes awakened between levels 9
+// and 15, and achieves an exalted state between levels 16 and 20."
+
+const int VESTIGE_DORMANT = 0;
+const int VESTIGE_AWAKENED = 1;
+const int VESTIGE_EXALTED = 2;
+
+class vestige_def {
+    string id;
+    string name;
+    string slot;             // "weapon", "armor", "amulet", "ring"
+    string attunement_req;   // "any", "wizard", "druid", etc.
+    string description;
+    string dormant_text;     // Source-quoted dormant abilities
+    string awakened_text;    // Source-quoted awakened abilities (L9+)
+    string exalted_text;     // Source-quoted exalted abilities (L16+)
+    int dormant_ac = 0;
+    int awakened_ac = 0;
+    int exalted_ac = 0;
+    int dormant_dmg = 0;
+    int awakened_dmg = 0;
+    int exalted_dmg = 0;
+}
+
+vestige_def@[] VESTIGES;
+
+void add_vestige(string id, string name, string slot, string attunement, string desc, string dormant, string awakened, string exalted, int d_ac, int a_ac, int e_ac, int d_dmg, int a_dmg, int e_dmg) {
+    vestige_def v;
+    v.id = id;
+    v.name = name;
+    v.slot = slot;
+    v.attunement_req = attunement;
+    v.description = desc;
+    v.dormant_text = dormant;
+    v.awakened_text = awakened;
+    v.exalted_text = exalted;
+    v.dormant_ac = d_ac;
+    v.awakened_ac = a_ac;
+    v.exalted_ac = e_ac;
+    v.dormant_dmg = d_dmg;
+    v.awakened_dmg = a_dmg;
+    v.exalted_dmg = e_dmg;
+    VESTIGES.insert_last(v);
+}
+
+void init_vestiges() {
+    if (VESTIGES.length() > 0) return;
+
+    // Wildemount paras 9072-9086 — Danoth's Visor
+    add_vestige("danoths_visor", "Danoth's Visor", "amulet", "any",
+        "Mithral-frame goggles with clear diamond lenses used by the evoker Danoth Oro to spot invisible enemies and scout areas from afar. (Wildemount para 9072, Vestige of Divergence)",
+        "Dormant: You can see normally in darkness, both magical and nonmagical, to a distance of 60 feet. You have advantage on Intelligence (Investigation) checks made to detect or perceive things hidden by sight.",
+        "Awakened (L9+): You see invisible creatures and objects within 60 feet, can see into the Ethereal Plane, can use a bonus action to see through solid matter (60 ft, 1 minute), and can switch the goggles into spyglass mode (2x magnification).",
+        "Exalted (L16+): You automatically detect illusions and succeed on saves against them. You see auras around creatures not in their true form. You can cast antimagic field once per dawn from the visor.",
+        0, 0, 0, 0, 0, 0);
+
+    // Wildemount paras 9087-9101 — Grimoire Infinitus
+    add_vestige("grimoire_infinitus", "Grimoire Infinitus", "amulet", "wizard",
+        "A spellbook with gilded pages and silver-plated covers created during the Age of Arcanum. The book has an infinite number of pages and contains many spells. (Wildemount para 9087, Vestige of Divergence)",
+        "Dormant: When you prepare wizard spells using the grimoire, the number of spells you can prepare increases by 1.",
+        "Awakened (L9+): While you carry the spellbook, you have advantage on saving throws against spells. The number of spells you can prepare increases by 1 again (total +2).",
+        "Exalted (L16+): You can use Arcane Recovery twice between long rests. The number of spells you can prepare increases by 1 again (total +3).",
+        0, 0, 0, 0, 0, 0);
+
+    // Wildemount paras 9102-9119 — Hide of the Feral Guardian
+    add_vestige("hide_feral_guardian", "Hide of the Feral Guardian", "armor", "any",
+        "Polished and beautifully detailed leather armor, believed to be a gift from Melora bestowed on a long-forgotten archdruid before the Calamity. (Wildemount para 9102, Vestige of Divergence)",
+        "Dormant: +1 AC. While transformed by an effect, +1 to melee attack and damage rolls. Cast polymorph on yourself once per dawn to transform into a giant owl.",
+        "Awakened (L9+): AC bonus increases to +2. While transformed, melee bonus increases to +2. Polymorph this way to transform into a cave bear (polar bear stats).",
+        "Exalted (L16+): AC bonus increases to +3. Melee bonus increases to +3 while transformed. Polymorph this way to transform into a guardian wolf (Huge monstrosity, AC 14, HP 66, 60 ft speed, multiattack).",
+        1, 2, 3, 0, 0, 0);
+
+    // Wildemount paras 9148-9163 — Infiltrator's Key
+    add_vestige("infiltrators_key", "Infiltrator's Key", "amulet", "any",
+        "A mithral skeleton key forged using the blood of twelve master thieves executed for trying to steal magic items during the Age of Arcanum. (Wildemount para 9148, Vestige of Divergence)",
+        "Dormant: You can use the key to open any nonmagical lock. You have advantage on Dexterity (Sleight of Hand) checks made to pick locks.",
+        "Awakened (L9+): The key can open magical locks (DC 20 check) and disarm magical traps (DC 20 check). You can use the knock spell from the key once per long rest.",
+        "Exalted (L16+): You can cast dimension door from the key once per long rest. You can pass through walls up to 5 feet thick once per long rest.",
+        0, 0, 0, 0, 0, 0);
+
+    // Wildemount paras 9164-9182 — Stormgirdle
+    add_vestige("stormgirdle", "Stormgirdle", "amulet", "any",
+        "A wide belt made of thick leather branded with the symbol of Kord. The girdle's clasps are made from dragon ivory. (Wildemount para 9164, Vestige of Divergence)",
+        "Dormant: Your Strength score becomes 19. Resistance to lightning damage. Cast thunderwave from the belt once per long rest.",
+        "Awakened (L9+): Your Strength score becomes 21. Cast call lightning once per long rest. When you hit with a melee attack, you can deal an extra 1d8 lightning damage (once per turn).",
+        "Exalted (L16+): Your Strength score becomes 25. Cast chain lightning once per long rest. Your melee attacks deal an extra 1d8 lightning damage on every hit.",
+        0, 0, 0, 1, 2, 3);
+
+    // Wildemount paras 9183-9199 — Verminshroud
+    add_vestige("verminshroud", "Verminshroud", "armor", "any",
+        "A patchy cloak pieced together from the pelts of rats found feasting on the dead in Blightshore, dotted with the bloated corpses of magically preserved insects. (Wildemount para 9183, Vestige of Divergence)",
+        "Dormant: Your Charisma score increases by 2 (max 20). Resistance to poison damage and immunity to disease. Cast bestow curse from the cloak once per long rest.",
+        "Awakened (L9+): Resistance to necrotic damage. You can cast contagion from the cloak once per long rest. As an action, you transform into a swarm of rats for 1 hour.",
+        "Exalted (L16+): Cast cloudkill from the cloak once per long rest. Your unarmed strikes deal an extra 2d6 necrotic damage and target must save vs Disease.",
+        0, 0, 0, 0, 0, 0);
+
+    // Wildemount paras 9200-9219 — Wreath of the Prism
+    add_vestige("wreath_of_prism", "Wreath of the Prism", "armor", "any",
+        "A loop of golden thorns inset with dozens of gems representing the five colors of Tiamat. (Wildemount para 9200, Vestige of Divergence)",
+        "Dormant: Resistance to one of acid, cold, fire, lightning, or poison damage (the wearer chooses on attunement). Cast chromatic orb from the wreath once per long rest.",
+        "Awakened (L9+): Resistance to all five chromatic damage types. Cast lightning bolt or fireball from the wreath once per long rest.",
+        "Exalted (L16+): Immunity to one chromatic damage type (chosen at attunement). Cast prismatic spray once per long rest.",
+        0, 0, 0, 0, 0, 0);
+
+    // Wildemount paras 9010-9057 — Spell Bottle (the first vestige in the section)
+    add_vestige("spell_bottle", "Spell Bottle", "amulet", "any",
+        "A small ornate glass bottle that can store and release magical energies. Created during the Age of Arcanum to contain captured spells. (Wildemount para 9010, Vestige of Divergence)",
+        "Dormant: The bottle can store one spell of 3rd level or lower cast into it. You can release the stored spell as an action.",
+        "Awakened (L9+): The bottle can now store spells of 5th level or lower. The release action can target a different point than originally cast.",
+        "Exalted (L16+): The bottle can store spells of 7th level or lower. As a reaction, you can release the stored spell to counter another spell being cast.",
+        0, 0, 0, 0, 0, 0);
+}
+
+vestige_def@ get_vestige(string id) {
+    init_vestiges();
+    for (uint i = 0; i < VESTIGES.length(); i++) {
+        if (VESTIGES[i].id == id) return VESTIGES[i];
+    }
+    return null;
+}
+
+string vestige_state_name(int state) {
+    if (state == VESTIGE_EXALTED) return "Exalted";
+    if (state == VESTIGE_AWAKENED) return "Awakened";
+    return "Dormant";
+}
+
+// Determine appropriate vestige state based on character level
+// Per source para 9071: dormant until L9, awakened L9-15, exalted L16+
+int suggested_vestige_state(int character_level) {
+    if (character_level >= 16) return VESTIGE_EXALTED;
+    if (character_level >= 9) return VESTIGE_AWAKENED;
+    return VESTIGE_DORMANT;
+}
+
+string vestige_full_text(vestige_def@ v, int state) {
+    if (@v == null) return "";
+    string s = v.name + " (" + vestige_state_name(state) + ").\n" + v.description + "\n";
+    s += v.dormant_text + "\n";
+    if (state >= VESTIGE_AWAKENED) s += v.awakened_text + "\n";
+    if (state >= VESTIGE_EXALTED) s += v.exalted_text + "\n";
+    return s;
+}
