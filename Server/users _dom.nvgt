@@ -1435,10 +1435,20 @@ void handle_user_message(user@ u, json_object@ msg)
 	}
 	else if (msg_type == message_types::bonus_action) {
 		if (@u.room == null or @u.room.bm == null or @u.room.bm.combat == null) return;
-		combatant@ c = u.room.bm.combat.current_combatant();
-		if (@c == null or c.player_username != u.username) return;
 		string feature = msg.exists("feature") ? string(msg["feature"]) : "";
 		uint target_id = msg.exists("target_id") ? uint(int(msg["target_id"])) : (msg.exists("target") ? uint(int(msg["target"])) : 0);
+		// Phase 1 config commands (set_*/query_phase1) work any time —
+		// they don't require the player to be the current combatant.
+		bool is_phase1_config = feature == "set_piety_god" or feature == "set_group_patron"
+			or feature == "set_ravnica_guild" or feature == "set_transformation"
+			or feature == "set_fey_court" or feature == "query_phase1";
+		combatant@ c = null;
+		if (is_phase1_config) {
+			@c = u.room.bm.find_player_combatant(u.username);
+		} else {
+			@c = u.room.bm.combat.current_combatant();
+		}
+		if (@c == null or c.player_username != u.username) return;
 
 		if (feature == "rage") {
 			if (c.class_name != "Barbarian") { u.send({{"type", message_types::announce}, {"text", "Only barbarians can Rage."}, {"interrupt", true}}); return; }
