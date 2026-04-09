@@ -2969,6 +2969,164 @@ void handle_user_message(user@ u, json_object@ msg)
 				u.room.bm.broadcast_announce(c.name + " summons their Drake Companion! HP " + drake_hp_now + ", AC " + (14 + c.proficiency) + ".", true);
 			}
 		}
+		else if (feature == "set_piety_god") {
+			// Client-side configuration: set the player's god (Theros Piety).
+			// Persists to account data and updates active combatant if any.
+			string god_name = msg.exists("value") ? string(msg["value"]) : "";
+			if (god_name == "") { u.send({{"type", message_types::announce}, {"text", "No god specified."}, {"interrupt", true}}); return; }
+			piety_god_def@ check = get_piety_god(god_name);
+			if (@check == null) { u.send({{"type", message_types::announce}, {"text", "Unknown Theros god: " + god_name + ". Valid: Athreos, Ephara, Erebos, Heliod, Iroas, Karametra, Keranos, Klothys, Kruphix, Mogis, Nylea, Pharika, Phenax, Purphoros, Thassa."}, {"interrupt", true}}); return; }
+			c.piety_god = god_name;
+			if (c.piety_score < 1) c.piety_score = 1;
+			if (@u.account != null) {
+				json_object@ data = u.account.data;
+				string ckey = get_character_storage_key(u.room.game_type);
+				if (data.exists(ckey)) {
+					json_object@ ch = data[ckey];
+					ch["piety_god"] = god_name;
+					ch["piety_score"] = c.piety_score;
+					u.account.commit();
+				}
+			}
+			u.send({{"type", message_types::announce}, {"text", "You now worship " + god_name + " (" + check.title + "). Piety score: " + c.piety_score + "."}, {"interrupt", true}});
+		}
+		else if (feature == "set_group_patron") {
+			string patron_name = msg.exists("value") ? string(msg["value"]) : "";
+			if (patron_name == "") { u.send({{"type", message_types::announce}, {"text", "No patron specified."}, {"interrupt", true}}); return; }
+			group_patron_def@ check = get_group_patron(patron_name);
+			if (@check == null) { u.send({{"type", message_types::announce}, {"text", "Unknown patron: " + patron_name + ". Valid: Academy, Ancient Being, Aristocrat, Criminal Syndicate, Guild, Military Force, Religious Order, Sovereign."}, {"interrupt", true}}); return; }
+			c.group_patron = patron_name;
+			if (@u.account != null) {
+				json_object@ data = u.account.data;
+				string ckey = get_character_storage_key(u.room.game_type);
+				if (data.exists(ckey)) {
+					json_object@ ch = data[ckey];
+					ch["group_patron"] = patron_name;
+					u.account.commit();
+				}
+			}
+			u.send({{"type", message_types::announce}, {"text", "Your group patron is now: " + patron_name + "."}, {"interrupt", true}});
+		}
+		else if (feature == "set_ravnica_guild") {
+			string guild_name = msg.exists("value") ? string(msg["value"]) : "";
+			if (guild_name == "") { u.send({{"type", message_types::announce}, {"text", "No guild specified."}, {"interrupt", true}}); return; }
+			ravnica_guild_def@ check = get_ravnica_guild(guild_name);
+			if (@check == null) { u.send({{"type", message_types::announce}, {"text", "Unknown Ravnica guild: " + guild_name + ". Valid: Azorius Senate, Boros Legion, House Dimir, Golgari Swarm, Gruul Clans, Izzet League, Orzhov Syndicate, Cult of Rakdos, Selesnya Conclave, Simic Combine."}, {"interrupt", true}}); return; }
+			c.ravnica_guild = guild_name;
+			if (@u.account != null) {
+				json_object@ data = u.account.data;
+				string ckey = get_character_storage_key(u.room.game_type);
+				if (data.exists(ckey)) {
+					json_object@ ch = data[ckey];
+					ch["ravnica_guild"] = guild_name;
+					u.account.commit();
+				}
+			}
+			u.send({{"type", message_types::announce}, {"text", "You are now a member of " + guild_name + " (" + check.colors + ")."}, {"interrupt", true}});
+		}
+		else if (feature == "set_transformation") {
+			string trans_name = msg.exists("value") ? string(msg["value"]) : "";
+			int stage = msg.exists("stage") ? int(msg["stage"]) : 1;
+			if (trans_name == "") {
+				c.transformation = "";
+				c.transformation_stage = 0;
+				if (@u.account != null) {
+					json_object@ data = u.account.data;
+					string ckey = get_character_storage_key(u.room.game_type);
+					if (data.exists(ckey)) {
+						json_object@ ch = data[ckey];
+						ch["transformation"] = "";
+						ch["transformation_stage"] = 0;
+						u.account.commit();
+					}
+				}
+				u.send({{"type", message_types::announce}, {"text", "You are no longer undergoing any transformation."}, {"interrupt", true}});
+				return;
+			}
+			transformation_def@ check = get_transformation(trans_name);
+			if (@check == null) { u.send({{"type", message_types::announce}, {"text", "Unknown transformation: " + trans_name + ". Valid: Vampirism, Lycanthropy, Lichdom, Aberrant Horror, Demonic Pact, Seraphic Ascension."}, {"interrupt", true}}); return; }
+			if (stage < 0) stage = 0;
+			if (stage > 20) stage = 20;
+			c.transformation = trans_name;
+			c.transformation_stage = stage;
+			if (@u.account != null) {
+				json_object@ data = u.account.data;
+				string ckey = get_character_storage_key(u.room.game_type);
+				if (data.exists(ckey)) {
+					json_object@ ch = data[ckey];
+					ch["transformation"] = trans_name;
+					ch["transformation_stage"] = stage;
+					u.account.commit();
+				}
+			}
+			u.send({{"type", message_types::announce}, {"text", "You are now undergoing " + trans_name + " at stage " + transformation_stage_name(stage) + " (" + stage + "/20)."}, {"interrupt", true}});
+		}
+		else if (feature == "set_fey_court") {
+			string court_name = msg.exists("value") ? string(msg["value"]) : "";
+			if (court_name == "") { u.send({{"type", message_types::announce}, {"text", "No court specified."}, {"interrupt", true}}); return; }
+			fey_court_def@ check = get_fey_court(court_name);
+			if (@check == null) { u.send({{"type", message_types::announce}, {"text", "Unknown fey court: " + court_name + "."}, {"interrupt", true}}); return; }
+			c.fey_court = court_name;
+			if (@u.account != null) {
+				json_object@ data = u.account.data;
+				string ckey = get_character_storage_key(u.room.game_type);
+				if (data.exists(ckey)) {
+					json_object@ ch = data[ckey];
+					ch["fey_court"] = court_name;
+					u.account.commit();
+				}
+			}
+			u.send({{"type", message_types::announce}, {"text", "You are now a member of the " + court_name + " (ruled by " + check.ruler + ")."}, {"interrupt", true}});
+		}
+		else if (feature == "query_phase1") {
+			// List all current Phase 1 affiliations for this character
+			string report = c.name + " Phase 1 Status:\n";
+			report += "  Piety God: " + (c.piety_god != "" ? c.piety_god + " (score " + c.piety_score + ")" : "None") + "\n";
+			report += "  Group Patron: " + (c.group_patron != "" ? c.group_patron : "None") + "\n";
+			report += "  Ravnica Guild: " + (c.ravnica_guild != "" ? c.ravnica_guild : "None") + "\n";
+			report += "  Transformation: " + (c.transformation != "" ? c.transformation + " (" + transformation_stage_name(c.transformation_stage) + ")" : "None") + "\n";
+			report += "  Fey Court: " + (c.fey_court != "" ? c.fey_court : "None") + "\n";
+			u.send({{"type", message_types::announce}, {"text", report}, {"interrupt", true}});
+		}
+		else if (feature == "invoke_devotee_trait") {
+			// Theros Piety — Devotee trait (source para 1328-1329): The player casts
+			// their god's devotee-trait spell for free, a number of times equal to
+			// the god's chosen ability modifier per long rest.
+			if (c.piety_god == "" or c.piety_score < 3) { u.send({{"type", message_types::announce}, {"text", "You must be a Devotee (Piety 3+) of a god to invoke this trait."}, {"interrupt", true}}); return; }
+			if (c.piety_devotee_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "You have no Devotee trait uses remaining. Finish a long rest to recover them."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			piety_god_def@ god = get_piety_god(c.piety_god);
+			if (@god == null or god.devotee_spell == "") { u.send({{"type", message_types::announce}, {"text", "Your god grants no castable Devotee spell."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.piety_devotee_uses--;
+			u.room.bm.broadcast_announce(c.name + " calls on " + c.piety_god + "'s favor and casts " + god.devotee_spell + "! (Devotee uses remaining: " + c.piety_devotee_uses + ")", true);
+			// Route to cast pipeline as a free cast of the god's spell
+			json_object free_cast_msg;
+			free_cast_msg["type"] = message_types::action_cast;
+			free_cast_msg["spell_id"] = god.devotee_spell;
+			free_cast_msg["target_id"] = target_id;
+			free_cast_msg["slot_level"] = 1;  // Always L1 (free cast)
+			free_cast_msg["is_free_cast"] = true;
+			u.room.bm.handle_cast(u, free_cast_msg);
+		}
+		else if (feature == "group_assistance") {
+			// Tasha's Group Patrons — Group Assistance (source para 4910): "Each member
+			// of the party can add a d4 to one ability check, attack roll, or saving
+			// throw they make. A player must decide to use this ability before rolling
+			// the d20." Once per long rest.
+			if (c.group_patron == "") { u.send({{"type", message_types::announce}, {"text", "You have no Group Patron to call upon for assistance."}, {"interrupt", true}}); return; }
+			if (c.group_assistance_used_this_rest) { u.send({{"type", message_types::announce}, {"text", "You have already called on your Patron for assistance today."}, {"interrupt", true}}); return; }
+			c.group_assistance_used_this_rest = true;
+			// Grant a luck point as a proxy for the d4 assistance bonus (the luck
+			// reroll pipeline is the closest existing match for a one-shot roll bonus).
+			if (!c.has_lucky_feat) {
+				c.has_lucky_feat = true;
+				c.luck_points_max = 1;
+			}
+			c.luck_points = c.luck_points_max > 0 ? c.luck_points_max : 1;
+			u.room.bm.broadcast_announce(c.name + " calls on their Patron (" + c.group_patron + ") for Group Assistance! They gain +1d4 to their next d20 roll this rest.", true);
+		}
 		else if (feature == "telekinetic_shove") {
 			// Telekinetic feat (PHB para 7813): "As a Bonus Action, you can telekinetically
 			// shove one creature you can see within 30 feet of yourself. When you do so,

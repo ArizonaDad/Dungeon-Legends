@@ -107,6 +107,16 @@ class combatant {
 	// Tasha's Group Patrons system (Tasha's pp. 4892-5300+)
 	string group_patron = "";   // Empty = no patron; one of: Academy, Ancient Being, Aristocrat, Criminal Syndicate, Guild, Military Force, Religious Order, Sovereign
 	bool group_assistance_used_this_rest = false;  // Per-rest d4 inspiration die from patron
+	// Ravnica Guild Membership
+	string ravnica_guild = "";
+	// Grim Hollow Transformations (Campaign Guide paras 2294-2306)
+	string transformation = "";    // "" = untransformed; one of 6 paths
+	int transformation_stage = 0;  // 0-20 progression
+	// Wildemount Vestige in combat (for active vestige item)
+	string active_vestige_id = "";
+	int active_vestige_state = 0;  // 0=Dormant, 1=Awakened, 2=Exalted
+	// Ebon Tides fey court affiliation
+	string fey_court = "";
 	int climb_speed = 0;        // PHB Athlete feat / climbing race trait
 	int inspiring_leader_temp_hp_pool = 0; // Pool of temp HP grants from Inspiring Leader rest performance
 	int blindsight_range = 0;   // PHB Blind Fighting feat (10 ft) and various species/subclass effects

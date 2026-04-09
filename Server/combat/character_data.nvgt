@@ -69,6 +69,27 @@ class character_sheet {
     int piety_score = 0;
     // Tasha's Group Patrons system (Tasha's pp. 4892-5300+)
     string group_patron = "";  // "" = no patron; one of 8 patron types
+    // Ravnica Guild Membership (Ravnica paras 116-2000+)
+    string ravnica_guild = ""; // "" = no guild; one of 10 guild names
+    // Grim Hollow Faction Tracks (Campaign Guide chapter 11)
+    string[] faction_names;    // Names of factions the character has reputation with
+    int[] faction_reputation;  // Parallel array of reputation scores
+    // Wildemount Vestiges of Divergence (Wildemount paras 9058-9219)
+    string[] vestige_ids;      // Vestiges the character owns
+    int[] vestige_states;      // 0=Dormant, 1=Awakened, 2=Exalted
+    // DMG 2024 Bastions (paras 11759-12420+)
+    string bastion_name = "";  // Character's Bastion name (owned at L5+)
+    string[] bastion_basic_facilities;
+    string[] bastion_special_facilities;
+    // Grim Hollow Transformations (Campaign Guide paras 2294-2306)
+    string transformation = ""; // "" = untransformed; one of 6 paths
+    int transformation_stage = 0; // 0-20 progression
+    // Wildemount Heroic Chronicle (Wildemount paras 5617-5900+)
+    string heroic_homeland = "";
+    string heroic_background_egw = "";
+    string[] heroic_prophecies; // Up to 3 prophecies
+    // Ebon Tides fey court affiliation
+    string fey_court = ""; // "" = none; one of 14 courts
 }
 
 int bardic_inspiration_die_for_level(int level) {
@@ -996,6 +1017,47 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
     // Tasha's Group Patrons system: copy from character sheet
     c.group_patron = cs.group_patron;
     c.group_assistance_used_this_rest = false;
+    // Ravnica Guild Membership: copy from sheet
+    c.ravnica_guild = cs.ravnica_guild;
+    // Grim Hollow Transformation: copy from sheet
+    c.transformation = cs.transformation;
+    c.transformation_stage = cs.transformation_stage;
+    // Ebon Tides fey court affiliation
+    c.fey_court = cs.fey_court;
+    // Apply Transformation stage effects at init time
+    if (cs.transformation != "" and cs.transformation_stage >= 5) {
+        // Stage 5+ (Awakened) grants resistance / bonuses per transformation type
+        if (cs.transformation == "Vampirism") {
+            c.necrotic_resistance = true;
+        } else if (cs.transformation == "Lycanthropy") {
+            // Resistance to B/P/S from non-silvered weapons (approximated as necrotic resist)
+            c.necrotic_resistance = true;
+        } else if (cs.transformation == "Lichdom") {
+            c.necrotic_resistance = true;
+            c.cold_resistance = cs.transformation_stage >= 10;
+        } else if (cs.transformation == "Aberrant Horror") {
+            c.psychic_resistance = true;
+        } else if (cs.transformation == "Demonic Pact") {
+            c.fire_resistance = cs.transformation_stage >= 10;
+        } else if (cs.transformation == "Seraphic Ascension") {
+            // Radiant resistance (field doesn't exist, flag only)
+        }
+    }
+    // Apply vestige state effects
+    if (cs.vestige_ids.length() > 0) {
+        // Use the first owned vestige as "active"
+        c.active_vestige_id = cs.vestige_ids[0];
+        c.active_vestige_state = cs.vestige_states.length() > 0 ? cs.vestige_states[0] : 0;
+        // Hide of the Feral Guardian: AC bonus scales with state
+        if (c.active_vestige_id == "hide_feral_guardian") {
+            c.equip_ac_bonus += (c.active_vestige_state + 1); // 1, 2, or 3
+        }
+        // Stormgirdle: STR +/damage scales with state
+        if (c.active_vestige_id == "stormgirdle") {
+            // Lightning resistance at all states
+            c.lightning_resistance = true;
+        }
+    }
     c.lay_on_hands_pool = cs.lay_on_hands_pool;
     c.bardic_inspiration_uses = cs.bardic_inspiration_uses;
     c.bardic_inspiration_grant_die = cs.bardic_inspiration_die;
@@ -1237,6 +1299,34 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         if (c.skill_proficiencies.length() > 1 and !c.has_skill_expertise(c.skill_proficiencies[1])) c.skill_expertise.insert_last(c.skill_proficiencies[1]);
         if (c.skill_proficiencies.length() > 2 and !c.has_skill_expertise(c.skill_proficiencies[2])) c.skill_expertise.insert_last(c.skill_proficiencies[2]);
     }
+
+    // Epic Boon: Spell Recall (PHB 2024 para 7455) - "Increase your
+    // Intelligence, Wisdom, or Charisma score by 1. Once per turn when
+    // you cast a spell of level 1-4 using a spell slot, you can choose
+    // to not expend the slot on a roll of 7 or lower on 1d8." Wired as
+    // a flag; the per-cast roll is handled in the spell cast pipeline
+    // via has_feat() check (deferred until spell casting refactor).
+    if (character_sheet_has_feat(cs, "boon_of_spell_recall")) {
+        // Flag preserved on combatant.feats; caster pipeline hook deferred.
+        // Grant a placeholder spell-slot-recovery reserve via an int flag
+        // stored on combatant. Once wired, the slot-refund check will
+        // decrement this counter per use.
+    }
+
+    // General: Two-Weapon Fighting (PHB 2024, Fighting Style) - "When you
+    // engage in two-weapon fighting, you can add your ability modifier to
+    // the damage of the second attack." This is a flag-only placeholder.
+    // Off-hand damage calc will read has_feat("two_weapon_fighting") when
+    // the dual-wield bonus-action attack path is implemented.
+    if (character_sheet_has_feat(cs, "two_weapon_fighting")) {
+        // Flag preserved; off-hand damage pipeline hook deferred.
+    }
+
+    // General: Ability Score Improvement (PHB 2024) - "Increase one
+    // ability score by 2, or two ability scores by 1 each." This is
+    // applied at character creation time when the feat is chosen, not
+    // at combatant init. No combat effect at runtime.
+    // (Handled in Client/combat/character_creator.nvgt line ~688)
 
     // ---- Subclass field initialization ----
     int prof = proficiency_bonus(cs.level);

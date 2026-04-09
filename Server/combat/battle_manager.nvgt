@@ -2553,6 +2553,19 @@ class battle_manager {
 					if (ch.exists("free_cast_spells")) parse_csv_list(string(ch["free_cast_spells"]), cs.free_cast_spells);
 					if (ch.exists("cantrips")) parse_csv_list(string(ch["cantrips"]), cs.cantrips);
 					if (ch.exists("spells")) parse_csv_list(string(ch["spells"]), cs.spells);
+					// Phase 1 sub-system fields (Piety, Group Patron, Guild, Vestiges,
+					// Bastion, Transformation, Heroic Chronicle, Fey Court)
+					if (ch.exists("piety_god")) cs.piety_god = string(ch["piety_god"]);
+					if (ch.exists("piety_score")) cs.piety_score = int(ch["piety_score"]);
+					if (ch.exists("group_patron")) cs.group_patron = string(ch["group_patron"]);
+					if (ch.exists("ravnica_guild")) cs.ravnica_guild = string(ch["ravnica_guild"]);
+					if (ch.exists("transformation")) cs.transformation = string(ch["transformation"]);
+					if (ch.exists("transformation_stage")) cs.transformation_stage = int(ch["transformation_stage"]);
+					if (ch.exists("heroic_homeland")) cs.heroic_homeland = string(ch["heroic_homeland"]);
+					if (ch.exists("heroic_background_egw")) cs.heroic_background_egw = string(ch["heroic_background_egw"]);
+					if (ch.exists("fey_court")) cs.fey_court = string(ch["fey_court"]);
+					if (ch.exists("bastion_name")) cs.bastion_name = string(ch["bastion_name"]);
+					if (ch.exists("vestige_ids")) parse_csv_list(string(ch["vestige_ids"]), cs.vestige_ids);
 					has_char = true;
 				} else if (lobby_game_type == GAME_TYPE_SANDBOX and data.exists(ACCOUNT_KEY_LEGACY_CHARACTER)) {
 					json_object@ ch = data[ACCOUNT_KEY_LEGACY_CHARACTER];
