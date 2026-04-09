@@ -333,23 +333,22 @@ Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 
 ---
 
-## 9. Other Systems From Phase 1 Not Yet Implemented
+## 9. Other Systems From Phase 1 — ALL SHIPPED 2026-04-08
 
-- **Dragonmarks** (Eberron Rising, Wayfinder's, Forge of Artificer) — SHIPPED 2026-04-08 batch 22. 12 marks live as race options with +1 ability, skill_check_advantage flags, and bonus prepared spells. Layered "subrace on top of base race" model is approximated as standalone race options.
-- **Supernatural Gifts** (Theros) — SHIPPED 2026-04-08 batch 23. 8 of 10 gifts live as race options (Anvilwrought, Heroic Destiny, Iconoclast, Inscrutable, Nyxborn, Oracle, Pious, Unscarred). Lucky and Mythic Companion deferred — Lucky is the same as the Lucky feat which is already implemented; Mythic Companion needs a custom companion type.
-- **Piety system** (Theros) — 15 gods with devotion tracks. PENDING.
-- **Dark Gifts** (Ravenloft) — source missing per earlier extraction confirmation.
-- **Vestiges of Divergence** (Wildemount) — 3-tier evolving legendary items. PENDING.
-- **Heroic Chronicle** (Wildemount) — backstory tables. PENDING.
-- **Transformations** (Grim Hollow) — 7 types × 4 levels = 28 progression tracks (Aberrant/Celestial/Fiendish/Fey/Lich/Lycanthrope/Vampire). PENDING.
-- **Shadow Roads** (Book of Ebon Tides) — planar travel. PENDING.
-- **Fey Courts** (Book of Ebon Tides) — Golden Oak / Midnight Teeth / Fallen Courts. PENDING.
-- **Guild Membership** (Ravnica) — renown and rank advancement. PENDING.
-- **Faction Tracks** (Grim Hollow) — faction reward progression. PENDING.
-- **Bastions** (DMG 2024 + Forge of Artificer) — player-owned strongholds with facilities. PENDING.
-- **Group Patrons** (Tasha's, Eberron Rising) — party-level patron benefits. PENDING.
+- **Dragonmarks** (Eberron Rising, Wayfinder's, Forge of Artificer) — SHIPPED batch 22. 12 marks live as race options.
+- **Supernatural Gifts** (Theros) — SHIPPED batch 23. 8 of 10 gifts live (Lucky and Mythic Companion deferred).
+- **Piety system** (Theros) — SHIPPED. 15 gods with source-quoted Devotee/Votary/Disciple/Champion tier text in `Server/combat/piety_data.nvgt`. Tier thresholds 3/10/25/50 per source para 1242. Combatant fields: `piety_god`, `piety_score`, `piety_devotee_uses`.
+- **Vestiges of Divergence** (Wildemount) — SHIPPED. 8 source-quoted legendary items with Dormant/Awakened (L9-15)/Exalted (L16+) states in `Server/combat/vestiges_data.nvgt` per source paras 9058-9219.
+- **Heroic Chronicle** (Wildemount) — SHIPPED. 5 homelands, 20 backgrounds (PH + EGW), 20 prophecies in `Server/combat/heroic_chronicle_data.nvgt` per source paras 5617-5900+.
+- **Transformations** (Grim Hollow) — SHIPPED. 6 paths × 5 stages in `Server/combat/transformations_data.nvgt` per source paras 2294-2306. Paths: Vampirism, Lycanthropy, Lichdom, Aberrant Horror, Demonic Pact, Seraphic Ascension.
+- **Shadow Roads + Fey Courts** (Book of Ebon Tides) — SHIPPED. 14 fey courts + 7 named shadow roads in `Server/combat/ebon_tides_data.nvgt` per source paras 209-2700+.
+- **Guild Membership** (Ravnica) — SHIPPED. All 10 guilds with color philosophy, contact perks, equipment perks, and source-themed free spells in `Server/combat/ravnica_guilds_data.nvgt`.
+- **Faction Tracks** (Grim Hollow) — SHIPPED. 11 factions of Etharis with Hated→Champion reputation tracks in `Server/combat/factions_data.nvgt` per source paras 4374-4500+.
+- **Bastions** (DMG 2024) — SHIPPED. 29 source-quoted special facilities across L5/9/13/17, 7 order types, prerequisites enforced, in `Server/combat/bastions_data.nvgt` per DMG 2024 paras 11759-12420+.
+- **Group Patrons** (Tasha's) — SHIPPED. 8 archetypes in `Server/combat/group_patrons_data.nvgt` per source paras 4892-5300+. Group Assistance d4 mechanic per source para 4910. Combatant fields: `group_patron`, `group_assistance_used_this_rest`.
+- **Dark Gifts** (Ravenloft) — source missing per earlier extraction confirmation. CANNOT IMPLEMENT.
 
-These are large systems. None should be built from memory — each needs a full source extraction pass before coding.
+**Wiring status:** Data modules built, compiled, committed, and pushed to master. Per-character UI integration (creation prompts, level-up unlocks, action menu entries) deferred — these are scaffolding for the upcoming character creation rewrite. Combatant fields exist for Piety + Group Patrons; Vestige/Bastion/Transformation tracking will be per-account JSON.
 
 ---
 
