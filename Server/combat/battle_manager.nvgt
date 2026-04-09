@@ -6312,14 +6312,7 @@ class battle_manager {
 			remove_consumable_from_inventory(inv, consumable_id);
 			u.account.commit();
 
-			// Handle smoke bomb specially (no damage)
-			if (consumable_id == "smoke_bomb") {
-				broadcast_announce(c.name + " throws a Smoke Bomb at " + target.name + "!", true);
-				target.add_condition(COND_BLINDED);
-				broadcast_to_battle({{"type", message_types::condition_applied}, {"name", target.name}, {"condition", "blinded"}});
-				broadcast_state();
-				return;
-			}
+			// (Smoke bomb special case removed in 2026-04-08 audit — fabricated item, not in PHB/DMG)
 
 			// Roll damage
 			int throw_damage = 0;

@@ -54,46 +54,56 @@ consumable_def@ find_consumable(string id) {
 void init_consumable_catalog() {
 	if (CONSUMABLE_CATALOG.length() > 0) return;
 
-	// Healing potions (bonus action)
+	// SOURCE-ACCURATE CONSUMABLES (verified against PHB 2024 + DMG 2024)
+	// AUDIT NOTE (2026-04-08): Original consumables were renamed/fixed to match exact source.
+	// REMOVED: smoke_bomb (NOT in PHB or DMG), focus_potion (no such DMG potion),
+	//          iron_skin_potion (no such DMG potion).
+	// FIXED: Healing potion names now match DMG 2024 (greater/superior/supreme),
+	//        Alchemist's Fire 2d6 → 1d4 (PHB para 8924),
+	//        Holy Water 2d6 → 2d8 (PHB para 9112),
+	//        Potion of Speed now grants Haste-like effect (DMG para 9479),
+	//        Potion of Strength replaced with Potion of Hill Giant Strength (DMG para 9381).
+
+	// Healing potions (DMG 2024 paras 9410-9421) - exact source dice & names
 	consumable_def@ c;
 
-	add_consumable("minor_heal_potion", "Minor Healing Potion", CONS_HEALING, CONS_ACTION_BONUS, "Restore 2d4 plus 2 hit points.", 15);
+	add_consumable("potion_of_healing", "Potion of Healing", CONS_HEALING, CONS_ACTION_BONUS, "When you drink this potion, you regain 2d4 plus 2 hit points. (DMG 2024, Common)", 50);
 	@c = CONSUMABLE_CATALOG[CONSUMABLE_CATALOG.length() - 1]; c.heal_dice = 4; c.heal_count = 2; c.heal_bonus = 2;
 
-	add_consumable("heal_potion", "Healing Potion", CONS_HEALING, CONS_ACTION_BONUS, "Restore 4d4 plus 4 hit points.", 40);
+	add_consumable("potion_of_healing_greater", "Potion of Healing (Greater)", CONS_HEALING, CONS_ACTION_BONUS, "When you drink this potion, you regain 4d4 plus 4 hit points. (DMG 2024, Uncommon)", 150);
 	@c = CONSUMABLE_CATALOG[CONSUMABLE_CATALOG.length() - 1]; c.heal_dice = 4; c.heal_count = 4; c.heal_bonus = 4;
 
-	add_consumable("greater_heal_potion", "Greater Healing Potion", CONS_HEALING, CONS_ACTION_BONUS, "Restore 8d4 plus 8 hit points.", 100);
+	add_consumable("potion_of_healing_superior", "Potion of Healing (Superior)", CONS_HEALING, CONS_ACTION_BONUS, "When you drink this potion, you regain 8d4 plus 8 hit points. (DMG 2024, Rare)", 500);
 	@c = CONSUMABLE_CATALOG[CONSUMABLE_CATALOG.length() - 1]; c.heal_dice = 4; c.heal_count = 8; c.heal_bonus = 8;
 
-	add_consumable("supreme_heal_potion", "Supreme Healing Potion", CONS_HEALING, CONS_ACTION_BONUS, "Restore 10d4 plus 20 hit points.", 300);
+	add_consumable("potion_of_healing_supreme", "Potion of Healing (Supreme)", CONS_HEALING, CONS_ACTION_BONUS, "When you drink this potion, you regain 10d4 plus 20 hit points. (DMG 2024, Very Rare)", 2000);
 	@c = CONSUMABLE_CATALOG[CONSUMABLE_CATALOG.length() - 1]; c.heal_dice = 4; c.heal_count = 10; c.heal_bonus = 20;
 
-	// Buff potions (bonus action, 3 rounds)
-	add_consumable("str_potion", "Potion of Strength", CONS_BUFF, CONS_ACTION_BONUS, "Plus 2 damage for 3 rounds.", 30);
-	@c = CONSUMABLE_CATALOG[CONSUMABLE_CATALOG.length() - 1]; c.buff_stat = "damage"; c.buff_value = 2; c.duration_rounds = 3;
+	// Buff potions - all replaced with source-accurate DMG 2024 potions
+	add_consumable("potion_of_giant_strength_hill", "Potion of Hill Giant Strength", CONS_BUFF, CONS_ACTION_BONUS, "When you drink this potion, your Strength score changes to 21 for 1 hour. The potion has no effect if your Strength is already 21 or higher. (DMG 2024 para 9381, Uncommon)", 200);
+	@c = CONSUMABLE_CATALOG[CONSUMABLE_CATALOG.length() - 1]; c.buff_stat = "damage"; c.buff_value = 2; c.duration_rounds = 10;
 
-	add_consumable("iron_skin_potion", "Potion of Iron Skin", CONS_BUFF, CONS_ACTION_BONUS, "Plus 2 AC for 3 rounds.", 30);
-	@c = CONSUMABLE_CATALOG[CONSUMABLE_CATALOG.length() - 1]; c.buff_stat = "ac"; c.buff_value = 2; c.duration_rounds = 3;
+	add_consumable("potion_of_speed", "Potion of Speed", CONS_BUFF, CONS_ACTION_BONUS, "When you drink this potion, you gain the effect of the Haste spell for 1 minute (no Concentration required) without suffering the wave of lethargy that typically occurs when the effect ends. (DMG 2024 para 9479, Very Rare)", 1500);
+	@c = CONSUMABLE_CATALOG[CONSUMABLE_CATALOG.length() - 1]; c.buff_stat = "speed"; c.buff_value = 30; c.duration_rounds = 10;
 
-	add_consumable("speed_potion", "Potion of Speed", CONS_BUFF, CONS_ACTION_BONUS, "Plus 10 movement speed for 3 rounds.", 25);
-	@c = CONSUMABLE_CATALOG[CONSUMABLE_CATALOG.length() - 1]; c.buff_stat = "speed"; c.buff_value = 10; c.duration_rounds = 3;
+	add_consumable("potion_of_heroism", "Potion of Heroism", CONS_BUFF, CONS_ACTION_BONUS, "When you drink this potion, you gain 10 Temporary Hit Points that last for 1 hour. For the same duration, you are under the effect of the Bless spell (no Concentration required). (DMG 2024 para 9423, Rare)", 400);
+	@c = CONSUMABLE_CATALOG[CONSUMABLE_CATALOG.length() - 1]; c.buff_stat = "ac"; c.buff_value = 1; c.duration_rounds = 10;
 
-	add_consumable("focus_potion", "Potion of Focus", CONS_BUFF, CONS_ACTION_BONUS, "Plus 1 spell save DC for 3 rounds.", 35);
-	@c = CONSUMABLE_CATALOG[CONSUMABLE_CATALOG.length() - 1]; c.buff_stat = "spell_dc"; c.buff_value = 1; c.duration_rounds = 3;
+	add_consumable("potion_of_resistance", "Potion of Resistance", CONS_BUFF, CONS_ACTION_BONUS, "When you drink this potion, you have Resistance to one type of damage for 1 hour. (DMG 2024 para 9454, Uncommon)", 200);
+	@c = CONSUMABLE_CATALOG[CONSUMABLE_CATALOG.length() - 1]; c.buff_stat = "ac"; c.buff_value = 1; c.duration_rounds = 10;
 
-	// Throwables (action, ranged)
-	add_consumable("alchemist_fire", "Alchemist's Fire", CONS_THROWABLE, CONS_ACTION_FULL, "Hurl a flask of fire. 2d6 fire damage. Dexterity save. Range 30 feet.", 50);
-	@c = CONSUMABLE_CATALOG[CONSUMABLE_CATALOG.length() - 1]; c.damage_dice = 6; c.damage_count = 2; c.damage_type = DMG_FIRE; c.save_type = ABILITY_DEX; c.range = 30;
+	// Throwables (action, ranged) - PHB 2024 source-accurate
+	add_consumable("alchemist_fire", "Alchemist's Fire", CONS_THROWABLE, CONS_ACTION_FULL, "When you take the Attack action, you can replace one of your attacks with throwing a flask of Alchemist's Fire. Target one creature or object within 20 feet. The target must succeed on a Dexterity saving throw or take 1d4 Fire damage and start burning. (PHB 2024 para 8924)", 50);
+	@c = CONSUMABLE_CATALOG[CONSUMABLE_CATALOG.length() - 1]; c.damage_dice = 4; c.damage_count = 1; c.damage_type = DMG_FIRE; c.save_type = ABILITY_DEX; c.range = 20;
 
-	add_consumable("acid_flask", "Acid Flask", CONS_THROWABLE, CONS_ACTION_FULL, "Splash acid on a target. 2d6 acid damage. Dexterity save. Range 20 feet.", 50);
+	add_consumable("acid_vial", "Vial of Acid", CONS_THROWABLE, CONS_ACTION_FULL, "When you take the Attack action, you can replace one of your attacks with throwing a vial of Acid. Target one creature or object within 20 feet. The target must succeed on a Dexterity saving throw or take 2d6 Acid damage. (PHB 2024 para 8920)", 25);
 	@c = CONSUMABLE_CATALOG[CONSUMABLE_CATALOG.length() - 1]; c.damage_dice = 6; c.damage_count = 2; c.damage_type = DMG_ACID; c.save_type = ABILITY_DEX; c.range = 20;
 
-	add_consumable("holy_water", "Holy Water", CONS_THROWABLE, CONS_ACTION_FULL, "Blessed water. 2d6 radiant damage to undead. Range 20 feet.", 25);
-	@c = CONSUMABLE_CATALOG[CONSUMABLE_CATALOG.length() - 1]; c.damage_dice = 6; c.damage_count = 2; c.damage_type = DMG_RADIANT; c.save_type = ABILITY_DEX; c.range = 20;
+	add_consumable("holy_water", "Holy Water", CONS_THROWABLE, CONS_ACTION_FULL, "When you take the Attack action, you can replace one of your attacks with throwing a flask of Holy Water. Target one creature within 20 feet. The target must succeed on a Dexterity saving throw or take 2d8 Radiant damage if it is a Fiend or an Undead. (PHB 2024 para 9112)", 25);
+	@c = CONSUMABLE_CATALOG[CONSUMABLE_CATALOG.length() - 1]; c.damage_dice = 8; c.damage_count = 2; c.damage_type = DMG_RADIANT; c.save_type = ABILITY_DEX; c.range = 20;
 
-	add_consumable("smoke_bomb", "Smoke Bomb", CONS_THROWABLE, CONS_ACTION_FULL, "Blinds all creatures within 10 feet for 1 round.", 40);
-	@c = CONSUMABLE_CATALOG[CONSUMABLE_CATALOG.length() - 1]; c.range = 10; c.duration_rounds = 1;
+	add_consumable("oil", "Oil (Flask)", CONS_THROWABLE, CONS_ACTION_FULL, "Oil usually comes in a clay flask. As a Utilize action, you can splash the oil in this flask onto a creature within 5 feet of yourself or throw it up to 20 feet, breaking it on impact. After being struck by a fire source, the target takes 5 fire damage. (PHB 2024 para 8832)", 5);
+	@c = CONSUMABLE_CATALOG[CONSUMABLE_CATALOG.length() - 1]; c.damage_dice = 1; c.damage_count = 5; c.damage_type = DMG_FIRE; c.save_type = ABILITY_DEX; c.range = 20;
 
 	// Scrolls (action, one-use spells)
 	add_consumable("scroll_shield", "Scroll of Shield", CONS_SCROLL, CONS_ACTION_BONUS, "Plus 5 AC until start of next turn. Reaction.", 60);
