@@ -1317,6 +1317,16 @@ class battle {
 				cond_arr.add(c.conditions[j]);
 			}
 			cobj["conditions"] = cond_arr;
+			// Phase 1 sub-system fields for UI display and bonus action gating
+			cobj["piety_god"] = c.piety_god;
+			cobj["piety_score"] = c.piety_score;
+			cobj["piety_devotee_uses"] = c.piety_devotee_uses;
+			cobj["group_patron"] = c.group_patron;
+			cobj["group_assistance_used_this_rest"] = c.group_assistance_used_this_rest;
+			cobj["ravnica_guild"] = c.ravnica_guild;
+			cobj["transformation"] = c.transformation;
+			cobj["transformation_stage"] = c.transformation_stage;
+			cobj["fey_court"] = c.fey_court;
 			combatant_arr.add(cobj);
 		}
 		state["combatants"] = combatant_arr;

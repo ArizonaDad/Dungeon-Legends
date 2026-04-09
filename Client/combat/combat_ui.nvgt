@@ -24,6 +24,16 @@ class combat_entity {
 	int initiative;
 	string wild_shape_form;
 	int[] conditions;
+	// Phase 1 sub-system fields (for UI display + bonus action gating)
+	string piety_god = "";
+	int piety_score = 0;
+	int piety_devotee_uses = 0;
+	string group_patron = "";
+	bool group_assistance_used_this_rest = false;
+	string ravnica_guild = "";
+	string transformation = "";
+	int transformation_stage = 0;
+	string fey_court = "";
 
 	combat_entity() {
 		id = 0;
@@ -40,6 +50,15 @@ class combat_entity {
 		is_stable = false;
 		initiative = 0;
 		wild_shape_form = "";
+		piety_god = "";
+		piety_score = 0;
+		piety_devotee_uses = 0;
+		group_patron = "";
+		group_assistance_used_this_rest = false;
+		ravnica_guild = "";
+		transformation = "";
+		transformation_stage = 0;
+		fey_court = "";
 	}
 
 	string health_status() {
@@ -854,6 +873,8 @@ void show_bonus_action_menu() {
 	int creeping_fog_opt = -1;
 	int consume_darkness_opt = -1;
 	int telekinetic_shove_opt = -1;
+	int piety_devotee_opt = -1;
+	int group_assistance_opt = -1;
 	int summon_primal_companion_opt = -1;
 	int summon_steel_defender_opt = -1;
 	int summon_drake_companion_opt = -1;
@@ -1159,6 +1180,20 @@ void show_bonus_action_menu() {
 	// Telekinetic feat (PHB para 7813) - bonus action shove available to anyone with the feat
 	if (feat_selected("telekinetic")) {
 		telekinetic_shove_opt = m.add_item("Telekinetic Shove. Bonus action. Push a creature within 30ft 5 feet (STR save vs DC 8 + PB + spellcasting mod).");
+	}
+	// Theros Piety Devotee trait (Mythic Odysseys of Theros paras 1328-1329) —
+	// bonus action that casts the god's devotee spell for free, a number of
+	// times equal to a relevant ability modifier per long rest. Available
+	// whenever the character has a Piety god set and score >= 3.
+	if (@me != null and me.piety_god != "" and me.piety_score >= 3 and me.piety_devotee_uses > 0) {
+		piety_devotee_opt = m.add_item("Invoke " + me.piety_god + "'s favor. Bonus action. Cast your Devotee trait spell for free (" + me.piety_devotee_uses + " uses remaining this long rest).");
+	}
+	// Tasha's Group Patrons — Group Assistance (source para 4910) — a
+	// once-per-long-rest d4 bonus on any one d20 roll granted by your party's
+	// patron organization. Available whenever the character has a patron set
+	// and hasn't used the benefit this rest.
+	if (@me != null and me.group_patron != "" and !me.group_assistance_used_this_rest) {
+		group_assistance_opt = m.add_item("Call on " + me.group_patron + " for Group Assistance. Bonus action. Gain +1d4 to your next d20 roll (1/long rest).");
 	}
 	// Companion summoning bonus actions (TODO §7C: minimum viable implementation)
 	if (lc == "ranger" and subclass == "Beast Master" and level >= 3) {
@@ -1657,6 +1692,14 @@ void show_bonus_action_menu() {
 	else if (consume_darkness_opt >= 0 and res == consume_darkness_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "consume_darkness"}});
 		speak("Consuming darkness.", true);
+	}
+	else if (piety_devotee_opt >= 0 and res == piety_devotee_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "invoke_devotee_trait"}, {"target_id", current_target_id}});
+		speak("Invoking devotee trait.", true);
+	}
+	else if (group_assistance_opt >= 0 and res == group_assistance_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "group_assistance"}});
+		speak("Calling on your patron for assistance.", true);
 	}
 	else if (telekinetic_shove_opt >= 0 and res == telekinetic_shove_opt) {
 		if (current_target_id == 0) { speak("No target selected.", true); return; }
@@ -2626,6 +2669,16 @@ void parse_game_state(json_object@ msg) {
 					e.conditions.insert_last(int(conds[j]));
 				}
 			}
+			// Phase 1 sub-system fields
+			if (cobj.exists("piety_god")) e.piety_god = string(cobj["piety_god"]);
+			if (cobj.exists("piety_score")) e.piety_score = int(cobj["piety_score"]);
+			if (cobj.exists("piety_devotee_uses")) e.piety_devotee_uses = int(cobj["piety_devotee_uses"]);
+			if (cobj.exists("group_patron")) e.group_patron = string(cobj["group_patron"]);
+			if (cobj.exists("group_assistance_used_this_rest")) e.group_assistance_used_this_rest = bool(cobj["group_assistance_used_this_rest"]);
+			if (cobj.exists("ravnica_guild")) e.ravnica_guild = string(cobj["ravnica_guild"]);
+			if (cobj.exists("transformation")) e.transformation = string(cobj["transformation"]);
+			if (cobj.exists("transformation_stage")) e.transformation_stage = int(cobj["transformation_stage"]);
+			if (cobj.exists("fey_court")) e.fey_court = string(cobj["fey_court"]);
 			// Extract spell slots for our combatant
 			if (e.id == my_combatant_id) {
 				if (cobj.exists("spell_slots_current")) {
