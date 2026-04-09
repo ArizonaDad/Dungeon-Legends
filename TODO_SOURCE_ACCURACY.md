@@ -120,6 +120,20 @@ PHB docx file is missing full subclass detail pages for Paladin, Ranger, Rogue, 
 ### Spell descriptions in Basic Rules (not PHB):
 Phase 1 notes that the PHB file is missing spell descriptions. Basic Rules file paragraphs 11869-15661 contain 300+ spell descriptions. **All new spell implementations must pull from Basic Rules, not PHB.**
 
+### Spell description text rigor — RESOLVED 2026-04-09 (batch source-pull pass):
+- **334 of 367 catalog spells** had truncated (cut at 150 chars) or paraphrased two-sentence descriptions before this pass. They now use **full source-quoted Basic Rules 2024 text** including upcast riders ("Using a Higher-Level Spell Slot.") and "Cantrip Upgrade." notes, capped at ~600 chars and ending on a sentence boundary.
+- Method: `py` extraction script reads `basic_rules_full.txt`, detects spell headers via `Level N <school>` / `<school> Cantrip` patterns, collects body lines until next header, normalizes, set-matches to catalog `s.id` entries, and writes back into `Server/combat/spell_data.nvgt`.
+- 33 catalog spells were already full-length and end-punctuated, so they were skipped untouched. 29 catalog spells (Wildemount, Eberron, Tasha's, Fizban's extras) are not in Basic Rules and remain on their existing descriptions until extracted from those source docx files.
+
+### Spell save type rigor — RESOLVED 2026-04-09 (6 bug fixes against source):
+- Color Spray: -1 → CON (was missing the save entirely, source: "Constitution save or Blinded")
+- Ensnaring Strike: -1 → STR + 1d6 piercing rider (was missing save AND damage)
+- Sleep: -1 → WIS + concentration true + range 90→60 (2024 update — Incapacitated→Unconscious chain)
+- Slow: DEX → WIS + max_targets 1→6 (source: "Up to six creatures must succeed on a WIS save")
+- Otto's Irresistible Dance: DEX → WIS + concentration true (description text always said WIS)
+- Storm of Vengeance: DEX → CON + AoE radius 300 (source: "must make a CON save... 2d6 Thunder + Deafened")
+- See commit `3e3f5ab` for full source quotes.
+
 ### Generic spell resolver gaps:
 - AoE healing spells work (Mass Cure Wounds fixed in batch 20)
 - AoE damage spells work via the generic save loop
