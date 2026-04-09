@@ -128,10 +128,11 @@ Phase 1 notes that the PHB file is missing spell descriptions. Basic Rules file 
 - Conjure X spells (Animals, Elementals, Fey, Minor Elementals, Woodland Beings) not implemented
 - Concentration drop needs to properly clear ALL of the spell's effects, not just a flag
 
-### Spell list completeness:
-- 367 spells in `spell_data.nvgt`
-- Source has ~500+ spells in Basic Rules + Xanathar's + Tasha's + Fizban's + Wildemount + Griffon's + Grim Hollow + Ebon Tides (has extensive shadow spell list)
-- Need to run a diff pass to confirm no gaps
+### Spell list completeness — RESOLVED 2026-04-09 (verified diff pass):
+- **365 spells in `spell_data.nvgt`**, **339 spell descriptions in Basic Rules** (paras 11935-15661+, "Spell Descriptions" through "Spells (Z)").
+- After normalization (apostrophes, dashes, underscores), **0 Basic Rules spells are missing** from the catalog. The catalog is a SUPERSET — it has 26 extras from Xanathar's/Tasha's/Fizban's/Wildemount/etc.
+- All wizard-named spells (Bigby's Hand, Mordenkainen's Sword, Tasha's Hideous Laughter, Otiluke's Resilient Sphere, Drawmij's Instant Summons, Leomund's Tiny Hut, Melf's Acid Arrow, Nystul's Magic Aura, Otto's Irresistible Dance, Rary's Telepathic Bond, Tenser's Floating Disk, Heroes' Feast, Dragon's Breath, Hunter's Mark, Evard's Black Tentacles) are present.
+- Diff method: extract Basic Rules spell headers (lines preceded by `Level N <school> (...)` or `<school> Cantrip (...)`), normalize to lowercase + strip apostrophes/dashes/underscores, set-diff against `s.name=...` matches in catalog. Confirmed via `py` script run 2026-04-09.
 
 ---
 
