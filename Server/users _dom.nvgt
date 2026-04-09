@@ -1278,6 +1278,19 @@ void handle_user_message(user@ u, json_object@ msg)
 			if (msg.exists("free_cast_spells")) char_data["free_cast_spells"] = msg["free_cast_spells"];
 			if (msg.exists("cantrips")) char_data["cantrips"] = msg["cantrips"];
 			if (msg.exists("spells")) char_data["spells"] = msg["spells"];
+			// Phase 1 affiliations (Theros Piety, Tasha Group Patron, Ravnica Guild,
+			// Grim Hollow Transformation, Ebon Tides Fey Court, Wildemount Heroic
+			// Chronicle homeland) — chosen optionally during character creation.
+			if (msg.exists("piety_god")) char_data["piety_god"] = msg["piety_god"];
+			if (msg.exists("group_patron")) char_data["group_patron"] = msg["group_patron"];
+			if (msg.exists("ravnica_guild")) char_data["ravnica_guild"] = msg["ravnica_guild"];
+			if (msg.exists("transformation")) char_data["transformation"] = msg["transformation"];
+			if (msg.exists("transformation_stage")) char_data["transformation_stage"] = msg["transformation_stage"];
+			if (msg.exists("fey_court")) char_data["fey_court"] = msg["fey_court"];
+			if (msg.exists("heroic_homeland")) char_data["heroic_homeland"] = msg["heroic_homeland"];
+			// New Devotee characters who name a god start with piety score 1 per
+			// Theros para 1242 (the source's recommended starting devotion level).
+			if (msg.exists("piety_god") and string(msg["piety_god"]) != "" and !char_data.exists("piety_score")) char_data["piety_score"] = 1;
 			// Append to character array (multi-character support, up to 40 per mode)
 			ensure_character_array_format(u.account, profile);
 			json_array@ chars = get_character_list(u.account, profile);
