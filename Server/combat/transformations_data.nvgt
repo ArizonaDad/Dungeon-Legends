@@ -1,0 +1,144 @@
+// Grim Hollow Transformations System
+// Source: Grim Hollow Campaign Guide, paragraphs 2294-2306
+//
+// In the world of Etharis, characters who undergo dark Transformations gain
+// terrible power but face persecution by the Inquisition. Per source para
+// 2295: "Any Transformation that results in a physical change—which is most
+// of them—is punishable by immediate death."
+//
+// Transformations are tracked as a 0-20 progression. Each tier grants
+// powers and physical changes. Arcanist Inquisition reputation drops by
+// 1 per stage.
+
+const int TRANSFORM_NONE = 0;
+const int TRANSFORM_INFECTED = 1;       // Showing first signs
+const int TRANSFORM_AWAKENED = 5;       // Powers fully manifest
+const int TRANSFORM_ASCENDED = 10;      // Major physical change
+const int TRANSFORM_FALLEN = 15;        // Lost most humanity
+const int TRANSFORM_FULL = 20;          // Complete transformation, NPC mode
+
+class transformation_def {
+    string name;
+    string description;
+    string source_book;
+    string flavor;
+    string stage_1_effect;   // Infected
+    string stage_5_effect;   // Awakened
+    string stage_10_effect;  // Ascended
+    string stage_15_effect;  // Fallen
+    string stage_20_effect;  // Full
+}
+
+transformation_def@[] TRANSFORMATIONS;
+
+void add_transformation(string name, string desc, string source, string flavor, string s1, string s5, string s10, string s15, string s20) {
+    transformation_def t;
+    t.name = name;
+    t.description = desc;
+    t.source_book = source;
+    t.flavor = flavor;
+    t.stage_1_effect = s1;
+    t.stage_5_effect = s5;
+    t.stage_10_effect = s10;
+    t.stage_15_effect = s15;
+    t.stage_20_effect = s20;
+    TRANSFORMATIONS.insert_last(t);
+}
+
+void init_transformations() {
+    if (TRANSFORMATIONS.length() > 0) return;
+
+    // Vampirism — implied from source para 2296 mentioning vampires as Transformation victims
+    add_transformation("Vampirism",
+        "The dark gift of the Crimson Court. Vampirism transforms a mortal into one of the undead, granting power at the cost of their humanity and an eternal hunger for blood.",
+        "Grim Hollow Campaign Guide para 2296",
+        "Eternity favors the strong. The dead serve the night, and the night serves us all. — Crimson Court motto",
+        "Infected: -1 sunlight resistance. Hunger for blood begins. Pale skin. (Stage 1+)",
+        "Awakened: Necrotic resistance. Charm vs. Humanoids once per dawn. Detect blood within 60 ft. (Stage 5+)",
+        "Ascended: +2 STR, +2 DEX. Spider Climb at will. Bite attack 1d6 piercing + 1d6 necrotic. Children of the Night (call 1d4 wolves/bats/rats per long rest). (Stage 10+)",
+        "Fallen: Permanent darkvision 120 ft. Damage resistance to all non-magical attacks (silver penalty). Vulnerable to sunlight and running water. (Stage 15+)",
+        "Full Vampire: Become an NPC. Full vampire spawn statistics. Cannot be a player character. (Stage 20)");
+
+    // Lycanthropy — implied from source para 2296
+    add_transformation("Lycanthropy",
+        "The curse of the moon. Bitten by a were-creature, the victim slowly transforms into a beast under the full moon. Werewolves, werebears, and weretigers are common.",
+        "Grim Hollow Campaign Guide para 2296",
+        "The moon calls. The hunt is on. Run wild, my brothers and sisters. — Wolfkin saying",
+        "Infected: Sensitivity to silver. Mild aggression. Heightened senses. (Stage 1+)",
+        "Awakened: Damage resistance to bludgeoning/piercing/slashing from non-silvered weapons. +1 STR. (Stage 5+)",
+        "Ascended: Hybrid form available as bonus action. +2 STR/DEX/CON in hybrid. Bite/claw attacks 1d8 + 1d4 piercing. (Stage 10+)",
+        "Fallen: Permanent claws (1d6+STR). Damage immunity to nonmagical, non-silvered weapons. Forced wild form during full moon. (Stage 15+)",
+        "Full Werecreature: Become an NPC. Full lycanthrope statistics. Permanent beast form. (Stage 20)");
+
+    // Lichdom — implied from source para 2299
+    add_transformation("Lichdom",
+        "The ultimate path of necromantic ascension. A wizard sacrifices their soul into a phylactery, becoming an undead spellcaster of immense power. Dabblers in this art often die horribly.",
+        "Grim Hollow Campaign Guide para 2299",
+        "Death is but a doorway. Through study, we transcend. — Lichdom mantra",
+        "Infected: Cold to the touch. Detect by undead. -1 CHA. Insomnia. (Stage 1+)",
+        "Awakened: Necrotic resistance. Cast detect undead at will. Phylactery created (vulnerable until destroyed). (Stage 5+)",
+        "Ascended: +2 INT. Cast animate dead at will. No need to eat or sleep. Resistance to cold. (Stage 10+)",
+        "Fallen: Damage immunity to poison and non-magical attacks. Cast finger of death once per long rest. Visible undeath. (Stage 15+)",
+        "Full Lich: Become an NPC. Full lich statistics. Cannot be a player character. (Stage 20)");
+
+    // Aberrant Horror — implied from source para 2296
+    add_transformation("Aberrant Horror",
+        "Exposure to the Far Realm warps a mortal's body and mind beyond mortal recognition. Tentacles, extra eyes, and unspeakable mutations manifest.",
+        "Grim Hollow Campaign Guide para 2296",
+        "The Old Ones whisper. Listen to them, mortal. They have so much to teach. — Far Realm cultist",
+        "Infected: Mild physical mutations. Headaches. Hear whispers in unknown tongue. -1 WIS. (Stage 1+)",
+        "Awakened: Telepathy 30 ft. Cast dissonant whispers once per long rest. Visible mutations. (Stage 5+)",
+        "Ascended: +2 INT/CHA, -2 WIS. Tentacle attack 1d6 bludgeoning + grapple. Resistance to psychic. (Stage 10+)",
+        "Fallen: Truesight 30 ft. Cast feeblemind once per long rest. Visible alien anatomy. Cannot pass for normal. (Stage 15+)",
+        "Full Aberration: Become an NPC. Full aberration statistics. (Stage 20)");
+
+    // Demonic Pact — Mortal corruption via demonic influence
+    add_transformation("Demonic Pact",
+        "A bargain with an Arch Daemon grants extraordinary power at the cost of the mortal soul. Each tier sees the host's body twist further toward fiendishness.",
+        "Grim Hollow Campaign Guide chapter on Daemons",
+        "Power has its price. Yours is steep but the rewards... oh, the rewards. — Arch Daemon",
+        "Infected: Brimstone smell. Eyes flash red when angry. Cast hellish rebuke once per long rest. (Stage 1+)",
+        "Awakened: Fire resistance. +1 STR or CHA. Visible horns or claws appearing. (Stage 5+)",
+        "Ascended: +2 STR or CHA. Bite/claw attack 1d6 + 1d6 fire. Cast burning hands once per long rest. (Stage 10+)",
+        "Fallen: Damage resistance to fire. Cast scorching ray once per long rest. Visible fiendish features (impossible to hide). (Stage 15+)",
+        "Full Cambion: Become an NPC. Full cambion statistics. (Stage 20)");
+
+    // Seraphic Ascension — The blessed Transformation per source para 2297
+    add_transformation("Seraphic Ascension",
+        "The rare blessing of the Arch Seraphs. A mortal who undergoes this Transformation is exalted as a divine champion. Per source para 2297: 'Servants of the Arch Seraphs reluctantly supply monster hunters with coin and other resources.'",
+        "Grim Hollow Campaign Guide para 2297",
+        "Blessed are the chosen. Walk in the Seraphs' light, mortal. — Hedric, the High Redeemer",
+        "Infected: Faint glow when in temples. +1 to one ability score. Heal others 1 HP by touch. (Stage 1+)",
+        "Awakened: Radiant resistance. Cast bless once per long rest. Detect undead/fiends within 60 ft. (Stage 5+)",
+        "Ascended: +2 CHA. Cast lesser restoration once per long rest. Permanent dim light aura around you. (Stage 10+)",
+        "Fallen: Cast revivify once per long rest. Permanent flying speed of 20 ft (small wings). Recognized as touched by gods. (Stage 15+)",
+        "Full Seraph: Become an NPC. Full celestial statistics. Blessed champion of the divine. (Stage 20)");
+}
+
+transformation_def@ get_transformation(string name) {
+    init_transformations();
+    for (uint i = 0; i < TRANSFORMATIONS.length(); i++) {
+        if (TRANSFORMATIONS[i].name == name) return TRANSFORMATIONS[i];
+    }
+    return null;
+}
+
+string transformation_stage_name(int stage) {
+    if (stage >= TRANSFORM_FULL) return "Full";
+    if (stage >= TRANSFORM_FALLEN) return "Fallen";
+    if (stage >= TRANSFORM_ASCENDED) return "Ascended";
+    if (stage >= TRANSFORM_AWAKENED) return "Awakened";
+    if (stage >= TRANSFORM_INFECTED) return "Infected";
+    return "Untransformed";
+}
+
+string transformation_active_effect(string name, int stage) {
+    transformation_def@ t = get_transformation(name);
+    if (@t == null) return "";
+    if (stage >= TRANSFORM_FULL) return t.stage_20_effect;
+    if (stage >= TRANSFORM_FALLEN) return t.stage_15_effect;
+    if (stage >= TRANSFORM_ASCENDED) return t.stage_10_effect;
+    if (stage >= TRANSFORM_AWAKENED) return t.stage_5_effect;
+    if (stage >= TRANSFORM_INFECTED) return t.stage_1_effect;
+    return "";
+}

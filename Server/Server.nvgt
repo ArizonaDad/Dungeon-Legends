@@ -19,6 +19,7 @@
 #include "combat/factions_data.nvgt"
 #include "combat/ravnica_guilds_data.nvgt"
 #include "combat/ebon_tides_data.nvgt"
+#include "combat/transformations_data.nvgt"
 #include "../common/glory_shop_data.nvgt"
 const string REQUIRED_CLIENT_VERSION = "1.0.2";
 
