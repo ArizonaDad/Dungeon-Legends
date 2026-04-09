@@ -2424,6 +2424,37 @@ void speak_my_status() {
 	}
 	if (has_slots) text += slot_text;
 
+	// Phase 1 setting affiliations: only list fields the player has actually set.
+	// Piety tier names follow Theros para 1242 thresholds (3/10/25/50 = Devotee/
+	// Votary/Disciple/Champion). Transformation stage names follow Grim Hollow
+	// para 2294-2306 (1/5/10/15/20 = Infected/Awakened/Ascended/Fallen/Full).
+	string phase1 = "";
+	if (me.piety_god != "") {
+		string tier = "Initiate";
+		if (me.piety_score >= 50) tier = "Champion";
+		else if (me.piety_score >= 25) tier = "Disciple";
+		else if (me.piety_score >= 10) tier = "Votary";
+		else if (me.piety_score >= 3) tier = "Devotee";
+		phase1 += " Worship: " + me.piety_god + ", piety score " + me.piety_score + " (" + tier + ").";
+		if (me.piety_devotee_uses > 0) phase1 += " Devotee trait uses: " + me.piety_devotee_uses + ".";
+	}
+	if (me.group_patron != "") {
+		phase1 += " Group Patron: " + me.group_patron + ".";
+		if (!me.group_assistance_used_this_rest) phase1 += " Group Assistance available.";
+	}
+	if (me.ravnica_guild != "") phase1 += " Ravnica Guild: " + me.ravnica_guild + ".";
+	if (me.transformation != "") {
+		string tstage = "Untransformed";
+		if (me.transformation_stage >= 20) tstage = "Full";
+		else if (me.transformation_stage >= 15) tstage = "Fallen";
+		else if (me.transformation_stage >= 10) tstage = "Ascended";
+		else if (me.transformation_stage >= 5) tstage = "Awakened";
+		else if (me.transformation_stage >= 1) tstage = "Infected";
+		phase1 += " Transformation: " + me.transformation + ", stage " + me.transformation_stage + " (" + tstage + ").";
+	}
+	if (me.fey_court != "") phase1 += " Fey Court: " + me.fey_court + ".";
+	if (phase1 != "") text += phase1;
+
 	speak(text, true);
 }
 
