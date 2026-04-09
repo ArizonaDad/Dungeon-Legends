@@ -1,0 +1,195 @@
+// DMG 2024 Bastions System
+// Source: Dungeon Master's Guide 2024, Chapter 8 (paragraphs 11759-12420+)
+//
+// A Bastion is a location that belongs to a player character: a home,
+// stronghold, and place of power developed over the course of a campaign.
+// Characters acquire Bastions at level 5.
+//
+// Bastions have basic facilities (no game effect, flavour) and special
+// facilities (game effects via Bastion turns and orders).
+
+const int BASTION_FACILITY_BASIC = 0;
+const int BASTION_FACILITY_SPECIAL = 1;
+
+const int BASTION_SPACE_CRAMPED = 0;  // 4 squares
+const int BASTION_SPACE_ROOMY = 1;    // 16 squares
+const int BASTION_SPACE_VAST = 2;     // 36 squares
+
+const int BASTION_ORDER_CRAFT = 0;
+const int BASTION_ORDER_EMPOWER = 1;
+const int BASTION_ORDER_HARVEST = 2;
+const int BASTION_ORDER_MAINTAIN = 3;
+const int BASTION_ORDER_RECRUIT = 4;
+const int BASTION_ORDER_RESEARCH = 5;
+const int BASTION_ORDER_TRADE = 6;
+
+string[] BASTION_ORDER_NAMES = {"Craft", "Empower", "Harvest", "Maintain", "Recruit", "Research", "Trade"};
+string[] BASTION_SPACE_NAMES = {"Cramped", "Roomy", "Vast"};
+int[] BASTION_SPACE_SQUARES = {4, 16, 36};
+
+// Source para 11819-11831 — Adding Basic Facilities cost
+int bastion_basic_cost(int space) {
+    if (space == BASTION_SPACE_CRAMPED) return 500;
+    if (space == BASTION_SPACE_ROOMY) return 1000;
+    if (space == BASTION_SPACE_VAST) return 3000;
+    return 0;
+}
+
+int bastion_basic_days(int space) {
+    if (space == BASTION_SPACE_CRAMPED) return 20;
+    if (space == BASTION_SPACE_ROOMY) return 45;
+    if (space == BASTION_SPACE_VAST) return 125;
+    return 0;
+}
+
+class bastion_facility_def {
+    string name;
+    int min_level;          // Minimum level required
+    int order_type;
+    string prerequisite;    // "None" or specific feature
+    string description;
+}
+
+bastion_facility_def@[] BASTION_FACILITIES;
+
+void add_bastion_facility(string name, int min_lvl, int order, string prereq, string desc) {
+    bastion_facility_def f;
+    f.name = name;
+    f.min_level = min_lvl;
+    f.order_type = order;
+    f.prerequisite = prereq;
+    f.description = desc;
+    BASTION_FACILITIES.insert_last(f);
+}
+
+void init_bastion_facilities() {
+    if (BASTION_FACILITIES.length() > 0) return;
+
+    // Source paras 11894-12009 — Special Facilities table
+
+    // Level 5 facilities
+    add_bastion_facility("Arcane Study", 5, BASTION_ORDER_CRAFT,
+        "Ability to use an Arcane Focus or a tool as a Spellcasting Focus",
+        "A workspace dedicated to magical research. Hirelings craft magical items here. (DMG 2024 para 11895)");
+    add_bastion_facility("Armory", 5, BASTION_ORDER_TRADE, "None",
+        "A storehouse for weapons and armor. Hirelings trade in martial gear and recruit warriors. (DMG 2024 para 11899)");
+    add_bastion_facility("Barrack", 5, BASTION_ORDER_RECRUIT, "None",
+        "A barracks where hirelings train and recruit Bastion Defenders. (DMG 2024 para 11903)");
+    add_bastion_facility("Garden", 5, BASTION_ORDER_HARVEST, "None",
+        "A cultivated garden producing herbs, vegetables, and other plant resources. (DMG 2024 para 11907)");
+    add_bastion_facility("Library", 5, BASTION_ORDER_RESEARCH, "None",
+        "A collection of books and scrolls. Hirelings research lore and historical information. (DMG 2024 para 11911)");
+    add_bastion_facility("Sanctuary", 5, BASTION_ORDER_CRAFT,
+        "Ability to use a Holy Symbol or Druidic Focus as a Spellcasting Focus",
+        "A consecrated space for divine or natural magic. Hirelings craft holy/natural items. (DMG 2024 para 11915)");
+    add_bastion_facility("Smithy", 5, BASTION_ORDER_CRAFT, "None",
+        "A forge where hirelings craft weapons, armor, and metal goods. (DMG 2024 para 11919)");
+    add_bastion_facility("Storehouse", 5, BASTION_ORDER_TRADE, "None",
+        "A warehouse for storing trade goods. Hirelings buy and sell various commodities. (DMG 2024 para 11923)");
+    add_bastion_facility("Workshop", 5, BASTION_ORDER_CRAFT, "None",
+        "A general crafting workspace. Hirelings craft mundane items and tools. (DMG 2024 para 11927)");
+
+    // Level 9 facilities
+    add_bastion_facility("Gaming Hall", 9, BASTION_ORDER_TRADE, "None",
+        "A hall for games of chance and skill, generating income through gambling. (DMG 2024 para 11931)");
+    add_bastion_facility("Greenhouse", 9, BASTION_ORDER_HARVEST, "None",
+        "A magical greenhouse producing rare herbs, alchemical components, and exotic plants. (DMG 2024 para 11935)");
+    add_bastion_facility("Laboratory", 9, BASTION_ORDER_CRAFT, "None*",
+        "An alchemical laboratory for crafting potions, poisons, and elixirs. (DMG 2024 para 11939)");
+    add_bastion_facility("Sacristy", 9, BASTION_ORDER_CRAFT,
+        "Ability to use a Holy Symbol or Druidic Focus as a Spellcasting Focus",
+        "A sacred chamber for crafting religious items and holy water. (DMG 2024 para 11943)");
+    add_bastion_facility("Scriptorium", 9, BASTION_ORDER_CRAFT, "None*",
+        "A scribal workshop for crafting scrolls, books, and written knowledge. (DMG 2024 para 11947)");
+    add_bastion_facility("Stable", 9, BASTION_ORDER_TRADE, "None",
+        "A stable for raising and trading mounts and beasts of burden. (DMG 2024 para 11951)");
+    add_bastion_facility("Teleportation Circle", 9, BASTION_ORDER_RECRUIT, "None",
+        "A permanent teleportation circle linked to other Bastions or planar locations. (DMG 2024 para 11955)");
+    add_bastion_facility("Theater", 9, BASTION_ORDER_EMPOWER, "None",
+        "A performance hall where bards inspire visitors. (DMG 2024 para 11959)");
+    add_bastion_facility("Training Area", 9, BASTION_ORDER_EMPOWER, "None",
+        "A training ground where the Bastion's owner and allies practice combat. (DMG 2024 para 11963)");
+    add_bastion_facility("Trophy Room", 9, BASTION_ORDER_RESEARCH, "None",
+        "A room displaying the owner's trophies of conquest. Studying them grants insight. (DMG 2024 para 11967)");
+
+    // Level 13 facilities
+    add_bastion_facility("Archive", 13, BASTION_ORDER_RESEARCH, "None",
+        "A vast collection of records and lore. Hirelings unearth deep secrets. (DMG 2024 para 11971)");
+    add_bastion_facility("Meditation Chamber", 13, BASTION_ORDER_EMPOWER, "None",
+        "A serene space for contemplation. Time here grants empowerment. (DMG 2024 para 11975)");
+    add_bastion_facility("Menagerie", 13, BASTION_ORDER_RECRUIT, "None",
+        "A collection of exotic creatures. Hirelings recruit beast companions. (DMG 2024 para 11979)");
+    add_bastion_facility("Observatory", 13, BASTION_ORDER_EMPOWER,
+        "Ability to use a Spellcasting Focus",
+        "A celestial observatory for divining cosmic patterns. (DMG 2024 para 11983)");
+    add_bastion_facility("Pub", 13, BASTION_ORDER_RESEARCH, "None",
+        "A tavern where patrons share rumors and information. (DMG 2024 para 11987)");
+    add_bastion_facility("Reliquary", 13, BASTION_ORDER_HARVEST,
+        "Ability to use a Holy Symbol or Druidic Focus as a Spellcasting Focus",
+        "A sanctified vault for holy relics. Generates blessings and spiritual resources. (DMG 2024 para 11991)");
+
+    // Level 17 facilities
+    add_bastion_facility("Demiplane", 17, BASTION_ORDER_EMPOWER,
+        "Ability to use an Arcane Focus or a tool as a Spellcasting Focus",
+        "A pocket dimension accessible from the Bastion. Time here flows differently. (DMG 2024 para 11995)");
+    add_bastion_facility("Guildhall", 17, BASTION_ORDER_RECRUIT, "Expertise in a skill",
+        "A formal guild headquarters. Hirelings recruit specialists from across the realm. (DMG 2024 para 11999)");
+    add_bastion_facility("Sanctum", 17, BASTION_ORDER_EMPOWER,
+        "Ability to use a Holy Symbol or Druidic Focus as a Spellcasting Focus",
+        "An ultimate sanctified space. Empowers the Bastion's owner with divine/natural might. (DMG 2024 para 12003)");
+    add_bastion_facility("War Room", 17, BASTION_ORDER_RECRUIT,
+        "Fighting Style feature or Unarmored Defense feature",
+        "A strategic command center. Hirelings recruit elite warriors and tacticians. (DMG 2024 para 12007)");
+}
+
+bastion_facility_def@ get_bastion_facility(string name) {
+    init_bastion_facilities();
+    for (uint i = 0; i < BASTION_FACILITIES.length(); i++) {
+        if (BASTION_FACILITIES[i].name == name) return BASTION_FACILITIES[i];
+    }
+    return null;
+}
+
+// Source paras 11849-11858 — Special Facility Acquisition by level
+int bastion_max_facilities_for_level(int level) {
+    if (level >= 17) return 6;
+    if (level >= 13) return 5;
+    if (level >= 9) return 4;
+    if (level >= 5) return 2;
+    return 0;
+}
+
+// Per-character Bastion state (would be stored in account JSON in practice)
+class bastion_state {
+    string owner_username;
+    string bastion_name;
+    int character_level = 5;
+    string[] basic_facilities;          // Names of basic facilities the character has
+    string[] special_facilities;        // Names of special facilities
+    int defensive_walls_squares = 0;    // Each square = 250 GP, 10 days
+    int last_bastion_turn_day = 0;      // In-game day count of last Bastion turn
+}
+
+// Source para 11869-11886 — Bastion orders descriptions
+string bastion_order_description(int order) {
+    if (order == BASTION_ORDER_CRAFT) return "Hirelings craft an item that can be made in this facility. (DMG para 11871)";
+    if (order == BASTION_ORDER_EMPOWER) return "The special facility confers a temporary empowerment to you or someone else. (DMG para 11873)";
+    if (order == BASTION_ORDER_HARVEST) return "Hirelings gather a resource produced in this facility. (DMG para 11875)";
+    if (order == BASTION_ORDER_MAINTAIN) return "All hirelings focus on maintaining the Bastion. Roll on Bastion Events table. (DMG para 11878)";
+    if (order == BASTION_ORDER_RECRUIT) return "Hirelings recruit creatures (often Bastion Defenders). (DMG para 11882)";
+    if (order == BASTION_ORDER_RESEARCH) return "Hirelings gather information. (DMG para 11884)";
+    if (order == BASTION_ORDER_TRADE) return "Hirelings buy and sell goods or services. (DMG para 11886)";
+    return "";
+}
+
+// List facilities by minimum level (for level-up choices)
+bastion_facility_def@[] facilities_for_level(int level) {
+    init_bastion_facilities();
+    bastion_facility_def@[] result;
+    for (uint i = 0; i < BASTION_FACILITIES.length(); i++) {
+        if (BASTION_FACILITIES[i].min_level <= level) {
+            result.insert_last(BASTION_FACILITIES[i]);
+        }
+    }
+    return result;
+}
