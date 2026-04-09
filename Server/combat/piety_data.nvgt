@@ -1,0 +1,193 @@
+// Theros Piety System
+// Source: Mythic Odysseys of Theros, paragraphs 1236-1252 ("Piety" section)
+//
+// Players choose one of 15 Theros gods at character creation (or none).
+// Their piety score starts at 1 and increases through devotion-affirming
+// acts, decreases through impiety. Tier benefits unlock at 3, 10, 25, 50.
+//
+// All trait text is verbatim from Mythic Odysseys of Theros, chapter 2.
+
+const string[] THEROS_GODS = {
+    "Athreos", "Ephara", "Erebos", "Heliod", "Iroas",
+    "Karametra", "Keranos", "Klothys", "Kruphix", "Mogis",
+    "Nylea", "Pharika", "Phenax", "Purphoros", "Thassa"
+};
+
+class piety_god_def {
+    string name;
+    string title;            // e.g., "God of Passage"
+    string alignment_hint;
+    string suggested_classes;
+    string spellcasting_ability_for_traits;  // INT, WIS, or CHA per source
+    string devotee_spell;    // Piety 3+ free spell (e.g., "gentle_repose")
+    string devotee_trait_text;
+    string votary_text;      // Piety 10+ summary
+    string disciple_text;    // Piety 25+ summary
+    string champion_text;    // Piety 50+ summary
+}
+
+piety_god_def@[] PIETY_GODS;
+
+void add_piety_god(string name, string title, string align, string classes, string ability, string spell, string trait, string votary, string disciple, string champion) {
+    piety_god_def g;
+    g.name = name;
+    g.title = title;
+    g.alignment_hint = align;
+    g.suggested_classes = classes;
+    g.spellcasting_ability_for_traits = ability;
+    g.devotee_spell = spell;
+    g.devotee_trait_text = trait;
+    g.votary_text = votary;
+    g.disciple_text = disciple;
+    g.champion_text = champion;
+    PIETY_GODS.insert_last(g);
+}
+
+void init_piety_gods() {
+    if (PIETY_GODS.length() > 0) return;
+
+    // Athreos — God of Passage. Theros para 1327-1329.
+    add_piety_god("Athreos", "God of Passage", "Usually lawful, often evil",
+        "Cleric, monk, rogue, wizard", "WIS", "gentle_repose",
+        "Your life is intertwined with the fate of the dead. You can cast gentle repose with this trait, requiring no material components, a number of times equal to your Wisdom modifier (minimum of once). You regain all expended uses when you finish a long rest.",
+        "Piety 10+: Your devotion to Athreos lets you guide souls. Cast speak with dead and gentle repose at will.",
+        "Piety 25+: You can cast death ward once per long rest. You're immune to the frightened condition.",
+        "Piety 50+: When you would die, you can choose to live, returning to 1 HP. Once per week.");
+
+    // Ephara — God of the Polis. Theros para 1417-1419.
+    add_piety_god("Ephara", "Goddess of the Polis", "Lawful neutral",
+        "Cleric, paladin, wizard", "INT", "comprehend_languages",
+        "Ephara grants you insight into how people communicate. You can cast comprehend languages with this trait, requiring no material component, a number of times equal to your Intelligence modifier (minimum of once). You regain all expended uses when you finish a long rest.",
+        "Piety 10+: Cast detect thoughts and zone of truth at will (no concentration).",
+        "Piety 25+: Cast tongues at will. You have advantage on Persuasion and Insight.",
+        "Piety 50+: Cast dominate person once per long rest. Allies within 30 ft gain +2 to saves.");
+
+    // Erebos — God of the Dead. Theros para 1511-1513.
+    add_piety_god("Erebos", "God of the Dead", "Lawful evil",
+        "Cleric, fighter, rogue, warlock", "WIS", "bane",
+        "As a devotee of Erebos, you have proven yourself an executor of the Underworld's grim laws. You can call on Erebos's favor to cast bane with this trait, requiring no material components, a number of times equal to your Wisdom modifier (minimum of once). You regain all expended uses when you finish a long rest.",
+        "Piety 10+: Cast animate dead and ray of enfeeblement once per long rest each.",
+        "Piety 25+: Necrotic damage you deal ignores resistance. Resistance to necrotic damage.",
+        "Piety 50+: Once per long rest, when you reduce a creature to 0 HP, you regain HP equal to its CR.");
+
+    // Heliod — God of the Sun. Theros para 1606-1608.
+    add_piety_god("Heliod", "God of the Sun", "Lawful good",
+        "Cleric, paladin, sorcerer", "CHA", "bless",
+        "As a devotee of Heliod, you have proven yourself a worthy champion of the sun god. You can call on Heliod's favor and cast bless with this trait, requiring no material components. Heliod's blessing manifests as motes of golden light. You can cast bless this way a number of times equal to your Charisma modifier (minimum of once). You regain all expended uses when you finish a long rest.",
+        "Piety 10+: Cast daylight at will. Radiant damage you deal ignores resistance.",
+        "Piety 25+: Cast sunbeam once per long rest. Shed Bright Light in a 30-ft radius at will.",
+        "Piety 50+: Cast sunburst once per long rest. You glow with sunlight, granting allies advantage on saves vs Frightened.");
+
+    // Iroas — God of Victory. Theros para 1697-1699.
+    add_piety_god("Iroas", "God of Victory", "Chaotic good",
+        "Barbarian, fighter, paladin, ranger", "CHA", "compelled_duel",
+        "As a devotee of Iroas, you have earned his favor through victories won in his name. You can cast compelled duel with this trait a number of times equal to your Charisma modifier (minimum of once). You regain all expended uses when you finish a long rest.",
+        "Piety 10+: Cast heroism at will. +1 to attack rolls when fighting one-on-one.",
+        "Piety 25+: Cast haste once per long rest. Critical hits with weapons deal an extra 1d6 damage.",
+        "Piety 50+: Cast destructive wave once per long rest. While engaged in single combat, gain advantage on attack rolls.");
+
+    // Karametra — God of the Harvest. Theros para 1792-1794.
+    add_piety_god("Karametra", "Goddess of Harvests", "Lawful good",
+        "Cleric, druid, ranger", "WIS", "shield_of_faith",
+        "As a devotee of Karametra, you have proven yourself a worthy potential champion of the harvest god. As a bonus action, you can invoke her protection; spectral plants cover you, providing you with a +1 bonus to AC for 1 minute. You can use this trait a number of times equal to your Wisdom modifier (minimum of once). You regain all expended uses when you finish a long rest.",
+        "Piety 10+: Cast plant growth and pass without trace at will. Difficult terrain costs you no extra movement.",
+        "Piety 25+: Cast wall of thorns once per long rest. Resistance to poison damage.",
+        "Piety 50+: Cast tree stride at will. Once per long rest, summon 4 dryads to aid you.");
+
+    // Keranos — God of Storms. Theros para 1886-1888.
+    add_piety_god("Keranos", "God of Storms and Wisdom", "Chaotic neutral",
+        "Cleric, sorcerer, warlock, wizard", "INT", "",
+        "As a devotee of Keranos, you have proven your wisdom and your allegiance to the storm lord. Once on each of your turns when you hit a creature with a weapon attack, you can deal an extra 1d6 lightning damage. The damage increases as you level up.",
+        "Piety 10+: Cast call lightning once per long rest. Resistance to lightning damage.",
+        "Piety 25+: Cast chain lightning once per long rest. Your lightning damage ignores resistance.",
+        "Piety 50+: Cast storm of vengeance once per long rest. Lightning critical hits stun enemies for 1 round.");
+
+    // Klothys — God of Destiny. Theros para 1975-1977.
+    add_piety_god("Klothys", "Goddess of Destiny", "Lawful neutral",
+        "Cleric, druid, monk", "WIS", "command",
+        "As a devotee of Klothys, you can manipulate the bonds of destiny that invisibly entangle every living thing. You can cast command with this trait a number of times equal to your Wisdom modifier (minimum of once). You regain all expended uses when you finish a long rest.",
+        "Piety 10+: Cast guidance and bane at will. You have advantage on death saves.",
+        "Piety 25+: Cast geas once per long rest. Once per turn, force a creature to reroll a successful attack against you.",
+        "Piety 50+: Cast foresight once per long rest. You and allies within 30 ft can reroll one failed save per round.");
+
+    // Kruphix — God of Mysteries. Theros para 2070-2073.
+    add_piety_god("Kruphix", "God of Horizons", "True neutral",
+        "Druid, sorcerer, wizard", "INT", "detect_magic",
+        "As a devotee of Kruphix, you have proven yourself a devotee of reality's mysteries and laws. You can cast detect magic with this trait a number of times equal to your Intelligence modifier (minimum of once). You regain all expended uses when you finish a long rest. In addition, you know the mage hand cantrip.",
+        "Piety 10+: Cast see invisibility and detect thoughts at will. Resistance to psychic damage.",
+        "Piety 25+: Cast scrying once per long rest. You know whether a creature is lying when it speaks to you.",
+        "Piety 50+: Cast foresight on yourself once per long rest. Know the answer to one truthful question per day.");
+
+    // Mogis — God of Slaughter. Theros para 2163-2165.
+    add_piety_god("Mogis", "God of Slaughter", "Chaotic evil",
+        "Barbarian, fighter", "STR", "wrathful_smite",
+        "As a devotee of Mogis, you have shown yourself to be a brutal combatant. You can call on Mogis's favor and cast wrathful smite with this trait. Mogis's blessing manifests as a blood-red glow around your weapon. You can cast this spell a number of times equal to your Charisma modifier (minimum of once). You regain all expended uses when you finish a long rest.",
+        "Piety 10+: Cast bless and bane at will (cannot use both at once). Critical hits restore 1d10 HP.",
+        "Piety 25+: Cast fear once per long rest. Frightened enemies take an extra 1d6 fire damage from you.",
+        "Piety 50+: Cast destructive wave once per long rest. Resistance to all physical damage while raging or frightened.");
+
+    // Nylea — God of the Hunt. Theros para 2256-2258.
+    add_piety_god("Nylea", "Goddess of the Hunt", "Chaotic good",
+        "Barbarian, druid, ranger", "WIS", "hunters_mark",
+        "As a devotee of Nylea, you have proven yourself a guardian of the wilds. You can cast hunter's mark with this trait a number of times equal to your Wisdom modifier (minimum of once). You regain all expended uses when you finish a long rest.",
+        "Piety 10+: Cast pass without trace and speak with animals at will. +10 ft movement speed.",
+        "Piety 25+: Cast conjure animals once per long rest. Your weapon attacks deal an extra 1d8 damage to Beasts and Monstrosities.",
+        "Piety 50+: Cast tree stride at will. Once per long rest, transform into a Huge beast (CR 5 or lower) for 1 hour.");
+
+    // Pharika — God of Affliction. Theros para 2348-2350.
+    add_piety_god("Pharika", "Goddess of Affliction", "Neutral",
+        "Cleric, druid, ranger, warlock", "WIS", "ray_of_sickness",
+        "As a devotee of Pharika, you have power over affliction. You can cast ray of sickness with this trait a number of times equal to your Wisdom modifier (minimum of once). You regain all expended uses when you finish a long rest.",
+        "Piety 10+: Cast lesser restoration and protection from poison at will. Immunity to disease.",
+        "Piety 25+: Cast contagion once per long rest. Resistance to poison damage and immunity to the Poisoned condition.",
+        "Piety 50+: Cast cloudkill once per long rest. Once per turn, force a creature you damage to make a Constitution save vs poison.");
+
+    // Phenax — God of Deception. Theros para 2442-2444.
+    add_piety_god("Phenax", "God of Deception", "Chaotic neutral",
+        "Bard, rogue, sorcerer, warlock", "CHA", "disguise_self",
+        "As a devotee of Phenax, you have proven yourself accomplished at deception. You can call on Phenax's blessing and cast disguise self with this trait. While the spell is active, your shadow still resembles your true form.",
+        "Piety 10+: Cast invisibility and silent image at will. Advantage on Deception checks.",
+        "Piety 25+: Cast modify memory once per long rest. You can speak any language while concentrating.",
+        "Piety 50+: Cast project image and dominate person once per long rest. Lies you tell can never be detected magically.");
+
+    // Purphoros — God of the Forge. Theros para 2536-2538.
+    add_piety_god("Purphoros", "God of the Forge", "Chaotic neutral",
+        "Cleric, fighter, sorcerer", "INT", "shield_of_faith",
+        "As a devotee of Purphoros, you have drawn the notice of the forge god with your skill. You can cast shield of faith with this trait, requiring no material components, a number of times equal to your Intelligence modifier (minimum of once). In addition, you know the mending cantrip.",
+        "Piety 10+: Cast heat metal and searing smite at will. Resistance to fire damage.",
+        "Piety 25+: Cast wall of fire once per long rest. Your weapon attacks deal an extra 1d6 fire damage.",
+        "Piety 50+: Cast investiture of flame once per long rest. Once per dawn, instantly repair any item.");
+
+    // Thassa — God of the Sea. Theros para 2630-2632.
+    add_piety_god("Thassa", "Goddess of the Sea", "Lawful neutral",
+        "Cleric, druid, ranger, warlock", "WIS", "fog_cloud",
+        "As a devotee of Thassa, you have proven yourself a worthy representative of the god of the sea. You can cast fog cloud with this trait. Fog created in this way smells strongly of the sea. You can cast this spell a number of times equal to your Wisdom modifier (minimum of once). You regain all expended uses when you finish a long rest.",
+        "Piety 10+: Cast water walk and water breathing at will. Swim speed equal to walking speed.",
+        "Piety 25+: Cast control water once per long rest. Resistance to cold damage.",
+        "Piety 50+: Cast tsunami once per long rest. Cannot be drowned. Cast freedom of movement on yourself at will.");
+}
+
+piety_god_def@ get_piety_god(string name) {
+    init_piety_gods();
+    for (uint i = 0; i < PIETY_GODS.length(); i++) {
+        if (PIETY_GODS[i].name == name) return PIETY_GODS[i];
+    }
+    return null;
+}
+
+// Piety tier names per Theros para 1242 (thresholds 3, 10, 25, 50)
+string piety_tier_name(int score) {
+    if (score >= 50) return "Champion";
+    if (score >= 25) return "Disciple";
+    if (score >= 10) return "Votary";
+    if (score >= 3) return "Devotee";
+    return "Initiate";
+}
+
+int piety_tier_index(int score) {
+    if (score >= 50) return 4;
+    if (score >= 25) return 3;
+    if (score >= 10) return 2;
+    if (score >= 3) return 1;
+    return 0;
+}

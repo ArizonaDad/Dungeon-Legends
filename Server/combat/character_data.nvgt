@@ -60,6 +60,13 @@ class character_sheet {
     bool lightning_resistance = false;
     bool piercing_resistance = false;
     bool poison_immunity = false;
+
+    // Theros Piety system (Mythic Odysseys of Theros pp. 1236-1252)
+    // Players start with piety 1 to chosen god (or 0 = no devotion).
+    // Score increases via devotion to the god, decreases by impiety acts.
+    // Tier benefits at thresholds: 3, 10, 25, 50.
+    string piety_god = "";   // "" = no devotion. "Athreos", "Ephara", etc.
+    int piety_score = 0;
 }
 
 int bardic_inspiration_die_for_level(int level) {
@@ -973,6 +980,17 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
     // Sorcerer Font of Magic: copy the character sheet's sorcery_points (cs.level for L2+)
     c.sorcery_points = cs.sorcery_points;
     c.sorcery_points_max = cs.sorcery_points;
+    // Theros Piety system: copy from character sheet, compute Devotee uses based on score
+    c.piety_god = cs.piety_god;
+    c.piety_score = cs.piety_score;
+    if (cs.piety_god != "" and cs.piety_score >= 3) {
+        // Per Theros para 1329: uses = ability mod (min 1) of god's chosen ability
+        // Use WIS as default since most gods key off WIS
+        int piety_mod = (cs.wisdom - 10) / 2;
+        if (piety_mod < 1) piety_mod = 1;
+        c.piety_devotee_uses_max = piety_mod;
+        c.piety_devotee_uses = piety_mod;
+    }
     c.lay_on_hands_pool = cs.lay_on_hands_pool;
     c.bardic_inspiration_uses = cs.bardic_inspiration_uses;
     c.bardic_inspiration_grant_die = cs.bardic_inspiration_die;

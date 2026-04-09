@@ -99,6 +99,11 @@ class combatant {
 	int focus_points = 0;
 	int sorcery_points = 0;     // Sorcerer Font of Magic resource (PHB Sorcerer L2)
 	int sorcery_points_max = 0;
+	// Theros Piety system (Mythic Odysseys of Theros pp. 1236-1252)
+	string piety_god = "";      // Empty = no god worship; otherwise one of THEROS_GODS
+	int piety_score = 0;        // 0 = no devotion; tier benefits at 3, 10, 25, 50
+	int piety_devotee_uses = 0; // Per-rest uses of Piety 3+ trait spell
+	int piety_devotee_uses_max = 0;
 	int climb_speed = 0;        // PHB Athlete feat / climbing race trait
 	int inspiring_leader_temp_hp_pool = 0; // Pool of temp HP grants from Inspiring Leader rest performance
 	int blindsight_range = 0;   // PHB Blind Fighting feat (10 ft) and various species/subclass effects
