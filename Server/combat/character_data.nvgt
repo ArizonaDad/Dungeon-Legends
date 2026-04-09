@@ -1043,21 +1043,9 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
             // Radiant resistance (field doesn't exist, flag only)
         }
     }
-    // Apply vestige state effects
-    if (cs.vestige_ids.length() > 0) {
-        // Use the first owned vestige as "active"
-        c.active_vestige_id = cs.vestige_ids[0];
-        c.active_vestige_state = cs.vestige_states.length() > 0 ? cs.vestige_states[0] : 0;
-        // Hide of the Feral Guardian: AC bonus scales with state
-        if (c.active_vestige_id == "hide_feral_guardian") {
-            c.equip_ac_bonus += (c.active_vestige_state + 1); // 1, 2, or 3
-        }
-        // Stormgirdle: STR +/damage scales with state
-        if (c.active_vestige_id == "stormgirdle") {
-            // Lightning resistance at all states
-            c.lightning_resistance = true;
-        }
-    }
+    // Vestige effects are now applied in apply_equipment_bonuses based on
+    // equipped wildemount_<vestige_id> items. State auto-advances by character
+    // level per Wildemount para 9071: Dormant <L9, Awakened L9-15, Exalted L16+.
     c.lay_on_hands_pool = cs.lay_on_hands_pool;
     c.bardic_inspiration_uses = cs.bardic_inspiration_uses;
     c.bardic_inspiration_grant_die = cs.bardic_inspiration_die;
@@ -2127,6 +2115,29 @@ void apply_equipment_bonuses(combatant@ c, json_object@ equipped_json) {
         c.equip_speed_bonus += item.speed_bonus;
         c.equip_save_bonus += item.save_bonus;
         c.equip_crit_reduction += item.crit_threshold_reduction;
+        // Wildemount Vestige of Divergence detection (paras 9058-9219).
+        // Item ids of the form "wildemount_<vestige_id>" are vestiges; the
+        // active state auto-advances by character level per source para 9071:
+        // Dormant <L9, Awakened L9-15, Exalted L16+.
+        if (c.active_vestige_id == "" and item_id.find("wildemount_") == 0) {
+            string maybe_vestige_id = item_id.substr(11);
+            vestige_def@ v = get_vestige(maybe_vestige_id);
+            if (@v != null) {
+                c.active_vestige_id = maybe_vestige_id;
+                c.active_vestige_state = suggested_vestige_state(c.level);
+                // Hide of the Feral Guardian (Wildemount para 9102):
+                // +1/+2/+3 AC bonus by state (Dormant/Awakened/Exalted).
+                if (c.active_vestige_id == "hide_feral_guardian") {
+                    int hide_ac_bonus = c.active_vestige_state + 1;
+                    c.equip_ac_bonus += hide_ac_bonus;
+                }
+                // Stormgirdle (Wildemount para 9164):
+                // Lightning resistance at all states.
+                if (c.active_vestige_id == "stormgirdle") {
+                    c.lightning_resistance = true;
+                }
+            }
+        }
     }
     // Apply accumulated bonuses to combatant stats
     c.armor_class += c.equip_ac_bonus;

@@ -399,6 +399,7 @@ void handle_message(json_object@ msg)
 		level_up_new_cantrips = msg.exists("new_cantrips") ? int(msg["new_cantrips"]) : 0;
 		level_up_new_spells = msg.exists("new_spells") ? int(msg["new_spells"]) : 0;
 		level_up_is_caster = msg.exists("is_caster") ? bool(msg["is_caster"]) : false;
+		level_up_vestige_announcement = msg.exists("vestige_announcement") ? string(msg["vestige_announcement"]) : "";
 	}
 	else if (msg_type == message_types::game_end_battle) {
 		string result = msg.exists("result") ? string(msg["result"]) : "";

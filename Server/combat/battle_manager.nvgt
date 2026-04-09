@@ -970,6 +970,39 @@ class battle_manager {
 		msg["new_cantrips"] = new_cantrips;
 		msg["new_spells"] = new_spells;
 
+		// Wildemount Vestige of Divergence advancement announcement
+		// (Wildemount para 9071): "A Vestige of Divergence typically remains
+		// dormant until its wielder achieves 9th level. It becomes awakened
+		// between levels 9 and 15, and achieves an exalted state between
+		// levels 16 and 20." When the level-up crosses 9 or 16, scan equipped
+		// items for any wildemount_<vestige_id> and announce its advancement.
+		bool crossed_l9 = (old_level < 9 and new_level >= 9);
+		bool crossed_l16 = (old_level < 16 and new_level >= 16);
+		if ((crossed_l9 or crossed_l16) and character.exists("equipped")) {
+			json_object@ equipped = character["equipped"];
+			if (@equipped != null) {
+				string[] eq_slots = {"weapon", "armor", "ring", "amulet"};
+				string[] advanced_vestiges;
+				for (uint si = 0; si < eq_slots.length(); si++) {
+					if (!equipped.exists(eq_slots[si])) continue;
+					string item_id = string(equipped[eq_slots[si]]);
+					if (item_id == "" or item_id.find("wildemount_") != 0) continue;
+					string vid = item_id.substr(11);
+					vestige_def@ vd = get_vestige(vid);
+					if (@vd != null) advanced_vestiges.insert_last(vd.name);
+				}
+				if (advanced_vestiges.length() > 0) {
+					string state_name = crossed_l16 ? "Exalted" : "Awakened";
+					string vlist = "";
+					for (uint vi = 0; vi < advanced_vestiges.length(); vi++) {
+						if (vi > 0) vlist += ", ";
+						vlist += advanced_vestiges[vi];
+					}
+					msg["vestige_announcement"] = "Your Vestige of Divergence (" + vlist + ") has advanced to the " + state_name + " state! (Wildemount para 9071)";
+				}
+			}
+		}
+
 		player.send(msg);
 	}
 
