@@ -67,6 +67,8 @@ class character_sheet {
     // Tier benefits at thresholds: 3, 10, 25, 50.
     string piety_god = "";   // "" = no devotion. "Athreos", "Ephara", etc.
     int piety_score = 0;
+    // Tasha's Group Patrons system (Tasha's pp. 4892-5300+)
+    string group_patron = "";  // "" = no patron; one of 8 patron types
 }
 
 int bardic_inspiration_die_for_level(int level) {
@@ -991,6 +993,9 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         c.piety_devotee_uses_max = piety_mod;
         c.piety_devotee_uses = piety_mod;
     }
+    // Tasha's Group Patrons system: copy from character sheet
+    c.group_patron = cs.group_patron;
+    c.group_assistance_used_this_rest = false;
     c.lay_on_hands_pool = cs.lay_on_hands_pool;
     c.bardic_inspiration_uses = cs.bardic_inspiration_uses;
     c.bardic_inspiration_grant_die = cs.bardic_inspiration_die;

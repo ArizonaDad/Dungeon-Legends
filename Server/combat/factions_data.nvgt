@@ -1,0 +1,150 @@
+// Grim Hollow Faction Tracks System
+// Source: Grim Hollow Campaign Guide, Chapter 11 — Factions of Etharis
+// (paragraphs 4374-4500+)
+//
+// Grim Hollow factions are organizations that characters can ally with,
+// betray, or oppose. Each faction has a Reputation track from -10 (Hated)
+// to +10 (Champion) that affects how the faction reacts to the character.
+
+const int FACTION_REP_HATED = -10;
+const int FACTION_REP_HOSTILE = -5;
+const int FACTION_REP_NEUTRAL = 0;
+const int FACTION_REP_LIKED = 5;
+const int FACTION_REP_HONORED = 8;
+const int FACTION_REP_CHAMPION = 10;
+
+class faction_def {
+    string name;
+    string region;       // Where they primarily operate
+    string description;
+    string motto;
+    string typical_quests;
+    string benefits_at_5;   // Liked rep
+    string benefits_at_8;   // Honored rep
+    string benefits_at_10;  // Champion rep
+}
+
+faction_def@[] FACTIONS;
+
+void add_faction(string name, string region, string desc, string motto, string quests, string b5, string b8, string b10) {
+    faction_def f;
+    f.name = name;
+    f.region = region;
+    f.description = desc;
+    f.motto = motto;
+    f.typical_quests = quests;
+    f.benefits_at_5 = b5;
+    f.benefits_at_8 = b8;
+    f.benefits_at_10 = b10;
+    FACTIONS.insert_last(f);
+}
+
+void init_factions() {
+    if (FACTIONS.length() > 0) return;
+
+    // Source paras 4412-4422 — Grim Hollow factions overview
+    add_faction("Augustine Trading Company", "Morencia (HQ); global",
+        "A bastion of free trade and education, but behind the gilded image is a ruthless corporation. Founded by the disgraced clergyman Manoch Augustus, evolved into a global powerbroker. Run by the Montarri (council of five) led by Treasurer Kolyhs Papinian. (Grim Hollow para 4432)",
+        "Behind every problem is a deal waiting to happen. — Manoch Augustus (para 4451)",
+        "Open new markets, sabotage rivals, recover indigenous artifacts, hunt for new resources, eliminate competition (paras 4454-4457)",
+        "Liked: Discounted Augustine Center training. 10% discount on all goods at Company shops.",
+        "Honored: Free legal protection. Access to Project Warbreed contractor mercenaries.",
+        "Champion: Lifetime stipend (50 gp/month). Personal audience with Kolyhs Papinian. Stake in Company profits.");
+
+    add_faction("Company of Free Swords", "All Etharis",
+        "An ancient and elite mercenary company. The Free Swords have tipped the scales of war for many nations and provinces. Members include warriors, wizards, priests, druids, rogues, and others. (Grim Hollow para 4413)",
+        "Steel for hire, glory for keeps.",
+        "High-paying combat contracts, escort missions, military operations, sieges",
+        "Liked: 25% discount on all weapons, armor, and military gear.",
+        "Honored: Captain rank — command up to 6 mercenary subordinates.",
+        "Champion: Free Swords name lends military authority. Access to legendary war banners.");
+
+    add_faction("Ebon Syndicate", "Hidden across Etharis",
+        "A criminal organization with a finger in every major criminal trade — assassination, kidnapping, drug trafficking, theft, and the black market. (Grim Hollow para 4414)",
+        "What's yours is ours.",
+        "Heists, assassinations, smuggling runs, blackmail, recovery of stolen goods",
+        "Liked: Access to fences and forgery contacts. -50% prices on illegal goods.",
+        "Honored: Personal Ebon Syndicate safehouse in any major city.",
+        "Champion: Inner Council membership. Direct authority over local syndicate cells.");
+
+    add_faction("Thaumaturge", "Hidden — possibly mythical",
+        "The Grand Thaumatic Order of archmages is a myth. Its existence has been a rumor throughout history, yet most commonfolk regard it as a fairy tale. (Grim Hollow para 4415)",
+        "Magic is the only true power.",
+        "Recover lost magical knowledge, hunt rogue arcanists, defeat extra-planar threats",
+        "Liked: Access to rare spell scrolls (1 per month).",
+        "Honored: Learn one rare wizard spell of your choice (DM approval).",
+        "Champion: Access to the Order's archives. Cast Wish once per year as a ritual.");
+
+    add_faction("Watchers of the Faithful", "Etharis (church-affiliated)",
+        "Composed of priests, paladins, chaplains, and other clergy. The Watchers have dedicated themselves to preserving the old faiths in a new form. They follow the divine. (Grim Hollow para 4416)",
+        "Faith never falters.",
+        "Hunt heretics, recover relics, defeat undead and fiends, escort pilgrims",
+        "Liked: Free healing at any church or temple.",
+        "Honored: Cast remove curse, lesser restoration, and protection from evil and good once per long rest.",
+        "Champion: Become a Templar. Lead a chapter of the Watchers. Cast revivify once per week.");
+
+    add_faction("Arcanist Inquisition", "Etharis (church-affiliated)",
+        "A religious order that hunts down arcanists to prevent them from using their powers to threaten the established political and social structures. (Grim Hollow para 4417)",
+        "Magic must be controlled.",
+        "Hunt rogue spellcasters, recover dangerous magical items, banish summoned creatures",
+        "Liked: Authority to question any spellcaster legally. Access to anti-magic gear.",
+        "Honored: Inquisitor rank — can demand local lawmen support your investigation.",
+        "Champion: Grand Inquisitor authority. Can order any Inquisition member into service.");
+
+    add_faction("Crimson Court", "Ostoya (Vampire-ruled)",
+        "The sun-starved nation of Ostoya is ruled by a cabal of vampire nobles called the Crimson Court. This loose system of nobility and feudal servants oversees every aspect of the nation. (Grim Hollow para 4418)",
+        "Eternity favors the strong.",
+        "Recruit thralls, eliminate rebels, hunt Order of Dawn agents, deliver dark relics",
+        "Liked: Welcomed in Ostoyan vampire courts. Protected from undead at night.",
+        "Honored: Granted vampiric thrall (1 weak vampire spawn ally).",
+        "Champion: Become a vampire spawn yourself. Resistance to necrotic damage.");
+
+    add_faction("Monster Hunter Guilds", "Etharis (regional chapters)",
+        "Monster hunting is an ancient trade. What separated hunters from common warriors was curiosity—a genuine desire to understand one's enemy. (Grim Hollow para 4419)",
+        "Know your prey.",
+        "Hunt specific monsters, recover hunting trophies, document new creatures, escort travelers",
+        "Liked: Access to monster lore database. Bounty on all monster kills.",
+        "Honored: Master Hunter rank. +2 damage vs Beasts and Monstrosities.",
+        "Champion: Legendary Hunter. Cast hunter's mark at will (no concentration).");
+
+    add_faction("Morbus Doctore", "Etharis (urban centers)",
+        "Created to combat the Weeping Pox. Members are easy to spot: boots and gloves dried with blood, strange coats and satchels hung with vials, and frightful masks. (Grim Hollow para 4420)",
+        "From poison, the cure.",
+        "Investigate plagues, recover diseased relics, deliver cures, hunt diseased creatures",
+        "Liked: Free disease cures. Access to alchemical lab.",
+        "Honored: Plague Doctor rank. Cast lesser restoration at will.",
+        "Champion: Master Plague Doctor. Cast greater restoration once per long rest.");
+
+    add_faction("Order of Dawn", "Raevo (Ostoyan exiles)",
+        "Formed when Ostoyans fled the rule of their vampire overlords and settled in the sympathetic province of Raevo. These dissidents occupied a fort outside of Castalore. (Grim Hollow para 4421)",
+        "Light against the night.",
+        "Hunt vampires, free thralls, defend Raevo, attack Crimson Court strongholds",
+        "Liked: Access to silvered weapons. Holy water on demand.",
+        "Honored: Sunblade ranking. +2 vs vampires and undead.",
+        "Champion: Dawn Knight. Permanent immunity to charm by undead. Cast daylight at will.");
+
+    add_faction("Prismatic Circle", "Valikan north",
+        "An order of druids who believe that only war and bloodshed can keep the world safe from the reawakening of Gormadraug, the Prismatic Wyrm. (Grim Hollow para 4422)",
+        "By tooth and claw, the world endures.",
+        "Defend natural sites, hunt poachers, prevent the Prismatic Wyrm's awakening, recruit allies",
+        "Liked: Druidic rituals teach you. Free spell scroll once per month.",
+        "Honored: Initiate of the Circle. Speak with animals at will.",
+        "Champion: Circle Master. Wild Shape into a Huge beast once per long rest (CR 6 or lower).");
+}
+
+faction_def@ get_faction(string name) {
+    init_factions();
+    for (uint i = 0; i < FACTIONS.length(); i++) {
+        if (FACTIONS[i].name == name) return FACTIONS[i];
+    }
+    return null;
+}
+
+string faction_reputation_name(int rep) {
+    if (rep <= -10) return "Hated";
+    if (rep <= -5) return "Hostile";
+    if (rep < 5) return "Neutral";
+    if (rep < 8) return "Liked";
+    if (rep < 10) return "Honored";
+    return "Champion";
+}

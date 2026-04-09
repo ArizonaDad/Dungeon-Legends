@@ -1,0 +1,119 @@
+// Tasha's Cauldron of Everything Group Patrons System
+// Source: Tasha's Cauldron of Everything, paragraphs 4892-5300+
+//
+// A group patron is an organization or being that ties an adventuring party
+// together with a common purpose, providing perks, contacts, quests, and
+// shared identity. Per source para 4910: "Each member of the party can add
+// a d4 to one ability check, attack roll, or saving throw they make. A
+// player must decide to use this ability before rolling the d20."
+
+class group_patron_def {
+    string name;
+    string description;
+    string types;          // Subtypes (e.g., "Boarding School, Arcane Enclave...")
+    string perks;          // Source-quoted perks summary
+    string contact_types;  // Contact NPC types
+    string quest_examples; // Sample quests
+}
+
+group_patron_def@[] GROUP_PATRONS;
+
+void add_group_patron(string name, string desc, string types, string perks, string contacts, string quests) {
+    group_patron_def p;
+    p.name = name;
+    p.description = desc;
+    p.types = types;
+    p.perks = perks;
+    p.contact_types = contacts;
+    p.quest_examples = quests;
+    GROUP_PATRONS.insert_last(p);
+}
+
+void init_group_patrons() {
+    if (GROUP_PATRONS.length() > 0) return;
+
+    // Source paras 4926-5011 — Academy
+    add_group_patron("Academy",
+        "The world's mysteries are innumerable, but you pursue them with vigor. As operatives for an academy, you seek to unravel the secrets of existence and the deeper riddles beyond. (Tasha's para 4929)",
+        "Boarding School, Arcane Enclave, Secret Monastery, Elite Institute, Vault of Secrets, Museum of Dreams (Tasha's para 4937-4948)",
+        "Compensation (1 gp/day per member), Documentation (academic ID), Research (call in favors), Resources (libraries/museums/training), Training discounts (Tasha's para 4953-4957)",
+        "Harried Functionary, Celebrated Instructor, Wizened Fixture, Infatuated Tourist, Spectral Fragment, Distant Observer (Tasha's para 4965-4975)",
+        "Aberrant Zoology, Arcanodynamics, Forbidden History, Cryptogeography, Restorative Antiquarianism, Evolutionary Divinity (Tasha's para 5001-5011)");
+
+    // Source paras 5012-5100+ — Ancient Being
+    add_group_patron("Ancient Being",
+        "Your group is bound to the designs of an ancient being of tremendous power and influence. You might serve as the creature's eyes and ears in the world, carrying information back to it. (Tasha's para 5015)",
+        "Elder Dragon, Lich, Bound Fiend, Guardian Celestial, The Endless, Primal Manifestation (Tasha's para 5023-5033)",
+        "Equipment (common magic items at 2d4*10 gp), Research (vast contact network), Sanctuary (safe houses), Strange Gifts (supernatural gift at L5 and L13) (Tasha's para 5038-5042)",
+        "Employer, Acolyte, Anointed Mortal, Direct Communion, Spectral Servant, Living Manifestation",
+        "Hunt rivals, gather forbidden lore, recover ancient relics, defeat enemies of the ancient being");
+
+    // Aristocrat
+    add_group_patron("Aristocrat",
+        "Your group is patronized by a wealthy noble or noble family. You serve as their personal agents, troubleshooters, and adventurers. (Tasha's)",
+        "Hereditary Noble, Self-Made Magnate, Eccentric Gentry, Reluctant Heir, Crime Lord (in disguise), Foreign Dignitary",
+        "Compensation (steady wage), Documentation (noble seal), Lodging (in the noble's estates), Specialty Items (noble's connections), Influence (use noble's name)",
+        "Steward, Personal Servant, Appointed Liaison, Family Member, Court Advisor, Captain of the Guard",
+        "Recover stolen heirlooms, investigate rivals, courier sensitive messages, escort visiting dignitaries, eliminate threats discreetly");
+
+    // Criminal Syndicate
+    add_group_patron("Criminal Syndicate",
+        "Your group is part of a criminal organization that operates in the shadows. You handle the dangerous work that requires special skills. (Tasha's)",
+        "Thieves' Guild, Smuggler Network, Assassin Brotherhood, Crime Family, Pirate Crew, Black Market Cartel",
+        "Compensation (variable - shares of jobs), Criminal Contacts (fences, informants, fixers), Documentation (forged identities), Safehouses, Training in criminal arts",
+        "Crime Boss, Lieutenant, Fence, Informer, Mysterious Voice, Apprentice Criminal",
+        "Heist a wealthy target, eliminate a rival, smuggle contraband, intimidate witnesses, recover lost property by any means");
+
+    // Guild
+    add_group_patron("Guild",
+        "Your group is part of a craftsmen's, merchants', or specialists' guild. The guild provides resources and contracts. (Tasha's)",
+        "Merchants' Guild, Adventurers' Guild, Mages' Guild, Stonemasons' Guild, Sailors' Guild, Mercenary Company",
+        "Compensation (guild wages), Documentation (guild membership), Equipment (guild stores at discount), Training (guild schools), Connections (guild network across cities)",
+        "Guild Master, Senior Member, Apprentice Trainer, Quartermaster, Diplomatic Liaison, Treasurer",
+        "Protect a guild caravan, recover stolen goods, train new members, infiltrate rival guilds, secure lucrative contracts");
+
+    // Military Force
+    add_group_patron("Military Force",
+        "Your group is a unit within a military organization. You serve a kingdom, lord, or military commander as elite operatives. (Tasha's)",
+        "Royal Guard, Mercenary Company, Border Wardens, Knights' Order, City Watch, Holy Warriors",
+        "Compensation (military pay grade), Equipment (standard weapons and armor), Lodging (barracks), Authority (military rank), Backup (call in soldier reinforcements)",
+        "Commanding Officer, Sergeant, Quartermaster, Spymaster, Field Captain, Veteran Mentor",
+        "Patrol borders, defend a fortress, scout enemy positions, eliminate enemy commanders, escort dignitaries through hostile territory");
+
+    // Religious Order
+    add_group_patron("Religious Order",
+        "Your group serves a temple, church, or religious organization. Your faith binds you together. (Tasha's)",
+        "Established Church, Cult of the One True God, Mystery Cult, Order of Chivalry, Druidic Circle, Monastic Order",
+        "Compensation (food, shelter, basic needs), Documentation (religious credentials), Healing (free at temples), Sanctified Items (holy water, blessed weapons), Sanctuary (any temple of the faith)",
+        "High Priest, Wandering Friar, Oracle, Senior Cleric, Spirit Guide, Foreign Missionary",
+        "Recover sacred relics, hunt heretics, build new temples, escort pilgrims, defeat fiends/undead/demons");
+
+    // Sovereign
+    add_group_patron("Sovereign",
+        "Your group serves a king, queen, emperor, or other ruler directly as their personal agents. You answer only to them. (Tasha's)",
+        "Beloved Ruler, Tyrannical Despot, Hidden Heir, Foreign Monarch, Council of Rulers, Reluctant Ruler",
+        "Compensation (royal pay), Documentation (royal seal — ultimate authority), Audience (direct access to the ruler), Resources (anything the kingdom can provide), Pardon (immunity from minor crimes)",
+        "Royal Steward, Personal Aide, Court Wizard, Spymaster, Royal Knight, Trusted Friend of the Ruler",
+        "Eliminate rivals to the throne, recover lost royal heirlooms, sabotage enemy kingdoms, escort the heir, expose conspiracies");
+}
+
+group_patron_def@ get_group_patron(string name) {
+    init_group_patrons();
+    for (uint i = 0; i < GROUP_PATRONS.length(); i++) {
+        if (GROUP_PATRONS[i].name == name) return GROUP_PATRONS[i];
+    }
+    return null;
+}
+
+// Per source para 4910: "Group Assistance — each member of the party can add
+// a d4 to one ability check, attack roll, or saving throw they make. A player
+// must decide to use this ability before rolling the d20."
+//
+// Returns true if a Group Assistance d4 was applied, false if not available
+// (already used this rest, or no group patron set).
+//
+// In the engine this is wired to a per-rest flag on the combatant.
+bool can_use_group_assistance(combatant@ c) {
+    if (@c == null) return false;
+    return c.group_patron != "" and !c.group_assistance_used_this_rest;
+}

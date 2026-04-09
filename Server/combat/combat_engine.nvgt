@@ -104,6 +104,9 @@ class combatant {
 	int piety_score = 0;        // 0 = no devotion; tier benefits at 3, 10, 25, 50
 	int piety_devotee_uses = 0; // Per-rest uses of Piety 3+ trait spell
 	int piety_devotee_uses_max = 0;
+	// Tasha's Group Patrons system (Tasha's pp. 4892-5300+)
+	string group_patron = "";   // Empty = no patron; one of: Academy, Ancient Being, Aristocrat, Criminal Syndicate, Guild, Military Force, Religious Order, Sovereign
+	bool group_assistance_used_this_rest = false;  // Per-rest d4 inspiration die from patron
 	int climb_speed = 0;        // PHB Athlete feat / climbing race trait
 	int inspiring_leader_temp_hp_pool = 0; // Pool of temp HP grants from Inspiring Leader rest performance
 	int blindsight_range = 0;   // PHB Blind Fighting feat (10 ft) and various species/subclass effects
