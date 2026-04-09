@@ -2132,9 +2132,49 @@ void apply_equipment_bonuses(combatant@ c, json_object@ equipped_json) {
                     c.equip_ac_bonus += hide_ac_bonus;
                 }
                 // Stormgirdle (Wildemount para 9164):
-                // Lightning resistance at all states.
+                // Lightning resistance at all states. Strength score becomes
+                // 19/21/25 by state per source — only applied if natural STR
+                // is lower so the wearer never loses Strength from the belt.
                 if (c.active_vestige_id == "stormgirdle") {
                     c.lightning_resistance = true;
+                    int target_str = 19;
+                    if (c.active_vestige_state == VESTIGE_AWAKENED) target_str = 21;
+                    else if (c.active_vestige_state == VESTIGE_EXALTED) target_str = 25;
+                    if (c.ability_scores[ABILITY_STR] < target_str) {
+                        c.ability_scores[ABILITY_STR] = target_str;
+                    }
+                }
+                // Verminshroud (Wildemount para 9183):
+                // Dormant: CHA +2 (max 20), poison resistance, disease immunity.
+                // Awakened L9+: also necrotic resistance.
+                // Exalted L16+: keeps awakened benefits (cloudkill / unarmed
+                // necrotic rider need a per-feature implementation).
+                if (c.active_vestige_id == "verminshroud") {
+                    if (c.ability_scores[ABILITY_CHA] < 20) {
+                        c.ability_scores[ABILITY_CHA] = c.ability_scores[ABILITY_CHA] + 2;
+                        if (c.ability_scores[ABILITY_CHA] > 20) c.ability_scores[ABILITY_CHA] = 20;
+                    }
+                    c.poison_resistance = true;
+                    if (c.active_vestige_state >= VESTIGE_AWAKENED) {
+                        c.necrotic_resistance = true;
+                    }
+                }
+                // Wreath of the Prism (Wildemount para 9200):
+                // Source says the wearer chooses the resistance type at
+                // attunement (acid/cold/fire/lightning/poison). We don't
+                // auto-pick per the no-invent rule — the choice will be
+                // wired through the equip flow when the prompt system
+                // covers attunement. At Awakened L9+, the source grants
+                // resistance to all five chromatic types automatically,
+                // so that branch is safe to apply unconditionally.
+                if (c.active_vestige_id == "wreath_of_prism") {
+                    if (c.active_vestige_state >= VESTIGE_AWAKENED) {
+                        c.acid_resistance = true;
+                        c.cold_resistance = true;
+                        c.fire_resistance = true;
+                        c.lightning_resistance = true;
+                        c.poison_resistance = true;
+                    }
                 }
             }
         }
