@@ -65,7 +65,7 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 
 | `Server/combat/wave_system.nvgt` | 9 wave scenarios, `spawn_wave()` with difficulty multipliers |
 
-| `Server/combat/spell_data.nvgt` | 365 spell definitions, ~306 with custom handlers in battle_manager.nvgt (~84% coverage) |
+| `Server/combat/spell_data.nvgt` | 365 spell definitions, all 365 with custom handlers in battle_manager.nvgt (100% coverage, 381 total handler branches counting dual-target variants) |
 | `Server/combat/piety_data.nvgt` | Theros Piety system: 15 gods, 4 tiers (Devotee/Votary/Disciple/Champion) |
 | `Server/combat/vestiges_data.nvgt` | Wildemount Vestiges of Divergence: 8 items, 3 awakening states (Dormant/Awakened/Exalted) |
 | `Server/combat/heroic_chronicle_data.nvgt` | Wildemount Heroic Chronicle: 5 homelands, 20 backgrounds, 20 prophecies |
