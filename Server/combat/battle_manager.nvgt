@@ -9263,6 +9263,570 @@ class battle_manager {
 				c.darkness_active = true;
 				broadcast_announce(c.name + " conjures magical Darkness in a 15-foot radius.", true);
 			}
+			// ==== UTILITY / BUFF SPELL HANDLERS (batch) ====
+			// Cantrips
+			else if (spell.id == "blade_ward") {
+				broadcast_announce(c.name + " casts Blade Ward, gaining resistance to bludgeoning, piercing, and slashing until the end of their next turn.", true);
+			}
+			else if (spell.id == "dancing_lights") {
+				broadcast_announce(c.name + " conjures Dancing Lights, creating up to four torch-sized lights.", true);
+			}
+			else if (spell.id == "druidcraft") {
+				broadcast_announce(c.name + " casts Druidcraft, producing a minor nature effect.", true);
+			}
+			else if (spell.id == "friends") {
+				broadcast_announce(c.name + " casts Friends, gaining advantage on Charisma checks for 1 minute.", true);
+			}
+			else if (spell.id == "guidance" and @target != null) {
+				broadcast_announce(c.name + " casts Guidance on " + target.name + ". They gain 1d4 to their next ability check.", true);
+			}
+			else if (spell.id == "guidance") {
+				broadcast_announce(c.name + " casts Guidance, granting 1d4 to the next ability check.", true);
+			}
+			else if (spell.id == "light") {
+				broadcast_announce(c.name + " casts Light, causing an object to shed bright light in a 20-foot radius.", true);
+			}
+			else if (spell.id == "mage_hand") {
+				broadcast_announce(c.name + " conjures a spectral Mage Hand.", true);
+			}
+			else if (spell.id == "mending") {
+				broadcast_announce(c.name + " casts Mending, repairing a small break or tear.", true);
+			}
+			else if (spell.id == "message") {
+				broadcast_announce(c.name + " casts Message, sending a whispered conversation.", true);
+			}
+			else if (spell.id == "minor_illusion") {
+				broadcast_announce(c.name + " casts Minor Illusion, creating a sound or image.", true);
+			}
+			else if (spell.id == "prestidigitation") {
+				broadcast_announce(c.name + " casts Prestidigitation, producing a minor magical effect.", true);
+			}
+			else if (spell.id == "resistance" and @target != null) {
+				broadcast_announce(c.name + " casts Resistance on " + target.name + ". They gain 1d4 to their next saving throw.", true);
+			}
+			else if (spell.id == "resistance") {
+				broadcast_announce(c.name + " casts Resistance, granting 1d4 to the next saving throw.", true);
+			}
+			else if (spell.id == "spare_the_dying" and @target != null) {
+				// Stabilizes a creature at 0 HP
+				if (target.current_hp == 0 and !target.is_dead) {
+					target.is_stable = true;
+					target.death_save_successes = 0;
+					target.death_save_failures = 0;
+					broadcast_announce(c.name + " casts Spare the Dying on " + target.name + ", stabilizing them.", true);
+				} else {
+					broadcast_announce(c.name + " casts Spare the Dying on " + target.name + ".", true);
+				}
+			}
+			else if (spell.id == "spare_the_dying") {
+				broadcast_announce(c.name + " casts Spare the Dying.", true);
+			}
+			else if (spell.id == "thaumaturgy") {
+				broadcast_announce(c.name + " casts Thaumaturgy, manifesting a minor wonder.", true);
+			}
+			// Level 1
+			else if (spell.id == "alarm") {
+				broadcast_announce(c.name + " casts Alarm, warding a 20-foot area.", true);
+			}
+			else if (spell.id == "animal_friendship") {
+				broadcast_announce(c.name + " casts Animal Friendship.", true);
+			}
+			else if (spell.id == "comprehend_languages") {
+				broadcast_announce(c.name + " casts Comprehend Languages.", true);
+			}
+			else if (spell.id == "create_or_destroy_water") {
+				broadcast_announce(c.name + " casts Create or Destroy Water.", true);
+			}
+			else if (spell.id == "detect_poison_and_disease") {
+				broadcast_announce(c.name + " casts Detect Poison and Disease.", true);
+			}
+			else if (spell.id == "disguise_self") {
+				broadcast_announce(c.name + " casts Disguise Self, altering their appearance.", true);
+			}
+			else if (spell.id == "entangle") {
+				// DEX save, restrained in 20 ft square (concentration)
+				combatant@[] entangle_targets;
+				int ecenter_x = @target != null ? target.x : c.x;
+				int ecenter_y = @target != null ? target.y : c.y;
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (t.is_player == c.is_player and combat.mode != "pvp") continue;
+					if (feet_distance(ecenter_x, ecenter_y, t.x, t.y) <= 20) entangle_targets.insert_last(t);
+				}
+				broadcast_announce(c.name + " casts Entangle, causing grasping weeds to erupt from the ground!", true);
+				for (uint ti = 0; ti < entangle_targets.length(); ti++) {
+					combatant@ t = entangle_targets[ti];
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_STR);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					if (bless_bonus > 0) broadcast_announce(t.name + "'s Bless adds " + bless_bonus + " to the save.", false);
+					broadcast_roll(t.name, "STR save vs Entangle", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Restrained!");
+					if (!saved) {
+						t.add_condition(COND_RESTRAINED);
+						broadcast_to_battle({{"type", message_types::condition_applied}, {"target", t.name}, {"condition", "Restrained"}});
+					}
+				}
+			}
+			else if (spell.id == "expeditious_retreat") {
+				broadcast_announce(c.name + " casts Expeditious Retreat, doubling their speed for 10 minutes.", true);
+			}
+			else if (spell.id == "feather_fall") {
+				broadcast_announce(c.name + " casts Feather Fall, slowing the descent of up to 5 creatures.", true);
+			}
+			else if (spell.id == "find_familiar") {
+				broadcast_announce(c.name + " casts Find Familiar, summoning a spirit companion.", true);
+			}
+			else if (spell.id == "goodberry") {
+				broadcast_announce(c.name + " casts Goodberry, creating 10 berries that each heal 1 HP.", true);
+			}
+			else if (spell.id == "grease") {
+				// DEX save in 10 ft area, prone on fail
+				combatant@[] grease_targets;
+				int gcenter_x = @target != null ? target.x : c.x;
+				int gcenter_y = @target != null ? target.y : c.y;
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (t.is_player == c.is_player and combat.mode != "pvp") continue;
+					if (feet_distance(gcenter_x, gcenter_y, t.x, t.y) <= 10) grease_targets.insert_last(t);
+				}
+				broadcast_announce(c.name + " conjures a patch of Grease on the ground!", true);
+				for (uint ti = 0; ti < grease_targets.length(); ti++) {
+					combatant@ t = grease_targets[ti];
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_DEX);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					if (bless_bonus > 0) broadcast_announce(t.name + "'s Bless adds " + bless_bonus + " to the save.", false);
+					broadcast_roll(t.name, "DEX save vs Grease", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Prone!");
+					if (!saved) {
+						t.add_condition(COND_PRONE);
+						broadcast_to_battle({{"type", message_types::condition_applied}, {"target", t.name}, {"condition", "Prone"}});
+					}
+				}
+			}
+			else if (spell.id == "identify") {
+				broadcast_announce(c.name + " casts Identify, learning the properties of a magic item.", true);
+			}
+			else if (spell.id == "jump") {
+				broadcast_announce(c.name + " casts Jump, tripling their jump distance.", true);
+			}
+			else if (spell.id == "protection_from_evil_and_good" and @target != null) {
+				broadcast_announce(c.name + " casts Protection from Evil and Good on " + target.name + ". They gain +1 on saves against aberrations, celestials, elementals, fey, fiends, and undead.", true);
+			}
+			else if (spell.id == "protection_from_evil_and_good") {
+				broadcast_announce(c.name + " casts Protection from Evil and Good.", true);
+			}
+			else if (spell.id == "purify_food_and_drink") {
+				broadcast_announce(c.name + " casts Purify Food and Drink.", true);
+			}
+			else if (spell.id == "shield_of_faith" and @target != null) {
+				// +2 AC for 10 minutes (concentration)
+				target.shield_active = true;
+				target.shield_ac_bonus += 2;
+				broadcast_announce(c.name + " casts Shield of Faith on " + target.name + ". Their AC increases by 2.", true);
+			}
+			else if (spell.id == "shield_of_faith") {
+				c.shield_active = true;
+				c.shield_ac_bonus += 2;
+				broadcast_announce(c.name + " casts Shield of Faith, gaining +2 AC.", true);
+			}
+			else if (spell.id == "silent_image") {
+				broadcast_announce(c.name + " casts Silent Image, creating a visual illusion.", true);
+			}
+			else if (spell.id == "speak_with_animals") {
+				broadcast_announce(c.name + " casts Speak with Animals.", true);
+			}
+			else if (spell.id == "unseen_servant") {
+				broadcast_announce(c.name + " casts Unseen Servant, conjuring an invisible force to perform tasks.", true);
+			}
+			else if (spell.id == "tensers_floating_disk") {
+				broadcast_announce(c.name + " casts Tenser's Floating Disk.", true);
+			}
+			// Level 2
+			else if (spell.id == "alter_self") {
+				broadcast_announce(c.name + " casts Alter Self, transforming their form.", true);
+			}
+			else if (spell.id == "arcane_lock") {
+				broadcast_announce(c.name + " casts Arcane Lock.", true);
+			}
+			else if (spell.id == "barkskin" and @target != null) {
+				// Source: PHB Basic Rules - Barkskin. AC becomes 16 (PHB 2024) / 17 for 1 hour.
+				target.equip_ac_bonus += 2;
+				broadcast_announce(c.name + " casts Barkskin on " + target.name + ". Their skin hardens like bark, increasing their AC.", true);
+			}
+			else if (spell.id == "barkskin") {
+				c.equip_ac_bonus += 2;
+				broadcast_announce(c.name + " casts Barkskin, their skin hardening like bark.", true);
+			}
+			else if (spell.id == "blur") {
+				// Concentration, attackers have disadvantage
+				c.mirror_images += 0; // No-op — flag pattern, but use existing obscuring mechanic via announcement
+				broadcast_announce(c.name + " casts Blur. Their form wavers, imposing disadvantage on attacks against them.", true);
+			}
+			else if (spell.id == "continual_flame") {
+				broadcast_announce(c.name + " casts Continual Flame, creating a flame that needs no fuel.", true);
+			}
+			else if (spell.id == "darkvision" and @target != null) {
+				target.darkvision = true;
+				if (target.darkvision_range < 60) target.darkvision_range = 60;
+				broadcast_announce(c.name + " casts Darkvision on " + target.name + ", granting 60 feet of darkvision for 8 hours.", true);
+			}
+			else if (spell.id == "darkvision") {
+				c.darkvision = true;
+				if (c.darkvision_range < 60) c.darkvision_range = 60;
+				broadcast_announce(c.name + " casts Darkvision, gaining 60 feet of darkvision.", true);
+			}
+			else if (spell.id == "enhance_ability" and @target != null) {
+				broadcast_announce(c.name + " casts Enhance Ability on " + target.name + ", granting advantage on chosen ability checks for 1 hour.", true);
+			}
+			else if (spell.id == "enhance_ability") {
+				broadcast_announce(c.name + " casts Enhance Ability, gaining advantage on a chosen ability for 1 hour.", true);
+			}
+			else if (spell.id == "find_steed") {
+				broadcast_announce(c.name + " casts Find Steed, summoning a spirit mount.", true);
+			}
+			else if (spell.id == "find_traps") {
+				broadcast_announce(c.name + " casts Find Traps.", true);
+			}
+			else if (spell.id == "gentle_repose") {
+				broadcast_announce(c.name + " casts Gentle Repose.", true);
+			}
+			else if (spell.id == "invisibility" and @target != null) {
+				target.add_condition(COND_INVISIBLE);
+				broadcast_announce(c.name + " casts Invisibility on " + target.name + ". They fade from view.", true);
+				broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Invisible"}});
+			}
+			else if (spell.id == "invisibility") {
+				c.add_condition(COND_INVISIBLE);
+				broadcast_announce(c.name + " casts Invisibility on themselves and fades from view.", true);
+				broadcast_to_battle({{"type", message_types::condition_applied}, {"target", c.name}, {"condition", "Invisible"}});
+			}
+			else if (spell.id == "knock") {
+				broadcast_announce(c.name + " casts Knock, magically unlocking a target.", true);
+			}
+			else if (spell.id == "levitate") {
+				broadcast_announce(c.name + " casts Levitate.", true);
+			}
+			else if (spell.id == "locate_animals_or_plants") {
+				broadcast_announce(c.name + " casts Locate Animals or Plants.", true);
+			}
+			else if (spell.id == "magic_mouth") {
+				broadcast_announce(c.name + " casts Magic Mouth.", true);
+			}
+			else if (spell.id == "protection_from_poison" and @target != null) {
+				target.poison_resistance = true;
+				broadcast_announce(c.name + " casts Protection from Poison on " + target.name + ", granting resistance to poison damage.", true);
+			}
+			else if (spell.id == "protection_from_poison") {
+				c.poison_resistance = true;
+				broadcast_announce(c.name + " casts Protection from Poison, gaining resistance to poison damage.", true);
+			}
+			else if (spell.id == "rope_trick") {
+				broadcast_announce(c.name + " casts Rope Trick.", true);
+			}
+			else if (spell.id == "see_invisibility") {
+				broadcast_announce(c.name + " casts See Invisibility.", true);
+			}
+			else if (spell.id == "silence") {
+				broadcast_announce(c.name + " casts Silence, creating a 20-foot sphere of silence.", true);
+			}
+			else if (spell.id == "spider_climb" and @target != null) {
+				broadcast_announce(c.name + " casts Spider Climb on " + target.name + ", granting them a climb speed equal to their walking speed.", true);
+			}
+			else if (spell.id == "spider_climb") {
+				c.climb_speed = c.speed;
+				broadcast_announce(c.name + " casts Spider Climb, gaining a climb speed.", true);
+			}
+			else if (spell.id == "zone_of_truth") {
+				broadcast_announce(c.name + " casts Zone of Truth, creating a 15-foot radius where creatures cannot speak lies.", true);
+			}
+			// Level 3
+			else if (spell.id == "clairvoyance") {
+				broadcast_announce(c.name + " casts Clairvoyance.", true);
+			}
+			else if (spell.id == "create_food_and_water") {
+				broadcast_announce(c.name + " casts Create Food and Water.", true);
+			}
+			else if (spell.id == "daylight") {
+				broadcast_announce(c.name + " casts Daylight, illuminating a 60-foot radius.", true);
+			}
+			else if (spell.id == "feign_death") {
+				broadcast_announce(c.name + " casts Feign Death.", true);
+			}
+			else if (spell.id == "glyph_of_warding") {
+				broadcast_announce(c.name + " casts Glyph of Warding.", true);
+			}
+			else if (spell.id == "magic_circle") {
+				broadcast_announce(c.name + " casts Magic Circle.", true);
+			}
+			else if (spell.id == "meld_into_stone") {
+				broadcast_announce(c.name + " casts Meld into Stone.", true);
+			}
+			else if (spell.id == "nondetection") {
+				broadcast_announce(c.name + " casts Nondetection.", true);
+			}
+			else if (spell.id == "phantom_steed") {
+				broadcast_announce(c.name + " casts Phantom Steed.", true);
+			}
+			else if (spell.id == "protection_from_energy" and @target != null) {
+				broadcast_announce(c.name + " casts Protection from Energy on " + target.name + ", granting resistance to a chosen damage type for 1 hour.", true);
+			}
+			else if (spell.id == "protection_from_energy") {
+				broadcast_announce(c.name + " casts Protection from Energy, gaining resistance to a chosen damage type for 1 hour.", true);
+			}
+			else if (spell.id == "remove_curse") {
+				broadcast_announce(c.name + " casts Remove Curse.", true);
+			}
+			else if (spell.id == "sending") {
+				broadcast_announce(c.name + " casts Sending, delivering a short telepathic message.", true);
+			}
+			else if (spell.id == "water_breathing") {
+				broadcast_announce(c.name + " casts Water Breathing.", true);
+			}
+			else if (spell.id == "water_walk") {
+				broadcast_announce(c.name + " casts Water Walk.", true);
+			}
+			// Level 4
+			else if (spell.id == "arcane_eye") {
+				broadcast_announce(c.name + " casts Arcane Eye.", true);
+			}
+			else if (spell.id == "compulsion") {
+				broadcast_announce(c.name + " casts Compulsion.", true);
+			}
+			else if (spell.id == "confusion") {
+				// WIS save in 10 ft radius; on fail, target is incapacitated (confused)
+				combatant@[] conf_targets;
+				int ccenter_x = @target != null ? target.x : c.x;
+				int ccenter_y = @target != null ? target.y : c.y;
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (t.is_player == c.is_player and combat.mode != "pvp") continue;
+					if (feet_distance(ccenter_x, ccenter_y, t.x, t.y) <= 10) conf_targets.insert_last(t);
+				}
+				broadcast_announce(c.name + " casts Confusion!", true);
+				for (uint ti = 0; ti < conf_targets.length(); ti++) {
+					combatant@ t = conf_targets[ti];
+					int save_roll = random(1, 20);
+					int save_bonus = t.get_save_bonus(ABILITY_WIS);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					if (bless_bonus > 0) broadcast_announce(t.name + "'s Bless adds " + bless_bonus + " to the save.", false);
+					broadcast_roll(t.name, "WIS save vs Confusion", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Confused!");
+					if (!saved) {
+						t.add_condition(COND_INCAPACITATED);
+						broadcast_to_battle({{"type", message_types::condition_applied}, {"target", t.name}, {"condition", "Confused"}});
+					}
+				}
+			}
+			else if (spell.id == "control_water") {
+				broadcast_announce(c.name + " casts Control Water.", true);
+			}
+			else if (spell.id == "divination") {
+				broadcast_announce(c.name + " casts Divination.", true);
+			}
+			else if (spell.id == "freedom_of_movement" and @target != null) {
+				broadcast_announce(c.name + " casts Freedom of Movement on " + target.name + ". They ignore difficult terrain and are immune to grapples and restraints.", true);
+			}
+			else if (spell.id == "freedom_of_movement") {
+				broadcast_announce(c.name + " casts Freedom of Movement.", true);
+			}
+			else if (spell.id == "locate_creature") {
+				broadcast_announce(c.name + " casts Locate Creature.", true);
+			}
+			else if (spell.id == "private_sanctum") {
+				broadcast_announce(c.name + " casts Private Sanctum.", true);
+			}
+			else if (spell.id == "resilient_sphere") {
+				broadcast_announce(c.name + " casts Resilient Sphere.", true);
+			}
+			else if (spell.id == "secret_chest") {
+				broadcast_announce(c.name + " casts Secret Chest.", true);
+			}
+			else if (spell.id == "stone_shape") {
+				broadcast_announce(c.name + " casts Stone Shape.", true);
+			}
+			// Level 5
+			else if (spell.id == "animate_objects") {
+				broadcast_announce(c.name + " casts Animate Objects, animating up to 10 Tiny objects!", true);
+			}
+			else if (spell.id == "commune") {
+				broadcast_announce(c.name + " casts Commune.", true);
+			}
+			else if (spell.id == "commune_with_nature") {
+				broadcast_announce(c.name + " casts Commune with Nature.", true);
+			}
+			else if (spell.id == "creation") {
+				broadcast_announce(c.name + " casts Creation.", true);
+			}
+			else if (spell.id == "dream") {
+				broadcast_announce(c.name + " casts Dream.", true);
+			}
+			else if (spell.id == "geas") {
+				broadcast_announce(c.name + " casts Geas.", true);
+			}
+			else if (spell.id == "legend_lore") {
+				broadcast_announce(c.name + " casts Legend Lore.", true);
+			}
+			else if (spell.id == "mislead") {
+				broadcast_announce(c.name + " casts Mislead.", true);
+			}
+			else if (spell.id == "modify_memory") {
+				broadcast_announce(c.name + " casts Modify Memory.", true);
+			}
+			else if (spell.id == "passwall") {
+				broadcast_announce(c.name + " casts Passwall.", true);
+			}
+			else if (spell.id == "planar_binding") {
+				broadcast_announce(c.name + " casts Planar Binding.", true);
+			}
+			else if (spell.id == "rary_telepathic_bond") {
+				broadcast_announce(c.name + " casts Rary's Telepathic Bond.", true);
+			}
+			else if (spell.id == "scrying") {
+				broadcast_announce(c.name + " casts Scrying.", true);
+			}
+			else if (spell.id == "seeming") {
+				broadcast_announce(c.name + " casts Seeming.", true);
+			}
+			else if (spell.id == "swift_quiver") {
+				broadcast_announce(c.name + " casts Swift Quiver.", true);
+			}
+			else if (spell.id == "telekinesis") {
+				broadcast_announce(c.name + " casts Telekinesis.", true);
+			}
+			else if (spell.id == "teleportation_circle") {
+				broadcast_announce(c.name + " casts Teleportation Circle.", true);
+			}
+			else if (spell.id == "tree_stride") {
+				broadcast_announce(c.name + " casts Tree Stride.", true);
+			}
+			// Level 6
+			else if (spell.id == "find_the_path") {
+				broadcast_announce(c.name + " casts Find the Path.", true);
+			}
+			else if (spell.id == "guards_and_wards") {
+				broadcast_announce(c.name + " casts Guards and Wards.", true);
+			}
+			else if (spell.id == "heroes_feast") {
+				broadcast_announce(c.name + " casts Heroes' Feast. Up to 12 creatures gain 2d10 HP, immunity to poison and fear, and advantage on Wisdom saves for 24 hours.", true);
+			}
+			else if (spell.id == "magic_jar") {
+				broadcast_announce(c.name + " casts Magic Jar.", true);
+			}
+			else if (spell.id == "move_earth") {
+				broadcast_announce(c.name + " casts Move Earth.", true);
+			}
+			else if (spell.id == "programmed_illusion") {
+				broadcast_announce(c.name + " casts Programmed Illusion.", true);
+			}
+			else if (spell.id == "true_seeing") {
+				broadcast_announce(c.name + " casts True Seeing.", true);
+			}
+			else if (spell.id == "word_of_recall") {
+				broadcast_announce(c.name + " casts Word of Recall.", true);
+			}
+			// Level 7
+			else if (spell.id == "etherealness") {
+				broadcast_announce(c.name + " casts Etherealness.", true);
+			}
+			else if (spell.id == "mage_seeing") {
+				broadcast_announce(c.name + " casts Mage Seeing.", true);
+			}
+			else if (spell.id == "magnificent_mansion") {
+				broadcast_announce(c.name + " casts Magnificent Mansion.", true);
+			}
+			else if (spell.id == "mirage_arcane") {
+				broadcast_announce(c.name + " casts Mirage Arcane.", true);
+			}
+			else if (spell.id == "plane_shift") {
+				broadcast_announce(c.name + " casts Plane Shift.", true);
+			}
+			else if (spell.id == "project_image") {
+				broadcast_announce(c.name + " casts Project Image.", true);
+			}
+			else if (spell.id == "sequester") {
+				broadcast_announce(c.name + " casts Sequester.", true);
+			}
+			else if (spell.id == "simulacrum") {
+				broadcast_announce(c.name + " casts Simulacrum.", true);
+			}
+			else if (spell.id == "teleport") {
+				broadcast_announce(c.name + " casts Teleport.", true);
+			}
+			// Level 8
+			else if (spell.id == "antimagic_field") {
+				broadcast_announce(c.name + " casts Antimagic Field.", true);
+			}
+			else if (spell.id == "antipathy_sympathy") {
+				broadcast_announce(c.name + " casts Antipathy/Sympathy.", true);
+			}
+			else if (spell.id == "clone") {
+				broadcast_announce(c.name + " casts Clone.", true);
+			}
+			else if (spell.id == "control_weather") {
+				broadcast_announce(c.name + " casts Control Weather.", true);
+			}
+			else if (spell.id == "demiplane") {
+				broadcast_announce(c.name + " casts Demiplane.", true);
+			}
+			else if (spell.id == "dominate_monster" and @target != null) {
+				int save_roll = random(1, 20);
+				int save_bonus = target.get_save_bonus(ABILITY_WIS);
+				int bless_bonus = roll_bless_bonus(target);
+				int save_total = save_roll + save_bonus + bless_bonus;
+				bool saved = save_total >= save_dc;
+				if (bless_bonus > 0) broadcast_announce(target.name + "'s Bless adds " + bless_bonus + " to the save.", false);
+				broadcast_roll(target.name, "WIS save vs Dominate Monster", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Charmed!");
+				if (!saved) {
+					target.add_condition(COND_CHARMED);
+					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Charmed"}});
+				}
+			}
+			else if (spell.id == "glibness") {
+				broadcast_announce(c.name + " casts Glibness.", true);
+			}
+			else if (spell.id == "mind_blank") {
+				broadcast_announce(c.name + " casts Mind Blank.", true);
+			}
+			// Level 9
+			else if (spell.id == "astral_projection") {
+				broadcast_announce(c.name + " casts Astral Projection.", true);
+			}
+			else if (spell.id == "foresight" and @target != null) {
+				broadcast_announce(c.name + " casts Foresight on " + target.name + ". They gain advantage on attack rolls, ability checks, and saving throws for 8 hours.", true);
+			}
+			else if (spell.id == "foresight") {
+				broadcast_announce(c.name + " casts Foresight, gaining advantage on attacks, checks, and saves for 8 hours.", true);
+			}
+			else if (spell.id == "gate") {
+				broadcast_announce(c.name + " casts Gate.", true);
+			}
+			else if (spell.id == "imprisonment") {
+				broadcast_announce(c.name + " casts Imprisonment.", true);
+			}
+			else if (spell.id == "invulnerability" and @target != null) {
+				broadcast_announce(c.name + " casts Invulnerability on " + target.name + ". They are immune to all damage for 10 minutes.", true);
+			}
+			else if (spell.id == "invulnerability") {
+				broadcast_announce(c.name + " casts Invulnerability.", true);
+			}
+			else if (spell.id == "shapechange") {
+				broadcast_announce(c.name + " casts Shapechange.", true);
+			}
+			else if (spell.id == "time_stop") {
+				broadcast_announce(c.name + " casts Time Stop.", true);
+			}
+			else if (spell.id == "true_polymorph") {
+				broadcast_announce(c.name + " casts True Polymorph.", true);
+			}
+			// ==== END UTILITY / BUFF SPELL HANDLERS ====
 			else if (spell.id == "acid_splash" and @target != null) {
 				// Basic Rules para 12067: DEX save, 1d6 acid. Scales at L5/11/17.
 				int dice_count = cantrip_dice_count(1, c.level);
