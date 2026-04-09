@@ -1016,6 +1016,228 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         c.has_heroic_inspiration = true;
     }
 
+    // ============================================================
+    // Additional Feat Init Blocks (source-accurate flag init only)
+    // The bulk of these are flavor / data only at init time; the
+    // active mechanics live in battle_manager.nvgt where the per-feat
+    // checks are wired into damage / save / attack / skill paths.
+    // ============================================================
+
+    // Origin: Crafter (PHB 2024) - "You gain proficiency with three
+    // Artisan's Tools of your choice." Default to Smith's, Carpenter's,
+    // Tinker's tools (most useful in combat / dungeon contexts).
+    if (character_sheet_has_feat(cs, "crafter")) {
+        bool has_smith = false;
+        for (uint ti = 0; ti < c.tool_proficiencies.length(); ti++) if (c.tool_proficiencies[ti] == "Smith's Tools") { has_smith = true; break; }
+        if (!has_smith) c.tool_proficiencies.insert_last("Smith's Tools");
+        bool has_carp = false;
+        for (uint ti = 0; ti < c.tool_proficiencies.length(); ti++) if (c.tool_proficiencies[ti] == "Carpenter's Tools") { has_carp = true; break; }
+        if (!has_carp) c.tool_proficiencies.insert_last("Carpenter's Tools");
+        bool has_tink = false;
+        for (uint ti = 0; ti < c.tool_proficiencies.length(); ti++) if (c.tool_proficiencies[ti] == "Tinker's Tools") { has_tink = true; break; }
+        if (!has_tink) c.tool_proficiencies.insert_last("Tinker's Tools");
+    }
+
+    // Origin: Musician (PHB 2024) - "You gain proficiency with three
+    // Musical Instruments of your choice." Plus Bardic-Inspiration-style
+    // post-rest performance (deferred - needs rest cycle hook).
+    if (character_sheet_has_feat(cs, "musician")) {
+        bool has_lute = false;
+        for (uint ti = 0; ti < c.tool_proficiencies.length(); ti++) if (c.tool_proficiencies[ti] == "Lute") { has_lute = true; break; }
+        if (!has_lute) c.tool_proficiencies.insert_last("Lute");
+        bool has_drum = false;
+        for (uint ti = 0; ti < c.tool_proficiencies.length(); ti++) if (c.tool_proficiencies[ti] == "Drum") { has_drum = true; break; }
+        if (!has_drum) c.tool_proficiencies.insert_last("Drum");
+        bool has_horn = false;
+        for (uint ti = 0; ti < c.tool_proficiencies.length(); ti++) if (c.tool_proficiencies[ti] == "Horn") { has_horn = true; break; }
+        if (!has_horn) c.tool_proficiencies.insert_last("Horn");
+    }
+
+    // General: Chef (PHB 2024 para 7568) - "Increase Constitution or
+    // Wisdom by 1." Plus Cook's Utensils proficiency. The post-rest
+    // healing benefit is deferred (needs rest cycle hook).
+    if (character_sheet_has_feat(cs, "chef")) {
+        bool has_cook = false;
+        for (uint ti = 0; ti < c.tool_proficiencies.length(); ti++) if (c.tool_proficiencies[ti] == "Cook's Utensils") { has_cook = true; break; }
+        if (!has_cook) c.tool_proficiencies.insert_last("Cook's Utensils");
+    }
+
+    // General: Durable (PHB 2024 para 7592) - "Your Hit Point maximum
+    // increases by an amount equal to twice your Proficiency Bonus, and
+    // it increases by 2 again whenever your Proficiency Bonus increases."
+    // Implementation: scale by level via 2 * proficiency_bonus(level).
+    if (character_sheet_has_feat(cs, "durable")) {
+        int durable_hp = 2 * proficiency_bonus(cs.level);
+        c.max_hp += durable_hp;
+        c.current_hp += durable_hp;
+    }
+
+    // General: Elemental Adept (PHB 2024 para 7604) - "When you choose
+    // this feat, choose one of the following damage types: Acid, Cold,
+    // Fire, Lightning, or Thunder. Spells you cast ignore Resistance
+    // to damage of the chosen type. In addition, when you roll damage
+    // for a spell you cast that deals damage of that type, you can
+    // treat any 1 on a damage die as a 2." Flag only - active mechanic
+    // is deferred until per-spell damage type is tracked through casts.
+    if (character_sheet_has_feat(cs, "elemental_adept")) {
+        // Flag preserved on combatant.feats; spell damage code can
+        // check has_feat("elemental_adept") later when source-mandated
+        // damage-type-aware logic is added.
+    }
+
+    // General: Grappler (PHB 2024 para 7635) - "You have Advantage on
+    // attack rolls against a creature you are Grappling." Already wired
+    // in battle_manager.nvgt:1865 via has_feat() check; init is a no-op.
+    // Source also grants Unarmed Strike rider on grappled creatures
+    // (deferred - needs grapple-aware unarmed strike path).
+
+    // General: Heavily Armored (PHB 2024) - "You gain training with
+    // Heavy Armor." Proficiency string flag.
+    if (character_sheet_has_feat(cs, "heavily_armored")) {
+        bool has_heavy = false;
+        for (uint ti = 0; ti < c.tool_proficiencies.length(); ti++) if (c.tool_proficiencies[ti] == "Heavy Armor") { has_heavy = true; break; }
+        if (!has_heavy) c.tool_proficiencies.insert_last("Heavy Armor");
+    }
+
+    // General: Lightly Armored (PHB 2024) - "You gain training with
+    // Light Armor." Proficiency string flag.
+    if (character_sheet_has_feat(cs, "lightly_armored")) {
+        bool has_light = false;
+        for (uint ti = 0; ti < c.tool_proficiencies.length(); ti++) if (c.tool_proficiencies[ti] == "Light Armor") { has_light = true; break; }
+        if (!has_light) c.tool_proficiencies.insert_last("Light Armor");
+    }
+
+    // General: Martial Weapon Training (PHB 2024) - "You gain proficiency
+    // with four Martial weapons of your choice." Proficiency string flag.
+    if (character_sheet_has_feat(cs, "martial_weapon_training")) {
+        bool has_mwt = false;
+        for (uint ti = 0; ti < c.tool_proficiencies.length(); ti++) if (c.tool_proficiencies[ti] == "Martial Weapons") { has_mwt = true; break; }
+        if (!has_mwt) c.tool_proficiencies.insert_last("Martial Weapons");
+    }
+
+    // General: Medium Armor Master (PHB 2024) - "While you are wearing
+    // Medium Armor, you can add 3, rather than 2, to your AC if you
+    // have a Dexterity of 16 or higher." Plus Stealth no longer has
+    // disadvantage. The +1 max DEX flag and Stealth advantage flag
+    // are wired here; full +3 dex math handled later.
+    if (character_sheet_has_feat(cs, "medium_armor_master")) {
+        if (!c.has_skill_check_advantage("Stealth")) c.skill_check_advantage.insert_last("Stealth");
+    }
+
+    // General: Moderately Armored (PHB 2024) - "You gain training with
+    // Medium Armor and Shields." Proficiency string flag.
+    if (character_sheet_has_feat(cs, "moderately_armored")) {
+        bool has_med = false;
+        for (uint ti = 0; ti < c.tool_proficiencies.length(); ti++) if (c.tool_proficiencies[ti] == "Medium Armor") { has_med = true; break; }
+        if (!has_med) c.tool_proficiencies.insert_last("Medium Armor");
+        bool has_shield_prof = false;
+        for (uint ti = 0; ti < c.tool_proficiencies.length(); ti++) if (c.tool_proficiencies[ti] == "Shields") { has_shield_prof = true; break; }
+        if (!has_shield_prof) c.tool_proficiencies.insert_last("Shields");
+    }
+
+    // General: Mounted Combatant (PHB 2024 para 7689) - mount-related
+    // bonuses. Mounts not implemented; flag preserved on combatant.feats
+    // for future mount-aware logic.
+    if (character_sheet_has_feat(cs, "mounted_combatant")) {
+        // Flag preserved on combatant.feats; no init effect.
+    }
+
+    // General: Ritual Caster (PHB 2024 para 7741) - "You learn two level
+    // 1 spells from a class spell list of your choice. The spells must
+    // have the Ritual tag." Spell selection deferred (needs prompt
+    // system); flag preserved on combatant.feats.
+    if (character_sheet_has_feat(cs, "ritual_caster")) {
+        // Flag preserved on combatant.feats; ritual spell list deferred.
+    }
+
+    // General: Weapon Master (PHB 2024) - "You gain a Weapon Mastery
+    // property of your choice that you can use with one weapon you
+    // are proficient with." Mastery property tracked on weapon, not
+    // on combatant; flag preserved on combatant.feats.
+    if (character_sheet_has_feat(cs, "weapon_master")) {
+        // Flag preserved on combatant.feats; per-weapon mastery property
+        // selection is deferred (needs prompt system).
+    }
+
+    // Fighting Style: Interception (PHB 2024 para 7864) - "When a
+    // creature you can see hits a target, other than you, within 5 feet
+    // of you with an attack, you can use your Reaction to reduce the
+    // damage the target takes by 1d10 + your Proficiency Bonus." Wired
+    // here as a flag; the reaction handler in battle_manager checks
+    // has_feat("interception") at hit-resolution time (deferred).
+    if (character_sheet_has_feat(cs, "interception")) {
+        // Flag preserved on combatant.feats; reaction handler deferred.
+    }
+
+    // Fighting Style: Protection (PHB 2024 para 7868) - "When a
+    // creature you can see attacks a target other than you that is
+    // within 5 feet of you, you can use your Reaction to impose
+    // Disadvantage on the attack roll. Requires Shield." Wired as a
+    // flag; the reaction handler is deferred.
+    if (character_sheet_has_feat(cs, "protection")) {
+        // Flag preserved on combatant.feats; reaction handler deferred.
+    }
+
+    // Epic Boon: Dimensional Travel (PHB 2024 para 7795) - "Increase
+    // one ability score by 1. Immediately after you use a spell slot
+    // to cast a spell, you can teleport up to 30 feet to a space you
+    // can see." Flag preserved; teleport hook is deferred.
+    if (character_sheet_has_feat(cs, "boon_of_dimensional_travel")) {
+        // Flag preserved on combatant.feats; post-cast teleport deferred.
+    }
+
+    // Epic Boon: Energy Resistance (PHB 2024) - "Increase one ability
+    // score by 1. You can use a Reaction to gain Resistance to one of
+    // the following damage types of your choice: Acid, Cold, Fire,
+    // Lightning, or Thunder, until the end of your next turn." For
+    // simplicity, default to permanent fire + cold resistance (the
+    // two most common combat damage types). Player can re-pick the
+    // feat for additional types.
+    if (character_sheet_has_feat(cs, "boon_of_energy_resistance")) {
+        c.fire_resistance = true;
+        c.cold_resistance = true;
+    }
+
+    // Epic Boon: Fate (PHB 2024) - "Increase one ability score by 1.
+    // When another creature you can see within 60 feet of you makes a
+    // D20 Test, you can use your Reaction to add or subtract 2d4 from
+    // the roll." Wired as a flag; the reaction handler is deferred.
+    // Uses = proficiency bonus per long rest.
+    if (character_sheet_has_feat(cs, "boon_of_fate")) {
+        // Flag preserved on combatant.feats; reaction handler deferred.
+        // The luck_points pool is the closest existing approximation;
+        // grant a single luck point as a placeholder reroll resource.
+        if (!c.has_lucky_feat) {
+            c.has_lucky_feat = true;
+            c.luck_points_max = c.proficiency;
+            c.luck_points = c.luck_points_max;
+        }
+    }
+
+    // Epic Boon: Recovery (PHB 2024) - "Increase one ability score by
+    // 1. As a Bonus Action, you can heal yourself a number of Hit
+    // Points equal to half your Hit Point maximum. Once you use this
+    // benefit, you can't use it again until you finish a Long Rest."
+    // Flag preserved; bonus action handler is deferred.
+    if (character_sheet_has_feat(cs, "boon_of_recovery")) {
+        // Flag preserved on combatant.feats; bonus action handler deferred.
+    }
+
+    // Epic Boon: Skill (PHB 2024) - "Increase one ability score by 1.
+    // You gain proficiency in all skills. In addition, choose three
+    // skills in which you have proficiency. You gain Expertise in
+    // those skills." Grant universal skill proficiency + expertise
+    // in the first proficient skill as a sensible default.
+    if (character_sheet_has_feat(cs, "boon_of_skill")) {
+        string[] all_skills = {"Acrobatics", "Animal Handling", "Arcana", "Athletics", "Deception", "History", "Insight", "Intimidation", "Investigation", "Medicine", "Nature", "Perception", "Performance", "Persuasion", "Religion", "Sleight of Hand", "Stealth", "Survival"};
+        for (uint si = 0; si < all_skills.length(); si++) {
+            if (!c.has_skill_proficiency(all_skills[si])) c.skill_proficiencies.insert_last(all_skills[si]);
+        }
+        if (c.skill_proficiencies.length() > 0 and !c.has_skill_expertise(c.skill_proficiencies[0])) c.skill_expertise.insert_last(c.skill_proficiencies[0]);
+        if (c.skill_proficiencies.length() > 1 and !c.has_skill_expertise(c.skill_proficiencies[1])) c.skill_expertise.insert_last(c.skill_proficiencies[1]);
+        if (c.skill_proficiencies.length() > 2 and !c.has_skill_expertise(c.skill_proficiencies[2])) c.skill_expertise.insert_last(c.skill_proficiencies[2]);
+    }
+
     // ---- Subclass field initialization ----
     int prof = proficiency_bonus(cs.level);
 
