@@ -65,11 +65,20 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 
 | `Server/combat/wave_system.nvgt` | 9 wave scenarios, `spawn_wave()` with difficulty multipliers |
 
-| `Server/combat/spell_data.nvgt` | 367 spell definitions, ~130 with custom handlers in battle_manager.nvgt |
+| `Server/combat/spell_data.nvgt` | 365 spell definitions, ~306 with custom handlers in battle_manager.nvgt (~84% coverage) |
+| `Server/combat/piety_data.nvgt` | Theros Piety system: 15 gods, 4 tiers (Devotee/Votary/Disciple/Champion) |
+| `Server/combat/vestiges_data.nvgt` | Wildemount Vestiges of Divergence: 8 items, 3 awakening states (Dormant/Awakened/Exalted) |
+| `Server/combat/heroic_chronicle_data.nvgt` | Wildemount Heroic Chronicle: 5 homelands, 20 backgrounds, 20 prophecies |
+| `Server/combat/bastions_data.nvgt` | DMG 2024 Bastions: 29 special facilities (L5/9/13/17), 7 order types |
+| `Server/combat/group_patrons_data.nvgt` | Tasha's Group Patrons: 8 archetypes (Academy, Ancient Being, etc.) |
+| `Server/combat/factions_data.nvgt` | Grim Hollow Factions: 11 factions of Etharis with rep tracks |
+| `Server/combat/ravnica_guilds_data.nvgt` | Ravnica Guilds: 10 guilds with color philosophy and perks |
+| `Server/combat/ebon_tides_data.nvgt` | Ebon Tides: 14 fey courts, 7 named shadow roads |
+| `Server/combat/transformations_data.nvgt` | Grim Hollow Transformations: 6 paths, 5 stages each (Vampirism, Lycanthropy, Lichdom, etc.) |
 
 | `Server/progression.nvgt` | XP tracking, achievement system, character level progression, prestige system, glory points |
 
-| `common/loot_data.nvgt` | Item catalog (168 items), loot generation, rarity tiers, inventory helpers |
+| `common/loot_data.nvgt` | Item catalog (270 items, all source-verified from PHB/DMG/Tasha/Fizban/Theros/Wildemount/Eberron/Grim Hollow/Ravnica/Griffon's/BOMT/Ebon Tides), loot generation, rarity tiers, inventory helpers |
 
 | `common/consumable_data.nvgt` | Consumable catalog (16 items), modifier system, inventory helpers |
 
@@ -344,6 +353,22 @@ Adding a new prompted spell or feature: in `handle_cast` (or the relevant action
 
 
 
+### Phase 1 Sub-Systems (2026-04-08 batch)
+
+All 9 Phase 1 sub-systems from the master directive are now implemented as data-only modules in `Server/combat/`:
+
+- **Theros Piety** (`piety_data.nvgt`) — 15 gods (Athreos, Ephara, Erebos, Heliod, Iroas, Karametra, Keranos, Klothys, Kruphix, Mogis, Nylea, Pharika, Phenax, Purphoros, Thassa). Source-quoted Devotee (Piety 3+) trait per god, Votary/Disciple/Champion summaries. Tier thresholds: 3, 10, 25, 50 per source para 1242. Fields: `piety_god`, `piety_score`, `piety_devotee_uses` on character_sheet + combatant.
+- **Vestiges of Divergence** (`vestiges_data.nvgt`) — 8 source-quoted Wildemount legendary items with 3 awakening states each: Spell Bottle, Danoth's Visor, Grimoire Infinitus, Hide of the Feral Guardian, Infiltrator's Key, Stormgirdle, Verminshroud, Wreath of the Prism. State auto-suggested by character level (Dormant<L9, Awakened L9-15, Exalted L16+).
+- **Heroic Chronicle** (`heroic_chronicle_data.nvgt`) — Wildemount backstory generator: 5 homelands (Menagerie Coast, Marrow Valley, Zemni Fields, Greying Wildlands, Xhorhas), 20 backgrounds (PH + EGW variants including Grinner, Volstrucker Agent, Cobalt Scholar, Augen Trust spy), 20 prophecy outcomes. `generate_heroic_chronicle()` returns a randomized full backstory.
+- **Bastions** (`bastions_data.nvgt`) — DMG 2024 chapter 8: 29 source-quoted special facilities across 4 tiers (L5: 9, L9: 10, L13: 6, L17: 4). 7 Bastion orders (Craft/Empower/Harvest/Maintain/Recruit/Research/Trade). Facility space tiers (Cramped/Roomy/Vast), basic facility costs, max facility count by level, prerequisites enforced.
+- **Group Patrons** (`group_patrons_data.nvgt`) — Tasha's: 8 archetypes (Academy, Ancient Being, Aristocrat, Criminal Syndicate, Guild, Military Force, Religious Order, Sovereign). Each has types, perks, contact NPCs, quest examples. Group Assistance d4 per source para 4910 — `can_use_group_assistance()` checks per-rest flag. Fields: `group_patron`, `group_assistance_used_this_rest` on combatant.
+- **Faction Tracks** (`factions_data.nvgt`) — Grim Hollow chapter 11: 11 factions of Etharis (Augustine Trading Company, Company of Free Swords, Ebon Syndicate, Thaumaturge, Watchers of the Faithful, Arcanist Inquisition, Crimson Court, Monster Hunter Guilds, Morbus Doctore, Order of Dawn, Prismatic Circle). Reputation tracks from Hated (-10) to Champion (+10) with 6 thresholds; tier-specific benefits at Liked/Honored/Champion.
+- **Ravnica Guilds** (`ravnica_guilds_data.nvgt`) — Guildmasters' Guide: all 10 guilds with color philosophy (W/U Azorius through G/U Simic), each with contact perk, equipment perk, and 3 source-themed free spells. Constants: `RAVNICA_GUILD_NAMES`.
+- **Ebon Tides Shadow Roads & Fey Courts** (`ebon_tides_data.nvgt`) — Book of Ebon Tides: 14 source-listed fey courts with rulers/alignment/perks (Court of Golden Oaks, Pale Roses, Midnight Teeth, Witch Queen's Court, etc.). 7 named shadow roads (Mage's Road, Flower Road, Bridge of Lethe, Twin Roads of Corremel, etc.) with travel days and passphrase requirements. `shadow_road_lore_modifier(race)` applies -5 to non-elf Arcana checks per source para 2500.
+- **Transformations** (`transformations_data.nvgt`) — Grim Hollow para 2294-2306: 5-stage progression (Untransformed → Infected → Awakened → Ascended → Fallen → Full NPC). 6 paths: Vampirism (Crimson Court), Lycanthropy, Lichdom, Aberrant Horror, Demonic Pact, Seraphic Ascension (the only blessed path per para 2297). Helper: `transformation_active_effect()`.
+
+**Wiring status:** Data modules built and compiled. Per-character usage requires UI flow integration (character creation prompts, level-up unlocks, action menu entries) — deferred. Combatant fields exist for Piety and Group Patrons; Vestige/Bastion/Transformation tracking is per-account JSON only.
+
 ### Source Audit Status (2026-04-08) — Post-Audit Additions
 All batches 15-21 implementations were audited against actual source docx files in `C:\Users\16239\Downloads\Sources_clean\Source Books and rules\`. Additionally batches 22-25 added new subclasses extracted directly from the source files.
 
@@ -524,7 +549,9 @@ Epic Boon feats: combat_prowess, dimensional_travel, energy_resistance, fate, fo
 
 ### Loot & Equipment System
 
-- 35 items across 5 rarity tiers (Common, Uncommon, Rare, Epic, Legendary) and 4 slots (Weapon, Armor, Ring, Amulet)
+- **270 source-verified items** across 5 rarity tiers (Common, Uncommon, Rare, Epic, Legendary) and 4 slots (Weapon, Armor, Ring, Amulet). Distribution: 28 Common, 61 Uncommon, 107 Rare, 53 Epic, 21 Legendary.
+- **Source breakdown** (as of 2026-04-08 audit): DMG 2024 (~100), Tasha's (~17), Fizban's (9), Theros (6), Wildemount (10), Eberron Rising (13), Grim Hollow (10), Ravnica (9), Griffon's Saddlebag (12), Book of Many Things (12), Book of Ebon Tides (14), plus 4 Glory Shop exclusives.
+- **Audit (2026-04-08)**: All 31 fabricated items removed from the original catalog. Every item now has a source-quoted description with paragraph reference. Glory Shop items preserved as intentional in-game rewards.
 
 - Item stats: AC bonus, damage bonus, HP bonus, spell DC bonus, initiative bonus, speed bonus, save bonus, crit threshold reduction
 
