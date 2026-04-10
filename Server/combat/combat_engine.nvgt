@@ -331,8 +331,13 @@ class combatant {
 	bool arcane_shot_pending = false; // Arcane Archer Fighter
 	string arcane_shot_type = "";
 	int arcane_shot_uses = 0;
-	bool restore_balance_ready = false; // Clockwork Soul Sorcerer
+	bool restore_balance_ready = false; // Clockwork Soul Sorcerer L1
 	int restore_balance_uses = 0;
+	// Tasha's Clockwork Soul L6/L14/L18 (paras 3997-4011)
+	int bastion_of_law_dice = 0; // L6: Nd8 ward dice to absorb damage
+	bool trance_of_order_active = false; // L14: can't be hit with advantage, treat d20 ≤9 as 10
+	int trance_of_order_rounds = 0;
+	bool clockwork_cavalcade_available = false; // L18: 100 HP heal + dispel L6-
 	bool twilight_sanctuary_active = false; // Twilight Domain Cleric
 	int twilight_sanctuary_rounds = 0;
 	bool abjure_extraplanar_active = false; // Oath of Watchers Paladin
@@ -1422,6 +1427,19 @@ class battle {
 			}
 		}
 
+		// Tasha's Clockwork Soul L6 Bastion of Law (para 3997-4000): ward dice absorb damage
+		if (target.bastion_of_law_dice > 0) {
+			int ward_absorbed = 0;
+			// Spend dice one at a time until damage is absorbed or dice run out
+			while (target.bastion_of_law_dice > 0 and amount > 0) {
+				int roll = random(1, 8);
+				ward_absorbed += roll;
+				target.bastion_of_law_dice--;
+				amount -= roll;
+			}
+			if (amount < 0) amount = 0;
+		}
+
 		// Xanathar's Shadow Magic L18 Umbral Form (para 2605-2607): resistance to all
 		// damage except force and radiant while in shadowy form.
 		if (target.shadow_umbral_active and damage_type != DMG_FORCE and damage_type != DMG_RADIANT) {
@@ -1916,6 +1934,11 @@ class battle {
 				state["my_revelation_in_flesh_active"] = c.revelation_in_flesh_active;
 				state["my_revelation_in_flesh_rounds"] = c.revelation_in_flesh_rounds;
 				state["my_warping_implosion_available"] = c.warping_implosion_available;
+				// Tasha's Clockwork Soul (paras 3953-4011)
+				state["my_bastion_of_law_dice"] = c.bastion_of_law_dice;
+				state["my_trance_of_order_active"] = c.trance_of_order_active;
+				state["my_trance_of_order_rounds"] = c.trance_of_order_rounds;
+				state["my_clockwork_cavalcade_available"] = c.clockwork_cavalcade_available;
 				// Potion buff rounds remaining
 				state["my_potion_damage_rounds"] = c.potion_damage_rounds;
 				state["my_potion_ac_rounds"] = c.potion_ac_rounds;

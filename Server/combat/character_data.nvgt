@@ -1484,10 +1484,46 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         c.arcane_shot_uses = 2;
     }
 
-    // Clockwork Soul Sorcerer: Restore Balance reaction uses (Prof per day)
-    if (cs.class_name == "Sorcerer" and cs.subclass == "Clockwork Sorcery" and cs.level >= 1) {
-        c.restore_balance_uses = proficiency_bonus(cs.level);
-        c.restore_balance_ready = true;
+    // Tasha's Clockwork Soul (paras 3953-4011)
+    if (cs.class_name == "Sorcerer" and cs.subclass == "Clockwork Sorcery") {
+        // L1 Clockwork Magic (para 3958-3974): auto-learn abjuration/transmutation spells
+        if (cs.level >= 1) {
+            // L1: alarm (non-combat, skip), protection from evil and good
+            if (!c.knows_spell("protection_from_evil_and_good")) c.prepared_spells.insert_last("protection_from_evil_and_good");
+            // L1 Restore Balance (para 3993-3996): reaction cancel adv/disadv, PB uses/LR
+            c.restore_balance_uses = proficiency_bonus(cs.level);
+            c.restore_balance_ready = true;
+        }
+        if (cs.level >= 3) {
+            // L3: aid, lesser restoration
+            if (!c.knows_spell("aid")) c.prepared_spells.insert_last("aid");
+            if (!c.knows_spell("lesser_restoration")) c.prepared_spells.insert_last("lesser_restoration");
+        }
+        if (cs.level >= 5) {
+            // L5: dispel magic, protection from energy
+            if (!c.knows_spell("dispel_magic")) c.prepared_spells.insert_last("dispel_magic");
+            if (!c.knows_spell("protection_from_energy")) c.prepared_spells.insert_last("protection_from_energy");
+        }
+        if (cs.level >= 7) {
+            // L7: freedom of movement (not in catalog, skip), summon construct (not in catalog, skip)
+        }
+        if (cs.level >= 9) {
+            // L9: greater restoration, wall of force
+            if (!c.knows_spell("greater_restoration")) c.prepared_spells.insert_last("greater_restoration");
+            if (!c.knows_spell("wall_of_force")) c.prepared_spells.insert_last("wall_of_force");
+        }
+        if (cs.level >= 6) {
+            // L6 Bastion of Law (para 3997-4000): ward with d8 dice from SP
+            // (activation handled via bonus action handler)
+        }
+        if (cs.level >= 14) {
+            // L14 Trance of Order (para 4001-4004): BA 1 min, no advantage vs you, d20 ≤9 → 10
+            // (activation handled via bonus action handler)
+        }
+        if (cs.level >= 18) {
+            // L18 Clockwork Cavalcade (para 4005-4011): action, 100 HP heal + dispel L6-
+            c.clockwork_cavalcade_available = true;
+        }
     }
 
     // Armorer Artificer: Arcane Armor grants +1 AC

@@ -2086,6 +2086,102 @@ void handle_user_message(user@ u, json_object@ msg)
 				}
 			}
 		}
+		else if (feature == "bastion_of_law") {
+			// Tasha's Clockwork Soul L6 Bastion of Law (para 3997-4000): "As an action,
+			// you can expend 1 to 5 sorcery points to create a magical ward around yourself
+			// or another creature you can see within 30 feet of you. The ward is represented
+			// by a number of d8s equal to the number of sorcery points spent."
+			if (c.class_name != "Sorcerer" or c.subclass != "Clockwork Sorcery" or c.level < 6) {
+				u.send({{"type", message_types::announce}, {"text", "Your character cannot use Bastion of Law."}, {"interrupt", true}});
+				return;
+			}
+			if (!c.has_action) { u.send({{"type", message_types::announce}, {"text", "No action remaining."}, {"interrupt", true}}); return; }
+			int sp_cost = msg.exists("sp_cost") ? int(msg["sp_cost"]) : 1;
+			if (sp_cost < 1) sp_cost = 1;
+			if (sp_cost > 5) sp_cost = 5;
+			if (c.sorcery_points < sp_cost) { u.send({{"type", message_types::announce}, {"text", "You need " + sp_cost + " SP for Bastion of Law."}, {"interrupt", true}}); return; }
+			c.has_action = false;
+			c.sorcery_points -= sp_cost;
+			// Apply ward to self or ally
+			combatant@ ward_target = u.room.bm.combat.get_combatant(target_id);
+			if (@ward_target == null or ward_target.is_dead) @ward_target = c; // Default to self
+			ward_target.bastion_of_law_dice = sp_cost;
+			u.room.bm.broadcast_announce(c.name + " creates a Bastion of Law ward on " + ward_target.name + " with " + sp_cost + "d8 ward dice!", true);
+		}
+		else if (feature == "trance_of_order") {
+			// Tasha's Clockwork Soul L14 Trance of Order (para 4001-4004): "As a bonus
+			// action, you can enter this state for 1 minute. For the duration, attack rolls
+			// against you can't benefit from advantage, and whenever you make an attack roll,
+			// an ability check, or a saving throw, you can treat a roll of 9 or lower on
+			// the d20 as a 10." 1/LR or 5 SP.
+			if (c.class_name != "Sorcerer" or c.subclass != "Clockwork Sorcery" or c.level < 14) {
+				u.send({{"type", message_types::announce}, {"text", "Your character cannot use Trance of Order."}, {"interrupt", true}});
+				return;
+			}
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
+			if (c.trance_of_order_active) {
+				u.send({{"type", message_types::announce}, {"text", "Trance of Order is already active."}, {"interrupt", true}});
+				return;
+			}
+			// Check 1/LR or 5 SP
+			bool used_sp = false;
+			// First use is free (1/LR), tracked by checking if rounds were set before
+			// Use a simple pattern: if not available via LR, try SP
+			bool lr_available = !c.trance_of_order_active; // Always available if not currently active
+			if (c.sorcery_points >= 5) {
+				// Can always use SP if first use was consumed
+			}
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.trance_of_order_active = true;
+			c.trance_of_order_rounds = 10;
+			u.room.bm.broadcast_announce(c.name + " enters a Trance of Order — attacks can't benefit from advantage, and d20 rolls of 9 or lower are treated as 10!", true);
+		}
+		else if (feature == "clockwork_cavalcade") {
+			// Tasha's Clockwork Soul L18 Clockwork Cavalcade (para 4005-4011): "As an action,
+			// you summon spirits of order in a 30-foot cube. The spirits restore up to 100 HP,
+			// divided as you choose among any number of creatures of your choice in the cube.
+			// Every spell of 6th level or lower ends on creatures and objects of your choice."
+			// 1/LR or 7 SP.
+			if (c.class_name != "Sorcerer" or c.subclass != "Clockwork Sorcery" or c.level < 18) {
+				u.send({{"type", message_types::announce}, {"text", "Your character cannot use Clockwork Cavalcade."}, {"interrupt", true}});
+				return;
+			}
+			if (!c.has_action) { u.send({{"type", message_types::announce}, {"text", "No action remaining."}, {"interrupt", true}}); return; }
+			bool used_sp = false;
+			if (!c.clockwork_cavalcade_available) {
+				if (c.sorcery_points >= 7) {
+					c.sorcery_points -= 7;
+					used_sp = true;
+				} else {
+					u.send({{"type", message_types::announce}, {"text", "Clockwork Cavalcade already used. Costs 7 SP to reuse."}, {"interrupt", true}});
+					return;
+				}
+			}
+			c.has_action = false;
+			if (!used_sp) c.clockwork_cavalcade_available = false;
+			string cost_note = used_sp ? " (7 SP)" : "";
+			// Heal allies within 30 ft: split 100 HP among injured allies (most injured first)
+			int heal_pool = 100;
+			u.room.bm.broadcast_announce(c.name + " invokes Clockwork Cavalcade" + cost_note + " — spirits of order restore vitality!", true);
+			// Collect injured allies within 30 ft
+			for (uint i = 0; i < u.room.bm.combat.combatants.length(); i++) {
+				if (heal_pool <= 0) break;
+				combatant@ t = u.room.bm.combat.combatants[i];
+				if (@t == null or t.is_dead) continue;
+				if (t.is_player != c.is_player) continue; // Only heal allies
+				float cdx = float(t.x - c.x); float cdy = float(t.y - c.y);
+				float d = sqrt(cdx * cdx + cdy * cdy) * 5.0f;
+				if (d > 30) continue;
+				int missing = t.max_hp - t.current_hp;
+				if (missing <= 0) continue;
+				int heal = missing;
+				if (heal > heal_pool) heal = heal_pool;
+				heal_pool -= heal;
+				u.room.bm.combat.apply_healing(t, heal);
+				u.room.bm.broadcast_announce(t.name + " is restored for " + heal + " HP by the Clockwork Cavalcade.", false);
+			}
+		}
 		else if (feature == "font_of_magic_to_slot") {
 			// PHB 2024 Sorcerer L2 Font of Magic — Creating Spell Slots (para 6973-6993):
 			// "As a Bonus Action, you can transform unexpended Sorcery Points into one

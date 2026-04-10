@@ -2117,6 +2117,11 @@ class battle_manager {
 		if (target.elusive_active and !target.has_condition(COND_INCAPACITATED)) {
 			adv = false;
 		}
+		// Tasha's Clockwork Soul L14 Trance of Order (para 4001-4003): "attack rolls
+		// against you can't benefit from advantage."
+		if (target.trance_of_order_active) {
+			adv = false;
+		}
 		// Valda's Spire Gunslinger High Roller L6 Risky Business (paras 265-266):
 		// "Once per turn when you make an attack roll against an enemy and the roll
 		// doesn't have Disadvantage, you can choose to make the roll with Disadvantage.
@@ -3371,6 +3376,15 @@ class battle_manager {
 					}
 					prev.revelation_see_invisible = false;
 					broadcast_announce(prev.name + "'s Revelation in Flesh ends.", false);
+				}
+			}
+			// Tasha's Clockwork Soul L14 Trance of Order (para 4001-4004): "1 minute"
+			// = 10 rounds. Advantage cancellation + d20 clamping expire.
+			if (prev.trance_of_order_active and prev.trance_of_order_rounds > 0) {
+				prev.trance_of_order_rounds--;
+				if (prev.trance_of_order_rounds <= 0) {
+					prev.trance_of_order_active = false;
+					broadcast_announce(prev.name + "'s Trance of Order ends.", false);
 				}
 			}
 			// Valda's Spire Gunslinger L5 Gut Shot debuff tickdown (paras 184-185):
@@ -5004,6 +5018,14 @@ class battle_manager {
 				total = natural_roll + pr.modifier + bless_bonus + bardic_bonus;
 			}
 		}
+		// Tasha's Clockwork Soul L14 Trance of Order (para 4001-4003): "whenever you
+		// make an attack roll, an ability check, or a saving throw, you can treat a
+		// roll of 9 or lower on the d20 as a 10."
+		if (c.trance_of_order_active and natural_roll < 10) {
+			broadcast_announce(c.name + "'s Trance of Order treats the " + natural_roll + " as a 10.", false);
+			natural_roll = 10;
+			total = natural_roll + pr.modifier + bless_bonus + bardic_bonus;
+		}
 		// PHB 2024 Barbarian L18 Indomitable Might (para 2354-2355): "If your total for
 		// a Strength check or Strength saving throw is less than your Strength score,
 		// you can use that score in place of the total." Applied to STR ability checks
@@ -6605,13 +6627,16 @@ class battle_manager {
 			}
 		}
 		else if (choice == "restore_balance" and defender.is_player) {
-			// Clockwork Soul: Restore Balance — cancel advantage/disadvantage on attack
+			// Tasha's Clockwork Soul L1 Restore Balance (para 3993-3996): "When a creature
+			// you can see within 60 feet of you is about to roll a d20 with advantage or
+			// disadvantage, you can use your reaction to prevent the roll from being affected
+			// by advantage and disadvantage." Approximation: reduce attack roll by 5 to
+			// represent cancelled advantage (the roll has already happened in our system).
 			if (defender.restore_balance_uses > 0) {
 				defender.restore_balance_uses--;
 				defender.has_reaction = false;
-				// Approximation: reduce attack roll by 5 to represent canceled advantage
 				rp.attack_total -= 5;
-				broadcast_announce(defender.name + " invokes Restore Balance! Attack advantage canceled.", true);
+				broadcast_announce(defender.name + " invokes Restore Balance! Attack advantage canceled. (" + defender.restore_balance_uses + " uses remain)", true);
 			}
 		}
 		else if (choice == "spirit_shield" and defender.is_player) {

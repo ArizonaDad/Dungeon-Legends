@@ -218,6 +218,11 @@ bool my_psionic_defenses_active = false;
 bool my_revelation_in_flesh_active = false;
 int my_revelation_in_flesh_rounds = 0;
 bool my_warping_implosion_available = false;
+// Tasha's Clockwork Soul (paras 3953-4011)
+int my_bastion_of_law_dice = 0;
+bool my_trance_of_order_active = false;
+int my_trance_of_order_rounds = 0;
+bool my_clockwork_cavalcade_available = false;
 // PHB 2024 Warlock L2 Magical Cunning / L9 Contact Patron / L11+ Mystic Arcanum — synced from server
 bool my_magical_cunning_available = false;
 bool my_contact_patron_available = false;
@@ -1067,6 +1072,10 @@ void show_bonus_action_menu() {
 	// Tasha's Aberrant Mind (paras 3894-3952)
 	int revelation_in_flesh_opt = -1;
 	int warping_implosion_opt = -1;
+	// Tasha's Clockwork Soul (paras 3953-4011)
+	int bastion_of_law_opt = -1;
+	int trance_of_order_opt = -1;
+	int clockwork_cavalcade_opt = -1;
 	// PHB 2024 Wizard Evoker L14 Overchannel (paras 9265-9268)
 	int overchannel_opt = -1;
 	// PHB 2024 Warlock L2 Magical Cunning / L9 Contact Patron / L11+ Mystic Arcanum
@@ -1137,6 +1146,21 @@ void show_bonus_action_menu() {
 	if (lc == "sorcerer" and subclass == "Aberrant Sorcery" and level >= 18) {
 		string wi_label = my_warping_implosion_available ? "Warping Implosion. Action. Teleport 120ft + 30ft AoE 3d10 force. 1/LR." : "Warping Implosion. Action. 5 SP to reuse.";
 		warping_implosion_opt = m.add_item(wi_label);
+	}
+	// Tasha's Clockwork Soul L6 Bastion of Law (para 3997-4000)
+	if (lc == "sorcerer" and subclass == "Clockwork Sorcery" and level >= 6) {
+		string bol_label = "Bastion of Law. Action. 1-5 SP: create d8 ward dice on self or ally to absorb damage.";
+		if (my_bastion_of_law_dice > 0) bol_label += " (Current ward: " + my_bastion_of_law_dice + "d8)";
+		bastion_of_law_opt = m.add_item(bol_label);
+	}
+	// Tasha's Clockwork Soul L14 Trance of Order (para 4001-4004)
+	if (lc == "sorcerer" and subclass == "Clockwork Sorcery" and level >= 14 and !my_trance_of_order_active) {
+		trance_of_order_opt = m.add_item("Trance of Order. Bonus action. 1 min: no advantage vs you + d20 9- treated as 10.");
+	}
+	// Tasha's Clockwork Soul L18 Clockwork Cavalcade (para 4005-4011)
+	if (lc == "sorcerer" and subclass == "Clockwork Sorcery" and level >= 18) {
+		string cc_label = my_clockwork_cavalcade_available ? "Clockwork Cavalcade. Action. Restore 100 HP among allies in 30ft cube. 1/LR." : "Clockwork Cavalcade. Action. 7 SP to reuse.";
+		clockwork_cavalcade_opt = m.add_item(cc_label);
 	}
 	// PHB 2024 Wizard Evoker L14 Overchannel (paras 9265-9268): When you cast a Wizard
 	// spell of levels 1-5 that deals damage, deal max damage. After first use per long
@@ -1784,6 +1808,27 @@ void show_bonus_action_menu() {
 	else if (warping_implosion_opt >= 0 and res == warping_implosion_opt) {
 		// Tasha's Aberrant Mind L18 Warping Implosion (para 3949-3952)
 		send({{"type", message_types::bonus_action}, {"feature", "warping_implosion"}, {"target_id", current_target_id}});
+	}
+	else if (bastion_of_law_opt >= 0 and res == bastion_of_law_opt) {
+		// Tasha's Clockwork Soul L6 Bastion of Law (para 3997-4000)
+		menu@ bm = setup_sub_menu("Choose SP to spend on Bastion of Law ward (1-5 d8 dice):");
+		bm.add_item("1 SP: 1d8 ward");
+		bm.add_item("2 SP: 2d8 ward");
+		bm.add_item("3 SP: 3d8 ward");
+		bm.add_item("4 SP: 4d8 ward");
+		bm.add_item("5 SP: 5d8 ward");
+		int bres = bm.run();
+		if (bres >= 0) {
+			send({{"type", message_types::bonus_action}, {"feature", "bastion_of_law"}, {"sp_cost", bres + 1}, {"target_id", current_target_id}});
+		}
+	}
+	else if (trance_of_order_opt >= 0 and res == trance_of_order_opt) {
+		// Tasha's Clockwork Soul L14 Trance of Order (para 4001-4004)
+		send({{"type", message_types::bonus_action}, {"feature", "trance_of_order"}});
+	}
+	else if (clockwork_cavalcade_opt >= 0 and res == clockwork_cavalcade_opt) {
+		// Tasha's Clockwork Soul L18 Clockwork Cavalcade (para 4005-4011)
+		send({{"type", message_types::bonus_action}, {"feature", "clockwork_cavalcade"}});
 	}
 	else if (overchannel_opt >= 0 and res == overchannel_opt) {
 		// PHB 2024 Wizard Evoker L14 Overchannel (paras 9265-9268)
@@ -3533,6 +3578,11 @@ void parse_game_state(json_object@ msg) {
 	my_revelation_in_flesh_active = msg.exists("my_revelation_in_flesh_active") ? bool(msg["my_revelation_in_flesh_active"]) : false;
 	my_revelation_in_flesh_rounds = msg.exists("my_revelation_in_flesh_rounds") ? int(msg["my_revelation_in_flesh_rounds"]) : 0;
 	my_warping_implosion_available = msg.exists("my_warping_implosion_available") ? bool(msg["my_warping_implosion_available"]) : false;
+	// Tasha's Clockwork Soul state
+	my_bastion_of_law_dice = msg.exists("my_bastion_of_law_dice") ? int(msg["my_bastion_of_law_dice"]) : 0;
+	my_trance_of_order_active = msg.exists("my_trance_of_order_active") ? bool(msg["my_trance_of_order_active"]) : false;
+	my_trance_of_order_rounds = msg.exists("my_trance_of_order_rounds") ? int(msg["my_trance_of_order_rounds"]) : 0;
+	my_clockwork_cavalcade_available = msg.exists("my_clockwork_cavalcade_available") ? bool(msg["my_clockwork_cavalcade_available"]) : false;
 	my_magical_cunning_available = msg.exists("my_magical_cunning_available") ? bool(msg["my_magical_cunning_available"]) : false;
 	my_contact_patron_available = msg.exists("my_contact_patron_available") ? bool(msg["my_contact_patron_available"]) : false;
 	my_mystic_arcanum_6_available = msg.exists("my_mystic_arcanum_6_available") ? bool(msg["my_mystic_arcanum_6_available"]) : false;
@@ -3756,6 +3806,11 @@ void reset_combat_state() {
 	my_revelation_in_flesh_active = false;
 	my_revelation_in_flesh_rounds = 0;
 	my_warping_implosion_available = false;
+	// Tasha's Clockwork Soul
+	my_bastion_of_law_dice = 0;
+	my_trance_of_order_active = false;
+	my_trance_of_order_rounds = 0;
+	my_clockwork_cavalcade_available = false;
 	my_magical_cunning_available = false;
 	my_contact_patron_available = false;
 	my_mystic_arcanum_6_available = false;
