@@ -1068,7 +1068,7 @@ void get_subclass_options(string class_name, string[]@ names, string[]@ descript
         add_text_pair(names, descriptions, "Path of the Battlerager", "Path of the Battlerager. Spiked armor melee rage. Dwarves only. (Sword Coast)");
         add_text_pair(names, descriptions, "Shadow Gnawer", "Shadow Gnawer. Consume raw shadow to gain teleport, stealth smoke, and corrosive haze. (Book of Ebon Tides)");
     } else if (class_name == "Bard") {
-        add_text_pair(names, descriptions, "College of Dance", "College of Dance. Turn movement and rhythm into magical performance.");
+        add_text_pair(names, descriptions, "College of Dance", "College of Dance. Turn movement and rhythm into magical performance. — Coming Soon");
         add_text_pair(names, descriptions, "College of Glamour", "College of Glamour. Beguile and command with fey majesty.");
         add_text_pair(names, descriptions, "College of Lore", "College of Lore. Master wide-ranging knowledge and cutting words.");
         add_text_pair(names, descriptions, "College of Valor", "College of Valor. Support allies while fighting in the thick of battle.");
@@ -1076,7 +1076,7 @@ void get_subclass_options(string class_name, string[]@ names, string[]@ descript
         add_text_pair(names, descriptions, "College of Whispers", "College of Whispers. Psychic blades and fear through words. (Xanathar's)");
         add_text_pair(names, descriptions, "College of Creation", "College of Creation. Bring items and creatures to life with song. (Tasha's)");
         add_text_pair(names, descriptions, "College of Eloquence", "College of Eloquence. Master persuasion and debilitating words. (Tasha's)");
-        add_text_pair(names, descriptions, "College of Spirits", "College of Spirits. Channel spirits for random magical tales. (Ravenloft)");
+        add_text_pair(names, descriptions, "College of Spirits", "College of Spirits. Channel spirits for random magical tales. (Ravenloft) — Coming Soon");
         add_text_pair(names, descriptions, "College of Choreography", "College of Choreography. Magical dance to inspire and control. (Griffon's Saddlebag)");
         add_text_pair(names, descriptions, "College of Mercantile", "College of Mercantile. Profit and persuasion through trade magic. (Griffon's Saddlebag)");
         add_text_pair(names, descriptions, "College of Requiems", "College of Requiems. Dark melodies that raise the dead. (Grim Hollow)");
@@ -1125,7 +1125,7 @@ void get_subclass_options(string class_name, string[]@ names, string[]@ descript
         add_text_pair(names, descriptions, "Couatl Herald", "Couatl Herald. Celestial warrior with divine mandate. (Griffon's Saddlebag)");
         add_text_pair(names, descriptions, "Steel Hawk", "Steel Hawk. Aerial combat specialist. (Griffon's Saddlebag)");
         add_text_pair(names, descriptions, "Blade Breaker", "Blade Breaker. Weapon stances and armor-crushing maneuvers. (Grim Hollow)");
-        add_text_pair(names, descriptions, "Purple Dragon Knight", "Purple Dragon Knight. Inspire allies through valor. Also called Banneret. (Sword Coast)");
+        add_text_pair(names, descriptions, "Purple Dragon Knight", "Purple Dragon Knight. Inspire allies through valor. Also called Banneret. (Sword Coast) — Coming Soon");
     } else if (class_name == "Monk") {
         add_text_pair(names, descriptions, "Warrior of Mercy", "Warrior of Mercy. Heal allies and harm foes with mystical medicine.");
         add_text_pair(names, descriptions, "Warrior of Shadow", "Warrior of Shadow. Move unseen and strike from darkness.");
@@ -1150,7 +1150,7 @@ void get_subclass_options(string class_name, string[]@ names, string[]@ descript
         add_text_pair(names, descriptions, "Oath of the Watchers", "Oath of the Watchers. Guard against extraplanar threats. (Tasha's)");
         add_text_pair(names, descriptions, "Oath of the Hearth", "Oath of the Hearth. Protect home and community. (Griffon's Saddlebag)");
         add_text_pair(names, descriptions, "Oath of Zeal", "Oath of Zeal. Zealous inquisitor hunting enemies of the faith. (Grim Hollow)");
-        add_text_pair(names, descriptions, "Oath of the Crown", "Oath of the Crown. Sworn to civilization and justice. (Sword Coast)");
+        add_text_pair(names, descriptions, "Oath of the Crown", "Oath of the Crown. Sworn to civilization and justice. (Sword Coast) — Coming Soon");
     } else if (class_name == "Ranger") {
         add_text_pair(names, descriptions, "Beast Master", "Beast Master. Fight alongside a trusted animal companion.");
         add_text_pair(names, descriptions, "Fey Wanderer", "Fey Wanderer. Blend martial skill with beguiling fey magic.");
@@ -1158,7 +1158,7 @@ void get_subclass_options(string class_name, string[]@ names, string[]@ descript
         add_text_pair(names, descriptions, "Hunter", "Hunter. Specialize in techniques for bringing down dangerous foes.");
         add_text_pair(names, descriptions, "Horizon Walker", "Horizon Walker. Protect the world from planar threats. (Xanathar's)");
         add_text_pair(names, descriptions, "Monster Slayer", "Monster Slayer. Hunt supernatural threats with specialized knowledge. (Xanathar's)");
-        add_text_pair(names, descriptions, "Swarmkeeper", "Swarmkeeper. Command a swarm of nature spirits in combat. (Tasha's)");
+        add_text_pair(names, descriptions, "Swarmkeeper", "Swarmkeeper. Command a swarm of nature spirits in combat. (Tasha's) — Coming Soon");
         add_text_pair(names, descriptions, "Drakewarden", "Drakewarden. Bond with a drake companion that grows with you. (Fizban's)");
         add_text_pair(names, descriptions, "Winter Trapper", "Winter Trapper. Master of traps and cold-weather survival. (Griffon's Saddlebag)");
         add_text_pair(names, descriptions, "Rocborne", "Rocborne. Ride and bond with giant birds. (Griffon's Saddlebag)");
@@ -1196,7 +1196,7 @@ void get_subclass_options(string class_name, string[]@ names, string[]@ descript
         add_text_pair(names, descriptions, "The Fathomless", "The Fathomless. Pact with a deep-sea entity. Tentacle attacks. (Tasha's)");
         add_text_pair(names, descriptions, "The Genie", "The Genie. Bound to a genie lord. Vessel refuge. Elemental damage. (Tasha's)");
         add_text_pair(names, descriptions, "The Undead", "The Undead. Pact with an undead power. Form of Dread. (Ravenloft)");
-        add_text_pair(names, descriptions, "The Undying", "The Undying. Pact with an immortal entity. Resist aging, death. (Sword Coast)");
+        add_text_pair(names, descriptions, "The Undying", "The Undying. Pact with an immortal entity. Resist aging, death. (Sword Coast) — Coming Soon");
         add_text_pair(names, descriptions, "Pact of the Astral Griffon", "Pact of the Astral Griffon. Bound to an astral griffon. (Griffon's Saddlebag)");
         add_text_pair(names, descriptions, "Pact of the Many", "Pact of the Many. Multiple lesser patrons. (Griffon's Saddlebag)");
         add_text_pair(names, descriptions, "Mother of Sorrows", "Mother of Sorrows. Spread venomous vengeance and supernatural poison. (Book of Ebon Tides)");
@@ -1212,7 +1212,7 @@ void get_subclass_options(string class_name, string[]@ names, string[]@ descript
         add_text_pair(names, descriptions, "Graviturgy Magic", "Graviturgy Magic. Control gravity with Dunamancy. (Wildemount)");
         add_text_pair(names, descriptions, "Materializer", "Materializer. Create objects from pure arcane energy. (Griffon's Saddlebag)");
         add_text_pair(names, descriptions, "Wand Lore", "Wand Lore. Specialize in wand-based arcane casting. (Griffon's Saddlebag)");
-        add_text_pair(names, descriptions, "Shadow Arcane Tradition", "Shadow Arcane Tradition. Bond a shadow symbiote, recover spell slots, and cloak yourself in darkness. (Book of Ebon Tides)");
+        add_text_pair(names, descriptions, "Shadow Arcane Tradition", "Shadow Arcane Tradition. Bond a shadow symbiote, recover spell slots, and cloak yourself in darkness. (Book of Ebon Tides) — Coming Soon");
     } else if (class_name == "Artificer") {
         add_text_pair(names, descriptions, "Alchemist", "Alchemist. Solve problems with restorative and transformative concoctions.");
         add_text_pair(names, descriptions, "Armorer", "Armorer. Build a magical suit that changes how you fight.");
