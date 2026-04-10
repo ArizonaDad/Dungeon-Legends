@@ -213,7 +213,7 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 
 - Spell menu shows level (Cantrip/Level N) and Concentration tag for each spell
 
-
+- **Bane spell** (Basic Rules 2024 para 12032): Random 1d4 penalty on attack rolls (via `roll_bane_penalty()` in battle_manager) and saving throws (via `random(1,4)` in `get_save_bonus`). Concentration with blanket-clear on break.
 
 ### Reroll Mechanics
 
@@ -490,6 +490,7 @@ Per-class audit of all 13 base class features against `basic_rules_full.txt` (Ba
 - Samurai Fighting Spirit, Horizon Walker Planar Warrior
 - Storm Herald Storm Aura, Rune Knight Giant Might, Wild Magic Surge table
 - Sun Soul Radiant Bolt, Ascendant Dragon Breath, Shadow Sorcerer Strength of the Grave
+- Shadow Magic Hound of Ill Omen: save disadvantage (all 110+ spell save sites), start-of-turn psychic damage (half sorcerer level), hound death cleanup
 - Heart of the Storm eruption damage, Storm's Fury melee reaction
 - Favored by the Gods +2d4 reroll, Otherworldly Wings permanent fly 30, Unearthly Recovery half-max-HP heal
 - Tentacle of the Deeps, Form of Dread, Genie Vessel, Eldritch Cannon, Steel Defender, Experimental Elixir
@@ -533,6 +534,17 @@ Epic Boon feats: combat_prowess, dimensional_travel, energy_resistance, fate, fo
 - **Boon of Dimensional Travel** (PHB 2024 para 7876): Blink Steps — free teleport 30ft to target after Attack or Magic action. Available from bonus action menu. Per-turn flag.
 - **Boon of Fate** (PHB 2024 para 7877): 2d4 bonus on ally save failures within 60ft. Smart-spend wired into 22 save sites (full extended save chain including Disciplined Survivor and Stroke of Luck). 1/SR reset.
 - **Boon of Energy Resistance**: Not in source files (confirmed search of PHB 2024 + Basic Rules). Removed from TODO.
+
+**Batch 2026-04-10 additions:**
+- **GWM Proficiency Damage** (PHB 2024 para 7624-7625): Heavy weapon hit adds proficiency bonus damage. Gated on feat + Heavy + proficient + non-ranged.
+- **Sentinel Guardian** (PHB 2024 para 7718-7720): Auto-resolved reaction OA when creature within 5ft attacks a different target. Halt (speed 0 on hit). Wired into all 3 attack paths (player/bot/monster).
+- **Crusher Crit Advantage** (PHB 2024 para 7579): On bludgeoning crit, all attacks vs target have advantage until start of attacker's next turn.
+- **Slasher Crit Disadvantage** (PHB 2024 para 7597): On slashing crit, target has disadvantage on attacks until start of attacker's next turn.
+- **War Caster Concentration Advantage** (PHB 2024 para 7840): Proper advantage on concentration saves (was +5 approximation, now dual d20).
+- **Skulker Sniper** (PHB 2024 para 7783): Missing with ranged attack while Hidden doesn't reveal. Reveal deferred to hit.
+- **Observant +5 Passive** (PHB 2024 para 7696): +5 to passive Perception in `get_passive_perception`.
+- **Interception Fighting Style** (PHB 2024 para 7864): Reaction reduces damage to adjacent ally by 1d10+prof. Auto-resolved.
+- **Protection Fighting Style** (PHB 2024 para 7868): Reaction imposes disadvantage on attack vs adjacent ally. Requires shield. Auto-resolved before Elusive override.
 
 **Previously implemented:** combat_prowess (+1d6 weapon miss → hit 1/turn), fortitude (+40 HP), irresistible_offense (+2d10 force 1/turn), skill (+1d10 ability check 1/turn), speed (+30ft), the_night_spirit (300ft darkvision + see invisible), truesight (Truesight 60ft)
 

@@ -356,6 +356,15 @@ class battle_manager {
 	// Cleans up a companion when the owner dies, leaves combat, or dismisses it.
 	void dismiss_companion(combatant@ companion, bool announce = true) {
 		if (@companion == null or !companion.is_companion) return;
+		// Xanathar's Shadow Magic Hound of Ill Omen: clear hound_caster_id on target
+		if (companion.companion_subclass == "hound_of_ill_omen" and @combat != null) {
+			for (uint hci = 0; hci < combat.combatants.length(); hci++) {
+				combatant@ ht = combat.combatants[hci];
+				if (@ht != null and ht.hound_caster_id == companion.owner_id) {
+					ht.hound_caster_id = 0;
+				}
+			}
+		}
 		companion.is_dead = true;
 		companion.current_hp = 0;
 		if (announce) broadcast_announce(companion.name + " fades away.", false);
@@ -2244,6 +2253,8 @@ class battle_manager {
 				t.staggering_blow_active = false;
 				broadcast_announce(t.name + " has disadvantage on the save from Staggering Blow!", false);
 			}
+			// Xanathar's Shadow Magic L6 Hound of Ill Omen (para 2596-2602)
+			apply_hound_save_disadvantage(t, caster.id, save_roll);
 			int save_bonus = t.get_save_bonus(pr.spell_save_type);
 			int bless_bonus = roll_bless_bonus(t);
 			int unsettling_penalty = 0;
@@ -2616,10 +2627,12 @@ class battle_manager {
 		return monster.monster_attack2_range > 5 and attack_name_is_ranged(monster.monster_attack2_name);
 	}
 
-	// Bane spell penalty on attack rolls. Subtracted from get_attack_bonus_for_roll.
-	int get_bane_penalty(combatant@ c) {
-		if (@c == null) return 0;
-		return c.baned ? 2 : 0; // Approximation of 1d4 average
+	// Basic Rules 2024 Bane (para 12032): "Whenever a target makes an attack roll
+	// or a saving throw before the spell ends, the target must roll a d4 and subtract
+	// the number rolled from the attack roll or saving throw."
+	int roll_bane_penalty(combatant@ c) {
+		if (@c == null or !c.baned) return 0;
+		return random(1, 4);
 	}
 
 	int get_attack_bonus_for_roll(combatant@ attacker, bool use_secondary = false) {
@@ -2631,7 +2644,7 @@ class battle_manager {
 			if (attacker.has_feat("archery") and attacker.main_hand_is_ranged) atk_bonus += 2;
 		}
 		atk_bonus -= attacker.exhaustion_level * 2;
-		atk_bonus -= get_bane_penalty(attacker);
+		atk_bonus -= roll_bane_penalty(attacker);
 		// Magic Weapon spell (Basic Rules para 14108): +1/+2/+3 to attack rolls
 		if (attacker.magic_weapon_bonus > 0) atk_bonus += attacker.magic_weapon_bonus;
 		// Xanathar's Kensei L11 Sharpen the Blade (para 1832-1835): +1/+2/+3 to attack rolls.
@@ -3244,6 +3257,29 @@ class battle_manager {
 		bool new_saved = new_total >= save_dc;
 		broadcast_announce(target.name + "'s Fanatical Focus rerolls the " + save_label + ": " + new_total + (new_saved ? " — saved!" : " — still failed."), true);
 		return new_total;
+	}
+
+	// Xanathar's Shadow Magic L6 Hound of Ill Omen (para 2596-2602): "If the hound
+	// is within 5 feet of the target at the start of the target's turn, the target
+	// has disadvantage on saving throws against any spell you cast."
+	// Checks: target has hound_caster_id matching the spell caster, and the hound
+	// companion is alive and within 5ft. Modifies save_roll in place (takes lower).
+	bool apply_hound_save_disadvantage(combatant@ target, uint caster_id, int &inout save_roll) {
+		if (@target == null or target.hound_caster_id == 0 or target.hound_caster_id != caster_id) return false;
+		if (@combat == null) return false;
+		for (uint hi = 0; hi < combat.combatants.length(); hi++) {
+			combatant@ h = combat.combatants[hi];
+			if (@h == null or h.is_dead or !h.is_alive()) continue;
+			if (!h.is_companion or h.owner_id != caster_id) continue;
+			if (h.companion_subclass != "hound_of_ill_omen") continue;
+			if (feet_distance(h.x, h.y, target.x, target.y) <= 5) {
+				int hound_roll = random(1, 20);
+				if (hound_roll < save_roll) save_roll = hound_roll;
+				broadcast_announce(target.name + " has disadvantage — Hound of Ill Omen!", false);
+				return true;
+			}
+		}
+		return false;
 	}
 
 	// PHB 2024 Forge Artificer L7 Flash of Genius (paras 655-657): "When you or a
@@ -4178,6 +4214,7 @@ class battle_manager {
 					if (caster.concentration_spell == "Hold Person" and caster.is_concentrating) {
 						int save_roll = random(1, 20);
 						if (prev.staggering_blow_active) { int sb2 = random(1, 20); if (sb2 < save_roll) save_roll = sb2; prev.staggering_blow_active = false; broadcast_announce(prev.name + " has disadvantage from Staggering Blow!", false); }
+						apply_hound_save_disadvantage(prev, caster.id, save_roll);
 						int save_bonus = prev.get_save_bonus(ABILITY_WIS);
 						int save_dc_val = spell_save_dc(caster);
 						int save_total = save_roll + save_bonus;
@@ -4206,6 +4243,7 @@ class battle_manager {
 					if (caster.concentration_spell == "Web" and caster.is_concentrating) {
 						int save_roll = random(1, 20);
 						if (prev.staggering_blow_active) { int sb2 = random(1, 20); if (sb2 < save_roll) save_roll = sb2; prev.staggering_blow_active = false; broadcast_announce(prev.name + " has disadvantage from Staggering Blow!", false); }
+						apply_hound_save_disadvantage(prev, caster.id, save_roll);
 						int save_bonus = prev.get_save_bonus(ABILITY_DEX);
 						int save_dc_val = spell_save_dc(caster);
 						int save_total = save_roll + save_bonus;
@@ -4231,6 +4269,7 @@ class battle_manager {
 					if (caster.concentration_spell == "Blindness/Deafness" and caster.is_concentrating) {
 						int save_roll = random(1, 20);
 						if (prev.staggering_blow_active) { int sb2 = random(1, 20); if (sb2 < save_roll) save_roll = sb2; prev.staggering_blow_active = false; broadcast_announce(prev.name + " has disadvantage from Staggering Blow!", false); }
+						apply_hound_save_disadvantage(prev, caster.id, save_roll);
 						int save_bonus = prev.get_save_bonus(ABILITY_CON);
 						int save_dc_val = spell_save_dc(caster);
 						int save_total = save_roll + save_bonus;
@@ -4256,6 +4295,7 @@ class battle_manager {
 					if (caster.concentration_spell == "Fear" and caster.is_concentrating) {
 						int save_roll = random(1, 20);
 						if (prev.staggering_blow_active) { int sb2 = random(1, 20); if (sb2 < save_roll) save_roll = sb2; prev.staggering_blow_active = false; broadcast_announce(prev.name + " has disadvantage from Staggering Blow!", false); }
+						apply_hound_save_disadvantage(prev, caster.id, save_roll);
 						// Aberrant Mind L6 Psychic Defenses / Fey Ancestry: advantage on charm/frighten saves
 						if (prev.charm_frighten_save_advantage) { int r2 = random(1, 20); if (r2 > save_roll) save_roll = r2; }
 						int save_bonus = prev.get_save_bonus(ABILITY_WIS);
@@ -4286,6 +4326,7 @@ class battle_manager {
 					if (caster.concentration_spell == "Tasha's Hideous Laughter" and caster.is_concentrating) {
 						int save_roll = random(1, 20);
 						if (prev.staggering_blow_active) { int sb2 = random(1, 20); if (sb2 < save_roll) save_roll = sb2; prev.staggering_blow_active = false; broadcast_announce(prev.name + " has disadvantage from Staggering Blow!", false); }
+						apply_hound_save_disadvantage(prev, caster.id, save_roll);
 						int save_bonus = prev.get_save_bonus(ABILITY_WIS);
 						int save_dc_val = spell_save_dc(caster);
 						int save_total = save_roll + save_bonus;
@@ -4449,6 +4490,32 @@ class battle_manager {
 				broadcast_announce(c.name + " takes " + sg_dmg + " " + sg_type_name + " damage from " + sg_caster.name + "'s Spirit Guardians!", true);
 				// Half movement speed within aura
 				c.speed = c.speed / 2 > 5 ? c.speed / 2 : 5;
+				break;
+			}
+		}
+
+		// Xanathar's Shadow Magic L6 Hound of Ill Omen (para 2596-2602): "At the start
+		// of the target's turn, the hound deals psychic damage to that target equal to
+		// half your sorcerer level (rounded down)."
+		if (c.hound_caster_id > 0 and @combat != null) {
+			for (uint hdi = 0; hdi < combat.combatants.length(); hdi++) {
+				combatant@ hound = combat.combatants[hdi];
+				if (@hound == null or hound.is_dead or !hound.is_alive()) continue;
+				if (!hound.is_companion or hound.owner_id != c.hound_caster_id) continue;
+				if (hound.companion_subclass != "hound_of_ill_omen") continue;
+				// Find the sorcerer owner for level calculation
+				combatant@ sorc = combat.get_combatant(hound.owner_id);
+				if (@sorc == null or sorc.is_dead) break;
+				int hound_psychic = sorc.level / 2;
+				if (hound_psychic < 1) hound_psychic = 1;
+				combat.apply_damage(c, hound_psychic, DMG_PSYCHIC, sorc);
+				broadcast_announce(c.name + " takes " + hound_psychic + " psychic damage from the Hound of Ill Omen!", true);
+				check_concentration(c, hound_psychic, sorc);
+				if (c.is_dead) {
+					broadcast_announce(c.name + " has been slain by the Hound of Ill Omen!", true);
+				}
+				broadcast_state();
+				check_battle_end();
 				break;
 			}
 		}
@@ -10258,6 +10325,7 @@ class battle_manager {
 				cs_caster.has_reaction = false;
 				int cs_dc = spell_save_dc(cs_caster);
 				int save_roll = random(1, 20);
+				apply_hound_save_disadvantage(c, c.id, save_roll);
 				int save_bonus = c.get_save_bonus(ABILITY_CON);
 				int save_total = save_roll + save_bonus;
 				bool cs_saved = save_total >= cs_dc;
@@ -10505,6 +10573,7 @@ class battle_manager {
 			for (uint ti = 0; ti < targets_hit.length(); ti++) {
 				combatant@ t = targets_hit[ti];
 				int save_roll = random(1, 20);
+				apply_hound_save_disadvantage(t, c.id, save_roll);
 				int save_bonus = t.get_save_bonus(ABILITY_DEX);
 				int bless_bonus = roll_bless_bonus(t);
 				int save_total = save_roll + save_bonus + bless_bonus;
@@ -10525,6 +10594,7 @@ class battle_manager {
 			int total_damage = 30;
 			for (int d = 0; d < 7; d++) total_damage += random(1, 8);
 			int save_roll = random(1, 20);
+			apply_hound_save_disadvantage(target, c.id, save_roll);
 			int save_bonus = target.get_save_bonus(ABILITY_CON);
 			int bless_bonus = roll_bless_bonus(target);
 			int save_total = save_roll + save_bonus + bless_bonus;
@@ -10822,6 +10892,7 @@ class battle_manager {
 				for (uint ti = 0; ti < targets_hit.length(); ti++) {
 					combatant@ t = targets_hit[ti];
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_DEX);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -10836,6 +10907,7 @@ class battle_manager {
 			}
 			else if (spell.id == "blindness_deafness" and @target != null) {
 				int save_roll = random(1, 20);
+				apply_hound_save_disadvantage(target, c.id, save_roll);
 				int save_bonus = target.get_save_bonus(ABILITY_CON);
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
@@ -10873,6 +10945,7 @@ class battle_manager {
 				for (uint ti = 0; ti < targets_hit.length(); ti++) {
 					combatant@ t = targets_hit[ti];
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					if (t.charm_frighten_save_advantage) { int r2 = random(1, 20); if (r2 > save_roll) save_roll = r2; }
 					int save_bonus = t.get_save_bonus(ABILITY_WIS);
 					int bless_bonus = roll_bless_bonus(t);
@@ -10907,6 +10980,7 @@ class battle_manager {
 				for (uint ti = 0; ti < targets_hit.length(); ti++) {
 					combatant@ t = targets_hit[ti];
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					if (t.charm_frighten_save_advantage) { int r2 = random(1, 20); if (r2 > save_roll) save_roll = r2; }
 					int save_bonus = t.get_save_bonus(ABILITY_WIS);
 					int bless_bonus = roll_bless_bonus(t);
@@ -10935,6 +11009,7 @@ class battle_manager {
 				bool saved = false;
 				if (is_enemy) {
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(target, c.id, save_roll);
 					int save_bonus = target.get_save_bonus(ABILITY_WIS);
 					int bless_bonus = roll_bless_bonus(target);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -10958,6 +11033,7 @@ class battle_manager {
 			else if (spell.id == "hold_person" and @target != null) {
 				// Primary target
 				int save_roll = random(1, 20);
+				apply_hound_save_disadvantage(target, c.id, save_roll);
 				int save_bonus = target.get_save_bonus(ABILITY_WIS);
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
@@ -11017,6 +11093,7 @@ class battle_manager {
 				for (uint hi = 0; hi < hm_targets.length(); hi++) {
 					combatant@ hm_t = hm_targets[hi];
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(hm_t, c.id, save_roll);
 					int save_bonus = hm_t.get_save_bonus(ABILITY_WIS);
 					int bless_bonus = roll_bless_bonus(hm_t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -11049,6 +11126,7 @@ class battle_manager {
 				for (uint ti = 0; ti < ck_targets.length(); ti++) {
 					combatant@ t = ck_targets[ti];
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_CON);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -11086,6 +11164,7 @@ class battle_manager {
 				for (uint ti = 0; ti < wf_targets.length(); ti++) {
 					combatant@ t = wf_targets[ti];
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_DEX);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -11118,6 +11197,7 @@ class battle_manager {
 				for (uint ti = 0; ti < sc_targets.length(); ti++) {
 					combatant@ t = sc_targets[ti];
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_CON);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -11156,6 +11236,7 @@ class battle_manager {
 					if (@t == null or t.is_dead or t.id == c.id) continue;
 					if (feet_distance(center_x, center_y, t.x, t.y) > 30) continue;
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_CON);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -11194,6 +11275,7 @@ class battle_manager {
 					if (@t == null or t.is_dead or t.id == c.id) continue;
 					if (feet_distance(center_x, center_y, t.x, t.y) > 20) continue;
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_STR);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -11221,6 +11303,7 @@ class battle_manager {
 				// or become frightened of you until the spell ends. A construct or an
 				// undead is immune to this effect."
 				int save_roll = random(1, 20);
+				apply_hound_save_disadvantage(target, c.id, save_roll);
 				if (target.charm_frighten_save_advantage) { int r2 = random(1, 20); if (r2 > save_roll) save_roll = r2; }
 				int save_bonus = target.get_save_bonus(ABILITY_WIS);
 				int bless_bonus = roll_bless_bonus(target);
@@ -11402,6 +11485,7 @@ class battle_manager {
 					if (@t == null or t.is_dead or t.id == c.id) continue;
 					if (feet_distance(c.x, c.y, t.x, t.y) > 60) continue;
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_STR);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -11443,6 +11527,7 @@ class battle_manager {
 					if (@t == null or t.is_dead or t.id == target.id or t.id == c.id) continue;
 					if (feet_distance(target.x, target.y, t.x, t.y) > 15) continue;
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_DEX);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -11474,6 +11559,7 @@ class battle_manager {
 				int total_damage = 0;
 				for (int d = 0; d < dice_count; d++) total_damage += random(1, 10);
 				int save_roll = random(1, 20);
+				apply_hound_save_disadvantage(target, c.id, save_roll);
 				int save_bonus = target.get_save_bonus(ABILITY_DEX);
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
@@ -11559,6 +11645,7 @@ class battle_manager {
 				int total_damage = 0;
 				for (int d = 0; d < dice_count; d++) total_damage += random(1, 6);
 				int save_roll = random(1, 20);
+				apply_hound_save_disadvantage(target, c.id, save_roll);
 				int save_bonus = target.get_save_bonus(ABILITY_WIS);
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
@@ -11638,6 +11725,7 @@ class battle_manager {
 					if (@t == null or t.is_dead or t.id == c.id) continue;
 					if (feet_distance(center_x, center_y, t.x, t.y) > 20) continue;
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_CHA);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -11705,6 +11793,7 @@ class battle_manager {
 					if (feet_distance(c.x, c.y, t.x, t.y) > 100) continue;
 					if (!combat.can_see(c, t)) continue;
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_DEX);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -11731,6 +11820,7 @@ class battle_manager {
 					if (@t == null or t.is_dead or t.id == c.id) continue;
 					if (feet_distance(c.x, c.y, t.x, t.y) > 15) continue;
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_CON);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -11788,6 +11878,7 @@ class battle_manager {
 					if (@t == null or t.is_dead or t.id == c.id) continue;
 					if (feet_distance(center_x, center_y, t.x, t.y) > 20) continue;
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_DEX);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -11811,6 +11902,7 @@ class battle_manager {
 				int total_damage = 0;
 				for (int d = 0; d < dice_count; d++) total_damage += random(1, 6);
 				int save_roll = random(1, 20);
+				apply_hound_save_disadvantage(target, c.id, save_roll);
 				int save_bonus = target.get_save_bonus(ABILITY_WIS);
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
@@ -11857,6 +11949,7 @@ class battle_manager {
 				int total_damage = 0;
 				for (int d = 0; d < dice_count; d++) total_damage += random(1, 10);
 				int save_roll = random(1, 20);
+				apply_hound_save_disadvantage(target, c.id, save_roll);
 				int save_bonus = target.get_save_bonus(ABILITY_CON);
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
@@ -11884,6 +11977,7 @@ class battle_manager {
 					if (feet_distance(c.x, c.y, t.x, t.y) > 15) continue;
 					if (!combat.can_see(c, t)) continue;
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_DEX);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -11907,6 +12001,7 @@ class battle_manager {
 				int total_damage = 0;
 				for (int d = 0; d < dice_count; d++) total_damage += random(1, 10);
 				int save_roll = random(1, 20);
+				apply_hound_save_disadvantage(target, c.id, save_roll);
 				if (target.charm_frighten_save_advantage) { int r2 = random(1, 20); if (r2 > save_roll) save_roll = r2; }
 				int save_bonus = target.get_save_bonus(ABILITY_WIS);
 				int bless_bonus = roll_bless_bonus(target);
@@ -11945,6 +12040,7 @@ class battle_manager {
 					if (@t == null or t.is_dead or t.id == c.id) continue;
 					if (feet_distance(center_x, center_y, t.x, t.y) > 10) continue;
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_CON);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -11974,6 +12070,7 @@ class battle_manager {
 					if (@t == null or t.is_dead or t.id == c.id) continue;
 					if (feet_distance(center_x, center_y, t.x, t.y) > 30) continue;
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_DEX);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -12007,6 +12104,7 @@ class battle_manager {
 					combat.apply_damage(target, hm_dmg, DMG_FIRE, c);
 					broadcast_announce(c.name + "'s Heat Metal sears " + target.name + " for " + hm_dmg + " fire damage!", true);
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(target, c.id, save_roll);
 					int save_bonus = target.get_save_bonus(ABILITY_CON);
 					int save_total = save_roll + save_bonus;
 					if (save_total < save_dc) {
@@ -12031,6 +12129,7 @@ class battle_manager {
 					if (@t == null or t.is_dead or t.id == c.id) continue;
 					if (feet_distance(center_x, center_y, t.x, t.y) > 20) continue;
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_DEX);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -12055,6 +12154,7 @@ class battle_manager {
 				// choice." Defaults to "Disadvantage on attack rolls against you" since
 				// the alternatives need a per-spell choice prompt.
 				int save_roll = random(1, 20);
+				apply_hound_save_disadvantage(target, c.id, save_roll);
 				int save_bonus = target.get_save_bonus(ABILITY_WIS);
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
@@ -12126,6 +12226,7 @@ class battle_manager {
 				int total_damage = 40;
 				for (int d = 0; d < dice_count; d++) total_damage += random(1, 6);
 				int save_roll = random(1, 20);
+				apply_hound_save_disadvantage(target, c.id, save_roll);
 				int save_bonus = target.get_save_bonus(ABILITY_DEX);
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
@@ -12153,6 +12254,7 @@ class battle_manager {
 					if (feet_distance(c.x, c.y, t.x, t.y) > 60) continue;
 					if (!combat.can_see(c, t)) continue;
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_CON);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -12190,6 +12292,7 @@ class battle_manager {
 				for (uint ti = 0; ti < cl_targets.length(); ti++) {
 					combatant@ t = cl_targets[ti];
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_DEX);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -12222,6 +12325,7 @@ class battle_manager {
 					if (@t == null or t.is_dead or t.id == c.id) continue;
 					if (feet_distance(c.x, c.y, t.x, t.y) > 80) continue;
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_DEX);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -12258,6 +12362,7 @@ class battle_manager {
 					if (feet_distance(c.x, c.y, t.x, t.y) > 60) continue;
 					if (!combat.can_see(c, t)) continue;
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_WIS);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -12282,6 +12387,7 @@ class battle_manager {
 				// or follow the command on its next turn." Defaults to Drop or Flee depending
 				// on combat state. Approach is the most useful but movement-based.
 				int save_roll = random(1, 20);
+				apply_hound_save_disadvantage(target, c.id, save_roll);
 				int save_bonus = target.get_save_bonus(ABILITY_WIS);
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
@@ -12306,6 +12412,7 @@ class battle_manager {
 				// or have the Charmed condition for the duration or until you or your allies
 				// deal damage to the target."
 				int save_roll = random(1, 20);
+				apply_hound_save_disadvantage(target, c.id, save_roll);
 				int save_bonus = target.get_save_bonus(ABILITY_WIS);
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
@@ -12380,6 +12487,7 @@ class battle_manager {
 					if (@t == null or t.is_dead or t.id == c.id) continue;
 					if (feet_distance(center_x, center_y, t.x, t.y) > 60) continue;
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_CON);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -12428,6 +12536,7 @@ class battle_manager {
 					if (feet_distance(c.x, c.y, t.x, t.y) > 30) continue;
 					if (!combat.can_see(c, t)) continue;
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_CHA);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -12485,6 +12594,7 @@ class battle_manager {
 				int total_damage = 0;
 				for (int d = 0; d < dice_count; d++) total_damage += random(1, 6);
 				int save_roll = random(1, 20);
+				apply_hound_save_disadvantage(target, c.id, save_roll);
 				int save_bonus = target.get_save_bonus(ABILITY_INT);
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
@@ -12512,6 +12622,7 @@ class battle_manager {
 				// Panicked (Frightened), or Sickened (disadvantage on attacks + ability checks).
 				// Defaults to Panicked since Unconscious auto-kills monsters.
 				int save_roll = random(1, 20);
+				apply_hound_save_disadvantage(target, c.id, save_roll);
 				if (target.charm_frighten_save_advantage) { int r2 = random(1, 20); if (r2 > save_roll) save_roll = r2; }
 				int save_bonus = target.get_save_bonus(ABILITY_WIS);
 				int bless_bonus = roll_bless_bonus(target);
@@ -12584,6 +12695,7 @@ class battle_manager {
 					if (@t == null or t.is_dead or t.id == c.id) continue;
 					if (feet_distance(center_x, center_y, t.x, t.y) > 20) continue;
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_WIS);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -12659,6 +12771,7 @@ class battle_manager {
 					if (@t == null or t.is_dead or t.id == c.id) continue;
 					if (feet_distance(center_x, center_y, t.x, t.y) > 100) continue;
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_DEX);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -12725,6 +12838,7 @@ class battle_manager {
 					if (@t == null or t.is_dead or t.id == c.id) continue;
 					if (feet_distance(center_x, center_y, t.x, t.y) > 60) continue;
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_STR);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -12783,6 +12897,7 @@ class battle_manager {
 					if (@t == null or t.is_dead or t.id == c.id) continue;
 					if (feet_distance(center_x, center_y, t.x, t.y) > 25) continue;
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_STR);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -12811,6 +12926,7 @@ class battle_manager {
 					if (@t == null or t.is_dead or t.id == c.id) continue;
 					if (feet_distance(center_x, center_y, t.x, t.y) > 30) continue;
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_DEX);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -12842,6 +12958,7 @@ class battle_manager {
 					// Approximate the line by hitting any visible target within 60 ft
 					if (!combat.can_see(c, t)) continue;
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_CON);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -12872,6 +12989,7 @@ class battle_manager {
 					if (@t == null or t.is_dead or t.id == c.id) continue;
 					if (feet_distance(center_x, center_y, t.x, t.y) > 50) continue;
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_DEX);
 					int save_total = save_roll + save_bonus;
 					bool saved = save_total >= save_dc;
@@ -12950,6 +13068,7 @@ class battle_manager {
 				for (uint ti = 0; ti < ip_targets.length(); ti++) {
 					combatant@ t = ip_targets[ti];
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_CON);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -12981,6 +13100,7 @@ class battle_manager {
 				for (uint ti = 0; ti < ss_targets.length(); ti++) {
 					combatant@ t = ss_targets[ti];
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_DEX);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -13004,6 +13124,7 @@ class battle_manager {
 				// Basic Rules para 12980: "One Humanoid you can see within range must succeed
 				// on a Wisdom saving throw or have the Charmed condition for the duration."
 				int save_roll = random(1, 20);
+				apply_hound_save_disadvantage(target, c.id, save_roll);
 				if (target.charm_frighten_save_advantage) { int r2 = random(1, 20); if (r2 > save_roll) save_roll = r2; }
 				int save_bonus = target.get_save_bonus(ABILITY_WIS);
 				int bless_bonus = roll_bless_bonus(target);
@@ -13026,6 +13147,7 @@ class battle_manager {
 			}
 			else if (spell.id == "banishment" and @target != null) {
 				int save_roll = random(1, 20);
+				apply_hound_save_disadvantage(target, c.id, save_roll);
 				int save_bonus = target.get_save_bonus(ABILITY_CHA);
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
@@ -13043,6 +13165,7 @@ class battle_manager {
 			}
 			else if (spell.id == "charm_person" and @target != null) {
 				int save_roll = random(1, 20);
+				apply_hound_save_disadvantage(target, c.id, save_roll);
 				if (target.charm_frighten_save_advantage) { int r2 = random(1, 20); if (r2 > save_roll) save_roll = r2; }
 				int save_bonus = target.get_save_bonus(ABILITY_WIS);
 				int bless_bonus = roll_bless_bonus(target);
@@ -13078,6 +13201,7 @@ class battle_manager {
 				for (uint ti = 0; ti < targets_hit.length(); ti++) {
 					combatant@ t = targets_hit[ti];
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_WIS);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -13103,6 +13227,7 @@ class battle_manager {
 				for (uint ti = 0; ti < targets_hit.length(); ti++) {
 					combatant@ t = targets_hit[ti];
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_CON);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -13117,6 +13242,7 @@ class battle_manager {
 			}
 			else if (spell.id == "tashas_hideous_laughter" and @target != null) {
 				int save_roll = random(1, 20);
+				apply_hound_save_disadvantage(target, c.id, save_roll);
 				int save_bonus = target.get_save_bonus(ABILITY_WIS);
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
@@ -13139,6 +13265,7 @@ class battle_manager {
 				if (@target != null and !target.is_dead) {
 					bool adv_save = (target.size >= SIZE_LARGE);
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(target, c.id, save_roll);
 					if (adv_save) {
 						int save_roll2 = random(1, 20);
 						if (save_roll2 > save_roll) save_roll = save_roll2;
@@ -13338,6 +13465,7 @@ class battle_manager {
 				for (uint ti = 0; ti < entangle_targets.length(); ti++) {
 					combatant@ t = entangle_targets[ti];
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_STR);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -13377,6 +13505,7 @@ class battle_manager {
 				for (uint ti = 0; ti < grease_targets.length(); ti++) {
 					combatant@ t = grease_targets[ti];
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_DEX);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -13593,6 +13722,7 @@ class battle_manager {
 				for (uint ti = 0; ti < conf_targets.length(); ti++) {
 					combatant@ t = conf_targets[ti];
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_WIS);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -13758,6 +13888,7 @@ class battle_manager {
 			}
 			else if (spell.id == "dominate_monster" and @target != null) {
 				int save_roll = random(1, 20);
+				apply_hound_save_disadvantage(target, c.id, save_roll);
 				if (target.charm_frighten_save_advantage) { int r2 = random(1, 20); if (r2 > save_roll) save_roll = r2; }
 				int save_bonus = target.get_save_bonus(ABILITY_WIS);
 				int bless_bonus = roll_bless_bonus(target);
@@ -13849,6 +13980,7 @@ class battle_manager {
 					int total_damage = 0;
 					for (int d = 0; d < dice_count; d++) total_damage += random(1, 4);
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_DEX);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -13919,6 +14051,7 @@ class battle_manager {
 				int total_damage = 0;
 				for (int d = 0; d < dice_count; d++) total_damage += random(1, 6);
 				int save_roll = random(1, 20);
+				apply_hound_save_disadvantage(target, c.id, save_roll);
 				int save_bonus = target.get_save_bonus(ABILITY_WIS);
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
@@ -13959,6 +14092,7 @@ class battle_manager {
 				int total_damage = 0;
 				for (int d = 0; d < dice_count; d++) total_damage += random(1, 12);
 				int save_roll = random(1, 20);
+				apply_hound_save_disadvantage(target, c.id, save_roll);
 				int save_bonus = target.get_save_bonus(ABILITY_CON);
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
@@ -14004,6 +14138,7 @@ class battle_manager {
 				int potent_bonus = c.potent_spellcasting_bonus();
 				if (potent_bonus > 0) total_damage += potent_bonus;
 				int save_roll = random(1, 20);
+				apply_hound_save_disadvantage(target, c.id, save_roll);
 				int save_bonus = target.get_save_bonus(ABILITY_DEX);
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
@@ -14043,6 +14178,7 @@ class battle_manager {
 					if (t.is_player == c.is_player and combat.mode != "pvp") continue;
 					if (feet_distance(center_x, center_y, t.x, t.y) > 5) continue;
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_STR);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -14077,6 +14213,7 @@ class battle_manager {
 			}
 			else if (spell.id == "enthrall" and @target != null) {
 				int save_roll = random(1, 20);
+				apply_hound_save_disadvantage(target, c.id, save_roll);
 				int save_bonus = target.get_save_bonus(ABILITY_WIS);
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
@@ -14165,6 +14302,7 @@ class battle_manager {
 					if (t.is_player == c.is_player and combat.mode != "pvp") continue;
 					if (feet_distance(center_x, center_y, t.x, t.y) > 20) continue;
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_DEX);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -14196,6 +14334,7 @@ class battle_manager {
 			}
 			else if (spell.id == "charm_monster" and @target != null) {
 				int save_roll = random(1, 20);
+				apply_hound_save_disadvantage(target, c.id, save_roll);
 				if (target.charm_frighten_save_advantage) { int r2 = random(1, 20); if (r2 > save_roll) save_roll = r2; }
 				int save_bonus = target.get_save_bonus(ABILITY_WIS);
 				int bless_bonus = roll_bless_bonus(target);
@@ -14225,6 +14364,7 @@ class battle_manager {
 			}
 			else if (spell.id == "dominate_beast" and @target != null) {
 				int save_roll = random(1, 20);
+				apply_hound_save_disadvantage(target, c.id, save_roll);
 				if (target.charm_frighten_save_advantage) { int r2 = random(1, 20); if (r2 > save_roll) save_roll = r2; }
 				int save_bonus = target.get_save_bonus(ABILITY_WIS);
 				int bless_bonus = roll_bless_bonus(target);
@@ -14270,6 +14410,7 @@ class battle_manager {
 			}
 			else if (spell.id == "otilukes_resilient_sphere" and @target != null) {
 				int save_roll = random(1, 20);
+				apply_hound_save_disadvantage(target, c.id, save_roll);
 				int save_bonus = target.get_save_bonus(ABILITY_DEX);
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
@@ -14301,6 +14442,7 @@ class battle_manager {
 			}
 			else if (spell.id == "contact_other_plane" and @target != null) {
 				int save_roll = random(1, 20);
+				apply_hound_save_disadvantage(target, c.id, save_roll);
 				int save_bonus = target.get_save_bonus(ABILITY_INT);
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
@@ -14364,6 +14506,7 @@ class battle_manager {
 			}
 			else if (spell.id == "flesh_to_stone" and @target != null) {
 				int save_roll = random(1, 20);
+				apply_hound_save_disadvantage(target, c.id, save_roll);
 				int save_bonus = target.get_save_bonus(ABILITY_CON);
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
@@ -14382,6 +14525,7 @@ class battle_manager {
 			}
 			else if (spell.id == "ottos_irresistible_dance" and @target != null) {
 				int save_roll = random(1, 20);
+				apply_hound_save_disadvantage(target, c.id, save_roll);
 				int save_bonus = target.get_save_bonus(ABILITY_WIS);
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
@@ -14418,6 +14562,7 @@ class battle_manager {
 					if (t.is_player == c.is_player and combat.mode != "pvp") continue;
 					if (feet_distance(center_x, center_y, t.x, t.y) > 20) continue;
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_DEX);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -14439,6 +14584,7 @@ class battle_manager {
 					if (t.is_player == c.is_player and combat.mode != "pvp") continue;
 					if (feet_distance(c.x, c.y, t.x, t.y) > 30) continue;
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_WIS);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -14470,6 +14616,7 @@ class battle_manager {
 			}
 			else if (spell.id == "befuddlement" and @target != null) {
 				int save_roll = random(1, 20);
+				apply_hound_save_disadvantage(target, c.id, save_roll);
 				int save_bonus = target.get_save_bonus(ABILITY_INT);
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
@@ -14501,6 +14648,7 @@ class battle_manager {
 				int total_damage = 0;
 				for (int d = 0; d < dice_count; d++) total_damage += random(1, 6);
 				int save_roll = random(1, 20);
+				apply_hound_save_disadvantage(target, c.id, save_roll);
 				int save_bonus = target.get_save_bonus(ABILITY_DEX);
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
@@ -14521,6 +14669,7 @@ class battle_manager {
 				int total_damage = 0;
 				for (int d = 0; d < dice_count; d++) total_damage += random(1, 6);
 				int save_roll = random(1, 20);
+				apply_hound_save_disadvantage(target, c.id, save_roll);
 				int save_bonus = target.get_save_bonus(ABILITY_INT);
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
@@ -14545,6 +14694,7 @@ class battle_manager {
 					if (@t == null or t.is_dead or t.id == c.id) continue;
 					if (feet_distance(c.x, c.y, t.x, t.y) > 5) continue;
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_CON);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -14567,6 +14717,7 @@ class battle_manager {
 					if (@t == null or t.is_dead or t.id == c.id) continue;
 					if (feet_distance(c.x, c.y, t.x, t.y) > 5) continue;
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_CON);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -14600,6 +14751,7 @@ class battle_manager {
 					if (@t == null or t.is_dead or t.id == c.id) continue;
 					if (feet_distance(center_x, center_y, t.x, t.y) > 5) continue;
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_DEX);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -14644,6 +14796,7 @@ class battle_manager {
 				int total_damage = 0;
 				for (int d = 0; d < dice_count; d++) total_damage += random(1, 6);
 				int save_roll = random(1, 20);
+				apply_hound_save_disadvantage(target, c.id, save_roll);
 				int save_bonus = target.get_save_bonus(ABILITY_DEX);
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
@@ -14663,6 +14816,7 @@ class battle_manager {
 				int total_damage = 0;
 				for (int d = 0; d < dice_count; d++) total_damage += random(1, 10);
 				int save_roll = random(1, 20);
+				apply_hound_save_disadvantage(target, c.id, save_roll);
 				int save_bonus = target.get_save_bonus(ABILITY_CON);
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
@@ -14681,6 +14835,7 @@ class battle_manager {
 				int total_damage = 0;
 				for (int d = 0; d < 3; d++) total_damage += random(1, 8);
 				int save_roll = random(1, 20);
+				apply_hound_save_disadvantage(target, c.id, save_roll);
 				int save_bonus = target.get_save_bonus(ABILITY_INT);
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
@@ -14700,6 +14855,7 @@ class battle_manager {
 				bool hostile = (target.is_player != c.is_player) or combat.mode == "pvp";
 				if (hostile) {
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(target, c.id, save_roll);
 					int save_bonus = target.get_save_bonus(ABILITY_CON);
 					int bless_bonus = roll_bless_bonus(target);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -14752,6 +14908,7 @@ class battle_manager {
 					if (@t == null or t.is_dead or t.id == c.id) continue;
 					if (feet_distance(center_x, center_y, t.x, t.y) > 5) continue;
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_DEX);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -14771,6 +14928,7 @@ class battle_manager {
 				int total_damage = 0;
 				for (int d = 0; d < dice_count; d++) total_damage += random(1, 8);
 				int save_roll = random(1, 20);
+				apply_hound_save_disadvantage(target, c.id, save_roll);
 				int save_bonus = target.get_save_bonus(ABILITY_CON);
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
@@ -14797,6 +14955,7 @@ class battle_manager {
 					if (@t == null or t.is_dead or t.id == c.id) continue;
 					if (feet_distance(center_x, center_y, t.x, t.y) > 20) continue;
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_DEX);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -14822,6 +14981,7 @@ class battle_manager {
 					int dmg = 0;
 					for (int d = 0; d < 3; d++) dmg += random(1, 6);
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_DEX);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -14853,6 +15013,7 @@ class battle_manager {
 					if (@t == null or t.is_dead or t.id == c.id) continue;
 					if (feet_distance(center_x, center_y, t.x, t.y) > 10) continue;
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_DEX);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -14920,6 +15081,7 @@ class battle_manager {
 					if (@t == null or t.is_dead or t.id == c.id) continue;
 					if (feet_distance(center_x, center_y, t.x, t.y) > 60) continue;
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_CON);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -14939,6 +15101,7 @@ class battle_manager {
 				int total_damage = 0;
 				for (int d = 0; d < dice_count; d++) total_damage += random(1, 6);
 				int save_roll = random(1, 20);
+				apply_hound_save_disadvantage(target, c.id, save_roll);
 				int save_bonus = target.get_save_bonus(ABILITY_CON);
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
@@ -14964,6 +15127,7 @@ class battle_manager {
 					if (@t == null or t.is_dead or t.id == c.id) continue;
 					if (feet_distance(center_x, center_y, t.x, t.y) > 10) continue;
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_DEX);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -14990,6 +15154,7 @@ class battle_manager {
 					if (@t == null or t.is_dead or t.id == c.id) continue;
 					if (feet_distance(center_x, center_y, t.x, t.y) > 60) continue;
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_CON);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -15016,6 +15181,7 @@ class battle_manager {
 					if (@t == null or t.is_dead or t.id == c.id) continue;
 					if (feet_distance(center_x, center_y, t.x, t.y) > 20) continue;
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_DEX);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -15041,6 +15207,7 @@ class battle_manager {
 					for (int d = 0; d < 10; d++) ray_dmg += random(1, 6);
 					int dtype = prism_types[random(0, 7)];
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_DEX);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -15086,6 +15253,7 @@ class battle_manager {
 					if (@t == null or t.is_dead or t.id == c.id) continue;
 					if (feet_distance(center_x, center_y, t.x, t.y) > 60) continue;
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_CON);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -15112,6 +15280,7 @@ class battle_manager {
 					if (@t == null or t.is_dead or t.id == c.id) continue;
 					if (feet_distance(center_x, center_y, t.x, t.y) > 20) continue;
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_DEX);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -15139,6 +15308,7 @@ class battle_manager {
 					if (@t == null or t.is_dead or t.id == c.id) continue;
 					if (feet_distance(c.x, c.y, t.x, t.y) > 360) continue;
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_DEX);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -15168,6 +15338,7 @@ class battle_manager {
 					int dmg = 0;
 					for (int d = 0; d < dice_count; d++) dmg += random(1, 10);
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					if (t.charm_frighten_save_advantage) { int r2 = random(1, 20); if (r2 > save_roll) save_roll = r2; }
 					int save_bonus = t.get_save_bonus(ABILITY_WIS);
 					int bless_bonus = roll_bless_bonus(t);
@@ -15202,6 +15373,7 @@ class battle_manager {
 					if (@t == null or t.is_dead or t.id == c.id) continue;
 					if (feet_distance(center_x, center_y, t.x, t.y) > 10) continue;
 					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
 					int save_bonus = t.get_save_bonus(ABILITY_DEX);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;

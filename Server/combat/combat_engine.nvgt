@@ -1108,9 +1108,9 @@ class combatant {
 		if (save_proficiencies[ability_id] == 1) mod += proficiency;
 		// 2024 exhaustion: subtract 2 * level from d20 rolls
 		mod -= exhaustion_level * 2;
-		// Bane spell (Basic Rules para 12174): "the target must subtract 1d4 from the roll."
-		// Approximated as -2 (average of 1d4) since the existing save flow is single-roll.
-		if (baned) mod -= 2;
+		// Basic Rules 2024 Bane (para 12032): "the target must roll a d4 and subtract
+		// the number rolled from the attack roll or saving throw."
+		if (baned) mod -= random(1, 4);
 		// Barbarian Danger Sense (PHB 2024 para 2783, L2): "You have Advantage on Dexterity
 		// saving throws unless you have the Incapacitated condition." Approximated as +5
 		// to the save bonus since the existing save flow doesn't currently roll twice.
