@@ -3298,6 +3298,44 @@ class battle_manager {
 		}
 		caster.hunters_mark_target_id = 0;
 		caster.hex_target_id = 0;
+		// Spirit Guardians: 15ft aura concentration spell — must stop dealing damage
+		caster.spirit_guardians_active = false;
+		caster.spirit_guardians_slot_level = 0;
+		caster.spirit_guardians_necrotic = false;
+		// Divine Favor: +1d4 radiant on weapon hits (concentration)
+		caster.divine_favor_active = false;
+		// Holy Weapon: +2d8 radiant on weapon hits (concentration)
+		caster.holy_weapon_active = false;
+		// Fire Shield: warm/chill shield (concentration)
+		caster.fire_shield_active = false;
+		// Stoneskin: B/P/S resistance (concentration)
+		caster.stoneskin_active = false;
+		// Fly: grant flying speed (concentration)
+		if (caster.fly_active) {
+			caster.fly_active = false;
+			caster.flying_speed = 0;
+		}
+		// Ensnaring Strike: pending weapon hit rider (concentration)
+		caster.ensnaring_strike_pending = false;
+		// Sanctuary: protection aura on target (concentration)
+		// Clear any sanctuary sourced by this caster on all combatants
+		for (uint sci = 0; sci < combat.combatants.length(); sci++) {
+			combatant@ sc = combat.combatants[sci];
+			if (@sc == null) continue;
+			if (sc.sanctuary_active and sc.sanctuary_source_id == caster.id) {
+				sc.sanctuary_active = false;
+				sc.sanctuary_dc = 0;
+				sc.sanctuary_source_id = 0;
+			}
+		}
+		// Venomous Mark: curse damage on target (concentration)
+		caster.venomous_mark_target_id = 0;
+		caster.venomous_mark_rounds = 0;
+		// Area effects — fog_cloud/darkness are positional not per-caster,
+		// so we clear the caster's flag (damage/visibility effects will
+		// be handled separately if positional tracking is added later).
+		caster.fog_cloud_active = false;
+		caster.darkness_active = false;
 	}
 
 	// ---- Swarming Modifier Helper ----
@@ -6231,6 +6269,28 @@ class battle_manager {
 				}
 			}
 
+			// PHB 2024 Sorcerer L2 Metamagic — Seeking Spell (para 7040): "If you make
+			// an attack roll for a spell and miss, you can spend 1 Sorcery Point to reroll
+			// the d20, and you must use the new roll." Consumes the metamagic flag.
+			if (!hit and !is_fumble and pr.is_spell_effect and pr.spell_uses_attack_roll
+				and c.metamagic_seeking_active and !target.is_dead) {
+				c.metamagic_seeking_active = false;
+				int sk_roll = random(1, 20);
+				int sk_total = sk_roll + pr.modifier;
+				bool sk_hit = sk_total >= target.armor_class and sk_roll != 1;
+				if (sk_roll >= get_critical_threshold(c, pr)) { sk_hit = true; }
+				string sk_outcome = sk_hit ? "hits!" : "misses.";
+				broadcast_roll(c.name, "Seeking Spell reroll", sk_roll, pr.modifier, sk_total, sk_outcome);
+				if (sk_hit) {
+					hit = true;
+					natural_roll = sk_roll;
+					total = sk_total;
+					reported_modifier = pr.modifier;
+					outcome = sk_outcome;
+					is_fumble = false;
+					pr.is_crit = (sk_roll >= get_critical_threshold(c, pr));
+				}
+			}
 			// Xanathar's Gloom Stalker L11 Stalker's Flurry (para 2160-2161): "Once on
 			// each of your turns when you miss with a weapon attack, you can make another
 			// weapon attack as part of the same action."
