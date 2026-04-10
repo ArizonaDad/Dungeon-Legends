@@ -14164,6 +14164,14 @@ class battle_manager {
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
 					bool saved = save_total >= save_dc;
+					// Save failure chain (WIS — Incapacitated condition)
+					if (!saved and try_arcane_deflection_save(t, save_dc, save_total)) saved = true;
+					if (!saved) { int ds = try_disciplined_survivor_reroll(t, save_dc, save_total, save_bonus + bless_bonus, "WIS save vs Sleep"); if (ds >= save_dc) saved = true; }
+					if (!saved) { int fg = try_flash_of_genius(t, save_dc, save_total, "WIS save vs Sleep"); if (fg >= save_dc) { saved = true; save_total = fg; } }
+					if (!saved) { int mv = try_maverick_spirit(t, save_dc, save_total, "WIS save vs Sleep"); if (mv >= save_dc) { saved = true; save_total = mv; } }
+					if (!saved and try_mage_slayer_guarded_mind(t, ABILITY_WIS)) saved = true;
+					if (!saved) { int bf = try_boon_of_fate_bonus(t, save_total, save_dc); if (bf >= save_dc) { saved = true; save_total = bf; } }
+					if (!saved and try_stroke_of_luck_save(t, save_dc, save_bonus + bless_bonus)) saved = true;
 					if (bless_bonus > 0) broadcast_announce(t.name + "'s Bless adds " + bless_bonus + " to the save.", false);
 					broadcast_roll(t.name, "WIS save vs Sleep", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Incapacitated!");
 					if (!saved) {
@@ -14205,6 +14213,14 @@ class battle_manager {
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
 				bool saved = save_total >= save_dc;
+				// Save failure chain (WIS — Incapacitated+Prone condition)
+				if (!saved and try_arcane_deflection_save(target, save_dc, save_total)) saved = true;
+				if (!saved) { int ds = try_disciplined_survivor_reroll(target, save_dc, save_total, save_bonus + bless_bonus, "WIS save vs Tasha's Hideous Laughter"); if (ds >= save_dc) saved = true; }
+				if (!saved) { int fg = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Tasha's Hideous Laughter"); if (fg >= save_dc) { saved = true; save_total = fg; } }
+				if (!saved) { int mv = try_maverick_spirit(target, save_dc, save_total, "WIS save vs Tasha's Hideous Laughter"); if (mv >= save_dc) { saved = true; save_total = mv; } }
+				if (!saved and try_mage_slayer_guarded_mind(target, ABILITY_WIS)) saved = true;
+				if (!saved) { int bf = try_boon_of_fate_bonus(target, save_total, save_dc); if (bf >= save_dc) { saved = true; save_total = bf; } }
+				if (!saved and try_stroke_of_luck_save(target, save_dc, save_bonus + bless_bonus)) saved = true;
 				if (bless_bonus > 0) broadcast_announce(target.name + "'s Bless adds " + bless_bonus + " to the save.", false);
 				broadcast_roll(target.name, "WIS save vs Tasha's Hideous Laughter", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Incapacitated!");
 				if (!saved) {
@@ -14685,6 +14701,14 @@ class battle_manager {
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
 					bool saved = save_total >= save_dc;
+					// Save failure chain (WIS — Confused/Incapacitated condition)
+					if (!saved and try_arcane_deflection_save(t, save_dc, save_total)) saved = true;
+					if (!saved) { int ds = try_disciplined_survivor_reroll(t, save_dc, save_total, save_bonus + bless_bonus, "WIS save vs Confusion"); if (ds >= save_dc) saved = true; }
+					if (!saved) { int fg = try_flash_of_genius(t, save_dc, save_total, "WIS save vs Confusion"); if (fg >= save_dc) { saved = true; save_total = fg; } }
+					if (!saved) { int mv = try_maverick_spirit(t, save_dc, save_total, "WIS save vs Confusion"); if (mv >= save_dc) { saved = true; save_total = mv; } }
+					if (!saved and try_mage_slayer_guarded_mind(t, ABILITY_WIS)) saved = true;
+					if (!saved) { int bf = try_boon_of_fate_bonus(t, save_total, save_dc); if (bf >= save_dc) { saved = true; save_total = bf; } }
+					if (!saved and try_stroke_of_luck_save(t, save_dc, save_bonus + bless_bonus)) saved = true;
 					if (bless_bonus > 0) broadcast_announce(t.name + "'s Bless adds " + bless_bonus + " to the save.", false);
 					broadcast_roll(t.name, "WIS save vs Confusion", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Confused!");
 					if (!saved) {
@@ -15473,6 +15497,13 @@ class battle_manager {
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
 				bool saved = save_total >= save_dc;
+				// Save failure chain (CON — Restrained/Petrifying condition)
+				if (!saved and try_arcane_deflection_save(target, save_dc, save_total)) saved = true;
+				if (!saved) { int ds = try_disciplined_survivor_reroll(target, save_dc, save_total, save_bonus + bless_bonus, "CON save vs Flesh to Stone"); if (ds >= save_dc) saved = true; }
+				if (!saved) { int fg = try_flash_of_genius(target, save_dc, save_total, "CON save vs Flesh to Stone"); if (fg >= save_dc) { saved = true; save_total = fg; } }
+				if (!saved) { int mv = try_maverick_spirit(target, save_dc, save_total, "CON save vs Flesh to Stone"); if (mv >= save_dc) { saved = true; save_total = mv; } }
+				if (!saved) { int bf = try_boon_of_fate_bonus(target, save_total, save_dc); if (bf >= save_dc) { saved = true; save_total = bf; } }
+				if (!saved and try_stroke_of_luck_save(target, save_dc, save_bonus + bless_bonus)) saved = true;
 				broadcast_roll(target.name, "CON save vs Flesh to Stone", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Petrifying!");
 				if (!saved) {
 					target.add_condition(COND_RESTRAINED);
@@ -15492,6 +15523,14 @@ class battle_manager {
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
 				bool saved = save_total >= save_dc;
+				// Save failure chain (WIS — Incapacitated condition)
+				if (!saved and try_arcane_deflection_save(target, save_dc, save_total)) saved = true;
+				if (!saved) { int ds = try_disciplined_survivor_reroll(target, save_dc, save_total, save_bonus + bless_bonus, "WIS save vs Otto's Irresistible Dance"); if (ds >= save_dc) saved = true; }
+				if (!saved) { int fg = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Otto's Irresistible Dance"); if (fg >= save_dc) { saved = true; save_total = fg; } }
+				if (!saved) { int mv = try_maverick_spirit(target, save_dc, save_total, "WIS save vs Otto's Irresistible Dance"); if (mv >= save_dc) { saved = true; save_total = mv; } }
+				if (!saved and try_mage_slayer_guarded_mind(target, ABILITY_WIS)) saved = true;
+				if (!saved) { int bf = try_boon_of_fate_bonus(target, save_total, save_dc); if (bf >= save_dc) { saved = true; save_total = bf; } }
+				if (!saved and try_stroke_of_luck_save(target, save_dc, save_bonus + bless_bonus)) saved = true;
 				broadcast_roll(target.name, "WIS save vs Otto's Irresistible Dance", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Dancing!");
 				if (!saved) {
 					target.add_condition(COND_INCAPACITATED);
