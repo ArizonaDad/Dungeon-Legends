@@ -3758,6 +3758,20 @@ class battle_manager {
 			c.wild_shape_uses = 1;
 			broadcast_announce(c.name + "'s Archdruid restores 1 Wild Shape use!", false);
 		}
+		// PHB 2024 Monk L2 Uncanny Metabolism (para 5334-5336): "When you roll
+		// Initiative and have no Focus Points remaining, you can regain all expended
+		// Focus Points. When you do so, roll your Martial Arts die, and you regain a
+		// number of Hit Points equal to your Monk level plus the number rolled."
+		if (c.class_name == "Monk" and c.level >= 2 and c.uncanny_metabolism_available and c.focus_points <= 0) {
+			c.focus_points = c.focus_points_max;
+			int ma_die = monk_martial_arts_die(c);
+			int heal_roll = random(1, ma_die);
+			int heal_amount = c.level + heal_roll;
+			c.current_hp += heal_amount;
+			if (c.current_hp > c.max_hp) c.current_hp = c.max_hp;
+			c.uncanny_metabolism_available = false;
+			broadcast_announce(c.name + "'s Uncanny Metabolism restores all Focus Points (" + c.focus_points_max + ") and heals " + heal_amount + " HP!", false);
+		}
 		@current_roll = pr;
 
 		if (@u != null and !u.is_bot and c.is_player) {
@@ -4656,6 +4670,42 @@ class battle_manager {
 			c.sorcerous_restoration_available = false;
 			broadcast_announce(c.name + " regains " + sp_regain + " Sorcery Points via Sorcerous Restoration.", false);
 		}
+		// Artificer L14 Advanced Artifice: regain 1 Flash of Genius use on SR
+		if (c.class_name == "Artificer" and c.refreshed_genius_active and c.flash_of_genius_uses_current < c.flash_of_genius_uses_max) {
+			c.flash_of_genius_uses_current++;
+		}
+		// PHB 2024 Ranger L10 Tireless (para 6178-6180): "Whenever you finish a
+		// Short Rest, your Exhaustion level, if any, decreases by 1."
+		if (c.class_name == "Ranger" and c.level >= 10 and c.exhaustion_level > 0) {
+			c.exhaustion_level--;
+			broadcast_announce(c.name + "'s Tireless reduces exhaustion to level " + c.exhaustion_level + ".", false);
+		}
+		// Rogue L20 Stroke of Luck: reset on SR
+		c.stroke_of_luck_available = (c.class_name == "Rogue" and c.level >= 20);
+		// Hexblade Curse: 1/SR (Xanathar's para 2779-2784)
+		c.hexblade_curse_used = false;
+		// Swashbuckler L17 Master Duelist: 1/SR reroll
+		c.master_duelist_used = false;
+		// Divine Soul L1 Favored by the Gods: 1/SR (Xanathar's para 2547-2548)
+		c.favored_by_gods_available = (c.class_name == "Sorcerer" and c.subclass == "Divine Soul");
+		// Gunslinger L13 Cheat Death: 1/SR
+		c.cheat_death_used = false;
+		// Gunslinger L20 Headshot: 1/SR
+		c.headshot_used = false;
+		// Monster Slayer L11 Magic User's Nemesis: 1/SR
+		c.magic_users_nemesis_used = false;
+		// Ebon Tides / Grim Hollow subclass 1/SR features
+		c.shadow_martyr_used = false;
+		c.exit_strategy_used = false;
+		c.pinball_shot_used = false;
+		c.night_music_used = false;
+		c.sickening_revenge_used = false;
+		c.touch_of_sorrow_used = false;
+		c.darkness_falls_used = false;
+		c.duty_over_death_used = false;
+		c.consume_darkness_used = false;
+		c.umbral_shadow_grasp_used = false;
+		c.bend_reality_used = false;
 
 		// Clear conditions and concentration
 		c.remove_condition(COND_FRIGHTENED);
@@ -4674,6 +4724,24 @@ class battle_manager {
 		for (uint i = 0; i < combat.combatants.length(); i++) {
 			if (combat.combatants[i].is_player) {
 				apply_short_rest(combat.combatants[i]);
+			}
+		}
+		// Inspiring Leader: re-grant temp HP after short rest (PHB para 7649)
+		for (uint il = 0; il < combat.combatants.length(); il++) {
+			combatant@ leader = combat.combatants[il];
+			if (@leader == null or leader.is_dead or !leader.is_player) continue;
+			if (leader.inspiring_leader_temp_hp_pool <= 0) continue;
+			int granted = 0;
+			for (uint tg = 0; tg < combat.combatants.length() and granted < 6; tg++) {
+				combatant@ ally = combat.combatants[tg];
+				if (@ally == null or ally.is_dead) continue;
+				if (ally.is_player != leader.is_player) continue;
+				if (feet_distance(leader.x, leader.y, ally.x, ally.y) > 30) continue;
+				if (ally.temp_hp < leader.inspiring_leader_temp_hp_pool) ally.temp_hp = leader.inspiring_leader_temp_hp_pool;
+				granted++;
+			}
+			if (granted > 0) {
+				broadcast_announce(leader.name + "'s Inspiring Leader grants " + leader.inspiring_leader_temp_hp_pool + " temporary HP to " + granted + " allies after rest.", false);
 			}
 		}
 		broadcast_state();

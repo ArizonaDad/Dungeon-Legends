@@ -1065,8 +1065,8 @@ void get_subclass_options(string class_name, string[]@ names, string[]@ descript
         add_text_pair(names, descriptions, "Path of the Glacier", "Path of the Glacier. Freeze the battlefield with icy rage. (Griffon's Saddlebag)");
         add_text_pair(names, descriptions, "Path of the Infernal", "Path of the Infernal. Channel hellfire and fiendish power. (Griffon's Saddlebag)");
         add_text_pair(names, descriptions, "Path of the Carrion Raven", "Path of the Carrion Raven. Beast maneuvers and primal cunning. (Grim Hollow)");
-        add_text_pair(names, descriptions, "Path of the Battlerager", "Path of the Battlerager. Spiked armor melee rage. Dwarves only. (Sword Coast)");
-        add_text_pair(names, descriptions, "Shadow Gnawer", "Shadow Gnawer. Consume raw shadow to gain teleport, stealth smoke, and corrosive haze. (Book of Ebon Tides)");
+        add_text_pair(names, descriptions, "Path of the Battlerager", "Path of the Battlerager. Spiked armor melee rage. Dwarves only. (Sword Coast) — Coming Soon");
+        add_text_pair(names, descriptions, "Shadow Gnawer", "Shadow Gnawer. Consume raw shadow to gain teleport, stealth smoke, and corrosive haze. (Book of Ebon Tides) — Coming Soon");
     } else if (class_name == "Bard") {
         add_text_pair(names, descriptions, "College of Dance", "College of Dance. Turn movement and rhythm into magical performance. — Coming Soon");
         add_text_pair(names, descriptions, "College of Glamour", "College of Glamour. Beguile and command with fey majesty.");
@@ -1078,7 +1078,7 @@ void get_subclass_options(string class_name, string[]@ names, string[]@ descript
         add_text_pair(names, descriptions, "College of Eloquence", "College of Eloquence. Master persuasion and debilitating words. (Tasha's)");
         add_text_pair(names, descriptions, "College of Spirits", "College of Spirits. Channel spirits for random magical tales. (Ravenloft) — Coming Soon");
         add_text_pair(names, descriptions, "College of Choreography", "College of Choreography. Magical dance to inspire and control. (Griffon's Saddlebag)");
-        add_text_pair(names, descriptions, "College of Mercantile", "College of Mercantile. Profit and persuasion through trade magic. (Griffon's Saddlebag)");
+        add_text_pair(names, descriptions, "College of Mercantile", "College of Mercantile. Profit and persuasion through trade magic. (Griffon's Saddlebag) — Coming Soon");
         add_text_pair(names, descriptions, "College of Requiems", "College of Requiems. Dark melodies that raise the dead. (Grim Hollow)");
         add_text_pair(names, descriptions, "College of the Dirge Singer", "College of the Dirge Singer. Historian and battle-caller. (Exploring Eberron)");
         add_text_pair(names, descriptions, "College of Shadow", "College of Shadow. Manipulate fear and protective shadows. (Book of Ebon Tides)");
@@ -1096,7 +1096,7 @@ void get_subclass_options(string class_name, string[]@ names, string[]@ descript
         add_text_pair(names, descriptions, "Festus Domain", "Festus Domain. Celebration, feasting, and communal magic. (Griffon's Saddlebag)");
         add_text_pair(names, descriptions, "Inquisition Domain", "Inquisition Domain. Hunt heretics and counter magic. (Grim Hollow)");
         add_text_pair(names, descriptions, "Mind Domain", "Mind Domain. Psychic power through divine devotion. (Exploring Eberron)");
-        add_text_pair(names, descriptions, "Arcana Domain", "Arcana Domain. Knowledge of arcane secrets + wizard cantrips. (Sword Coast)");
+        add_text_pair(names, descriptions, "Arcana Domain", "Arcana Domain. Knowledge of arcane secrets + wizard cantrips. (Sword Coast) — Coming Soon");
         add_text_pair(names, descriptions, "Keeper Domain", "Keeper Domain. Protect allies with martial prowess, leadership, and divine reactions. (Book of Ebon Tides)");
         add_text_pair(names, descriptions, "Shadow Domain", "Shadow Domain. Walk between light and dark; stealth, invisibility, and shadow grasp. (Book of Ebon Tides)");
     } else if (class_name == "Druid") {
@@ -1138,7 +1138,7 @@ void get_subclass_options(string class_name, string[]@ names, string[]@ descript
         add_text_pair(names, descriptions, "Way of the Ascendant Dragon", "Way of the Ascendant Dragon. Channel draconic breath and flight. (Fizban's)");
         add_text_pair(names, descriptions, "Warrior of the Celestial", "Warrior of the Celestial. Channel divine light through martial arts. (Griffon's Saddlebag)");
         add_text_pair(names, descriptions, "Way of the Aether", "Way of the Aether. Manipulate ethereal energy. (Griffon's Saddlebag)");
-        add_text_pair(names, descriptions, "Way of the Long Death", "Way of the Long Death. Extract vitality from dying creatures. (Sword Coast)");
+        add_text_pair(names, descriptions, "Way of the Long Death", "Way of the Long Death. Extract vitality from dying creatures. (Sword Coast) — Coming Soon");
         add_text_pair(names, descriptions, "Way of the Prophet", "Way of the Prophet. Spread the wisdom of your faith with charm and divine inspiration. (Book of Ebon Tides)");
     } else if (class_name == "Paladin") {
         add_text_pair(names, descriptions, "Oath of Devotion", "Oath of Devotion. Embody honesty, courage, and justice.");

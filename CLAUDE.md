@@ -451,6 +451,9 @@ Per-class audit of all 13 base class features against `basic_rules_full.txt` (Ba
 - **Paladin Aura ally coverage** (`09a4b32`): PHB 2024 paras 5665-5669, 5682-5683 — refresh_paladin_auras() at turn start and after movement. Aura of Protection CHA mod to ALL ally saves within 10ft (30ft at L18). Aura of Courage Frightened immunity for allies in range.
 - **Charger feat charge damage** (`2e4be7f`): PHB 2024 para 1394-1403 — +1d8 on first melee hit after Dash. charger_dash_active flag set on Dash, consumed on hit.
 - **Fey Touched / Shadow Touched free casts** (`2e4be7f`): PHB 2024 paras 1793-1800, 3563-3570 — grant_free_cast for Misty Step/Bless and Invisibility/Blindness-Deafness (1/LR each).
+- **Polearm Master Reactive Strike** (`2813154`): PHB 2024 para 7714 — entering-reach OA trigger alongside leaving-reach in check_opportunity_attacks. Gated on has_feat("polearm_master") + non-ranged.
+- **Short rest 1/SR reset sweep**: Added 18 missing 1/SR feature resets (Hexblade Curse, Master Duelist, Favored by Gods, Cheat Death, Headshot, Magic User's Nemesis, Flash of Genius +1 via Refreshed Genius, Stroke of Luck, 10 Ebon Tides/Grim Hollow subclass flags). Ranger L10 Tireless exhaustion -1 on SR. Inspiring Leader temp HP re-grant on short rest.
+- **Monk Uncanny Metabolism** (initiative): PHB 2024 para 5334-5336 — L2+ Monk regains all Focus Points + heals (level + Martial Arts die) when rolling initiative with 0 Focus Points. 1/LR.
 
 **Pending classes (in priority order):** *(all base class audits complete — focus shifts to subclass batches and shared backlog)*
 
@@ -458,7 +461,7 @@ Per-class audit of all 13 base class features against `basic_rules_full.txt` (Ba
 
 ### Subclass Combat Features (138 subclasses, 80+ with full combat logic)
 **Fully Implemented Subclasses with Combat Logic:**
-- **Barbarian**: Berserker, Wild Heart, World Tree, Zealot, Ancestral Guardian, Storm Herald, Path of the Carrion Raven
+- **Barbarian**: Berserker, Wild Heart, World Tree, Zealot, Ancestral Guardian, Storm Herald, Path of the Carrion Raven, Path of the Glacier, Path of the Infernal
 - **Bard**: Glamour, Swords, Whispers, Creation, Lore, Valor, Eloquence, Spirits
 - **Cleric**: Life, Light, War, Forge, Grave, Peace, Twilight, Order, Festus, Inquisition, Astral
 - **Druid**: Moon, Spores, Dreams, Stars, Land, Wildfire, Sea, Unbroken, Dragons
