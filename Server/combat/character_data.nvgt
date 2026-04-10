@@ -2783,6 +2783,68 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         c.orders_demand_used = false;
     }
 
+    // Xanathar's Grave Domain (paras 756-803)
+    if (cs.class_name == "Cleric" and cs.subclass == "Grave Domain") {
+        // L1 Circle of Mortality (para 788-790): max healing dice at 0 HP + spare the dying
+        c.circle_of_mortality_active = true;
+        if (!c.knows_spell("spare_the_dying")) c.prepared_spells.insert_last("spare_the_dying");
+        // L1 Domain Spells (para 773-787): always prepared
+        if (!c.knows_spell("bane")) c.prepared_spells.insert_last("bane");
+        if (!c.knows_spell("false_life")) c.prepared_spells.insert_last("false_life");
+        if (cs.level >= 3) {
+            if (!c.knows_spell("ray_of_enfeeblement")) c.prepared_spells.insert_last("ray_of_enfeeblement");
+        }
+        if (cs.level >= 5) {
+            if (!c.knows_spell("vampiric_touch")) c.prepared_spells.insert_last("vampiric_touch");
+        }
+        if (cs.level >= 7) {
+            if (!c.knows_spell("blight")) c.prepared_spells.insert_last("blight");
+        }
+        if (cs.level >= 9) {
+            if (!c.knows_spell("antilife_shell")) c.prepared_spells.insert_last("antilife_shell");
+        }
+        // L6 Sentinel at Death's Door (para 797-799): negate crit, WIS mod uses/LR
+        if (cs.level >= 6) {
+            int wis_mod = ability_modifier(cs.wisdom);
+            if (wis_mod < 1) wis_mod = 1;
+            c.sentinel_at_death_uses = wis_mod;
+        }
+        // L8 Potent Spellcasting (para 800-801): add WIS mod to cantrip damage
+        if (cs.level >= 8) c.blessed_strikes_choice = "potent_spellcasting";
+        // L17 Keeper of Souls (para 802-803): heal on enemy death within 60ft
+        if (cs.level >= 17) c.keeper_of_souls_active = true;
+    }
+
+    // Xanathar's Hexblade Warlock (paras 2748-2795)
+    if (cs.class_name == "Warlock" and cs.subclass == "The Hexblade") {
+        // L1 Hexblade's Curse (para 2779-2784): BA curse, +prof damage, crit 19-20, heal on kill
+        c.hexblade_curse_used = false;
+        // L1 Hex Warrior (para 2785-2787): CHA for attack/damage — deferred (weapon system changes)
+        // L1 Expanded Spells (para 2764-2778):
+        if (!c.knows_spell("shield")) c.prepared_spells.insert_last("shield");
+        if (!c.knows_spell("wrathful_smite")) c.prepared_spells.insert_last("wrathful_smite");
+        if (cs.level >= 3) {
+            if (!c.knows_spell("blur")) c.prepared_spells.insert_last("blur");
+            if (!c.knows_spell("branding_smite")) c.prepared_spells.insert_last("branding_smite");
+        }
+        if (cs.level >= 5) {
+            if (!c.knows_spell("blink")) c.prepared_spells.insert_last("blink");
+            if (!c.knows_spell("elemental_weapon")) c.prepared_spells.insert_last("elemental_weapon");
+        }
+        if (cs.level >= 7) {
+            if (!c.knows_spell("phantasmal_killer")) c.prepared_spells.insert_last("phantasmal_killer");
+            if (!c.knows_spell("staggering_smite")) c.prepared_spells.insert_last("staggering_smite");
+        }
+        if (cs.level >= 9) {
+            if (!c.knows_spell("banishing_smite")) c.prepared_spells.insert_last("banishing_smite");
+            if (!c.knows_spell("cone_of_cold")) c.prepared_spells.insert_last("cone_of_cold");
+        }
+        // L10 Armor of Hexes (para 2792-2793): reaction d6 vs cursed target attacks
+        if (cs.level >= 10) c.armor_of_hexes_active = true;
+        // L14 Master of Hexes (para 2794-2795): transfer curse on kill
+        if (cs.level >= 14) c.master_of_hexes_active = true;
+    }
+
     // Warlock subclasses
     if (cs.class_name == "Warlock") {
         if (cs.subclass == "Celestial Patron") {

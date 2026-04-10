@@ -229,6 +229,13 @@ int my_power_surge_charges = 0;
 int my_power_surge_max = 0;
 bool my_durable_magic_active = false;
 bool my_deflecting_shroud_active = false;
+// Xanathar's Grave Domain (paras 756-803) — synced from server
+int my_sentinel_at_death_uses = 0;
+bool my_keeper_of_souls_active = false;
+// Xanathar's Hexblade (paras 2748-2795) — synced from server
+bool my_hexblade_curse_used = false;
+bool my_armor_of_hexes_active = false;
+bool my_master_of_hexes_active = false;
 // PHB 2024 Warlock L2 Magical Cunning / L9 Contact Patron / L11+ Mystic Arcanum — synced from server
 bool my_magical_cunning_available = false;
 bool my_contact_patron_available = false;
@@ -1318,7 +1325,7 @@ void show_bonus_action_menu() {
 		planar_warrior_opt = m.add_item("Planar Warrior. Bonus action. Next weapon attack deals bonus force damage.");
 	}
 	if (lc == "cleric" and subclass == "Grave Domain") {
-		path_to_grave_opt = m.add_item("Path to the Grave. Channel Divinity. Curse a target for bonus damage on next hit.");
+		path_to_grave_opt = m.add_item("Path to the Grave. Channel Divinity. Curse target — next attack deals double damage (vulnerability).");
 	}
 	if (lc == "warlock" and subclass == "The Hexblade") {
 		hexblades_curse_opt = m.add_item("Hexblade's Curse. Bonus action. Mark a target for +Prof damage and expanded crits.");
@@ -3595,6 +3602,13 @@ void parse_game_state(json_object@ msg) {
 	my_power_surge_max = msg.exists("my_power_surge_max") ? int(msg["my_power_surge_max"]) : 0;
 	my_durable_magic_active = msg.exists("my_durable_magic_active") ? bool(msg["my_durable_magic_active"]) : false;
 	my_deflecting_shroud_active = msg.exists("my_deflecting_shroud_active") ? bool(msg["my_deflecting_shroud_active"]) : false;
+	// Xanathar's Grave Domain (paras 756-803)
+	my_sentinel_at_death_uses = msg.exists("my_sentinel_at_death_uses") ? int(msg["my_sentinel_at_death_uses"]) : 0;
+	my_keeper_of_souls_active = msg.exists("my_keeper_of_souls_active") ? bool(msg["my_keeper_of_souls_active"]) : false;
+	// Xanathar's Hexblade (paras 2748-2795)
+	my_hexblade_curse_used = msg.exists("my_hexblade_curse_used") ? bool(msg["my_hexblade_curse_used"]) : false;
+	my_armor_of_hexes_active = msg.exists("my_armor_of_hexes_active") ? bool(msg["my_armor_of_hexes_active"]) : false;
+	my_master_of_hexes_active = msg.exists("my_master_of_hexes_active") ? bool(msg["my_master_of_hexes_active"]) : false;
 	my_magical_cunning_available = msg.exists("my_magical_cunning_available") ? bool(msg["my_magical_cunning_available"]) : false;
 	my_contact_patron_available = msg.exists("my_contact_patron_available") ? bool(msg["my_contact_patron_available"]) : false;
 	my_mystic_arcanum_6_available = msg.exists("my_mystic_arcanum_6_available") ? bool(msg["my_mystic_arcanum_6_available"]) : false;
@@ -3828,6 +3842,11 @@ void reset_combat_state() {
 	my_power_surge_max = 0;
 	my_durable_magic_active = false;
 	my_deflecting_shroud_active = false;
+	my_sentinel_at_death_uses = 0;
+	my_keeper_of_souls_active = false;
+	my_hexblade_curse_used = false;
+	my_armor_of_hexes_active = false;
+	my_master_of_hexes_active = false;
 	my_magical_cunning_available = false;
 	my_contact_patron_available = false;
 	my_mystic_arcanum_6_available = false;

@@ -1459,6 +1459,47 @@ class battle_manager {
 			}
 		}
 
+		// Xanathar's Hexblade L1 Hexblade's Curse on-kill heal + L14 Master of Hexes transfer
+		// (para 2779-2784): "you regain hit points equal to your warlock level + your Charisma
+		// modifier" when the cursed target drops to 0 HP.
+		if (target.is_dead) {
+			for (uint hx = 0; hx < combat.combatants.length(); hx++) {
+				combatant@ hxc = combat.combatants[hx];
+				if (@hxc == null or hxc.is_dead) continue;
+				if (hxc.class_name != "Warlock" or hxc.subclass != "The Hexblade") continue;
+				if (hxc.hexblade_curse_target != target.id) continue;
+				// Heal on cursed target death
+				int hx_heal = hxc.level + hxc.get_ability_mod(ABILITY_CHA);
+				if (hx_heal < 1) hx_heal = 1;
+				int healed = combat.apply_healing(hxc, hx_heal);
+				if (healed > 0) broadcast_announce(hxc.name + "'s Hexblade's Curse restores " + healed + " HP from the kill!", false);
+				// L14 Master of Hexes (para 2794-2795): "you can move the curse to a different
+				// creature you can see within 30 feet. You don't regain HP from the previous
+				// target." Auto-transfer to nearest living enemy within 30ft.
+				if (hxc.master_of_hexes_active) {
+					combatant@ new_target = null;
+					float best_dist = 999;
+					for (uint nt = 0; nt < combat.combatants.length(); nt++) {
+						combatant@ nt_c = combat.combatants[nt];
+						if (@nt_c == null or nt_c.is_dead or nt_c.id == target.id) continue;
+						if (nt_c.is_player == hxc.is_player) continue; // Only enemies
+						float nx = float(nt_c.x - hxc.x);
+						float ny = float(nt_c.y - hxc.y);
+						float nd = sqrt(nx * nx + ny * ny) * 5.0f;
+						if (nd <= 30 and nd < best_dist) { best_dist = nd; @new_target = nt_c; }
+					}
+					if (@new_target != null) {
+						hxc.hexblade_curse_target = new_target.id;
+						broadcast_announce(hxc.name + "'s Master of Hexes transfers the curse to " + new_target.name + "!", true);
+					} else {
+						hxc.hexblade_curse_target = 0;
+					}
+				} else {
+					hxc.hexblade_curse_target = 0;
+				}
+			}
+		}
+
 		// Sword Coast: Way of the Long Death L3 Touch of Death — temp HP = WIS mod + monk level when reducing creature to 0 HP within 5ft
 		if (attacker.class_name == "Monk" and attacker.subclass == "Way of the Long Death" and attacker.level >= 3) {
 			if (feet_distance(attacker.x, attacker.y, target.x, target.y) <= 5) {
@@ -1467,6 +1508,46 @@ class battle_manager {
 				if (td_temp > attacker.temp_hp) {
 					attacker.temp_hp = td_temp;
 					broadcast_announce(attacker.name + "'s Touch of Death grants " + td_temp + " temp HP!", false);
+				}
+			}
+		}
+
+		// Xanathar's Grave Domain L17 Keeper of Souls (para 802-803): "At the start
+		// of your turn, if there is a creature that has died since the start of your
+		// last turn within 60 feet... you or one creature within 60 feet regains HP
+		// equal to the number of Hit Dice the creature had." Approximated: triggers
+		// immediately on enemy death, once per round, heal = target level/CR Hit Dice.
+		if (target.is_dead and @combat != null) {
+			for (uint kos = 0; kos < combat.combatants.length(); kos++) {
+				combatant@ kc = combat.combatants[kos];
+				if (@kc == null or kc.is_dead) continue;
+				if (kc.class_name != "Cleric" or kc.subclass != "Grave Domain") continue;
+				if (!kc.keeper_of_souls_active or kc.keeper_of_souls_used_this_turn) continue;
+				float kd_x = float(kc.x - target.x);
+				float kd_y = float(kc.y - target.y);
+				float kd_dist = sqrt(kd_x * kd_x + kd_y * kd_y) * 5.0f;
+				if (kd_dist <= 60) {
+					// Heal the most injured ally within 60ft (or self)
+					int heal_amount = target.level > 0 ? target.level : 1;
+					combatant@ heal_target = null;
+					int worst_deficit = 0;
+					for (uint ht = 0; ht < combat.combatants.length(); ht++) {
+						combatant@ ally = combat.combatants[ht];
+						if (@ally == null or ally.is_dead or ally.current_hp >= ally.max_hp) continue;
+						if (ally.is_player != kc.is_player) continue; // Only allies
+						float hd_x = float(kc.x - ally.x);
+						float hd_y = float(kc.y - ally.y);
+						float hd_dist = sqrt(hd_x * hd_x + hd_y * hd_y) * 5.0f;
+						if (hd_dist > 60) continue;
+						int deficit = ally.max_hp - ally.current_hp;
+						if (deficit > worst_deficit) { worst_deficit = deficit; @heal_target = ally; }
+					}
+					if (@heal_target != null) {
+						int healed = combat.apply_healing(heal_target, heal_amount);
+						kc.keeper_of_souls_used_this_turn = true;
+						broadcast_announce(kc.name + "'s Keeper of Souls restores " + healed + " HP to " + heal_target.name + "!", false);
+					}
+					break; // Only one Keeper of Souls triggers
 				}
 			}
 		}
@@ -3746,6 +3827,8 @@ class battle_manager {
 		c.long_arm_used_this_turn = false;
 		// Xanathar's War Magic L6 Power Surge (para 2940): once per turn reset.
 		c.power_surge_used_this_turn = false;
+		// Xanathar's Grave Domain L17 Keeper of Souls (para 802-803): once per round.
+		c.keeper_of_souls_used_this_turn = false;
 		// Valda's Spire Gunslinger White Hat L10 Long Arm of the Law (paras 462-463):
 		// "The creature can't move on its next turn unless it first takes the Disengage
 		// action." If this combatant was hobbled, zero out movement at turn start. The
@@ -4597,14 +4680,9 @@ class battle_manager {
 			broadcast_announce(attacker.name + "'s Planar Warrior deals " + planar_dmg + " force damage!", false);
 		}
 
-		// Grave Domain Cleric: Path to the Grave — vulnerability on marked target
-		// (simplified: +1d8 damage vs marked target)
-		if (attacker.class_name == "Cleric" and attacker.subclass == "Grave Domain" and attacker.path_to_grave_target == target.id) {
-			int grave_dmg = random(1, 8);
-			bonus += grave_dmg;
-			attacker.path_to_grave_target = 0;
-			broadcast_announce(attacker.name + "'s Path to the Grave adds " + grave_dmg + " damage!", false);
-		}
+		// Grave Domain Cleric: Path to the Grave vulnerability is now checked
+		// in the main damage resolution path (doubles total_damage before apply_damage).
+		// Old wrong +1d8 block removed — see para 794-796.
 
 		// Hexblade: Hexblade's Curse — +Prof damage to cursed target
 		if (attacker.class_name == "Warlock" and attacker.subclass == "The Hexblade" and attacker.hexblade_curse_target == target.id) {
@@ -5228,6 +5306,31 @@ class battle_manager {
 				outcome = "Critical hit! Focused Shot.";
 				broadcast_announce(c.name + "'s Focused Shot turns the hit into a Critical Hit!", true);
 			}
+			// Xanathar's Grave Domain L6 Sentinel at Death's Door (para 797-799): "When you
+			// or a creature you can see within 30 feet suffers a critical hit, you can use
+			// your reaction to turn that hit into a normal hit. Any effects triggered by a
+			// critical hit are canceled." Uses = WIS mod per long rest.
+			// Auto-resolved: scans for any Grave Cleric within 30 ft with reaction + uses.
+			if (is_crit and @combat != null) {
+				for (uint sdd = 0; sdd < combat.combatants.length(); sdd++) {
+					combatant@ gc = combat.combatants[sdd];
+					if (@gc == null or gc.is_dead or gc.id == c.id) continue;
+					if (gc.class_name != "Cleric" or gc.subclass != "Grave Domain") continue;
+					if (gc.level < 6 or gc.sentinel_at_death_uses <= 0 or !gc.has_reaction) continue;
+					float sdx = float(gc.x - target.x);
+					float sdy = float(gc.y - target.y);
+					float sd_dist = sqrt(sdx * sdx + sdy * sdy) * 5.0f;
+					if (sd_dist <= 30) {
+						gc.sentinel_at_death_uses--;
+						gc.has_reaction = false;
+						is_crit = false;
+						hit = true;
+						outcome = "Hit! (crit negated)";
+						broadcast_announce(gc.name + "'s Sentinel at Death's Door negates the critical hit! (" + gc.sentinel_at_death_uses + " uses remaining)", true);
+						break;
+					}
+				}
+			}
 			// Fighter L13 Studied Attacks (PHB 2024 para 5983): on miss, mark the target
 			// so the next attack roll against them gains advantage. The advantage flag is
 			// consumed in apply_attack_advantage_state on the next attack.
@@ -5311,6 +5414,12 @@ class battle_manager {
 				if (target.class_name == "Wizard" and target.subclass == "War Magic" and target.arcane_deflection_available) {
 					reaction_options.insert_last("arcane_deflection");
 				}
+				// Xanathar's Hexblade L10 Armor of Hexes (para 2792-2793): "If the target
+				// cursed by your Hexblade's Curse hits you with an attack roll, you can use
+				// your reaction to roll a d6. On a 4 or higher, the attack instead misses you."
+				if (target.class_name == "Warlock" and target.subclass == "The Hexblade" and target.armor_of_hexes_active and target.hexblade_curse_target == c.id) {
+					reaction_options.insert_last("armor_of_hexes");
+				}
 				// PHB 2024 Monk L3 Deflect Attacks (para 5337-5339): reduce an attack's
 				// total damage by 1d10 + DEX mod + Monk level. Normally restricted to
 				// Bludgeoning/Piercing/Slashing damage. L13 Deflect Energy (para 5366)
@@ -5364,6 +5473,7 @@ class battle_manager {
 							else if (reaction_options[oi] == "spirit_shield") opts += "Spirit Shield (reduce damage by 2d6+)";
 							else if (reaction_options[oi] == "entropic_ward") opts += "Entropic Ward (force the hit to miss)";
 							else if (reaction_options[oi] == "arcane_deflection") opts += "Arcane Deflection (+2 AC)";
+						else if (reaction_options[oi] == "armor_of_hexes") opts += "Armor of Hexes (d6, 4+ = miss)";
 							else if (reaction_options[oi] == "deflect_attacks") opts += "Deflect Attacks (reduce by 1d10+DEX+level)";
 							else if (reaction_options[oi] == "uncanny_dodge") opts += "Uncanny Dodge (halve the damage)";
 							else if (reaction_options[oi] == "storms_fury") opts += "Storm's Fury (" + target.level + " lightning damage to attacker + STR save or pushed 20 ft)";
@@ -5869,6 +5979,20 @@ class battle_manager {
 			}
 			string dmg_type_str = (pr.damage_type >= 0 and pr.damage_type < int(DAMAGE_TYPE_NAMES.length())) ? DAMAGE_TYPE_NAMES[pr.damage_type] : "physical";
 			broadcast_to_battle({{"type", message_types::damage_dealt}, {"attacker", c.name}, {"target", target.name}, {"amount", total_damage}, {"damage_type", dmg_type_str}, {"is_crit", pr.is_crit}, {"weapon", pr.attack_name}, {"is_weapon_attack", pr.is_weapon_attack}});
+			// Xanathar's Grave Domain L2 Path to the Grave (para 794-796): "the next time
+			// you or an ally hits the cursed creature with an attack, the creature has
+			// vulnerability to all of that attack's damage, and then the curse ends."
+			// Vulnerability = double damage. Applied to total_damage from ANY attacker.
+			if (target.path_to_grave_vulnerable) {
+				broadcast_announce("Path to the Grave! " + target.name + " is vulnerable — damage doubled from " + total_damage + " to " + (total_damage * 2) + "!", true);
+				total_damage *= 2;
+				target.path_to_grave_vulnerable = false;
+				// Clear the caster's tracking too
+				for (uint ptg = 0; ptg < combat.combatants.length(); ptg++) {
+					combatant@ ptg_c = combat.combatants[ptg];
+					if (@ptg_c != null and ptg_c.path_to_grave_target == target.id) ptg_c.path_to_grave_target = 0;
+				}
+			}
 			bool target_was_full_hp = (target.current_hp == target.max_hp);
 			bool attacker_was_hidden = c.is_hidden;
 			combat.apply_damage(target, total_damage, pr.damage_type, c);
@@ -6714,6 +6838,20 @@ class battle_manager {
 							targets_hit++;
 						}
 					}
+				}
+			}
+		}
+		else if (choice == "armor_of_hexes" and defender.is_player) {
+			// Xanathar's Hexblade L10 Armor of Hexes (para 2792-2793): "you can use your
+			// reaction to roll a d6. On a 4 or higher, the attack instead misses you."
+			if (defender.class_name == "Warlock" and defender.subclass == "The Hexblade" and defender.armor_of_hexes_active) {
+				defender.has_reaction = false;
+				int hex_roll = random(1, 6);
+				if (hex_roll >= 4) {
+					rp.attack_total = 0;
+					broadcast_announce(defender.name + "'s Armor of Hexes rolls " + hex_roll + " — the attack misses!", true);
+				} else {
+					broadcast_announce(defender.name + "'s Armor of Hexes rolls " + hex_roll + " — not enough to deflect.", false);
 				}
 			}
 		}

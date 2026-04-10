@@ -304,8 +304,17 @@ class combatant {
 	int temp_ac_bonus_this_attack = 0; // Defensive Duelist reaction
 	// Subclass feature tracking (Xanathar's/Tasha's)
 	bool planar_warrior_active = false; // Horizon Walker Ranger
-	uint path_to_grave_target = 0; // Grave Domain Cleric
+	uint path_to_grave_target = 0; // Grave Domain Cleric (caster tracking)
+	bool path_to_grave_vulnerable = false; // Grave Domain: on TARGET, doubles next hit
+	// Xanathar's Grave Domain (paras 756-803)
+	bool circle_of_mortality_active = false; // L1: max healing dice at 0 HP
+	int sentinel_at_death_uses = 0; // L6: reaction negate crit, WIS mod uses/LR
+	bool keeper_of_souls_active = false; // L17: heal on enemy death within 60ft
+	bool keeper_of_souls_used_this_turn = false; // L17: once per turn
 	uint hexblade_curse_target = 0; // Hexblade Warlock
+	bool hexblade_curse_used = false; // Xanathar's Hexblade L1 (para 2779-2784): 1/SR
+	bool armor_of_hexes_active = false; // Xanathar's Hexblade L10 (para 2792-2793)
+	bool master_of_hexes_active = false; // Xanathar's Hexblade L14 (para 2794-2795)
 	bool fighting_spirit_active = false; // Samurai Fighter
 	int fighting_spirit_uses = 0; // Samurai
 	bool cavalier_mark_active = false; // Cavalier Fighter
@@ -1955,6 +1964,13 @@ class battle {
 				state["my_power_surge_max"] = c.power_surge_max;
 				state["my_durable_magic_active"] = c.durable_magic_active;
 				state["my_deflecting_shroud_active"] = c.deflecting_shroud_active;
+				// Xanathar's Grave Domain (paras 756-803)
+				state["my_sentinel_at_death_uses"] = c.sentinel_at_death_uses;
+				state["my_keeper_of_souls_active"] = c.keeper_of_souls_active;
+				// Xanathar's Hexblade (paras 2748-2795)
+				state["my_hexblade_curse_used"] = c.hexblade_curse_used;
+				state["my_armor_of_hexes_active"] = c.armor_of_hexes_active;
+				state["my_master_of_hexes_active"] = c.master_of_hexes_active;
 				// Potion buff rounds remaining
 				state["my_potion_damage_rounds"] = c.potion_damage_rounds;
 				state["my_potion_ac_rounds"] = c.potion_ac_rounds;

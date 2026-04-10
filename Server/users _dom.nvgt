@@ -2964,25 +2964,37 @@ void handle_user_message(user@ u, json_object@ msg)
 		}
 
 		else if (feature == "path_to_grave") {
-			// Grave Domain Cleric: mark a target with Channel Divinity
+			// Xanathar's Grave Domain L2 Path to the Grave (para 794-796): "As an action,
+			// you choose one creature you can see within 30 feet, cursing it until the end
+			// of your next turn. The next time you or an ally hits the cursed creature with
+			// an attack, the creature has vulnerability to all of that attack's damage."
 			if (c.class_name != "Cleric" or c.subclass != "Grave Domain") { u.send({{"type", message_types::announce}, {"text", "Only Grave Domain clerics can use Path to the Grave."}, {"interrupt", true}}); return; }
 			if (c.channel_divinity_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Channel Divinity uses remaining."}, {"interrupt", true}}); return; }
 			if (!c.has_action) { u.send({{"type", message_types::announce}, {"text", "No action remaining."}, {"interrupt", true}}); return; }
+			combatant@ ptg_target = u.room.bm.combat.get_combatant(target_id);
+			if (@ptg_target == null) { u.send({{"type", message_types::announce}, {"text", "Invalid target."}, {"interrupt", true}}); return; }
 			c.has_action = false;
 			c.used_action = true;
 			c.channel_divinity_uses--;
 			c.path_to_grave_target = target_id;
-			u.room.bm.broadcast_announce(c.name + " curses a target with Path to the Grave! Next hit will deal bonus damage.", false);
+			ptg_target.path_to_grave_vulnerable = true;
+			u.room.bm.broadcast_announce(c.name + " curses " + ptg_target.name + " with Path to the Grave! Next attack deals double damage.", true);
 		}
 
 		else if (feature == "hexblades_curse") {
-			// Hexblade Warlock: curse a target, +Prof damage and crit on 19-20
+			// Xanathar's Hexblade L1 Hexblade's Curse (para 2779-2784): "As a bonus action,
+			// choose one creature you can see within 30 feet. The target is cursed. You gain
+			// bonus to damage rolls against the cursed target equal to your proficiency bonus.
+			// Attack rolls against the cursed target score a critical hit on 19 or 20.
+			// If the cursed target dies, you regain hit points." 1/short or long rest.
 			if (c.class_name != "Warlock" or c.subclass != "The Hexblade") { u.send({{"type", message_types::announce}, {"text", "Only Hexblade warlocks can use Hexblade's Curse."}, {"interrupt", true}}); return; }
+			if (c.hexblade_curse_used) { u.send({{"type", message_types::announce}, {"text", "Hexblade's Curse already used this encounter."}, {"interrupt", true}}); return; }
 			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
 			c.has_bonus_action = false;
 			c.used_bonus_action = true;
+			c.hexblade_curse_used = true;
 			c.hexblade_curse_target = target_id;
-			u.room.bm.broadcast_announce(c.name + " marks a target with Hexblade's Curse! +" + c.proficiency + " damage and crit on 19-20 against that target.", false);
+			u.room.bm.broadcast_announce(c.name + " places Hexblade's Curse! +" + c.proficiency + " damage and crit on 19-20 vs target. Heal " + (c.level + c.get_ability_mod(ABILITY_CHA)) + " HP on kill.", true);
 		}
 
 		else if (feature == "fighting_spirit") {
