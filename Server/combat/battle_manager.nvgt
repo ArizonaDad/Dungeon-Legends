@@ -5039,7 +5039,7 @@ class battle_manager {
 		for (uint i = 0; i < combat.combatants.length(); i++) {
 			combatant@ enemy = combat.combatants[i];
 			if (@enemy == null or enemy.is_dead or !enemy.is_alive()) continue;
-			if (!enemy.is_conscious()) continue;
+			if (!enemy.is_conscious() or enemy.is_incapacitated_check()) continue;
 			// Cannot make opportunity attack against yourself.
 			if (enemy.id == mover.id) continue;
 			// Must be on the opposite side (in PvP, all players are enemies to each other).
@@ -6365,6 +6365,15 @@ class battle_manager {
 					hit = true;
 					outcome = "Critical hit! Assassinate!";
 					broadcast_announce(c.name + "'s Assassinate turns the hit into a critical!", false);
+				}
+			}
+
+			// PHB 2024 Paralyzed (para 16232) / Unconscious (para 16251): "Any attack
+			// that hits the creature is a Critical Hit if the attacker is within 5 feet."
+			if (!is_fumble and !is_crit and pr.is_weapon_attack) {
+				int tgt_dist = feet_distance(c.x, c.y, target.x, target.y);
+				if (tgt_dist <= 5 and (target.has_condition(COND_PARALYZED) or target.has_condition(COND_UNCONSCIOUS))) {
+					is_crit = true;
 				}
 			}
 
