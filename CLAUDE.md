@@ -404,6 +404,26 @@ All batches 15-21 implementations were audited against actual source docx files 
 - Grim Hollow: removed dangerous `magic_resistance` at L1 on Inquisition Domain (NOT in source); removed fabricated flat damage on Carrion Raven, College of Requiems, Oath of Zeal, Misfortune Bringer (all use different mechanics than flat riders)
 - Gunslinger subclasses: major rewrite — Sharpshooter's Stance was NOT a damage buff (it's a Prone feature), Liar's Dice is a bluff mechanic not temp HP gamble, License to Kill is L14 not L3, Ricochet is a miss-reroll maneuver not bouncing bullet. Only Lay Down the Law (White Hat) remains as a bonus action, properly using Risk Dice.
 
+### Base Class Audit (2026-04-09) — PHB 2024 Basic Rules pass
+
+Per-class audit of all 13 base class features against `basic_rules_full.txt` (Basic Rules 2024). Pass tracks: source-paragraph references in inline comments, missing features added, stale 2014 mechanics replaced with 2024 wording, deferred items logged in `TODO_SOURCE_ACCURACY.md`.
+
+**Completed classes (with commit refs):**
+- **Barbarian** (`c71c732`): Fast Movement L5, Feral Instinct L7, Instinctive Pounce L7, Persistent Rage L15, Indomitable Might L18, Primal Champion L20 (+4 STR/CON cap 25), Primal Knowledge L3 (skill swap from Athletics)
+- **Cleric** (`f58986f`): Divine Order L1 (Protector vs Thaumaturge), Divine Spark L2 reaction (radiant/necrotic damage), Blessed Strikes L7 (+1d8 radiant 1/turn), Divine Intervention L10 (1/long rest cleric domain spell free cast), Improved Blessed Strikes L14 (extra die)
+- **Druid** (`57c5185`): Primal Order L1 (Magician vs Warden), Wild Companion L2 (Find Familiar via Wild Shape), Wild Resurgence L5 (Wild Shape→spell slot 1/turn), Elemental Fury L7 (damage type swap), Improved Elemental Fury L14
+- **Fighter** (`69caa32`): Tactical Mind L2 (use Second Wind for INT-based check reroll), Tactical Shift L5 (free OA-immune movement on Second Wind), Second Wind use scaling (2/3/4 by level), L20 Three Extra Attacks fix
+- **Monk** (`2730b5a` + `5e78f1c` + this batch): All 17 class features audited. See full table in `TODO_SOURCE_ACCURACY.md` Monk Audit section. Major fixes/additions:
+  - Was missing entirely: Unarmored Movement speed scaling, Patient Defense, Step of the Wind, Martial Arts Bonus Unarmed Strike, Uncanny Metabolism, Self-Restoration, Superior Defense, Body and Mind, Deflect Attacks reaction (with L13 Deflect Energy gating), Perfect Focus, Heightened Focus Flurry-of-Blows third strike
+  - Stunning Strike L5 rewrote from stale 2014 ("end of next turn" + repeating saves) to 2024 wording: stuns until start of monk's next turn, success rider grants speed-halved + advantage on next attack vs target
+  - Disciplined Survivor L14 sets all 6 save proficiencies (reroll prompt deferred)
+  - Empowered Strikes L6 flag set (Force/normal damage type prompt still deferred)
+- **Rogue Evasion fix** (`5e78f1c`): L7 init was missing — only Monks were getting `evasion_active`. Fixed in `character_data.nvgt` Rogue init block.
+
+**Pending classes (in priority order):** Paladin, Ranger, Rogue full audit, Sorcerer, Warlock, Wizard, Bard, Artificer, Gunslinger.
+
+**Audit doctrine:** every implementation block carries `// PHB 2024 <Class> L<n> <Feature> (para <X>-<Y>)` comments. Source-quoted commit messages. No invent. No auto-pick for player choices.
+
 ### Subclass Combat Features (138 subclasses, 80+ with full combat logic)
 **Fully Implemented Subclasses with Combat Logic:**
 - **Barbarian**: Berserker, Wild Heart, World Tree, Zealot, Ancestral Guardian, Storm Herald, Path of the Carrion Raven

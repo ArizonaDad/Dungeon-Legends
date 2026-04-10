@@ -277,12 +277,12 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 | **Empowered Strikes** (Force damage option on unarmed) | 6 | 5350-5351 | ✓ Done — `empowered_strikes_active` flag set at L6+. (Damage type currently auto-defaults to original; player choice prompt deferred.) |
 | **Evasion** (DEX save: 0 dmg on success, half on failure) | 7 | 5352-5354 | ✓ Done — `evasion_active` flag set at L7+ and applied in `apply_save_damage`. |
 | **Acrobatic Movement** (climb walls + run on liquids unarmored) | 9 | 5355-5356 | DEFERRED — combat doesn't currently model vertical surfaces or liquid terrain. |
-| **Heightened Focus** (Flurry +1 strike, Patient Def temp HP, Step ally) | 10 | 5357-5361 | PARTIAL 2026-04-09 — Patient Defense temp HP rider implemented. Flurry of Blows third strike and Step of the Wind ally-carry deferred (Flurry needs `start_flurry_strike` count parameter, ally-carry needs targeting prompt). |
+| **Heightened Focus** (Flurry +1 strike, Patient Def temp HP, Step ally) | 10 | 5357-5361 | PARTIAL 2026-04-09 — Patient Defense temp HP rider implemented (batch 1). Flurry of Blows third strike implemented (batch 3) by passing chain count of 2 instead of 1 to `start_flurry_strike`. Step of the Wind ally-carry still deferred — needs targeting prompt. |
 | **Self-Restoration** (auto remove Charmed/Frightened/Poisoned at end of turn) | 10 | 5362-5364 | ✓ Done 2026-04-09 — `self_restoration_active` flag and end-of-turn cleanup in `advance_turn` (highest-priority condition removed first). |
 | **Subclass feature** | 11 | 5256 | ✓ Done. |
 | **Deflect Energy** (Deflect Attacks works on any damage type) | 13 | 5365-5366 | ✓ Done 2026-04-09 — Deflect Attacks reaction option is offered for any damage type when defender is L13+ (the L3 gating only enforces B/P/S below L13). |
 | **Disciplined Survivor** (all save profs + reroll failed save with FP) | 14 | 5367-5369 | PARTIAL 2026-04-09 — all save proficiencies set in `character_data.nvgt` Monk L14+ block. Save reroll prompt deferred (needs failed-save prompt chain integration). |
-| **Perfect Focus** (regain to 4 FP on initiative if 3 or fewer) | 15 | 5370-5371 | DEFERRED — needs initiative-time hook similar to Uncanny Metabolism. |
+| **Perfect Focus** (regain to 4 FP on initiative if 3 or fewer) | 15 | 5370-5371 | ✓ Done 2026-04-09 — applied in `finish_initiative()` immediately after initiative rolls. Tops up to 4 if current < 4. Announced to players. Uncanny Metabolism path unaffected (UM fully refills anyway). |
 | **Subclass feature** | 17 | 5292 | ✓ Done. |
 | **Superior Defense** (3 FP, 1 minute Resistance to all but Force) | 18 | 5372-5373 | ✓ Done 2026-04-09 — new `superior_defense_active` + `superior_defense_rounds_remaining` fields, bonus action handler, damage halving in `apply_damage` for any non-Force damage type, round-tick in `start_turn`, ends if Incapacitated. |
 | **Epic Boon** | 19 | 5374-5375 | ✓ Done — Epic Boon feat catalog. |
@@ -290,11 +290,9 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 
 **Pending follow-up Monk batches:**
 - Deflect Attacks redirect target picker (Focus Point spend, 5ft melee / 60ft ranged, DEX save, 2× MA die + DEX mod same damage type)
-- Disciplined Survivor failed-save reroll prompt chain
-- Perfect Focus initiative-time floor
-- Heightened Focus Flurry-of-Blows third strike (needs `start_flurry_strike` count parameter)
+- Disciplined Survivor failed-save reroll prompt chain (L14)
 - Heightened Focus Step of the Wind ally-carry (needs targeting prompt)
-- Empowered Strikes Force/normal damage type prompt
+- Empowered Strikes Force/normal damage type prompt (L6) — could be a persistent toggle bonus action
 
 - **Paladin:** Lay on Hands (pool size), Divine Smite (slot-based in 2024), Aura of Courage, Cleansing Touch
 - **Paladin:** Lay on Hands (pool size), Divine Smite (slot-based in 2024), Aura of Courage, Cleansing Touch

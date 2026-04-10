@@ -2903,6 +2903,21 @@ class battle_manager {
 		if (@combat == null) return;
 		initiative_phase = false;
 
+		// PHB 2024 Monk L15 Perfect Focus (para 5370-5371): "When you roll Initiative
+		// and don't use Uncanny Metabolism, you regain expended Focus Points until you
+		// have 4 if you have 3 or fewer." Applied immediately after initiative is
+		// rolled. Uncanny Metabolism is a separate bonus action that fully refills,
+		// so this top-up is a no-op for monks who later use UM.
+		for (uint pfi = 0; pfi < combat.combatants.length(); pfi++) {
+			combatant@ pfm = combat.combatants[pfi];
+			if (@pfm == null) continue;
+			if (pfm.class_name == "Monk" and pfm.level >= 15 and pfm.focus_points <= 3) {
+				int pf_top = 4 - pfm.focus_points;
+				pfm.focus_points = 4;
+				broadcast_announce(pfm.name + "'s Perfect Focus restores " + pf_top + " Focus Points (now at 4).", false);
+			}
+		}
+
 		// Build and sort initiative order from stored rolls.
 		combat.build_initiative_order();
 

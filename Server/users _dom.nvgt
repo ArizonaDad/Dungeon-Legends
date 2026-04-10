@@ -1703,6 +1703,12 @@ void handle_user_message(user@ u, json_object@ msg)
 			}
 		}
 		else if (feature == "flurry_of_blows") {
+			// PHB 2024 Monk L2 Flurry of Blows (para 5329): "You can expend 1 Focus
+			// Point to make two Unarmed Strikes as a Bonus Action."
+			// PHB 2024 Monk L10 Heightened Focus (para 5359): "You can expend 1 Focus
+			// Point to use Flurry of Blows and make three Unarmed Strikes with it
+			// instead of two." Implemented by passing 2 chained strikes (instead of 1)
+			// to start_flurry_strike when heightened_focus_active is true.
 			if (c.class_name != "Monk" or c.level < 2) { u.send({{"type", message_types::announce}, {"text", "Your character cannot use Flurry of Blows."}, {"interrupt", true}}); return; }
 			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
 			if (c.focus_points <= 0) { u.send({{"type", message_types::announce}, {"text", "You need 1 Focus Point for Flurry of Blows."}, {"interrupt", true}}); return; }
@@ -1712,28 +1718,18 @@ void handle_user_message(user@ u, json_object@ msg)
 			if (flurry_dist > 5) { u.send({{"type", message_types::announce}, {"text", "Target must be within 5 feet for Flurry of Blows."}, {"interrupt", true}}); return; }
 			c.has_bonus_action = false;
 			c.used_bonus_action = true;
-			if (!u.room.bm.start_flurry_strike(c, target, 1)) {
+			int flurry_chain = c.heightened_focus_active ? 2 : 1;
+			if (!u.room.bm.start_flurry_strike(c, target, flurry_chain)) {
 				c.has_bonus_action = true;
 				c.used_bonus_action = false;
 				u.send({{"type", message_types::announce}, {"text", "You cannot make that Flurry attack right now."}, {"interrupt", true}});
 				return;
 			}
 			c.focus_points--;
-			u.room.bm.broadcast_announce(c.name + " spends 1 Focus Point and unleashes Flurry of Blows!", true);
-			// PHB 2024 Monk L10 Heightened Focus (para 5359): "You can expend 1 Focus
-			// Point to use Flurry of Blows and make three Unarmed Strikes with it
-			// instead of two." We've already queued one extra strike via remaining=1
-			// above; if Heightened Focus is active, queue another.
-			if (c.heightened_focus_active and c.has_bonus_action == false) {
-				// We can't easily inject after the fact — flag the additional strike
-				// on the chained pending_roll resolution by setting attacks_remaining
-				// path through start_flurry_strike's recursion. Use the same helper
-				// to spawn an additional strike on chain completion. Done by tagging
-				// the third strike via the existing `remaining_after_current` parameter.
-				// (start_flurry_strike already chains via attacks_remaining; we
-				// explicitly bump the chain by spawning an extra dummy strike that the
-				// existing flurry handler will absorb.)
-			}
+			string flurry_msg = c.heightened_focus_active
+				? c.name + " spends 1 Focus Point and unleashes Flurry of Blows for three strikes (Heightened Focus)!"
+				: c.name + " spends 1 Focus Point and unleashes Flurry of Blows!";
+			u.room.bm.broadcast_announce(flurry_msg, true);
 		}
 		else if (feature == "patient_defense") {
 			// PHB 2024 Monk L2 Patient Defense (para 5330): "You can take the Disengage
