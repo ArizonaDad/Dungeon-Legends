@@ -1735,6 +1735,13 @@ class battle_manager {
 			int pcs_bonus = caster.potent_spellcasting_bonus();
 			if (pcs_bonus > 0) base_damage += pcs_bonus;
 		}
+		// PHB 2024 Druid L7 Elemental Fury — Potent Spellcasting (para 4432): "Add your
+		// Wisdom modifier to the damage you deal with any Druid cantrip." Same gating
+		// as Cleric — only when the chosen Elemental Fury option is potent_spellcasting.
+		if (@pcs_spell != null and pcs_spell.level == 0 and pcs_spell.class_list.find("druid") >= 0) {
+			int dpc_bonus = caster.druid_potent_spellcasting_bonus();
+			if (dpc_bonus > 0) base_damage += dpc_bonus;
+		}
 		string dmg_type_name = "damage";
 		if (pr.damage_type >= 0 and pr.damage_type < int(DAMAGE_TYPE_NAMES.length())) {
 			dmg_type_name = DAMAGE_TYPE_NAMES[pr.damage_type] + " damage";
@@ -2629,6 +2636,10 @@ class battle_manager {
 					if (ch.exists("divine_order")) cs.divine_order = string(ch["divine_order"]);
 					if (ch.exists("blessed_strikes_choice")) cs.blessed_strikes_choice = string(ch["blessed_strikes_choice"]);
 					if (ch.exists("divine_strike_damage_type")) cs.divine_strike_damage_type = string(ch["divine_strike_damage_type"]);
+					// PHB 2024 Druid L1 Primal Order, L7 Elemental Fury choices
+					if (ch.exists("primal_order")) cs.primal_order = string(ch["primal_order"]);
+					if (ch.exists("elemental_fury_choice")) cs.elemental_fury_choice = string(ch["elemental_fury_choice"]);
+					if (ch.exists("primal_strike_damage_type")) cs.primal_strike_damage_type = string(ch["primal_strike_damage_type"]);
 					has_char = true;
 				} else if (lobby_game_type == GAME_TYPE_SANDBOX and data.exists(ACCOUNT_KEY_LEGACY_CHARACTER)) {
 					json_object@ ch = data[ACCOUNT_KEY_LEGACY_CHARACTER];
@@ -3157,6 +3168,10 @@ class battle_manager {
 		c.shield_bash_used_this_turn = false;
 		// PHB 2024 Cleric L7 Divine Strike (para 3619): "Once on each of your turns" — reset.
 		c.divine_strike_used_this_turn = false;
+		// PHB 2024 Druid L7 Primal Strike (para 4433): "Once on each of your turns" — reset.
+		c.primal_strike_used_this_turn = false;
+		// PHB 2024 Druid L5 Wild Resurgence (para 4428): "Once on each of your turns" — reset.
+		c.wild_resurgence_slot_to_use_used_this_turn = false;
 		// Reset Way of the Prophet Righteous Strike (1/turn)
 		c.righteous_strike_used_this_turn = false;
 		// Reset Stunning Strike (PHB 2024 Monk L5: "Once per turn")
@@ -4424,6 +4439,19 @@ class battle_manager {
 			}
 		}
 
+		// PHB 2024 Druid L1 Primal Order — Magician (para 4389): "your mystical connection
+		// to nature gives you a bonus to your Intelligence (Arcana or Nature) checks. The
+		// bonus equals your Wisdom modifier (minimum bonus of +1)."
+		if (c.class_name == "Druid" and c.primal_order == "magician" and pr.roll_type == ROLL_ABILITY_CHECK) {
+			if (pr.resolution_tag == "skill_arcana" or pr.resolution_tag == "skill_nature") {
+				int mag_bonus = c.get_ability_mod(ABILITY_WIS);
+				if (mag_bonus < 1) mag_bonus = 1;
+				total += mag_bonus;
+				reported_modifier += mag_bonus;
+				broadcast_announce(c.name + "'s Magician Primal Order adds +" + mag_bonus + " to the check.", false);
+			}
+		}
+
 		if (pr.roll_type == ROLL_INITIATIVE) {
 			if (!initiative_phase) return; // Guard against stale/duplicate initiative rolls
 			c.initiative_roll = total;
@@ -4864,6 +4892,25 @@ class battle_manager {
 					string ds_name = (ds_type == DMG_NECROTIC) ? "necrotic" : "radiant";
 					combat.apply_damage(target, ds_dmg, ds_type, c);
 					broadcast_announce(c.name + "'s Divine Strike deals " + ds_dmg + " extra " + ds_name + " damage!", false);
+				}
+			}
+
+			// PHB 2024 Druid L7 Elemental Fury — Primal Strike (para 4433): "Once on each
+			// of your turns when you hit a creature with an attack roll using a weapon or
+			// a Beast form's attack in Wild Shape, you can cause the target to take an
+			// extra 1d8 Cold, Fire, Lightning, or Thunder damage (choose when you hit)."
+			// L15 Improved Elemental Fury (para 4437) increases to 2d8.
+			if (pr.is_weapon_attack and !pr.is_spell_effect) {
+				int ps_type = -1;
+				int ps_dmg = c.roll_primal_strike(ps_type);
+				if (ps_dmg > 0 and ps_type >= 0) {
+					string ps_name = "elemental";
+					if (ps_type == DMG_COLD) ps_name = "cold";
+					else if (ps_type == DMG_FIRE) ps_name = "fire";
+					else if (ps_type == DMG_LIGHTNING) ps_name = "lightning";
+					else if (ps_type == DMG_THUNDER) ps_name = "thunder";
+					combat.apply_damage(target, ps_dmg, ps_type, c);
+					broadcast_announce(c.name + "'s Primal Strike deals " + ps_dmg + " extra " + ps_name + " damage!", false);
 				}
 			}
 
@@ -10124,6 +10171,10 @@ class battle_manager {
 				if (hit) {
 					int total_damage = 0;
 					for (int d = 0; d < dice_count; d++) total_damage += random(1, 8);
+					// PHB 2024 Druid L7 Elemental Fury — Potent Spellcasting (para 4432):
+					// "Add your Wisdom modifier to the damage you deal with any Druid cantrip."
+					int dpc_bonus = c.druid_potent_spellcasting_bonus();
+					if (dpc_bonus > 0) total_damage += dpc_bonus;
 					combat.apply_damage(target, total_damage, DMG_FIRE, c);
 					broadcast_announce(c.name + "'s Produce Flame burns " + target.name + " for " + total_damage + " fire damage.", true);
 				}

@@ -213,8 +213,27 @@ Audited against Basic Rules 2024 paras 3589-3630 (full Cleric class entry).
 
 **Player choice infrastructure:** Three new Phase 1 config commands (`set_divine_order`, `set_blessed_strikes`, `set_divine_strike_damage_type`) added to the Shift+P menu. They persist to `account.data` so Cleric choices survive across sessions. Source-only rule respected — players configure their own choices, no auto-pick.
 
+### Druid — RESOLVED 2026-04-09 (most features)
+Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 
-- **Druid:** Wild Companion, Elemental Fury, Archdruid
+| Feature | Level | Source para | Status |
+|---|---|---|---|
+| Spellcasting (full caster, WIS, prepared) | 1 | 4372-4383 | ✓ Done |
+| Druidic (Speak with Animals always prepared) | 1 | 4384-4386 | PARTIAL — language flavor only; auto-prepare of Speak with Animals deferred |
+| **Primal Order** (Magician or Warden — once-per-character choice) | 1 | 4387-4390 | ✓ Done 2026-04-09 — `primal_order` field on character_sheet + combatant. Configured via Shift+P → "Set Druid Primal Order". Magician bonus to Arcana/Nature checks (WIS mod, min +1) wired in `finalize_roll_result`. Warden martial-weapon + medium-armor proficiency at character creation deferred to a future `apply_class_defaults` pass. |
+| Wild Shape (BA, scale 2/3/4 uses at L2/6/14, temp HP) | 2 | 4391-4419 | ✓ Done — and 2026-04-09 added the use-count scaling to `apply_class_defaults` (was hard-coded to 2). |
+| **Wild Companion** (Magic action, expend slot or WS use, cast Find Familiar) | 2 | 4420-4422 | ✓ Done 2026-04-09 — bonus action handler in `users _dom.nvgt` consumes WS use first, falls back to lowest spell slot. Find Familiar narrative-only (no grid familiar pet, matches no-pet-grid policy). Client menu entry visible at Druid L2+. |
+| Druid Subclass | 3 | 4423-4424 | ✓ Done |
+| **Wild Resurgence** (slot → WS use 1/turn; WS use → L1 slot 1/long rest) | 5 | 4427-4429 | ✓ Done 2026-04-09 — two no-action bonus action handlers (`wild_resurgence_slot_to_use` and `wild_resurgence_use_to_slot`). Per-turn and per-rest tracking flags reset at turn start (slot → use) and on long rest (use → slot). |
+| **Elemental Fury** (Potent Spellcasting OR Primal Strike — choose at L7) | 7 | 4430-4433 | ✓ Done 2026-04-09 — `elemental_fury_choice` field. Primal Strike: `roll_primal_strike` helper applies +1d8 cold/fire/lightning/thunder once per turn on weapon and Wild Shape attacks (mirrors Cleric Divine Strike). Potent Spellcasting: `druid_potent_spellcasting_bonus` adds WIS mod to Druid cantrip damage (produce_flame inline + generic spell save damage path both updated). Damage type sub-choice persisted. Configured via Shift+P. |
+| **Improved Elemental Fury** (Primal Strike +2d8 / Potent Spellcasting cantrip range +300 ft) | 15 | 4434-4437 | ✓ Done 2026-04-09 — Primal Strike doubles dice at L15+ via `roll_primal_strike`. Potent Spellcasting cantrip range extension is descriptive only (range checks pass at +300 ft regardless since combat grid is small). |
+| **Beast Spells** (cast spells in Wild Shape form, except costed material components) | 18 | 4438-4439 | ✗ DEFERRED — requires Wild Shape spellcasting refactor (current code blocks spellcasting in beast form). |
+| **Archdruid: Evergreen Wild Shape** (regen WS on Initiative if 0 uses) | 20 | 4444 | ✗ DEFERRED — easy add, slated for L20 polish pass. |
+| **Archdruid: Nature Magician** (convert WS uses to a single spell slot, 1/long rest) | 20 | 4445 | ✗ DEFERRED — needs a player-prompt "how many uses to convert" UI. Per-rest flag is in place. |
+
+**Player choice infrastructure:** Three new Phase 1 config commands (`set_primal_order`, `set_elemental_fury`, `set_primal_strike_damage_type`) added to the Shift+P menu. They persist to `account.data` so Druid choices survive across sessions.
+
+
 - **Fighter:** Tactical Mind/Shift/Master, Second Wind (correct dice), Studied Attacks
 - **Monk:** Martial Arts die scaling, Deflect Attacks (was Deflect Missiles), Stunning Strike, Empowered Strikes, Perfect Focus
 - **Paladin:** Lay on Hands (pool size), Divine Smite (slot-based in 2024), Aura of Courage, Cleansing Touch

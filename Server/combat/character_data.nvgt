@@ -100,6 +100,15 @@ class character_sheet {
     // Divine Strike damage type sub-choice: "necrotic" or "radiant" (picked when
     // blessed_strikes_choice == "divine_strike").
     string divine_strike_damage_type = "";
+    // PHB 2024 Druid L1 Primal Order (para 4387-4390): "Magician" (+1 cantrip + WIS
+    // mod bonus to Arcana/Nature) or "Warden" (martial weapons + medium armor).
+    string primal_order = "";
+    // PHB 2024 Druid L7 Elemental Fury (para 4430-4433): "potent_spellcasting"
+    // (WIS mod to Druid cantrip damage) or "primal_strike" (once/turn +1d8
+    // cold/fire/lightning/thunder on weapon or beast attack). Scales at L15.
+    string elemental_fury_choice = "";
+    // Primal Strike damage type sub-choice: "cold" / "fire" / "lightning" / "thunder".
+    string primal_strike_damage_type = "";
 }
 
 int bardic_inspiration_die_for_level(int level) {
@@ -1824,6 +1833,15 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         }
     }
     if (cs.class_name == "Druid") {
+        // PHB 2024 Druid L1 Primal Order, L7 Elemental Fury — copy choices
+        c.primal_order = cs.primal_order;
+        c.elemental_fury_choice = cs.elemental_fury_choice;
+        c.primal_strike_damage_type = cs.primal_strike_damage_type;
+        // PHB 2024 Druid L2 Wild Shape uses (para 4393): 2 baseline, scales at L6 to 3,
+        // L14 to 4 per the Druid Features table (col "Wild Shape").
+        if (cs.level >= 14) c.wild_shape_uses = 4;
+        else if (cs.level >= 6) c.wild_shape_uses = 3;
+        else if (cs.level >= 2) c.wild_shape_uses = 2;
         // PHB 2024 Druid L2 Wild Companion: cast Find Familiar via Wild Shape
         if (cs.level >= 2) c.wild_companion_active = true;
         // PHB 2024 Druid L7 Elemental Fury: choose damage type swap on Wild Shape attacks

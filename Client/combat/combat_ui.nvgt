@@ -888,6 +888,9 @@ void show_bonus_action_menu() {
 	int divine_spark_radiant_opt = -1;
 	int divine_spark_necrotic_opt = -1;
 	int divine_intervention_opt = -1;
+	int wild_companion_opt = -1;
+	int wild_resurgence_slot_to_use_opt = -1;
+	int wild_resurgence_use_to_slot_opt = -1;
 	int magic_coin_opt = -1;
 	int create_void_opt = -1;
 	int breath_of_dragon_opt = -1;
@@ -936,6 +939,17 @@ void show_bonus_action_menu() {
 	if (lc == "druid" and level >= 2 and (currently_wild_shaped or subclass == "Circle of the Moon")) {
 		if (currently_wild_shaped) wild_shape_opt = m.add_item("Wild Shape. Revert or choose a new beast form.");
 		else wild_shape_opt = m.add_item("Wild Shape. Bonus action. Transform into a beast.");
+	}
+	// PHB 2024 Druid L2 Wild Companion (para 4420). Action — expend a Wild Shape use OR
+	// a spell slot to summon a fey familiar (Find Familiar without material components).
+	if (lc == "druid" and level >= 2) {
+		wild_companion_opt = m.add_item("Wild Companion. Action. Expend a Wild Shape use or spell slot to summon a fey familiar.");
+	}
+	// PHB 2024 Druid L5 Wild Resurgence (para 4427-4429). Two no-action options gated by
+	// resource state — only show the one that's currently usable.
+	if (lc == "druid" and level >= 5) {
+		wild_resurgence_slot_to_use_opt = m.add_item("Wild Resurgence: spell slot to Wild Shape. No action. Once per turn. Burn a slot to recover one Wild Shape use (only if 0 uses left).");
+		wild_resurgence_use_to_slot_opt = m.add_item("Wild Resurgence: Wild Shape to level 1 slot. No action. 1/long rest. Burn a Wild Shape use to recover a level 1 spell slot.");
 	}
 	if (my_spiritual_weapon_active) spiritual_weapon_opt = m.add_item("Spiritual Weapon. Strike a target within 60 feet with your summoned weapon.");
 
@@ -1779,6 +1793,18 @@ void show_bonus_action_menu() {
 		send({{"type", message_types::bonus_action}, {"feature", "divine_intervention"}});
 		speak("Divine Intervention readied. Your next Cleric spell of level 5 or lower will be cast for free.", true);
 	}
+	else if (wild_companion_opt >= 0 and res == wild_companion_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "wild_companion"}});
+		speak("Summoning Wild Companion familiar.", true);
+	}
+	else if (wild_resurgence_slot_to_use_opt >= 0 and res == wild_resurgence_slot_to_use_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "wild_resurgence_slot_to_use"}});
+		speak("Wild Resurgence: trading slot for Wild Shape.", true);
+	}
+	else if (wild_resurgence_use_to_slot_opt >= 0 and res == wild_resurgence_use_to_slot_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "wild_resurgence_use_to_slot"}});
+		speak("Wild Resurgence: trading Wild Shape for spell slot.", true);
+	}
 	else if (magic_coin_opt >= 0 and res == magic_coin_opt) {
 		if (current_target_id == 0) { speak("No target selected.", true); return; }
 		send({{"type", message_types::bonus_action}, {"feature", "magic_coin"}, {"target_id", current_target_id}});
@@ -2147,6 +2173,17 @@ void show_phase1_menu() {
 			divine_strike_dmg_opt = m.add_item("Set Divine Strike damage type (Necrotic or Radiant — only used if Blessed Strikes is Divine Strike).");
 		}
 	}
+	// PHB 2024 Druid L1 Primal Order (para 4387-4390) and L7 Elemental Fury (para 4430-4433).
+	int primal_order_opt = -1;
+	int elemental_fury_opt = -1;
+	int primal_strike_dmg_opt = -1;
+	if (lc_class == "druid") {
+		primal_order_opt = m.add_item("Set Druid Primal Order (PHB 2024 L1 choice: Magician or Warden).");
+		if (current_character_level() >= 7) {
+			elemental_fury_opt = m.add_item("Set Druid Elemental Fury (PHB 2024 L7 choice: Potent Spellcasting or Primal Strike).");
+			primal_strike_dmg_opt = m.add_item("Set Primal Strike damage type (Cold, Fire, Lightning, or Thunder — only used if Elemental Fury is Primal Strike).");
+		}
+	}
 	int status_opt = m.add_item("Show full Phase 1 status.");
 	int cancel_opt = m.add_item("Cancel.");
 
@@ -2304,6 +2341,49 @@ void show_phase1_menu() {
 		else if (pick == rad) chosen = "radiant";
 		send({{"type", message_types::bonus_action}, {"feature", "set_divine_strike_damage_type"}, {"value", chosen}});
 		speak("Divine Strike damage type set to " + chosen + ".", true);
+	}
+	else if (primal_order_opt >= 0 and res == primal_order_opt) {
+		menu@ pom = setup_sub_menu("Choose your Druid Primal Order. PHB 2024 para 4387-4390.");
+		int mag = pom.add_item("Magician. Extra cantrip + WIS mod (min +1) bonus to Arcana and Nature checks.");
+		int war = pom.add_item("Warden. Martial weapon proficiency + medium armor training.");
+		int cnc = pom.add_item("Cancel.");
+		int pick = pom.run();
+		if (pick < 0 or pick == cnc) return;
+		string chosen = "";
+		if (pick == mag) chosen = "magician";
+		else if (pick == war) chosen = "warden";
+		send({{"type", message_types::bonus_action}, {"feature", "set_primal_order"}, {"value", chosen}});
+		speak("Primal Order set to " + chosen + ".", true);
+	}
+	else if (elemental_fury_opt >= 0 and res == elemental_fury_opt) {
+		menu@ efm = setup_sub_menu("Choose your Druid Elemental Fury (L7). PHB 2024 para 4430-4433.");
+		int ps = efm.add_item("Primal Strike. Once per turn on a weapon or beast attack hit, deal +1d8 cold/fire/lightning/thunder. +2d8 at L15.");
+		int pcs = efm.add_item("Potent Spellcasting. Add WIS mod to Druid cantrip damage. Cantrip range +300 ft at L15.");
+		int cnc = efm.add_item("Cancel.");
+		int pick = efm.run();
+		if (pick < 0 or pick == cnc) return;
+		string chosen = "";
+		if (pick == ps) chosen = "primal_strike";
+		else if (pick == pcs) chosen = "potent_spellcasting";
+		send({{"type", message_types::bonus_action}, {"feature", "set_elemental_fury"}, {"value", chosen}});
+		speak("Elemental Fury set to " + chosen + ".", true);
+	}
+	else if (primal_strike_dmg_opt >= 0 and res == primal_strike_dmg_opt) {
+		menu@ pdt = setup_sub_menu("Choose Primal Strike damage type.");
+		int co = pdt.add_item("Cold.");
+		int fi = pdt.add_item("Fire.");
+		int li = pdt.add_item("Lightning.");
+		int th = pdt.add_item("Thunder.");
+		int cnc = pdt.add_item("Cancel.");
+		int pick = pdt.run();
+		if (pick < 0 or pick == cnc) return;
+		string chosen = "";
+		if (pick == co) chosen = "cold";
+		else if (pick == fi) chosen = "fire";
+		else if (pick == li) chosen = "lightning";
+		else if (pick == th) chosen = "thunder";
+		send({{"type", message_types::bonus_action}, {"feature", "set_primal_strike_damage_type"}, {"value", chosen}});
+		speak("Primal Strike damage type set to " + chosen + ".", true);
 	}
 	else if (res == status_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "query_phase1"}});

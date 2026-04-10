@@ -1456,7 +1456,9 @@ void handle_user_message(user@ u, json_object@ msg)
 			or feature == "set_ravnica_guild" or feature == "set_transformation"
 			or feature == "set_fey_court" or feature == "query_phase1"
 			or feature == "set_divine_order" or feature == "set_blessed_strikes"
-			or feature == "set_divine_strike_damage_type";
+			or feature == "set_divine_strike_damage_type"
+			or feature == "set_primal_order" or feature == "set_elemental_fury"
+			or feature == "set_primal_strike_damage_type";
 		combatant@ c = null;
 		if (is_phase1_config) {
 			@c = u.room.bm.find_player_combatant(u.username);
@@ -3000,6 +3002,129 @@ void handle_user_message(user@ u, json_object@ msg)
 				}
 			}
 			u.send({{"type", message_types::announce}, {"text", "Divine Strike damage type set to " + dt_choice + "."}, {"interrupt", true}});
+		}
+		else if (feature == "set_primal_order") {
+			// PHB 2024 Druid L1 Primal Order (para 4387-4390) — player chooses
+			// "magician" or "warden". Persisted to character.
+			string po_choice = msg.exists("value") ? string(msg["value"]) : "";
+			if (po_choice != "magician" and po_choice != "warden") {
+				u.send({{"type", message_types::announce}, {"text", "Primal Order must be 'magician' or 'warden'."}, {"interrupt", true}});
+				return;
+			}
+			if (c.class_name != "Druid") { u.send({{"type", message_types::announce}, {"text", "Only Druids have a Primal Order."}, {"interrupt", true}}); return; }
+			c.primal_order = po_choice;
+			if (@u.account != null) {
+				json_object@ data = u.account.data;
+				string ckey = get_character_storage_key(u.room.game_type);
+				if (data.exists(ckey)) {
+					json_object@ ch = data[ckey];
+					ch["primal_order"] = po_choice;
+					u.account.commit();
+				}
+			}
+			string po_label = (po_choice == "magician") ? "Magician (extra cantrip + WIS bonus to Arcana/Nature)" : "Warden (martial weapons + medium armor training)";
+			u.send({{"type", message_types::announce}, {"text", "Primal Order set to " + po_label + "."}, {"interrupt", true}});
+		}
+		else if (feature == "set_elemental_fury") {
+			// PHB 2024 Druid L7 Elemental Fury (para 4430-4433) — player chooses
+			// "potent_spellcasting" or "primal_strike" once at L7.
+			string ef_choice = msg.exists("value") ? string(msg["value"]) : "";
+			if (ef_choice != "potent_spellcasting" and ef_choice != "primal_strike") {
+				u.send({{"type", message_types::announce}, {"text", "Elemental Fury must be 'potent_spellcasting' or 'primal_strike'."}, {"interrupt", true}});
+				return;
+			}
+			if (c.class_name != "Druid") { u.send({{"type", message_types::announce}, {"text", "Only Druids have Elemental Fury."}, {"interrupt", true}}); return; }
+			if (c.level < 7) { u.send({{"type", message_types::announce}, {"text", "Elemental Fury unlocks at Druid L7."}, {"interrupt", true}}); return; }
+			c.elemental_fury_choice = ef_choice;
+			if (@u.account != null) {
+				json_object@ data = u.account.data;
+				string ckey = get_character_storage_key(u.room.game_type);
+				if (data.exists(ckey)) {
+					json_object@ ch = data[ckey];
+					ch["elemental_fury_choice"] = ef_choice;
+					u.account.commit();
+				}
+			}
+			string ef_label = (ef_choice == "primal_strike") ? "Primal Strike (+1d8 cold/fire/lightning/thunder on attack hit, once per turn)" : "Potent Spellcasting (WIS modifier to Druid cantrip damage)";
+			u.send({{"type", message_types::announce}, {"text", "Elemental Fury set to " + ef_label + "."}, {"interrupt", true}});
+		}
+		else if (feature == "set_primal_strike_damage_type") {
+			// Primal Strike damage type sub-choice — pick once.
+			string pst = msg.exists("value") ? string(msg["value"]) : "";
+			if (pst != "cold" and pst != "fire" and pst != "lightning" and pst != "thunder") {
+				u.send({{"type", message_types::announce}, {"text", "Primal Strike damage type must be cold, fire, lightning, or thunder."}, {"interrupt", true}});
+				return;
+			}
+			if (c.class_name != "Druid") { u.send({{"type", message_types::announce}, {"text", "Only Druids use Primal Strike."}, {"interrupt", true}}); return; }
+			if (c.elemental_fury_choice != "primal_strike") { u.send({{"type", message_types::announce}, {"text", "Pick Elemental Fury Primal Strike first."}, {"interrupt", true}}); return; }
+			c.primal_strike_damage_type = pst;
+			if (@u.account != null) {
+				json_object@ data = u.account.data;
+				string ckey = get_character_storage_key(u.room.game_type);
+				if (data.exists(ckey)) {
+					json_object@ ch = data[ckey];
+					ch["primal_strike_damage_type"] = pst;
+					u.account.commit();
+				}
+			}
+			u.send({{"type", message_types::announce}, {"text", "Primal Strike damage type set to " + pst + "."}, {"interrupt", true}});
+		}
+		else if (feature == "wild_companion") {
+			// PHB 2024 Druid L2 Wild Companion (para 4420-4422): "As a Magic action, you
+			// can expend a spell slot or a use of Wild Shape to cast the Find Familiar
+			// spell without Material components." Find Familiar isn't a combat-relevant
+			// spell so we just consume the resource and broadcast — the familiar lives
+			// in the narrative, not the combat grid (matches no-pet-grid policy).
+			if (c.class_name != "Druid") { u.send({{"type", message_types::announce}, {"text", "Only Druids can use Wild Companion."}, {"interrupt", true}}); return; }
+			if (c.level < 2) { u.send({{"type", message_types::announce}, {"text", "Wild Companion unlocks at Druid L2."}, {"interrupt", true}}); return; }
+			if (!c.has_action) { u.send({{"type", message_types::announce}, {"text", "No action remaining."}, {"interrupt", true}}); return; }
+			// Player chooses the resource: prefer Wild Shape use if available, else lowest spell slot.
+			bool used_ws = false;
+			int ws_slot = 0;
+			if (c.wild_shape_uses > 0) {
+				c.wild_shape_uses--;
+				used_ws = true;
+			} else {
+				for (int sl = 1; sl <= 9; sl++) {
+					if (c.spell_slots_current[sl] > 0) { c.spell_slots_current[sl]--; ws_slot = sl; break; }
+				}
+				if (ws_slot == 0) { u.send({{"type", message_types::announce}, {"text", "No Wild Shape uses or spell slots available for Wild Companion."}, {"interrupt", true}}); return; }
+			}
+			c.has_action = false;
+			c.used_action = true;
+			string cost = used_ws ? "a use of Wild Shape" : ("a level " + ws_slot + " spell slot");
+			u.room.bm.broadcast_announce(c.name + " expends " + cost + " to summon a fey familiar via Wild Companion.", true);
+		}
+		else if (feature == "wild_resurgence_slot_to_use") {
+			// PHB 2024 Druid L5 Wild Resurgence (para 4427-4428): "Once on each of your
+			// turns, if you have no uses of Wild Shape left, you can give yourself one
+			// use by expending a spell slot (no action required)."
+			if (c.class_name != "Druid") { u.send({{"type", message_types::announce}, {"text", "Only Druids can use Wild Resurgence."}, {"interrupt", true}}); return; }
+			if (c.level < 5) { u.send({{"type", message_types::announce}, {"text", "Wild Resurgence unlocks at Druid L5."}, {"interrupt", true}}); return; }
+			if (c.wild_shape_uses > 0) { u.send({{"type", message_types::announce}, {"text", "You still have Wild Shape uses; this option only works at 0 uses."}, {"interrupt", true}}); return; }
+			if (c.wild_resurgence_slot_to_use_used_this_turn) { u.send({{"type", message_types::announce}, {"text", "Already used Wild Resurgence this turn."}, {"interrupt", true}}); return; }
+			int wr_slot = 0;
+			for (int sl = 1; sl <= 9; sl++) {
+				if (c.spell_slots_current[sl] > 0) { c.spell_slots_current[sl]--; wr_slot = sl; break; }
+			}
+			if (wr_slot == 0) { u.send({{"type", message_types::announce}, {"text", "No spell slots available."}, {"interrupt", true}}); return; }
+			c.wild_shape_uses++;
+			c.wild_resurgence_slot_to_use_used_this_turn = true;
+			u.room.bm.broadcast_announce(c.name + " channels Wild Resurgence — burns a level " + wr_slot + " slot to recover one Wild Shape use.", true);
+		}
+		else if (feature == "wild_resurgence_use_to_slot") {
+			// PHB 2024 Druid L5 Wild Resurgence (para 4429): "you can expend one use of
+			// Wild Shape (no action required) to give yourself a level 1 spell slot, but
+			// you can't do so again until you finish a Long Rest."
+			if (c.class_name != "Druid") { u.send({{"type", message_types::announce}, {"text", "Only Druids can use Wild Resurgence."}, {"interrupt", true}}); return; }
+			if (c.level < 5) { u.send({{"type", message_types::announce}, {"text", "Wild Resurgence unlocks at Druid L5."}, {"interrupt", true}}); return; }
+			if (c.wild_shape_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Wild Shape uses available."}, {"interrupt", true}}); return; }
+			if (c.wild_resurgence_use_to_slot_used_this_rest) { u.send({{"type", message_types::announce}, {"text", "Already used the Wild Shape → spell slot conversion this rest."}, {"interrupt", true}}); return; }
+			if (c.spell_slots_current[1] >= c.spell_slots_max[1]) { u.send({{"type", message_types::announce}, {"text", "Your level 1 spell slots are already full."}, {"interrupt", true}}); return; }
+			c.wild_shape_uses--;
+			c.spell_slots_current[1]++;
+			c.wild_resurgence_use_to_slot_used_this_rest = true;
+			u.room.bm.broadcast_announce(c.name + " channels Wild Resurgence — burns a Wild Shape use to recover a level 1 spell slot.", true);
 		}
 		else if (feature == "arcane_recovery") {
 			// PHB 2024 Wizard L1 Arcane Recovery: "Once per day when you finish a Short

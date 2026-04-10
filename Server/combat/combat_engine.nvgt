@@ -645,6 +645,21 @@ class combatant {
 	bool divine_intervention_ready = false;
 	bool divine_intervention_used_this_rest = false;
 
+	// PHB 2024 Druid L1 Primal Order (para 4387-4390) — "" / "magician" / "warden"
+	string primal_order = "";
+	// PHB 2024 Druid L7 Elemental Fury (para 4430-4433) — "" / "potent_spellcasting" / "primal_strike"
+	string elemental_fury_choice = "";
+	// Primal Strike damage type sub-choice — "cold" / "fire" / "lightning" / "thunder"
+	string primal_strike_damage_type = "";
+	// "Once on each of your turns" tracking for Primal Strike (para 4433)
+	bool primal_strike_used_this_turn = false;
+	// PHB 2024 Druid L5 Wild Resurgence (para 4427-4429): one direction is "no action" once-per-turn
+	// (slot → wild shape use) and the other is "no action" 1/long rest (wild shape → L1 slot).
+	bool wild_resurgence_slot_to_use_used_this_turn = false;
+	bool wild_resurgence_use_to_slot_used_this_rest = false;
+	// PHB 2024 Druid L20 Archdruid Nature Magician (para 4445): convert WS uses to one slot, 1/LR
+	bool nature_magician_used_this_rest = false;
+
 	// Potion buff tracking
 	int potion_damage_bonus = 0;
 	int potion_ac_bonus = 0;
@@ -832,6 +847,42 @@ class combatant {
 		for (int i = 0; i < dice; i++) total += random(1, 8);
 		divine_strike_used_this_turn = true;
 		out_damage_type = (divine_strike_damage_type == "necrotic") ? DMG_NECROTIC : DMG_RADIANT;
+		return total;
+	}
+
+	// PHB 2024 Druid L7 Elemental Fury — Potent Spellcasting (para 4432): "Add your
+	// Wisdom modifier to the damage you deal with any Druid cantrip." Returns WIS mod
+	// when the druid has explicitly chosen this option; 0 otherwise.
+	int druid_potent_spellcasting_bonus() {
+		if (class_name != "Druid") return 0;
+		if (level < 7) return 0;
+		if (elemental_fury_choice != "potent_spellcasting") return 0;
+		int wm = get_ability_mod(ABILITY_WIS);
+		if (wm < 0) return 0;
+		return wm;
+	}
+
+	// PHB 2024 Druid L7 Elemental Fury — Primal Strike (para 4433): "Once on each of
+	// your turns when you hit a creature with an attack roll using a weapon or a Beast
+	// form's attack in Wild Shape, you can cause the target to take an extra 1d8 Cold,
+	// Fire, Lightning, or Thunder damage (choose when you hit)."
+	// L15 Improved Elemental Fury (para 4437): "The extra damage of your Primal Strike
+	// increases to 2d8." Returns rolled damage and chosen damage type via out param.
+	int roll_primal_strike(int&out out_damage_type) {
+		out_damage_type = -1;
+		if (class_name != "Druid") return 0;
+		if (level < 7) return 0;
+		if (elemental_fury_choice != "primal_strike") return 0;
+		if (primal_strike_used_this_turn) return 0;
+		if (primal_strike_damage_type == "") return 0; // Player must pick damage type first
+		int dice = (level >= 15) ? 2 : 1;
+		int total = 0;
+		for (int i = 0; i < dice; i++) total += random(1, 8);
+		primal_strike_used_this_turn = true;
+		if (primal_strike_damage_type == "cold") out_damage_type = DMG_COLD;
+		else if (primal_strike_damage_type == "fire") out_damage_type = DMG_FIRE;
+		else if (primal_strike_damage_type == "lightning") out_damage_type = DMG_LIGHTNING;
+		else if (primal_strike_damage_type == "thunder") out_damage_type = DMG_THUNDER;
 		return total;
 	}
 
