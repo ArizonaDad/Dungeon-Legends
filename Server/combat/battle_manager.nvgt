@@ -7435,6 +7435,12 @@ class battle_manager {
 			// weapon attacks (not spells) when the attacker has mastery for their weapon.
 			if (pr.is_weapon_attack and !pr.is_spell_effect and c.main_hand_mastery != MASTERY_NONE and !target.is_dead) {
 				int mastery = c.main_hand_mastery;
+				// PHB 2024 Fighter L9 Tactical Master (para 5125-5126): override mastery
+				if (c.tactical_master_active) {
+					mastery = c.tactical_master_mastery;
+					c.tactical_master_active = false;
+					c.tactical_master_mastery = MASTERY_NONE;
+				}
 				// Push (para 10343): push target up to 10 ft straight away if Large or smaller
 				if (mastery == MASTERY_PUSH and target.size <= SIZE_LARGE) {
 					int push_dir_x = 0; int push_dir_y = 0;

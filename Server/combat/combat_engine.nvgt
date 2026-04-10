@@ -257,6 +257,9 @@ class combatant {
 	bool lifedrinker = false;              // L9+, Pact of Blade: +1d6 necrotic on pact weapon hit (para 7801-7803)
 	bool lifedrinker_used_this_turn = false;
 	bool devouring_blade = false;          // L12+, Thirsting Blade: 3 attacks instead of 2 (para 7761-7763)
+	// PHB 2024 Fighter L9 Tactical Master (para 5125-5126): replace weapon mastery with Push/Sap/Slow
+	bool tactical_master_active = false;
+	int tactical_master_mastery = 0; // MASTERY_PUSH, MASTERY_SAP, or MASTERY_SLOW
 	// --- Companion / Summon System (TODO §7C) ---
 	// Companions are full combatants tracked in combat.combatants with their own initiative,
 	// HP, AC, attacks, and conditions. They're owned by another combatant via owner_id and
@@ -2040,6 +2043,7 @@ class battle {
 				state["my_second_wind_uses_max"] = c.second_wind_uses_max;
 				state["my_is_hidden"] = c.is_hidden;
 				state["my_weapon_range"] = c.main_hand_range;
+				state["my_main_hand_mastery"] = c.main_hand_mastery;
 				state["my_movement_remaining"] = c.movement_remaining;
 				state["my_speed"] = c.speed;
 				state["my_has_action"] = c.has_action;

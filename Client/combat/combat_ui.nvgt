@@ -316,6 +316,7 @@ int my_second_wind_uses_remaining = 0;
 int my_second_wind_uses_max = 0;
 bool my_is_hidden = false;
 int my_weapon_range = 5;
+int my_main_hand_mastery = 0;
 int my_movement_remaining = 0;
 int my_speed = 30;
 bool my_has_action = false;
@@ -1140,9 +1141,12 @@ void show_bonus_action_menu() {
 	int magical_cunning_opt = -1;
 	int contact_patron_opt = -1;
 	int mystic_arcanum_opt = -1;
+	int tactical_master_opt = -1;
 
 	if (lc == "barbarian" and !my_is_raging and my_rage_uses_remaining > 0) rage_opt = m.add_item("Rage. Bonus action. Uses left: " + my_rage_uses_remaining + ". Damage bonus: " + my_rage_damage_bonus + ".");
 	if (lc == "fighter" and my_second_wind_uses_remaining > 0) second_wind_opt = m.add_item("Second Wind. Bonus action. Heal 1d10 plus fighter level. Uses left: " + my_second_wind_uses_remaining + " of " + my_second_wind_uses_max + ".");
+	// PHB 2024 Fighter L9 Tactical Master (para 5125-5126): replace weapon mastery with Push/Sap/Slow
+	if (lc == "fighter" and level >= 9 and my_main_hand_mastery != 0) tactical_master_opt = m.add_item("Tactical Master. Replace your weapon mastery with Push, Sap, or Slow for next attack.");
 	if (lc == "rogue" and level >= 2) cunning_opt = m.add_item("Cunning Action. Bonus action. Dash, Disengage, or Hide.");
 	// PHB 2024 Rogue L3 Steady Aim (para 6550-6551): "As a Bonus Action, you give yourself
 	// Advantage on your next attack roll on the current turn... You can use this Bonus Action
@@ -1799,6 +1803,17 @@ void show_bonus_action_menu() {
 	}
 	else if (second_wind_opt >= 0 and res == second_wind_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "second_wind"}});
+	}
+	else if (tactical_master_opt >= 0 and res == tactical_master_opt) {
+		menu@ tm = setup_sub_menu("Tactical Master. Replace your weapon mastery for next attack. Choose:");
+		tm.add_item("Push. Push target up to 10 feet away if Large or smaller.");
+		tm.add_item("Sap. Target has disadvantage on its next attack.");
+		tm.add_item("Slow. Reduce target speed by 10 feet until your next turn.");
+		int tp = tm.run();
+		string sub = "push";
+		if (tp == 1) sub = "sap";
+		else if (tp == 2) sub = "slow";
+		if (tp >= 0) send({{"type", message_types::bonus_action}, {"feature", "tactical_master"}, {"sub_choice", sub}});
 	}
 	else if (cunning_opt >= 0 and res == cunning_opt) {
 		menu@ cm = setup_sub_menu("Cunning Action. Choose:");
@@ -3916,6 +3931,7 @@ void parse_game_state(json_object@ msg) {
 	my_second_wind_uses_max = msg.exists("my_second_wind_uses_max") ? int(msg["my_second_wind_uses_max"]) : 0;
 	my_is_hidden = msg.exists("my_is_hidden") ? bool(msg["my_is_hidden"]) : false;
 	my_weapon_range = msg.exists("my_weapon_range") ? int(msg["my_weapon_range"]) : 5;
+	my_main_hand_mastery = msg.exists("my_main_hand_mastery") ? int(msg["my_main_hand_mastery"]) : 0;
 	my_movement_remaining = msg.exists("my_movement_remaining") ? int(msg["my_movement_remaining"]) : 0;
 	my_speed = msg.exists("my_speed") ? int(msg["my_speed"]) : 30;
 	my_has_action = msg.exists("my_has_action") ? bool(msg["my_has_action"]) : false;
@@ -4178,6 +4194,7 @@ void reset_combat_state() {
 	my_second_wind_uses_max = 0;
 	my_is_hidden = false;
 	my_weapon_range = 5;
+	my_main_hand_mastery = 0;
 	my_movement_remaining = 0;
 	my_speed = 30;
 	my_has_action = false;

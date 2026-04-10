@@ -1592,6 +1592,32 @@ void handle_user_message(user@ u, json_object@ msg)
 				}
 			}
 		}
+		else if (feature == "tactical_master") {
+			// PHB 2024 Fighter L9 Tactical Master (para 5125-5126): "When you attack with
+			// a weapon whose mastery property you can use, you can replace that property
+			// with the Push, Sap, or Slow property for that attack."
+			if (c.class_name != "Fighter" or c.level < 9) { u.send({{"type", message_types::announce}, {"text", "Only L9+ Fighters can use Tactical Master."}, {"interrupt", true}}); return; }
+			if (c.main_hand_mastery == MASTERY_NONE) { u.send({{"type", message_types::announce}, {"text", "Your weapon has no mastery property to replace."}, {"interrupt", true}}); return; }
+			// The sub_choice field determines which mastery to swap to: "push", "sap", or "slow"
+			string sub_choice = "";
+			if (msg.exists("sub_choice")) sub_choice = string(msg["sub_choice"]);
+			if (sub_choice == "push") {
+				c.tactical_master_active = true;
+				c.tactical_master_mastery = MASTERY_PUSH;
+				u.room.bm.broadcast_announce(c.name + " activates Tactical Master — next attack uses Push mastery!", false);
+			} else if (sub_choice == "sap") {
+				c.tactical_master_active = true;
+				c.tactical_master_mastery = MASTERY_SAP;
+				u.room.bm.broadcast_announce(c.name + " activates Tactical Master — next attack uses Sap mastery!", false);
+			} else if (sub_choice == "slow") {
+				c.tactical_master_active = true;
+				c.tactical_master_mastery = MASTERY_SLOW;
+				u.room.bm.broadcast_announce(c.name + " activates Tactical Master — next attack uses Slow mastery!", false);
+			} else {
+				u.send({{"type", message_types::announce}, {"text", "Choose a mastery: push, sap, or slow."}, {"interrupt", true}});
+				return;
+			}
+		}
 		else if (feature == "divine_smite") {
 			if (c.class_name != "Paladin") { u.send({{"type", message_types::announce}, {"text", "Only paladins can prepare Divine Smite."}, {"interrupt", true}}); return; }
 			// PHB 2024 Paladin L2 Paladin's Smite (para 5656-5657): "You always have
