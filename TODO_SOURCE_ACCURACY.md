@@ -82,9 +82,9 @@ The rule remains: **NEVER choose for the player when a spell has a choice.** Bot
 
 ### Known rule divergences flagged for the user:
 - **Shield Master (2024)** — Implemented as automatic rider after Attack action hit. Source allows choice of Push 5ft OR Prone — currently always Prone.
-- **Polearm Master** — Bonus action butt-strike implemented, but **Reactive Strike (reaction on enter reach) is NOT implemented**. Needs a new reaction trigger system for opportunity attacks on entering reach (the existing system only handles leaving reach).
+- **Polearm Master** — RESOLVED (commit 2813154). Bonus action butt-strike implemented, and Reactive Strike now wired: entering-reach OA trigger in `check_opportunity_attacks`, gated on `has_feat("polearm_master")` + non-ranged.
 - **Order's Demand** — Drop-held-items rider on failed save is not implemented.
-- **Mage Slayer 2024 Guarded Mind** — 1/rest auto-succeed on failed INT/WIS/CHA save not implemented.
+- **Mage Slayer 2024 Guarded Mind** — RESOLVED (commit 7a47504). 1/SR auto-succeed on failed INT/WIS/CHA save wired into 22 save failure sites via `try_mage_slayer_guarded_mind`. 1/SR reset in `apply_short_rest`.
 
 ---
 
