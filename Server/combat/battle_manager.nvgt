@@ -18,6 +18,7 @@ class pending_roll {
 	string reason = "";
 	int dc = 0;
 	string resolution_tag = "";
+	int ability_id = -1;     // Ability used by this check (for Indomitable Might, Primal Knowledge, etc.)
 	// Attack context (used when roll_type == ROLL_ATTACK or ROLL_DAMAGE)
 	uint target_id = 0;
 	int attack_bonus = 0;
@@ -1159,6 +1160,16 @@ class battle_manager {
 		if (@combat == null or @c == null) return false;
 		int ability_id = skill_to_ability(skill_name);
 		if (ability_id < 0) return false;
+		// PHB 2024 Barbarian L3 Primal Knowledge (para 2325-2327): "while your Rage is
+		// active, you can channel primal power when you attempt certain tasks; whenever
+		// you make an ability check using one of the following skills, you can make it
+		// as a Strength check even if it normally uses a different ability: Acrobatics,
+		// Intimidation, Perception, Stealth, or Survival."
+		if (c.class_name == "Barbarian" and c.level >= 3 and c.raging) {
+			if (skill_name == "Acrobatics" or skill_name == "Intimidation" or skill_name == "Perception" or skill_name == "Stealth" or skill_name == "Survival") {
+				ability_id = ABILITY_STR;
+			}
+		}
 		int mod = c.get_skill_bonus(skill_name, ability_id);
 		bool adv = extra_advantage or c.has_skill_check_advantage(skill_name);
 		bool disadv = extra_disadvantage or c.has_skill_check_disadvantage(skill_name);
@@ -1179,6 +1190,7 @@ class battle_manager {
 		pr.has_advantage = adv;
 		pr.has_disadvantage = disadv;
 		pr.resolution_tag = tag;
+		pr.ability_id = ability_id;
 		@current_roll = pr;
 		if (@u != null and !u.is_bot and c.is_player) {
 			send_roll_request(u, pr);
@@ -2807,14 +2819,24 @@ class battle_manager {
 		pr.dice_sides = 20;
 		pr.modifier = mod;
 		pr.reason = "initiative";
+		// PHB 2024 Barbarian Level 7: Feral Instinct (para 2334-2335):
+		// "Your instincts are so honed that you have Advantage on Initiative rolls."
+		if (c.class_name == "Barbarian" and c.level >= 7) pr.has_advantage = true;
 		@current_roll = pr;
 
 		if (@u != null and !u.is_bot and c.is_player) {
 			// Human player: send roll request.
 			send_roll_request(u, pr);
 		} else {
-			// Bot/monster: auto-roll.
+			// Bot/monster: auto-roll. Apply advantage (e.g. Feral Instinct) by rolling twice.
 			int natural = random(1, 20);
+			if (pr.has_advantage and !pr.has_disadvantage) {
+				int second = random(1, 20);
+				if (second > natural) natural = second;
+			} else if (pr.has_disadvantage and !pr.has_advantage) {
+				int second = random(1, 20);
+				if (second < natural) natural = second;
+			}
 			process_roll_result(natural);
 		}
 	}
@@ -3906,7 +3928,7 @@ class battle_manager {
 			attacker.trip_attack_pending = false;
 			// Target must make STR save or be knocked prone
 			int save_dc = 8 + attacker.proficiency + attacker.get_ability_mod(ABILITY_STR);
-			int save_roll = random(1, 20) + target.get_save_bonus(ABILITY_STR);
+			int save_roll = target.apply_indomitable_might(random(1, 20) + target.get_save_bonus(ABILITY_STR), ABILITY_STR);
 			if (save_roll < save_dc) {
 				target.add_condition(COND_PRONE);
 				broadcast_announce(attacker.name + "'s Trip Attack deals " + trip_dmg + " extra damage and knocks " + target.name + " prone!", false);
@@ -4217,7 +4239,7 @@ class battle_manager {
 		// until the start of your next turn." Auto-applies on the first weapon hit per turn.
 		if (attacker.class_name == "Cleric" and attacker.subclass == "Keeper Domain" and attacker.level >= 8 and is_weapon_attack and attacker.is_first_hit_this_turn) {
 			int hs_dc = 8 + attacker.proficiency + attacker.get_ability_mod(ABILITY_WIS);
-			int hs_save = random(1, 20) + target.get_save_bonus(ABILITY_STR);
+			int hs_save = target.apply_indomitable_might(random(1, 20) + target.get_save_bonus(ABILITY_STR), ABILITY_STR);
 			if (hs_save < hs_dc) {
 				target.add_condition(COND_PRONE);
 				if (attacker.level >= 14) {
@@ -4326,6 +4348,17 @@ class battle_manager {
 				broadcast_announce(c.name + "'s Silver Tongue treats the " + natural_roll + " as a 10.", false);
 				natural_roll = 10;
 				total = natural_roll + pr.modifier + bless_bonus + bardic_bonus;
+			}
+		}
+		// PHB 2024 Barbarian L18 Indomitable Might (para 2354-2355): "If your total for
+		// a Strength check or Strength saving throw is less than your Strength score,
+		// you can use that score in place of the total." Applied to STR ability checks
+		// here; STR saving throws are inline and clamp at their call sites.
+		if (c.class_name == "Barbarian" and c.level >= 18 and pr.roll_type == ROLL_ABILITY_CHECK and pr.ability_id == ABILITY_STR) {
+			int str_score = c.ability_scores[ABILITY_STR];
+			if (total < str_score) {
+				broadcast_announce(c.name + "'s Indomitable Might raises the total from " + total + " to " + str_score + ".", false);
+				total = str_score;
 			}
 		}
 		// Reliable Talent (PHB 2024 Rogue L11): "Whenever you make an ability check that
@@ -4859,7 +4892,7 @@ class battle_manager {
 			if (c.has_feat("shield_master") and c.has_shield and !c.main_hand_is_ranged and !pr.is_spell_effect and !c.shield_bash_used_this_turn and !target.is_dead and feet_distance(c.x, c.y, target.x, target.y) <= 5) {
 				c.shield_bash_used_this_turn = true;
 				int sb_dc = 8 + c.get_ability_mod(ABILITY_STR) + c.proficiency;
-				int sb_save = random(1, 20) + target.get_save_bonus(ABILITY_STR);
+				int sb_save = target.apply_indomitable_might(random(1, 20) + target.get_save_bonus(ABILITY_STR), ABILITY_STR);
 				if (sb_save < sb_dc) {
 					target.add_condition(COND_PRONE);
 					broadcast_announce(c.name + "'s Shield Master knocks " + target.name + " prone! (save " + sb_save + " vs DC " + sb_dc + ")", true);
@@ -5119,7 +5152,7 @@ class battle_manager {
 			}
 		}
 
-		if ((pr.roll_type == ROLL_ATTACK or pr.roll_type == ROLL_ABILITY_CHECK) and (has_effective_advantage(pr) or has_effective_disadvantage(pr))) {
+		if ((pr.roll_type == ROLL_ATTACK or pr.roll_type == ROLL_ABILITY_CHECK or pr.roll_type == ROLL_INITIATIVE) and (has_effective_advantage(pr) or has_effective_disadvantage(pr))) {
 			int die_roll = random(1, pr.dice_sides);
 			string roller_name = @roller != null ? roller.name : pr.player_username;
 			string mode = has_effective_advantage(pr) ? "advantage" : "disadvantage";
@@ -6186,9 +6219,10 @@ class battle_manager {
 		int dex_save = target.get_save_bonus(ABILITY_DEX);
 		int best_save = str_save > dex_save ? str_save : dex_save;
 		string save_type = str_save > dex_save ? "STR" : "DEX";
+		int save_ability_id = str_save > dex_save ? ABILITY_STR : ABILITY_DEX;
 
 		int save_roll = random(1, 20);
-		int save_total = save_roll + best_save;
+		int save_total = target.apply_indomitable_might(save_roll + best_save, save_ability_id);
 		bool saved = save_total >= shove_dc;
 
 		broadcast_roll(target.name, save_type + " save vs Shove (DC " + shove_dc + ")", save_roll, best_save, save_total, saved ? "Resisted!" : "Shoved!");
@@ -6244,9 +6278,10 @@ class battle_manager {
 		int dex_save = target.get_save_bonus(ABILITY_DEX);
 		int best_save = str_save > dex_save ? str_save : dex_save;
 		string save_type = str_save > dex_save ? "STR" : "DEX";
+		int save_ability_id = str_save > dex_save ? ABILITY_STR : ABILITY_DEX;
 
 		int save_roll = random(1, 20);
-		int save_total = save_roll + best_save;
+		int save_total = target.apply_indomitable_might(save_roll + best_save, save_ability_id);
 		bool saved = save_total >= grapple_dc;
 
 		broadcast_roll(target.name, save_type + " save vs Grapple (DC " + grapple_dc + ")", save_roll, best_save, save_total, saved ? "Escaped!" : "Grappled!");

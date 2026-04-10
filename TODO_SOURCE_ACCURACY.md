@@ -152,8 +152,33 @@ Phase 1 notes that the PHB file is missing spell descriptions. Basic Rules file 
 
 ## 6. Class Feature TODOs (non-subclass)
 
-Every base class has features that need the same level of rigor as subclasses:
-- **Barbarian:** Reckless Attack, Danger Sense, Brutal Strike (2024), Relentless Rage
+### Barbarian — RESOLVED 2026-04-09 (most features)
+Audited against Basic Rules 2024 paras 2301-2359 (full Barbarian class entry).
+
+| Feature | Level | Source para | Status |
+|---|---|---|---|
+| Rage (BPS resist, +damage, STR adv, no concentration, 10-rd duration) | 1 | 2301-2313 | ✓ Done |
+| Unarmored Defense (10 + DEX + CON) | 1 | 2314-2315 | ✓ Done |
+| Weapon Mastery | 1 | 2316-2318 | ✓ Done (system-wide) |
+| Danger Sense (advantage on DEX saves) | 2 | 2319-2320 | ✓ Done |
+| Reckless Attack | 2 | 2321-2322 | ✓ Done |
+| Primal Knowledge (extra skill + STR substitution while raging on 5 skills) | 3 | 2325-2327 | ✓ Done 2026-04-09 — `request_skill_check` swaps the ability to STR for Acrobatics/Intimidation/Perception/Stealth/Survival when class is Barbarian L3+ and raging |
+| Extra Attack | 5 | 2330-2331 | ✓ Done |
+| **Fast Movement** (+10 ft speed when not in heavy armor) | 5 | 2332-2333 | ✓ Done 2026-04-09 — `apply_class_defaults` Barbarian block adds `cs.speed += 10` at L5+ |
+| **Feral Instinct** (advantage on Initiative rolls) | 7 | 2334-2335 | ✓ Done 2026-04-09 — `request_next_initiative` sets `pr.has_advantage = true`; `handle_roll_result` and the bot/auto-roll path both honor advantage on `ROLL_INITIATIVE` |
+| **Instinctive Pounce** (move half speed as part of rage entry) | 7 | 2336-2337 | ✓ Done 2026-04-09 — rage handler in `users _dom.nvgt` adds `c.movement_remaining += c.speed / 2` at L7+ |
+| **Brutal Strike** (forgo advantage for +1d10 + Forceful/Hamstring effect) | 9 | 2338-2341 | ✗ DEFERRED — needs a player-choice prompt similar to `pending_smite_prompt` (declared via bonus action, drops Reckless Attack advantage, prompts for effect on hit). Not yet wired. |
+| Relentless Rage (DC 10 CON save when dropped to 0 HP, +5 each use) | 11 | 2342-2344 | ✓ Done |
+| **Improved Brutal Strike** (Staggering/Sundering effects) | 13 | 2345-2348 | ✗ DEFERRED — depends on Brutal Strike infrastructure |
+| **Persistent Rage** (rage lasts 10 minutes / 100 rounds without needing to extend) | 15 | 2349-2351 | ✓ Done 2026-04-09 — rage handler sets `rage_turns_remaining = 100` and `persistent_rage_active = true` at L15+ |
+| **Improved Brutal Strike** (2d10 + 2 effects) | 17 | 2352-2353 | ✗ DEFERRED — depends on Brutal Strike infrastructure |
+| **Indomitable Might** (STR check/save total ≥ STR score) | 18 | 2354-2355 | ✓ Done 2026-04-09 — new `combatant.apply_indomitable_might(total, ability_id)` helper. Wired into `finalize_roll_result` for STR ability checks via the new `pr.ability_id` field, plus inline at the trip attack / hobbling strike / shield master / shove / grapple sites. Not yet wired into all spell-handler STR saves (Storm Sphere, etc.) — those are rare and queued for a later pass. |
+| **Primal Champion** (+4 STR/CON, max 25) | 20 | 2358-2359 | ✓ Done 2026-04-09 — `apply_class_defaults` adds the bonus with the cap |
+
+**Brutal Strike infrastructure plan (deferred):** Add `brutal_strike_pending` flag on combatant + a `brutal_strike` bonus action menu entry. When set, the next Strength-based weapon attack drops Reckless Attack advantage (must not have disadvantage). On hit, deal +1d10 (or +2d10 at L17) of the weapon's damage type and queue a `pending_brutal_strike_choice` prompt with the available effects (Forceful/Hamstring at L9, +Staggering/Sundering at L13). Player picks via numeric key. At L17, repeat the prompt for a second different effect.
+
+Other base class features that still need the same audit:
+- **Barbarian (Brutal Strike line above is the only remaining gap)**
 - **Bard:** Jack of All Trades, Expertise, Magical Inspiration, Countercharm, Superior Inspiration
 - **Cleric:** Channel Divinity (generic Turn Undead + Divine Intervention), Destroy Undead
 - **Druid:** Wild Companion, Elemental Fury, Archdruid

@@ -125,6 +125,16 @@ void apply_class_defaults(character_sheet@ cs) {
         if (cs.level >= 16) cs.rage_damage = 4;
         if (cs.level >= 17) cs.rage_count = 6;
         if (cs.level >= 5) cs.extra_attacks = 1;
+        // PHB 2024 Barbarian Level 5: Fast Movement (para 2332-2333):
+        // "Your speed increases by 10 feet while you aren't wearing Heavy armor."
+        // Barbarian armor_type defaults to "none" so the condition is satisfied here.
+        if (cs.level >= 5) cs.speed += 10;
+        // PHB 2024 Barbarian Level 20: Primal Champion (para 2358-2359):
+        // "Your Strength and Constitution scores increase by 4, to a maximum of 25."
+        if (cs.level >= 20) {
+            cs.strength += 4; if (cs.strength > 25) cs.strength = 25;
+            cs.constitution += 4; if (cs.constitution > 25) cs.constitution = 25;
+        }
     } else if (c == "Bard") {
         cs.hit_die = 8; cs.save_profs = {0,1,0,0,0,1}; // DEX, CHA
         cs.is_caster = true; cs.spellcasting_ability = ABILITY_CHA;

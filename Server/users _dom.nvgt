@@ -1472,7 +1472,16 @@ void handle_user_message(user@ u, json_object@ msg)
 			c.used_bonus_action = true;
 			c.rage_uses_remaining--;
 			c.raging = true;
-			c.rage_turns_remaining = 10;
+			// PHB 2024 Barbarian L15 Persistent Rage (para 2349-2351): "your Rage is so
+			// fierce that it now lasts for 10 minutes without you needing to do anything
+			// to extend it from round to round." 10 minutes ≈ 100 combat rounds.
+			if (c.level >= 15) {
+				c.rage_turns_remaining = 100;
+				c.persistent_rage_active = true;
+			} else {
+				c.rage_turns_remaining = 10;
+				c.persistent_rage_active = false;
+			}
 			// Storm Herald: Activate Storm Aura
 			if (c.subclass == "Storm Herald") {
 				c.storm_aura_active = true;
@@ -1510,6 +1519,14 @@ void handle_user_message(user@ u, json_object@ msg)
 				if (cold_temp < 1) cold_temp = 1;
 				if (c.temp_hp < cold_temp) c.temp_hp = cold_temp;
 				u.room.bm.broadcast_announce(c.name + "'s Cold Fortress grants " + cold_temp + " temp HP!", false);
+			}
+			// PHB 2024 Barbarian Level 7: Instinctive Pounce (para 2336-2337):
+			// "As part of the Bonus Action you take to enter your Rage, you can move up
+			// to half your Speed."
+			if (c.level >= 7) {
+				int pounce_feet = c.speed / 2;
+				c.movement_remaining += pounce_feet;
+				u.room.bm.broadcast_announce(c.name + "'s Instinctive Pounce grants " + pounce_feet + " feet of free movement.", false);
 			}
 			u.room.bm.broadcast_announce(c.name + " enters a Rage! Bonus damage and resistance to bludgeoning, piercing, and slashing. " + c.rage_uses_remaining + " use" + (c.rage_uses_remaining == 1 ? "" : "s") + " remain.", true);
 		}

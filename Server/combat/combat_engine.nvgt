@@ -758,6 +758,18 @@ class combatant {
 		return false;
 	}
 
+	// PHB 2024 Barbarian L18 Indomitable Might (para 2354-2355): "If your total for a
+	// Strength check or Strength saving throw is less than your Strength score, you can
+	// use that score in place of the total." Returns the maximum of the supplied total
+	// and the Strength score when the combatant qualifies; otherwise returns total.
+	int apply_indomitable_might(int total, int ability_id) {
+		if (class_name == "Barbarian" and level >= 18 and ability_id == ABILITY_STR) {
+			int str_score = ability_scores[ABILITY_STR];
+			if (total < str_score) return str_score;
+		}
+		return total;
+	}
+
 	int get_skill_bonus(string skill_name, int ability_id) {
 		// PHB 2024: ability mod + proficiency bonus (if proficient) + 2x prof if expertise +
 		// half prof if Jack of All Trades and not otherwise proficient.
