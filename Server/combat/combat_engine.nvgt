@@ -630,6 +630,7 @@ class combatant {
 	bool spirit_guardians_active = false;
 	int spirit_guardians_slot_level = 0;
 	bool spirit_guardians_necrotic = false; // true if caster is evil-aligned
+	bool spirit_guardians_damaged_this_turn = false; // prevent double SG damage per turn
 	bool fog_cloud_active = false;
 	bool darkness_active = false;
 	// Fire Shield variant

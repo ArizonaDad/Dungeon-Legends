@@ -4506,17 +4506,17 @@ class battle_manager {
 			if (healed > 0) broadcast_announce(c.name + " heals " + healed + " HP from Blessed Grounds.", false);
 		}
 
-		// Spirit Guardians: WIS save; enemies who start their turn already inside the 15ft aura take damage.
-		// Note: 2024 RAW is "end of turn" but we handle this at turn start for simplicity;
-		// the entering-aura-on-movement trigger is handled in move handlers.
-		// Halved movement applies only while the creature is within the emanation (applied once per turn).
+		// Spirit Guardians: WIS save; enemies who start their turn inside the 15ft aura take damage.
+		// Basic Rules 2024 Spirit Guardians (para 15123-15126): "the first time on a turn
+		// [the creature] enters the Emanation or starts its turn in it." Movement entry
+		// is handled in handle_move. Halved speed while inside the aura.
 		for (uint sgi = 0; sgi < combat.combatants.length(); sgi++) {
 			combatant@ sg_caster = combat.combatants[sgi];
 			if (@sg_caster == null or sg_caster.is_dead or !sg_caster.spirit_guardians_active) continue;
 			if (sg_caster.id == c.id) continue;
 			if (sg_caster.is_player == c.is_player) continue;
 			int sg_dist = feet_distance(sg_caster.x, sg_caster.y, c.x, c.y);
-			if (sg_dist <= 15) {
+			if (sg_dist <= 15 and !c.spirit_guardians_damaged_this_turn) {
 				int sg_dice = 3 + (sg_caster.spirit_guardians_slot_level - 3);
 				if (sg_dice < 3) sg_dice = 3;
 				int sg_save_roll = random(1, 20);
@@ -4533,6 +4533,7 @@ class battle_manager {
 				string sg_type_name = sg_caster.spirit_guardians_necrotic ? "necrotic" : "radiant";
 				combat.apply_damage(c, sg_dmg, sg_damage_type, sg_caster);
 				broadcast_announce(c.name + " takes " + sg_dmg + " " + sg_type_name + " damage from " + sg_caster.name + "'s Spirit Guardians!", true);
+				c.spirit_guardians_damaged_this_turn = true;
 				// Half movement speed within aura
 				c.speed = c.speed / 2 > 5 ? c.speed / 2 : 5;
 				break;
@@ -4601,6 +4602,8 @@ class battle_manager {
 		// PHB 2024 Bonus Action Spell rule (para 7986-7989): per-turn tracking.
 		c.cast_ba_spell_this_turn = false;
 		c.cast_leveled_spell_this_turn = false;
+		// Spirit Guardians: once per turn damage tracking
+		c.spirit_guardians_damaged_this_turn = false;
 		// Counterspell readied action expires at start of your next turn
 		c.counterspell_pending = false;
 		// PHB 2024 Boon of Dimensional Travel Blink Steps (para 7876)
@@ -5621,6 +5624,36 @@ class battle_manager {
 			if (@current_roll != null or monster.is_dead or monster.current_hp == 0) {
 				broadcast_state();
 				return;
+			}
+
+			// Spirit Guardians entry damage on monster movement
+			if (!monster.spirit_guardians_damaged_this_turn and !monster.is_dead) {
+				for (uint sgi = 0; sgi < combat.combatants.length(); sgi++) {
+					combatant@ sg_caster = combat.combatants[sgi];
+					if (@sg_caster == null or sg_caster.is_dead or !sg_caster.spirit_guardians_active) continue;
+					if (sg_caster.id == monster.id or sg_caster.is_player == monster.is_player) continue;
+					int sg_old_dist = feet_distance(old_x, old_y, sg_caster.x, sg_caster.y);
+					int sg_new_dist = feet_distance(monster.x, monster.y, sg_caster.x, sg_caster.y);
+					if (sg_old_dist > 15 and sg_new_dist <= 15) {
+						int sg_dice = 3 + (sg_caster.spirit_guardians_slot_level - 3);
+						if (sg_dice < 3) sg_dice = 3;
+						int sg_sr = random(1, 20);
+						int sg_sb = monster.get_save_bonus(ABILITY_WIS);
+						int sg_dc = spell_save_dc(sg_caster, "spirit_guardians");
+						bool sg_ok = (sg_sr + sg_sb) >= sg_dc;
+						broadcast_roll(monster.name, "WIS save vs Spirit Guardians", sg_sr, sg_sb, sg_sr + sg_sb, sg_ok ? "Saved!" : "Failed!");
+						int sg_d = 0;
+						for (int sd = 0; sd < sg_dice; sd++) sg_d += random(1, 8);
+						if (sg_ok) sg_d /= 2;
+						if (sg_d < 1) sg_d = 1;
+						int sg_dt = sg_caster.spirit_guardians_necrotic ? DMG_NECROTIC : DMG_RADIANT;
+						combat.apply_damage(monster, sg_d, sg_dt, sg_caster);
+						broadcast_announce(monster.name + " enters Spirit Guardians and takes " + sg_d + " damage!", true);
+						monster.spirit_guardians_damaged_this_turn = true;
+						if (monster.is_dead) { broadcast_state(); check_battle_end(); return; }
+						break;
+					}
+				}
 			}
 
 			nearest_dist = feet_distance(monster.x, monster.y, nearest.x, nearest.y);
@@ -9659,6 +9692,45 @@ class battle_manager {
 		if (@current_roll != null) {
 			broadcast_state();
 			return;
+		}
+
+		// Basic Rules 2024 Spirit Guardians (para 15123-15126): "the first time on
+		// a turn [the creature] enters the Emanation." Trigger when moving INTO the
+		// 15ft aura of a hostile Spirit Guardians caster.
+		if (!c.spirit_guardians_damaged_this_turn and !c.is_dead) {
+			for (uint sgi = 0; sgi < combat.combatants.length(); sgi++) {
+				combatant@ sg_caster = combat.combatants[sgi];
+				if (@sg_caster == null or sg_caster.is_dead or !sg_caster.spirit_guardians_active) continue;
+				if (sg_caster.id == c.id) continue;
+				if (sg_caster.is_player == c.is_player) continue;
+				int old_dist = feet_distance(old_x, old_y, sg_caster.x, sg_caster.y);
+				int new_dist = feet_distance(new_x, new_y, sg_caster.x, sg_caster.y);
+				if (old_dist > 15 and new_dist <= 15) {
+					int sg_dice = 3 + (sg_caster.spirit_guardians_slot_level - 3);
+					if (sg_dice < 3) sg_dice = 3;
+					int sg_save_roll = random(1, 20);
+					int sg_save_bonus = c.get_save_bonus(ABILITY_WIS);
+					int sg_dc = spell_save_dc(sg_caster, "spirit_guardians");
+					bool sg_saved = (sg_save_roll + sg_save_bonus) >= sg_dc;
+					broadcast_roll(c.name, "WIS save vs Spirit Guardians", sg_save_roll, sg_save_bonus, sg_save_roll + sg_save_bonus, sg_saved ? "Saved! Half damage." : "Failed!");
+					int sg_dmg = 0;
+					for (int sd = 0; sd < sg_dice; sd++) sg_dmg += random(1, 8);
+					if (sg_saved) sg_dmg /= 2;
+					if (sg_dmg < 1) sg_dmg = 1;
+					int sg_damage_type = sg_caster.spirit_guardians_necrotic ? DMG_NECROTIC : DMG_RADIANT;
+					string sg_type_name = sg_caster.spirit_guardians_necrotic ? "necrotic" : "radiant";
+					combat.apply_damage(c, sg_dmg, sg_damage_type, sg_caster);
+					broadcast_announce(c.name + " enters " + sg_caster.name + "'s Spirit Guardians and takes " + sg_dmg + " " + sg_type_name + " damage!", true);
+					c.spirit_guardians_damaged_this_turn = true;
+					check_concentration(c, sg_dmg, sg_caster);
+					if (c.is_dead) {
+						broadcast_state();
+						check_battle_end();
+						return;
+					}
+					break;
+				}
+			}
 		}
 
 		broadcast_state();
