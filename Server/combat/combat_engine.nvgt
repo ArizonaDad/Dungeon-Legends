@@ -526,6 +526,7 @@ class combatant {
 	bool sculpt_spells_active = false; // Evoker Wizard
 	bool improved_illusions = false; // Illusionist Wizard
 	bool arcane_deflection_available = false; // War Magic Wizard L2
+	int arcane_deflection_no_spell_turns = 0; // Turns remaining where non-cantrip casts are blocked
 	// Xanathar's War Magic (paras 2915-2944)
 	bool tactical_wit_active = false; // L2: +INT mod to initiative
 	int power_surge_charges = 0; // L6: stored surges for bonus damage
@@ -916,7 +917,17 @@ class combatant {
 	int main_hand_range = 5;           // melee = 5, ranged = varies
 	bool main_hand_finesse = false;
 	bool main_hand_is_ranged = false;
+	bool main_hand_is_light = false;
 	int main_hand_mastery = MASTERY_NONE; // PHB 2024 Weapon Mastery property
+	// PHB 2024 Two-Weapon Fighting: off-hand weapon fields
+	int off_hand_damage_dice = 0;
+	int off_hand_damage_count = 0;
+	int off_hand_damage_type = DMG_BLUDGEONING;
+	int off_hand_range = 5;
+	bool off_hand_finesse = false;
+	bool off_hand_is_light = false;
+	int off_hand_mastery = MASTERY_NONE;
+	bool twf_attack_used_this_turn = false;
 	bool extended_spell_concentration = false; // PHB 2024 Sorcerer Extended Spell: advantage on conc saves
 	int monster_attack_bonus = 0;
 	int monster_attack_damage_mod = 0;
@@ -1557,6 +1568,8 @@ class battle {
 		c.unerring_accuracy_used_this_turn = false;
 		c.slayer_prey_used_this_turn = false;
 		c.storm_aura_used_this_turn = false;
+		c.twf_attack_used_this_turn = false;
+		if (c.arcane_deflection_no_spell_turns > 0) c.arcane_deflection_no_spell_turns--;
 
 		// Reaction resets at start of YOUR turn
 		c.has_reaction = true;
@@ -1830,12 +1843,8 @@ class battle {
 			target.polymorph_caster_id = 0;
 		}
 
-		// Concentration check
-		if (target.is_concentrating and target.current_hp > 0) {
-			int dc = amount / 2;
-			if (dc < 10) dc = 10;
-			// Need to request a Constitution save from the player
-		}
+		// Note: concentration saves are handled by battle_manager.check_concentration()
+		// which is called by each damage source site individually (spell handlers, OA, etc.)
 
 		// Check for dropping to 0
 		if (target.current_hp <= 0) {
@@ -2158,6 +2167,9 @@ class battle {
 				state["my_is_hidden"] = c.is_hidden;
 				state["my_weapon_range"] = c.main_hand_range;
 				state["my_main_hand_mastery"] = c.main_hand_mastery;
+				state["my_main_hand_is_light"] = c.main_hand_is_light;
+				state["my_off_hand"] = c.off_hand;
+				state["my_off_hand_is_light"] = c.off_hand_is_light;
 				state["my_movement_remaining"] = c.movement_remaining;
 				state["my_speed"] = c.speed;
 				state["my_has_action"] = c.has_action;

@@ -5763,6 +5763,42 @@ void handle_user_message(user@ u, json_object@ msg)
 			c.experimental_elixir_available = true;
 		}
 
+		// PHB 2024 Two-Weapon Fighting: off-hand attack as Bonus Action
+		else if (feature == "twf_offhand") {
+			if (!c.has_bonus_action) {
+				u.send({{"type", message_types::error}, {"text", "No bonus action available."}});
+				return;
+			}
+			if (c.off_hand == "") {
+				u.send({{"type", message_types::error}, {"text", "You don't have an off-hand weapon."}});
+				return;
+			}
+			if (c.twf_attack_used_this_turn) {
+				u.send({{"type", message_types::error}, {"text", "You already made an off-hand attack this turn."}});
+				return;
+			}
+			// Find target: use target_id from message or nearest hostile
+			combatant@ twf_target = target_id != 0 ? u.room.bm.combat.get_combatant(target_id) : null;
+			if (@twf_target == null or twf_target.is_dead) {
+				int best_td = 9999;
+				for (uint ti = 0; ti < u.room.bm.combat.combatants.length(); ti++) {
+					combatant@ tc = u.room.bm.combat.combatants[ti];
+					if (@tc == null or tc.is_dead or tc.id == c.id) continue;
+					if (!u.room.bm.combat.are_hostile(c, tc)) continue;
+					int td = feet_distance(c.x, c.y, tc.x, tc.y);
+					if (td <= c.off_hand_range and td < best_td) { best_td = td; @twf_target = tc; }
+				}
+			}
+			if (@twf_target == null or twf_target.is_dead) {
+				u.send({{"type", message_types::error}, {"text", "No valid target in off-hand weapon range."}});
+				return;
+			}
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			u.room.bm.broadcast_announce(c.name + " makes an off-hand attack!", false);
+			u.room.bm.start_twf_offhand_strike(c, twf_target);
+		}
+
 		else {
 			u.send({{"type", message_types::announce}, {"text", "That bonus action is not available to your character."}, {"interrupt", true}});
 			return;

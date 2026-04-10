@@ -3298,6 +3298,39 @@ class battle_manager {
 		return random(1, 4);
 	}
 
+	// Xanathar's War Magic L2 Arcane Deflection save variant (para 2932-2934): "When
+	// you fail a saving throw, you can use your reaction to gain a +4 bonus to that
+	// saving throw." Restriction: can't cast non-cantrip spells until end of next turn.
+	// Auto-fires for the target themselves if they are a War Magic Wizard with reaction.
+	// Returns true if the +4 turned the failure into a success.
+	bool try_arcane_deflection_save(combatant@ target, int save_dc, int save_total) {
+		if (@target == null) return false;
+		if (target.class_name != "Wizard" or target.subclass != "War Magic") return false;
+		if (!target.arcane_deflection_available or !target.has_reaction) return false;
+		int new_total = save_total + 4;
+		if (new_total < save_dc) return false; // Smart-spend: only use if it actually helps
+		target.has_reaction = false;
+		target.arcane_deflection_no_spell_turns = 2; // Blocks non-cantrip until end of next turn
+		broadcast_announce(target.name + " uses Arcane Deflection! +4 to saving throw (total " + new_total + " vs DC " + save_dc + ") — saved!", true);
+		// L14 Deflecting Shroud: deal damage to up to 3 enemies within 60 ft
+		if (target.deflecting_shroud_active and target.level >= 14) {
+			int shroud_dmg = target.level / 2;
+			if (shroud_dmg < 1) shroud_dmg = 1;
+			int hits = 0;
+			for (uint dsi = 0; dsi < combat.combatants.length(); dsi++) {
+				if (hits >= 3) break;
+				combatant@ ds = combat.combatants[dsi];
+				if (@ds == null or ds.is_dead or ds.id == target.id) continue;
+				if (ds.is_player == target.is_player) continue;
+				if (feet_distance(target.x, target.y, ds.x, ds.y) > 60) continue;
+				combat.apply_damage(ds, shroud_dmg, DMG_FORCE, target);
+				broadcast_announce(target.name + "'s Deflecting Shroud deals " + shroud_dmg + " force damage to " + ds.name + "!", false);
+				hits++;
+			}
+		}
+		return true;
+	}
+
 	// PHB 2024 Bard L7 Countercharm (paras 2756-2757): "If you or a creature within
 	// 30 feet of you fails a saving throw against an effect that applies the Charmed
 	// or Frightened condition, you can take a Reaction to cause the save to be
@@ -4335,6 +4368,7 @@ class battle_manager {
 						int save_total = save_roll + save_bonus;
 						bool saved = save_total >= save_dc_val;
 						broadcast_roll(prev.name, "WIS save vs Hold Person (end of turn)", save_roll, save_bonus, save_total, saved ? "Freed!" : "Still paralyzed!");
+						if (!saved and try_arcane_deflection_save(prev, save_dc_val, save_total)) saved = true;
 						if (!saved) { int ff_total = try_fanatical_focus(prev, save_dc_val, save_total, save_bonus, "WIS save vs Hold Person"); if (ff_total >= save_dc_val) saved = true; }
 						if (!saved) { int ds = try_disciplined_survivor_reroll(prev, save_dc_val, save_total, save_bonus, "WIS save vs Hold Person"); if (ds >= save_dc_val) saved = true; }
 						if (!saved) { int new_total = try_flash_of_genius(prev, save_dc_val, save_total, "WIS save vs Hold Person"); if (new_total >= save_dc_val) saved = true; }
@@ -4364,6 +4398,7 @@ class battle_manager {
 						int save_total = save_roll + save_bonus;
 						bool saved = save_total >= save_dc_val;
 						broadcast_roll(prev.name, "DEX save vs Web (end of turn)", save_roll, save_bonus, save_total, saved ? "Freed!" : "Still restrained!");
+						if (!saved and try_arcane_deflection_save(prev, save_dc_val, save_total)) saved = true;
 						if (!saved) { int ff_total = try_fanatical_focus(prev, save_dc_val, save_total, save_bonus, "DEX save vs Web"); if (ff_total >= save_dc_val) saved = true; }
 						if (!saved) { int ds = try_disciplined_survivor_reroll(prev, save_dc_val, save_total, save_bonus, "DEX save vs Web"); if (ds >= save_dc_val) saved = true; }
 						if (!saved) { int new_total = try_flash_of_genius(prev, save_dc_val, save_total, "DEX save vs Web"); if (new_total >= save_dc_val) saved = true; }
@@ -4390,6 +4425,7 @@ class battle_manager {
 						int save_total = save_roll + save_bonus;
 						bool saved = save_total >= save_dc_val;
 						broadcast_roll(prev.name, "CON save vs Blindness/Deafness (end of turn)", save_roll, save_bonus, save_total, saved ? "Recovered!" : "Still blinded!");
+						if (!saved and try_arcane_deflection_save(prev, save_dc_val, save_total)) saved = true;
 						if (!saved) { int ff_total = try_fanatical_focus(prev, save_dc_val, save_total, save_bonus, "CON save vs Blindness/Deafness"); if (ff_total >= save_dc_val) saved = true; }
 						if (!saved) { int ds = try_disciplined_survivor_reroll(prev, save_dc_val, save_total, save_bonus, "CON save vs Blindness/Deafness"); if (ds >= save_dc_val) saved = true; }
 						if (!saved) { int new_total = try_flash_of_genius(prev, save_dc_val, save_total, "CON save vs Blindness/Deafness"); if (new_total >= save_dc_val) saved = true; }
@@ -4418,6 +4454,7 @@ class battle_manager {
 						int save_total = save_roll + save_bonus;
 						bool saved = save_total >= save_dc_val;
 						broadcast_roll(prev.name, "WIS save vs Fear (end of turn)", save_roll, save_bonus, save_total, saved ? "Courage returns!" : "Still frightened!");
+						if (!saved and try_arcane_deflection_save(prev, save_dc_val, save_total)) saved = true;
 						if (!saved) { int ff_total = try_fanatical_focus(prev, save_dc_val, save_total, save_bonus, "WIS save vs Fear"); if (ff_total >= save_dc_val) saved = true; }
 						if (!saved) { int ds = try_disciplined_survivor_reroll(prev, save_dc_val, save_total, save_bonus, "WIS save vs Fear"); if (ds >= save_dc_val) saved = true; }
 						if (!saved) { int new_total = try_flash_of_genius(prev, save_dc_val, save_total, "WIS save vs Fear"); if (new_total >= save_dc_val) saved = true; }
@@ -4447,6 +4484,7 @@ class battle_manager {
 						int save_total = save_roll + save_bonus;
 						bool saved = save_total >= save_dc_val;
 						broadcast_roll(prev.name, "WIS save vs Tasha's Hideous Laughter (end of turn)", save_roll, save_bonus, save_total, saved ? "Laughter fades!" : "Still laughing!");
+						if (!saved and try_arcane_deflection_save(prev, save_dc_val, save_total)) saved = true;
 						if (!saved) { int ff_total = try_fanatical_focus(prev, save_dc_val, save_total, save_bonus, "WIS save vs Tasha's Hideous Laughter"); if (ff_total >= save_dc_val) saved = true; }
 						if (!saved) { int ds = try_disciplined_survivor_reroll(prev, save_dc_val, save_total, save_bonus, "WIS save vs Tasha's Hideous Laughter"); if (ds >= save_dc_val) saved = true; }
 						if (!saved) { int new_total = try_flash_of_genius(prev, save_dc_val, save_total, "WIS save vs Tasha's Hideous Laughter"); if (new_total >= save_dc_val) saved = true; }
@@ -5840,6 +5878,70 @@ class battle_manager {
 		pr.is_weapon_attack = true;
 		pr.attacks_remaining = remaining_after_current;
 		pr.resolution_tag = "flurry";
+		@current_roll = pr;
+
+		user@ u = find_user_for_combatant(attacker);
+		if (@u != null and !u.is_bot and attacker.is_player) {
+			send_roll_request(u, pr);
+		} else {
+			int roll1 = random(1, 20);
+			int roll2 = random(1, 20);
+			int natural = roll1;
+			if (adv and !disadv) natural = roll1 > roll2 ? roll1 : roll2;
+			else if (disadv and !adv) natural = roll1 < roll2 ? roll1 : roll2;
+			process_roll_result(natural);
+		}
+		return true;
+	}
+
+	// PHB 2024 Two-Weapon Fighting: off-hand attack with a Light melee weapon.
+	// No ability mod to damage unless Two-Weapon Fighting style or negative mod.
+	bool start_twf_offhand_strike(combatant@ attacker, combatant@ target) {
+		if (@combat == null or @attacker == null or @target == null) return false;
+		if (target.is_dead or !target.is_alive()) return false;
+		if (attacker.off_hand == "" or attacker.off_hand_damage_count == 0) return false;
+		int dist = feet_distance(attacker.x, attacker.y, target.x, target.y);
+		if (dist > attacker.off_hand_range) return false;
+		if (!combat.can_see(attacker, target)) return false;
+
+		bool adv = false;
+		bool disadv = false;
+		apply_attack_advantage_state(attacker, target, dist, false, adv, disadv);
+		reveal_hidden_combatant(attacker, "making an off-hand attack");
+
+		// Determine ability modifier (finesse: higher of STR/DEX)
+		int str_mod = attacker.get_ability_mod(ABILITY_STR);
+		int dex_mod = attacker.get_ability_mod(ABILITY_DEX);
+		int ability_mod = str_mod;
+		if (attacker.off_hand_finesse and dex_mod > str_mod) ability_mod = dex_mod;
+
+		pending_roll pr;
+		pr.combatant_id = attacker.id;
+		pr.player_username = attacker.is_player ? attacker.player_username : attacker.name;
+		pr.roll_type = ROLL_ATTACK;
+		pr.dice_sides = 20;
+		pr.modifier = ability_mod + attacker.proficiency - attacker.exhaustion_level * 2;
+		pr.reason = "Off-hand attack (" + attacker.off_hand + ") against " + target.name;
+		pr.target_id = target.id;
+		pr.has_advantage = adv;
+		pr.has_disadvantage = disadv;
+		pr.attack_name = attacker.off_hand + " (off-hand)";
+		pr.damage_dice_count = attacker.off_hand_damage_count;
+		pr.damage_dice_sides = attacker.off_hand_damage_dice;
+		// PHB 2024: "you don't add your Ability Modifier to the extra attack's damage
+		// unless that modifier is negative." Two-Weapon Fighting style overrides this.
+		bool has_twf_style = attacker.has_feat("two_weapon_fighting");
+		if (has_twf_style) {
+			pr.damage_modifier = ability_mod;
+		} else if (ability_mod < 0) {
+			pr.damage_modifier = ability_mod;
+		} else {
+			pr.damage_modifier = 0;
+		}
+		pr.damage_type = attacker.off_hand_damage_type;
+		pr.is_weapon_attack = true;
+		pr.resolution_tag = "twf_offhand";
+		attacker.twf_attack_used_this_turn = true;
 		@current_roll = pr;
 
 		user@ u = find_user_for_combatant(attacker);
@@ -8355,6 +8457,30 @@ class battle_manager {
 						atk_user.send({{"type", message_types::announce}, {"text", attacker.attacks_remaining_this_turn + " extra attack" + (attacker.attacks_remaining_this_turn > 1 ? "s" : "") + " remaining. Press F to Attack again, move, or take another action."}, {"interrupt", false}});
 					}
 				}
+				// PHB 2024 Nick mastery (para 10341): "When you make the extra attack of the
+				// Light property, you can make it as part of the Attack action instead of as a
+				// Bonus Action. You can make this extra attack only once per turn."
+				else if (attacker.is_player and attacker.attacks_remaining_this_turn <= 0
+					and attacker.used_action and !attacker.twf_attack_used_this_turn
+					and attacker.off_hand != "" and attacker.main_hand_mastery == MASTERY_NICK) {
+					combatant@ nick_target = target;
+					if (@nick_target == null or nick_target.is_dead) {
+						@nick_target = null;
+						int best_nd = 9999;
+						for (uint nt = 0; nt < combat.combatants.length(); nt++) {
+							combatant@ nc = combat.combatants[nt];
+							if (@nc == null or nc.is_dead or nc.id == attacker.id) continue;
+							if (!combat.are_hostile(attacker, nc)) continue;
+							int nd = feet_distance(attacker.x, attacker.y, nc.x, nc.y);
+							if (nd <= attacker.off_hand_range and nd < best_nd) { best_nd = nd; @nick_target = nc; }
+						}
+					}
+					if (@nick_target != null and nick_target.is_alive()) {
+						broadcast_announce(attacker.name + " makes a free off-hand attack (Nick)!", false);
+						start_twf_offhand_strike(attacker, nick_target);
+						return;
+					}
+				}
 				else if (!attacker.is_player and pr.attacks_remaining > 0 and !target.is_dead) {
 					combatant@ next_target = target;
 					if (@next_target == null or next_target.is_dead) @next_target = find_nearest_target_for_monster(attacker);
@@ -10551,6 +10677,13 @@ class battle_manager {
 			u.send({{"type", message_types::announce}, {"text", "That spell is not prepared or known by your character."}, {"interrupt", true}});
 			return;
 		}
+		// War Magic Arcane Deflection restriction (para 2933-2934): "If you use
+		// Arcane Deflection, you can't cast spells other than cantrips until the
+		// end of your next turn."
+		if (c.arcane_deflection_no_spell_turns > 0 and spell.level > 0) {
+			u.send({{"type", message_types::announce}, {"text", "Arcane Deflection restricts you to cantrips until end of your next turn."}, {"interrupt", true}});
+			return;
+		}
 
 		combatant@ target = combat.get_combatant(target_id);
 		if (spell.id == "true_strike") {
@@ -11479,6 +11612,7 @@ class battle_manager {
 					bool saved = save_total >= save_dc;
 					if (bless_bonus > 0) broadcast_announce(t.name + "'s Bless adds " + bless_bonus + " to the save.", false);
 					broadcast_roll(t.name, "WIS save vs Fear", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Frightened!");
+					if (!saved and try_arcane_deflection_save(t, save_dc, save_total)) saved = true;
 					if (!saved and try_countercharm_reroll(t, save_dc, save_bonus + bless_bonus, "WIS save vs Fear")) saved = true;
 					if (!saved) { int ds = try_disciplined_survivor_reroll(t, save_dc, save_total, save_bonus + bless_bonus, "WIS save vs Fear"); if (ds >= save_dc) saved = true; }
 					if (!saved) { int new_total = try_flash_of_genius(t, save_dc, save_total, "WIS save vs Fear"); if (new_total >= save_dc) saved = true; }
@@ -11515,6 +11649,7 @@ class battle_manager {
 					bool saved = save_total >= save_dc;
 					if (bless_bonus > 0) broadcast_announce(t.name + "'s Bless adds " + bless_bonus + " to the save.", false);
 					broadcast_roll(t.name, "WIS save vs Hypnotic Pattern", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Charmed!");
+					if (!saved and try_arcane_deflection_save(t, save_dc, save_total)) saved = true;
 					if (!saved and try_countercharm_reroll(t, save_dc, save_bonus + bless_bonus, "WIS save vs Hypnotic Pattern")) saved = true;
 					if (!saved) { int ds = try_disciplined_survivor_reroll(t, save_dc, save_total, save_bonus + bless_bonus, "WIS save vs Hypnotic Pattern"); if (ds >= save_dc) saved = true; }
 					if (!saved) { int new_total = try_flash_of_genius(t, save_dc, save_total, "WIS save vs Hypnotic Pattern"); if (new_total >= save_dc) saved = true; }
@@ -11568,6 +11703,7 @@ class battle_manager {
 				bool saved = save_total >= save_dc;
 				if (bless_bonus > 0) broadcast_announce(target.name + "'s Bless adds " + bless_bonus + " to the save.", false);
 				broadcast_roll(target.name, "WIS save vs Hold Person", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Paralyzed!");
+				if (!saved and try_arcane_deflection_save(target, save_dc, save_total)) saved = true;
 				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Hold Person")) saved = true;
 				if (!saved) { int ds = try_disciplined_survivor_reroll(target, save_dc, save_total, save_bonus + bless_bonus, "WIS save vs Hold Person"); if (ds >= save_dc) saved = true; }
 				if (!saved) { int fg = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Hold Person"); if (fg >= save_dc) saved = true; }
@@ -11588,6 +11724,7 @@ class battle_manager {
 					bool t2_saved = t2_total >= save_dc;
 					if (t2_bless > 0) broadcast_announce(twinned_target.name + "'s Bless adds " + t2_bless + " to the save.", false);
 					broadcast_roll(twinned_target.name, "WIS save vs Hold Person (Twinned)", t2_roll, t2_bonus + t2_bless, t2_total, t2_saved ? "Saved!" : "Paralyzed!");
+					if (!t2_saved and try_arcane_deflection_save(twinned_target, save_dc, t2_total)) t2_saved = true;
 					if (!t2_saved and try_countercharm_reroll(twinned_target, save_dc, t2_bonus + t2_bless, "WIS save vs Hold Person")) t2_saved = true;
 					if (!t2_saved) { int ds2 = try_disciplined_survivor_reroll(twinned_target, save_dc, t2_total, t2_bonus + t2_bless, "WIS save vs Hold Person"); if (ds2 >= save_dc) t2_saved = true; }
 					if (!t2_saved) { int fg2 = try_flash_of_genius(twinned_target, save_dc, t2_total, "WIS save vs Hold Person"); if (fg2 >= save_dc) t2_saved = true; }
@@ -11838,6 +11975,7 @@ class battle_manager {
 				int save_total = save_roll + save_bonus + bless_bonus;
 				bool saved = save_total >= save_dc;
 				broadcast_roll(target.name, "WIS save vs Cause Fear", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Frightened!");
+				if (!saved and try_arcane_deflection_save(target, save_dc, save_total)) saved = true;
 				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Cause Fear")) saved = true;
 				if (!saved) { int ds = try_disciplined_survivor_reroll(target, save_dc, save_total, save_bonus + bless_bonus, "WIS save vs Cause Fear"); if (ds >= save_dc) saved = true; }
 				if (!saved) { int new_total = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Cause Fear"); if (new_total >= save_dc) saved = true; }
@@ -12537,6 +12675,7 @@ class battle_manager {
 				int save_total = save_roll + save_bonus + bless_bonus;
 				bool saved = save_total >= save_dc;
 				broadcast_roll(target.name, "WIS save vs Phantasmal Killer", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Frightened!");
+				if (!saved and try_arcane_deflection_save(target, save_dc, save_total)) saved = true;
 				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Phantasmal Killer")) saved = true;
 				if (!saved) { int ds = try_disciplined_survivor_reroll(target, save_dc, save_total, save_bonus + bless_bonus, "WIS save vs Phantasmal Killer"); if (ds >= save_dc) saved = true; }
 				if (!saved) { int new_total = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Phantasmal Killer"); if (new_total >= save_dc) saved = true; }
@@ -12901,6 +13040,7 @@ class battle_manager {
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
 					bool saved = save_total >= save_dc;
+					if (!saved and try_arcane_deflection_save(t, save_dc, save_total)) saved = true;
 					if (!saved and try_countercharm_reroll(t, save_dc, save_bonus + bless_bonus, "WIS save vs Mass Suggestion")) saved = true;
 					if (!saved) { int ds = try_disciplined_survivor_reroll(t, save_dc, save_total, save_bonus + bless_bonus, "WIS save vs Mass Suggestion"); if (ds >= save_dc) saved = true; }
 					if (!saved) { int new_total = try_flash_of_genius(t, save_dc, save_total, "WIS save vs Mass Suggestion"); if (new_total >= save_dc) saved = true; }
@@ -12927,6 +13067,7 @@ class battle_manager {
 				int save_total = save_roll + save_bonus + bless_bonus;
 				bool saved = save_total >= save_dc;
 				broadcast_roll(target.name, "WIS save vs Command", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Commanded!");
+				if (!saved and try_arcane_deflection_save(target, save_dc, save_total)) saved = true;
 				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Command")) saved = true;
 				if (!saved) { int ds = try_disciplined_survivor_reroll(target, save_dc, save_total, save_bonus + bless_bonus, "WIS save vs Command"); if (ds >= save_dc) saved = true; }
 				if (!saved) { int new_total = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Command"); if (new_total >= save_dc) saved = true; }
@@ -12952,6 +13093,7 @@ class battle_manager {
 				int save_total = save_roll + save_bonus + bless_bonus;
 				bool saved = save_total >= save_dc;
 				broadcast_roll(target.name, "WIS save vs Suggestion", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Charmed!");
+				if (!saved and try_arcane_deflection_save(target, save_dc, save_total)) saved = true;
 				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Suggestion")) saved = true;
 				if (!saved) { int ds = try_disciplined_survivor_reroll(target, save_dc, save_total, save_bonus + bless_bonus, "WIS save vs Suggestion"); if (ds >= save_dc) saved = true; }
 				if (!saved) { int new_total = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Suggestion"); if (new_total >= save_dc) saved = true; }
@@ -13163,6 +13305,7 @@ class battle_manager {
 				int save_total = save_roll + save_bonus + bless_bonus;
 				bool saved = save_total >= save_dc;
 				broadcast_roll(target.name, "WIS save vs Eyebite", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Afflicted!");
+				if (!saved and try_arcane_deflection_save(target, save_dc, save_total)) saved = true;
 				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Eyebite")) saved = true;
 				if (!saved) { int ds = try_disciplined_survivor_reroll(target, save_dc, save_total, save_bonus + bless_bonus, "WIS save vs Eyebite"); if (ds >= save_dc) saved = true; }
 				if (!saved) { int new_total = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Eyebite"); if (new_total >= save_dc) saved = true; }
@@ -13667,6 +13810,7 @@ class battle_manager {
 				bool saved = save_total >= save_dc;
 				if (bless_bonus > 0) broadcast_announce(target.name + "'s Bless adds " + bless_bonus + " to the save.", false);
 				broadcast_roll(target.name, "WIS save vs Dominate Person", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Charmed!");
+				if (!saved and try_arcane_deflection_save(target, save_dc, save_total)) saved = true;
 				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Dominate Person")) saved = true;
 				if (!saved) { int ds = try_disciplined_survivor_reroll(target, save_dc, save_total, save_bonus + bless_bonus, "WIS save vs Dominate Person"); if (ds >= save_dc) saved = true; }
 				if (!saved) { int new_total = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Dominate Person"); if (new_total >= save_dc) saved = true; }
@@ -13689,6 +13833,7 @@ class battle_manager {
 				bool saved = save_total >= save_dc;
 				if (bless_bonus > 0) broadcast_announce(target.name + "'s Bless adds " + bless_bonus + " to the save.", false);
 				broadcast_roll(target.name, "CHA save vs Banishment", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Banished!");
+				if (!saved and try_arcane_deflection_save(target, save_dc, save_total)) saved = true;
 				if (!saved) { int ds = try_disciplined_survivor_reroll(target, save_dc, save_total, save_bonus + bless_bonus, "CHA save vs Banishment"); if (ds >= save_dc) saved = true; }
 				if (!saved and try_mage_slayer_guarded_mind(target, ABILITY_CHA)) saved = true;
 				if (!saved) { int bf = try_boon_of_fate_bonus(target, save_total, save_dc); if (bf > 0) saved = true; }
@@ -13708,6 +13853,7 @@ class battle_manager {
 				bool saved = save_total >= save_dc;
 				if (bless_bonus > 0) broadcast_announce(target.name + "'s Bless adds " + bless_bonus + " to the save.", false);
 				broadcast_roll(target.name, "WIS save vs Charm Person", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Charmed!");
+				if (!saved and try_arcane_deflection_save(target, save_dc, save_total)) saved = true;
 				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Charm Person")) saved = true;
 				if (!saved) { int ds = try_disciplined_survivor_reroll(target, save_dc, save_total, save_bonus + bless_bonus, "WIS save vs Charm Person"); if (ds >= save_dc) saved = true; }
 				if (!saved) { int new_total = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Charm Person"); if (new_total >= save_dc) saved = true; }
@@ -14431,6 +14577,7 @@ class battle_manager {
 				bool saved = save_total >= save_dc;
 				if (bless_bonus > 0) broadcast_announce(target.name + "'s Bless adds " + bless_bonus + " to the save.", false);
 				broadcast_roll(target.name, "WIS save vs Dominate Monster", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Charmed!");
+				if (!saved and try_arcane_deflection_save(target, save_dc, save_total)) saved = true;
 				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Dominate Monster")) saved = true;
 				if (!saved) { int ds = try_disciplined_survivor_reroll(target, save_dc, save_total, save_bonus + bless_bonus, "WIS save vs Dominate Monster"); if (ds >= save_dc) saved = true; }
 				if (!saved) { int new_total = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Dominate Monster"); if (new_total >= save_dc) saved = true; }
@@ -14754,6 +14901,7 @@ class battle_manager {
 				int save_total = save_roll + save_bonus + bless_bonus;
 				bool saved = save_total >= save_dc;
 				broadcast_roll(target.name, "WIS save vs Enthrall", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Charmed!");
+				if (!saved and try_arcane_deflection_save(target, save_dc, save_total)) saved = true;
 				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Enthrall")) saved = true;
 				if (!saved) { int ds = try_disciplined_survivor_reroll(target, save_dc, save_total, save_bonus + bless_bonus, "WIS save vs Enthrall"); if (ds >= save_dc) saved = true; }
 				if (!saved) { int new_total = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Enthrall"); if (new_total >= save_dc) saved = true; }
@@ -14876,6 +15024,7 @@ class battle_manager {
 				int save_total = save_roll + save_bonus + bless_bonus;
 				bool saved = save_total >= save_dc;
 				broadcast_roll(target.name, "WIS save vs Charm Monster", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Charmed!");
+				if (!saved and try_arcane_deflection_save(target, save_dc, save_total)) saved = true;
 				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Charm Monster")) saved = true;
 				if (!saved) { int ds = try_disciplined_survivor_reroll(target, save_dc, save_total, save_bonus + bless_bonus, "WIS save vs Charm Monster"); if (ds >= save_dc) saved = true; }
 				if (!saved) { int new_total = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Charm Monster"); if (new_total >= save_dc) saved = true; }
@@ -14906,6 +15055,7 @@ class battle_manager {
 				int save_total = save_roll + save_bonus + bless_bonus;
 				bool saved = save_total >= save_dc;
 				broadcast_roll(target.name, "WIS save vs Dominate Beast", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Charmed!");
+				if (!saved and try_arcane_deflection_save(target, save_dc, save_total)) saved = true;
 				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Dominate Beast")) saved = true;
 				if (!saved) { int ds = try_disciplined_survivor_reroll(target, save_dc, save_total, save_bonus + bless_bonus, "WIS save vs Dominate Beast"); if (ds >= save_dc) saved = true; }
 				if (!saved) { int new_total = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Dominate Beast"); if (new_total >= save_dc) saved = true; }
@@ -15157,6 +15307,7 @@ class battle_manager {
 				int save_total = save_roll + save_bonus + bless_bonus;
 				bool saved = save_total >= save_dc;
 				broadcast_roll(target.name, "INT save vs Befuddlement", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Hit!");
+				if (!saved and try_arcane_deflection_save(target, save_dc, save_total)) saved = true;
 				if (!saved) { int ds = try_disciplined_survivor_reroll(target, save_dc, save_total, save_bonus + bless_bonus, "INT save vs Befuddlement"); if (ds >= save_dc) saved = true; }
 				if (!saved and try_mage_slayer_guarded_mind(target, ABILITY_INT)) saved = true;
 				if (!saved) { int bf = try_boon_of_fate_bonus(target, save_total, save_dc); if (bf > 0) saved = true; }
@@ -15887,6 +16038,7 @@ class battle_manager {
 					int save_total = save_roll + save_bonus + bless_bonus;
 					bool saved = save_total >= save_dc;
 					broadcast_roll(t.name, "WIS save vs Weird", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Terrified!");
+					if (!saved and try_arcane_deflection_save(t, save_dc, save_total)) saved = true;
 					if (!saved and try_countercharm_reroll(t, save_dc, save_bonus + bless_bonus, "WIS save vs Weird")) saved = true;
 					if (!saved) { int ds = try_disciplined_survivor_reroll(t, save_dc, save_total, save_bonus + bless_bonus, "WIS save vs Weird"); if (ds >= save_dc) saved = true; }
 					if (!saved) { int new_total = try_flash_of_genius(t, save_dc, save_total, "WIS save vs Weird"); if (new_total >= save_dc) saved = true; }

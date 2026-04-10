@@ -35,6 +35,7 @@ class character_sheet {
     int weapon_damage_type = DMG_BLUDGEONING;
     int weapon_range = 5; bool weapon_finesse = false;
     bool weapon_is_ranged = false;
+    bool weapon_is_light = false;
     int weapon_mastery = MASTERY_NONE;
     bool has_unarmored_defense = false;
     bool has_heroic_inspiration = false;
@@ -596,7 +597,9 @@ void apply_weapon(character_sheet@ cs, string weapon) {
     cs.weapon_range = 5;
     cs.weapon_finesse = false;
     cs.weapon_is_ranged = false;
+    cs.weapon_is_light = false;
     int mastery = MASTERY_NONE;
+    bool is_light = false;
 
     // === Simple Melee ===
     if (weapon == "Unarmed") {
@@ -604,22 +607,22 @@ void apply_weapon(character_sheet@ cs, string weapon) {
         cs.weapon_range = 5;
     } else if (weapon == "Club") {
         cs.weapon_damage_dice = 4; cs.weapon_damage_type = DMG_BLUDGEONING;
-        cs.weapon_range = 5; mastery = MASTERY_SLOW;
+        cs.weapon_range = 5; mastery = MASTERY_SLOW; is_light = true;
     } else if (weapon == "Dagger") {
         cs.weapon_damage_dice = 4; cs.weapon_damage_type = DMG_PIERCING;
-        cs.weapon_range = 5; cs.weapon_finesse = true; mastery = MASTERY_NICK;
+        cs.weapon_range = 5; cs.weapon_finesse = true; mastery = MASTERY_NICK; is_light = true;
     } else if (weapon == "Greatclub") {
         cs.weapon_damage_dice = 8; cs.weapon_damage_type = DMG_BLUDGEONING;
         cs.weapon_range = 5; mastery = MASTERY_PUSH;
     } else if (weapon == "Handaxe") {
         cs.weapon_damage_dice = 6; cs.weapon_damage_type = DMG_SLASHING;
-        cs.weapon_range = 5; mastery = MASTERY_VEX;
+        cs.weapon_range = 5; mastery = MASTERY_VEX; is_light = true;
     } else if (weapon == "Javelin") {
         cs.weapon_damage_dice = 6; cs.weapon_damage_type = DMG_PIERCING;
         cs.weapon_range = 5; mastery = MASTERY_SLOW;
     } else if (weapon == "Light Hammer") {
         cs.weapon_damage_dice = 4; cs.weapon_damage_type = DMG_BLUDGEONING;
-        cs.weapon_range = 5; mastery = MASTERY_NICK;
+        cs.weapon_range = 5; mastery = MASTERY_NICK; is_light = true;
     } else if (weapon == "Mace") {
         cs.weapon_damage_dice = 6; cs.weapon_damage_type = DMG_BLUDGEONING;
         cs.weapon_range = 5; mastery = MASTERY_SAP;
@@ -628,7 +631,7 @@ void apply_weapon(character_sheet@ cs, string weapon) {
         cs.weapon_range = 5; mastery = MASTERY_TOPPLE;
     } else if (weapon == "Sickle") {
         cs.weapon_damage_dice = 4; cs.weapon_damage_type = DMG_SLASHING;
-        cs.weapon_range = 5; mastery = MASTERY_NICK;
+        cs.weapon_range = 5; mastery = MASTERY_NICK; is_light = true;
     } else if (weapon == "Spear") {
         cs.weapon_damage_dice = 6; cs.weapon_damage_type = DMG_PIERCING;
         cs.weapon_range = 5; mastery = MASTERY_SAP;
@@ -688,10 +691,10 @@ void apply_weapon(character_sheet@ cs, string weapon) {
         cs.weapon_range = 5; cs.weapon_finesse = true; mastery = MASTERY_VEX;
     } else if (weapon == "Scimitar") {
         cs.weapon_damage_dice = 6; cs.weapon_damage_type = DMG_SLASHING;
-        cs.weapon_range = 5; cs.weapon_finesse = true; mastery = MASTERY_NICK;
+        cs.weapon_range = 5; cs.weapon_finesse = true; mastery = MASTERY_NICK; is_light = true;
     } else if (weapon == "Shortsword") {
         cs.weapon_damage_dice = 6; cs.weapon_damage_type = DMG_PIERCING;
-        cs.weapon_range = 5; cs.weapon_finesse = true; mastery = MASTERY_VEX;
+        cs.weapon_range = 5; cs.weapon_finesse = true; mastery = MASTERY_VEX; is_light = true;
     } else if (weapon == "Trident") {
         cs.weapon_damage_dice = 8; cs.weapon_damage_type = DMG_PIERCING;
         cs.weapon_range = 5; mastery = MASTERY_TOPPLE;
@@ -727,6 +730,7 @@ void apply_weapon(character_sheet@ cs, string weapon) {
         cs.weapon_range = 30; cs.weapon_is_ranged = true; mastery = MASTERY_VEX;
     }
     cs.weapon_mastery = mastery;
+    cs.weapon_is_light = is_light;
 }
 
 void finalize_character(character_sheet@ cs) {
@@ -1079,7 +1083,20 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
     c.main_hand_range = cs.weapon_range;
     c.main_hand_finesse = cs.weapon_finesse;
     c.main_hand_is_ranged = cs.weapon_is_ranged;
+    c.main_hand_is_light = cs.weapon_is_light;
     c.main_hand_mastery = cs.weapon_mastery;
+    // PHB 2024 Two-Weapon Fighting: auto-equip off-hand if weapon is Light melee
+    // (or Dual Wielder feat removes the Light requirement)
+    if (!cs.weapon_is_ranged and (cs.weapon_is_light or character_sheet_has_feat(cs, "dual_wielder"))) {
+        c.off_hand = cs.weapon_name;
+        c.off_hand_damage_dice = cs.weapon_damage_dice;
+        c.off_hand_damage_count = cs.weapon_damage_count;
+        c.off_hand_damage_type = cs.weapon_damage_type;
+        c.off_hand_range = cs.weapon_range;
+        c.off_hand_finesse = cs.weapon_finesse;
+        c.off_hand_is_light = cs.weapon_is_light;
+        c.off_hand_mastery = cs.weapon_mastery;
+    }
     c.spell_slots_max = cs.spell_slots_max;
     c.spell_slots_current = cs.spell_slots_max;
     c.known_cantrips = cs.cantrips;

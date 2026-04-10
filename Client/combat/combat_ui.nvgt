@@ -323,6 +323,9 @@ int my_second_wind_uses_max = 0;
 bool my_is_hidden = false;
 int my_weapon_range = 5;
 int my_main_hand_mastery = 0;
+bool my_main_hand_is_light = false;
+string my_off_hand = "";
+bool my_off_hand_is_light = false;
 int my_movement_remaining = 0;
 int my_speed = 30;
 bool my_has_action = false;
@@ -1306,6 +1309,11 @@ void show_bonus_action_menu() {
 		mystic_arcanum_opt = m.add_item(arc_label);
 	}
 	if (lc == "paladin" and my_lay_on_hands_pool > 0) lay_hands_opt = m.add_item("Lay on Hands. Bonus action. Pool: " + my_lay_on_hands_pool + ".");
+	// PHB 2024 Two-Weapon Fighting: off-hand attack with Light melee weapon
+	int twf_offhand_opt = -1;
+	if (my_off_hand != "" and my_off_hand_is_light) {
+		twf_offhand_opt = m.add_item("Off-Hand Attack (" + my_off_hand + "). Bonus action.");
+	}
 	if (lc == "monk" and level >= 2) flurry_opt = m.add_item("Flurry of Blows. 1 Focus Point. Focus Points: " + my_focus_points + ".");
 	int patient_defense_opt = -1;
 	int step_of_wind_opt = -1;
@@ -2054,6 +2062,13 @@ void show_bonus_action_menu() {
 	}
 	else if (lay_hands_opt >= 0 and res == lay_hands_opt) {
 		use_lay_on_hands();
+	}
+	else if (twf_offhand_opt >= 0 and res == twf_offhand_opt) {
+		if (current_target_id == 0) {
+			speak("No target selected. Scan with I J K L and press Enter to lock a target.", true);
+			return;
+		}
+		send({{"type", message_types::bonus_action}, {"feature", "twf_offhand"}, {"target_id", current_target_id}});
 	}
 	else if (flurry_opt >= 0 and res == flurry_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "flurry_of_blows"}, {"target_id", current_target_id}});
@@ -4034,6 +4049,9 @@ void parse_game_state(json_object@ msg) {
 	my_is_hidden = msg.exists("my_is_hidden") ? bool(msg["my_is_hidden"]) : false;
 	my_weapon_range = msg.exists("my_weapon_range") ? int(msg["my_weapon_range"]) : 5;
 	my_main_hand_mastery = msg.exists("my_main_hand_mastery") ? int(msg["my_main_hand_mastery"]) : 0;
+	my_main_hand_is_light = msg.exists("my_main_hand_is_light") ? bool(msg["my_main_hand_is_light"]) : false;
+	my_off_hand = msg.exists("my_off_hand") ? string(msg["my_off_hand"]) : "";
+	my_off_hand_is_light = msg.exists("my_off_hand_is_light") ? bool(msg["my_off_hand_is_light"]) : false;
 	my_movement_remaining = msg.exists("my_movement_remaining") ? int(msg["my_movement_remaining"]) : 0;
 	my_speed = msg.exists("my_speed") ? int(msg["my_speed"]) : 30;
 	my_has_action = msg.exists("my_has_action") ? bool(msg["my_has_action"]) : false;
@@ -4305,6 +4323,9 @@ void reset_combat_state() {
 	my_is_hidden = false;
 	my_weapon_range = 5;
 	my_main_hand_mastery = 0;
+	my_main_hand_is_light = false;
+	my_off_hand = "";
+	my_off_hand_is_light = false;
 	my_movement_remaining = 0;
 	my_speed = 30;
 	my_has_action = false;
