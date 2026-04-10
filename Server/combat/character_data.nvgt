@@ -1560,10 +1560,11 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         cs.armor_class += 1;
     }
 
-    // Path of the Storm Herald: Storm Aura damage on rage
+    // Xanathar's Storm Herald Barbarian (paras 416-434): Storm Aura
+    // Environment choice: DMG_FIRE=desert, DMG_LIGHTNING=sea, DMG_COLD=tundra
     if (cs.class_name == "Barbarian" and cs.subclass == "Storm Herald" and cs.level >= 3) {
         c.storm_aura_active = false;
-        c.storm_aura_damage_type = DMG_LIGHTNING; // default tundra
+        c.storm_aura_damage_type = DMG_FIRE; // default desert (player can change via Shift+P)
     }
 
     // Phantom Rogue: Wails from the Grave (once per short rest)

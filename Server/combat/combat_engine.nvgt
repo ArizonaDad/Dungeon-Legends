@@ -379,7 +379,8 @@ class combatant {
 	bool abjure_extraplanar_active = false; // Oath of Watchers Paladin
 	int spirit_shield_reduction = 0; // Ancestral Guardian Barbarian reaction
 	bool storm_aura_active = false; // Storm Herald Barbarian
-	int storm_aura_damage_type = 0;
+	int storm_aura_damage_type = 0; // DMG_FIRE=desert, DMG_LIGHTNING=sea, DMG_COLD=tundra
+	bool storm_aura_used_this_turn = false; // BA activation once per turn
 	int wails_from_grave_uses = 0; // Phantom Rogue
 	bool mote_of_potential_active = false; // College of Creation Bard
 	bool steel_defender_active = false; // Battle Smith Artificer
@@ -1408,6 +1409,7 @@ class battle {
 		c.deft_strike_used_this_turn = false;
 		c.unerring_accuracy_used_this_turn = false;
 		c.slayer_prey_used_this_turn = false;
+		c.storm_aura_used_this_turn = false;
 
 		// Reaction resets at start of YOUR turn
 		c.has_reaction = true;

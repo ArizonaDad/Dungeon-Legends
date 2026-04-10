@@ -1488,10 +1488,12 @@ void handle_user_message(user@ u, json_object@ msg)
 				c.rage_turns_remaining = 10;
 				c.persistent_rage_active = false;
 			}
-			// Storm Herald: Activate Storm Aura
+			// Xanathar's Storm Herald L3 Storm Aura (para 416-418): "your aura has an
+			// effect that activates when you enter your rage"
 			if (c.subclass == "Storm Herald") {
 				c.storm_aura_active = true;
 				u.room.bm.broadcast_announce(c.name + "'s Storm Aura activates!", true);
+				u.room.bm.apply_storm_aura_effect(c);
 			}
 			// Wild Heart: Beast animal bonuses
 			if (c.subclass == "Wild Heart") {
@@ -2873,15 +2875,19 @@ void handle_user_message(user@ u, json_object@ msg)
 		}
 
 		else if (feature == "mantle_of_inspiration") {
-			// Glamour Bard: Mantle of Inspiration (temp HP to allies)
+			// Xanathar's Glamour Bard L3 Mantle of Inspiration (para 549-552): "each of
+			// them gains 5 temporary hit points... increasing to 8 at 5th level, 11 at
+			// 10th level, and 14 at 15th level." Costs 1 Bardic Inspiration use.
 			if (c.class_name != "Bard" or c.subclass != "College of Glamour") { u.send({{"type", message_types::announce}, {"text", "Only Glamour bards can use Mantle of Inspiration."}, {"interrupt", true}}); return; }
 			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
 			if (c.bardic_inspiration_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Bardic Inspiration uses remaining."}, {"interrupt", true}}); return; }
 			c.has_bonus_action = false;
 			c.used_bonus_action = true;
 			c.bardic_inspiration_uses--;
-			int temp_hp = random(1, c.bardic_inspiration_grant_die) + c.get_ability_mod(ABILITY_CHA);
-			if (temp_hp < 1) temp_hp = 1;
+			int temp_hp = 5;
+			if (c.level >= 15) temp_hp = 14;
+			else if (c.level >= 10) temp_hp = 11;
+			else if (c.level >= 5) temp_hp = 8;
 			int allies_affected = 0;
 			int cha_mod = c.get_ability_mod(ABILITY_CHA);
 			int max_allies = cha_mod > 0 ? cha_mod : 1;
@@ -4088,6 +4094,19 @@ void handle_user_message(user@ u, json_object@ msg)
 			}
 			u.room.bm.broadcast_announce(c.name + " uses Arcane Recovery to restore " + recovered + " spell slot" + (recovered == 1 ? "" : "s") + " (combined level budget half wizard level, rounded up).", true);
 		}
+		else if (feature == "storm_aura") {
+			// Xanathar's Storm Herald L3 Storm Aura (para 416-418): "you can activate
+			// the effect again on each of your turns as a bonus action."
+			if (c.class_name != "Barbarian" or c.subclass != "Storm Herald") { u.send({{"type", message_types::announce}, {"text", "Only Storm Herald barbarians can use Storm Aura."}, {"interrupt", true}}); return; }
+			if (!c.storm_aura_active) { u.send({{"type", message_types::announce}, {"text", "Storm Aura is not active. Rage first."}, {"interrupt", true}}); return; }
+			if (c.storm_aura_used_this_turn) { u.send({{"type", message_types::announce}, {"text", "Already used Storm Aura this turn."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.storm_aura_used_this_turn = true;
+			u.room.bm.apply_storm_aura_effect(c);
+		}
+
 		else if (feature == "reckless_attack") {
 			// PHB 2024 para 2785, Barbarian L2: "When you make your first attack roll on
 			// your turn, you can decide to attack recklessly. Doing so gives you Advantage

@@ -1291,6 +1291,74 @@ class battle_manager {
 		return 6;
 	}
 
+	// Xanathar's Storm Herald L3 Storm Aura (paras 416-422): Apply aura effect
+	// based on environment choice. Called on rage entry + as BA each turn.
+	void apply_storm_aura_effect(combatant@ c) {
+		if (@c == null or @combat == null or !c.storm_aura_active) return;
+		int save_dc = 8 + c.proficiency + c.get_ability_mod(ABILITY_CON);
+		// Damage/temp HP scaling: desert/tundra = flat 2/3/4/5/6 at L3/5/10/15/20
+		// sea = 1d6/2d6/3d6/4d6 at L3/10/15/20
+		if (c.storm_aura_damage_type == DMG_FIRE) {
+			// Desert: all other creatures in 10ft take fire damage (no save)
+			int flat_dmg = 2;
+			if (c.level >= 20) flat_dmg = 6;
+			else if (c.level >= 15) flat_dmg = 5;
+			else if (c.level >= 10) flat_dmg = 4;
+			else if (c.level >= 5) flat_dmg = 3;
+			int hits = 0;
+			for (uint si = 0; si < combat.combatants.length(); si++) {
+				combatant@ t = combat.combatants[si];
+				if (@t == null or t.is_dead or t.id == c.id) continue;
+				if (feet_distance(c.x, c.y, t.x, t.y) > 10) continue;
+				combat.apply_damage(t, flat_dmg, DMG_FIRE, c);
+				hits++;
+			}
+			if (hits > 0) broadcast_announce(c.name + "'s Desert Storm Aura deals " + flat_dmg + " fire damage to " + hits + " creatures!", true);
+		} else if (c.storm_aura_damage_type == DMG_LIGHTNING) {
+			// Sea: one target in 10ft, DEX save, lightning damage
+			int dice = 1;
+			if (c.level >= 20) dice = 4;
+			else if (c.level >= 15) dice = 3;
+			else if (c.level >= 10) dice = 2;
+			// Auto-pick nearest enemy
+			combatant@ best = null;
+			int best_dist = 999;
+			for (uint si = 0; si < combat.combatants.length(); si++) {
+				combatant@ t = combat.combatants[si];
+				if (@t == null or t.is_dead or t.id == c.id) continue;
+				if (t.is_player == c.is_player) continue; // skip allies
+				int dist = feet_distance(c.x, c.y, t.x, t.y);
+				if (dist <= 10 and dist < best_dist) { @best = t; best_dist = dist; }
+			}
+			if (@best != null) {
+				int dmg = 0;
+				for (int di = 0; di < dice; di++) dmg += random(1, 6);
+				int dex_save = random(1, 20) + best.get_ability_mod(ABILITY_DEX);
+				if (best.save_proficiencies[ABILITY_DEX] == 1) dex_save += best.proficiency;
+				if (dex_save >= save_dc) dmg /= 2;
+				if (dmg > 0) combat.apply_damage(best, dmg, DMG_LIGHTNING, c);
+				string save_text = dex_save >= save_dc ? " (half, DEX save)" : "";
+				broadcast_announce(c.name + "'s Sea Storm Aura strikes " + best.name + " for " + dmg + " lightning damage" + save_text + "!", true);
+			}
+		} else if (c.storm_aura_damage_type == DMG_COLD) {
+			// Tundra: allies in 10ft gain temp HP
+			int temp = 2;
+			if (c.level >= 20) temp = 6;
+			else if (c.level >= 15) temp = 5;
+			else if (c.level >= 10) temp = 4;
+			else if (c.level >= 5) temp = 3;
+			int hits = 0;
+			for (uint si = 0; si < combat.combatants.length(); si++) {
+				combatant@ t = combat.combatants[si];
+				if (@t == null or t.is_dead) continue;
+				if (t.is_player != c.is_player) continue; // allies only
+				if (feet_distance(c.x, c.y, t.x, t.y) > 10) continue;
+				if (t.temp_hp < temp) { t.temp_hp = temp; hits++; }
+			}
+			if (hits > 0) broadcast_announce(c.name + "'s Tundra Storm Aura grants " + temp + " temp HP to " + hits + " allies!", true);
+		}
+	}
+
 	int bardic_die_for_target(combatant@ c) {
 		if (@c == null) return 0;
 		return c.bardic_inspiration_die;
@@ -4846,12 +4914,19 @@ class battle_manager {
 			broadcast_announce(attacker.name + "'s Blade Flourish adds " + flourish_dmg + " damage!", false);
 		}
 
-		// College of Whispers Bard: Psychic Blades — bonus psychic damage when active
+		// Xanathar's College of Whispers L3 Psychic Blades (para 610-613): "extra
+		// 2d6 psychic damage... increasing to 3d6 at 5th level, 5d6 at 10th level,
+		// and 8d6 at 15th level." Once per round on your turn.
 		if (attacker.class_name == "Bard" and attacker.subclass == "College of Whispers" and attacker.psychic_blades_pending and is_weapon_attack) {
-			int psychic_dmg = random(1, 6) * ((attacker.level / 5) + 2);
+			int pb_dice = 2;
+			if (attacker.level >= 15) pb_dice = 8;
+			else if (attacker.level >= 10) pb_dice = 5;
+			else if (attacker.level >= 5) pb_dice = 3;
+			int psychic_dmg = 0;
+			for (int pbi = 0; pbi < pb_dice; pbi++) psychic_dmg += random(1, 6);
 			bonus += psychic_dmg;
 			attacker.psychic_blades_pending = false;
-			broadcast_announce(attacker.name + "'s Psychic Blades add " + psychic_dmg + " psychic damage!", false);
+			broadcast_announce(attacker.name + "'s Psychic Blades add " + psychic_dmg + " psychic damage! (" + pb_dice + "d6)", false);
 		}
 
 		// Cavalier Unwavering Mark: old +prof bonus removed — retaliation is now a BA attack per source (para 1671-1672)
