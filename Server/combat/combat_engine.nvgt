@@ -331,7 +331,11 @@ class combatant {
 	int swim_speed = 0;
 	// Feat once-per-turn flags
 	bool crusher_used_this_turn = false;
+	bool crusher_crit_advantage = false; // PHB 2024 Crusher: advantage on attacks vs this target
+	uint crusher_crit_source_id = 0; // Who applied the crusher crit (clears at their turn start)
 	bool slasher_used_this_turn = false;
+	bool slasher_crit_disadvantage = false; // PHB 2024 Slasher: disadvantage on target's attacks
+	uint slasher_crit_source_id = 0; // Who applied the slasher crit (clears at their turn start)
 	bool piercer_reroll_used_this_turn = false;
 	int temp_ac_bonus_this_attack = 0; // Defensive Duelist reaction
 	// Subclass feature tracking (Xanathar's/Tasha's)

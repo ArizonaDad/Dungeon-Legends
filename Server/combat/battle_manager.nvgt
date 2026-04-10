@@ -2424,6 +2424,10 @@ class battle_manager {
 			adv = true;
 			target.stunning_strike_advantage_pending = false;
 		}
+		// PHB 2024 Crusher (para 7579): crit advantage on attacks against target
+		if (target.crusher_crit_advantage) adv = true;
+		// PHB 2024 Slasher (para 7597): crit disadvantage on target's attacks
+		if (attacker.slasher_crit_disadvantage) disadv = true;
 		if (target.has_condition(COND_PRONE) and !attack_is_ranged and dist <= 5) adv = true;
 		if (target.has_condition(COND_PRONE) and (attack_is_ranged or dist > 5)) disadv = true;
 		if (target.has_condition(COND_PARALYZED) or target.has_condition(COND_STUNNED) or target.has_condition(COND_UNCONSCIOUS)) adv = true;
@@ -2764,6 +2768,11 @@ class battle_manager {
 		apply_attack_advantage_state(monster, target, dist, attack_is_ranged, adv, disadv);
 
 		string attack_name = get_attack_name(monster, use_secondary);
+		// PHB 2024 Sentinel Guardian — fire on first attack of the sequence
+		if (attack_index == 0) {
+			check_sentinel_guardian(monster, target);
+			if (monster.is_dead or @combat == null or !combat.battle_active) return false;
+		}
 		broadcast_announce(monster.name + " attacks " + target.name + " with " + attack_name + "!");
 
 		pending_roll pr;
@@ -2811,6 +2820,9 @@ class battle_manager {
 			bot.has_action = false;
 			bot.used_action = true;
 			bot.attacks_remaining_this_turn = bot.extra_attacks;
+			// PHB 2024 Sentinel Guardian — fire on first attack of the bot's Attack action
+			check_sentinel_guardian(bot, target);
+			if (bot.is_dead or @combat == null or !combat.battle_active) return false;
 		}
 
 		bool adv = false;
@@ -4469,6 +4481,19 @@ class battle_manager {
 				}
 			}
 		}
+		// PHB 2024 Crusher crit: clear advantage on targets this combatant crushed
+		for (uint cr = 0; cr < combat.combatants.length(); cr++) {
+			combatant@ cr_t = combat.combatants[cr];
+			if (@cr_t != null and cr_t.crusher_crit_advantage and cr_t.crusher_crit_source_id == c.id) {
+				cr_t.crusher_crit_advantage = false;
+				cr_t.crusher_crit_source_id = 0;
+			}
+			// PHB 2024 Slasher crit: clear disadvantage on targets this combatant slashed
+			if (@cr_t != null and cr_t.slasher_crit_disadvantage and cr_t.slasher_crit_source_id == c.id) {
+				cr_t.slasher_crit_disadvantage = false;
+				cr_t.slasher_crit_source_id = 0;
+			}
+		}
 		c.mastery_sap_active = false;
 		c.mastery_vex_active = false;
 		c.mastery_vex_target_id = 0;
@@ -4676,13 +4701,14 @@ class battle_manager {
 		int dc = damage / 2;
 		if (dc < 10) dc = 10;
 		int con_mod = target.get_save_bonus(ABILITY_CON);
-		// Feat: War Caster — advantage on Concentration saves (applied as +5 bonus approximation)
-		if (target.has_feat("war_caster")) con_mod += 5;
 		// 2024 Mage Slayer feat: damaging a concentrating creature gives it disadvantage on concentration save
 		bool mage_slayer_disadv = (@attacker != null and attacker.has_feat("mage_slayer"));
+		// PHB 2024 War Caster (para 7840): "You have Advantage on Constitution saving
+		// throws that you make to maintain Concentration."
+		bool war_caster_adv = target.has_feat("war_caster");
 		// PHB 2024 Sorcerer Metamagic Extended Spell (para 7029): "you have Advantage
 		// on any Constitution saving throw you make to maintain Concentration on it."
-		bool extended_adv = target.extended_spell_concentration;
+		bool conc_adv = war_caster_adv or target.extended_spell_concentration;
 
 		user@ u = find_user_for_combatant(target);
 		if (target.is_player and @u != null and !u.is_bot) {
@@ -4696,21 +4722,23 @@ class battle_manager {
 			pr.reason = "Constitution save to maintain concentration on " + target.concentration_spell + " (DC " + dc + ")";
 			pr.dc = dc;
 			pr.has_disadvantage = mage_slayer_disadv;
-			if (extended_adv) pr.has_advantage = true;
+			if (conc_adv) pr.has_advantage = true;
 			if (mage_slayer_disadv) broadcast_announce(attacker.name + "'s Mage Slayer imposes disadvantage on " + target.name + "'s concentration save!", false);
-			if (extended_adv) broadcast_announce(target.name + " has advantage on the concentration save from Extended Spell!", false);
+			if (war_caster_adv) broadcast_announce(target.name + " has advantage on the concentration save from War Caster!", false);
+			else if (conc_adv) broadcast_announce(target.name + " has advantage on the concentration save from Extended Spell!", false);
 			@current_roll = pr;
 
 			send_roll_request(u, pr);
 		} else {
 			// Auto-roll for monsters/bots.
 			int natural = random(1, 20);
-			if (extended_adv and !mage_slayer_disadv) {
+			if (conc_adv and !mage_slayer_disadv) {
 				int r2 = random(1, 20);
 				if (r2 > natural) natural = r2;
-				broadcast_announce(target.name + " has advantage on the concentration save from Extended Spell!", false);
+				if (war_caster_adv) broadcast_announce(target.name + " has advantage on the concentration save from War Caster!", false);
+				else broadcast_announce(target.name + " has advantage on the concentration save from Extended Spell!", false);
 			}
-			if (mage_slayer_disadv and !extended_adv) {
+			if (mage_slayer_disadv and !conc_adv) {
 				int r2 = random(1, 20);
 				if (r2 < natural) natural = r2;
 				broadcast_announce(attacker.name + "'s Mage Slayer imposes disadvantage on " + target.name + "'s concentration save!", false);
@@ -5153,6 +5181,84 @@ class battle_manager {
 				broadcast_state();
 				cleanup_after_battle();
 			}
+		}
+	}
+
+	// ---- Sentinel Guardian Reaction Attack ----
+
+	// PHB 2024 Sentinel Guardian (para 7718-7720): "Immediately after a creature
+	// within 5 feet of you takes the Attack action against a target other than you
+	// (you don't need to see the attacker), you can make an Opportunity Attack
+	// against the attacker."
+	void check_sentinel_guardian(combatant@ attacker, combatant@ target) {
+		if (@attacker == null or @target == null or @combat == null) return;
+		if (attacker.is_dead) return;
+		for (uint si = 0; si < combat.combatants.length(); si++) {
+			combatant@ sentinel = combat.combatants[si];
+			if (@sentinel == null or sentinel.is_dead or !sentinel.is_alive()) continue;
+			if (!sentinel.is_conscious() or sentinel.is_incapacitated_check()) continue;
+			if (sentinel.id == attacker.id) continue;
+			if (sentinel.id == target.id) continue;
+			if (!sentinel.has_feat("sentinel")) continue;
+			if (!sentinel.has_reaction) continue;
+			if (sentinel.main_hand_is_ranged) continue;
+			if (!combat.are_hostile(sentinel, attacker)) continue;
+			if (feet_distance(sentinel.x, sentinel.y, attacker.x, attacker.y) > 5) continue;
+			// Source: "you don't need to see the attacker" — no LoS check.
+			sentinel.has_reaction = false;
+			int atk_bonus = get_attack_bonus_for_roll(sentinel, false);
+			bool adv = false;
+			bool disadv = false;
+			apply_attack_advantage_state(sentinel, attacker, feet_distance(sentinel.x, sentinel.y, attacker.x, attacker.y), false, adv, disadv);
+			int roll1 = random(1, 20);
+			int roll2 = random(1, 20);
+			int natural = roll1;
+			if (adv and !disadv) natural = roll1 > roll2 ? roll1 : roll2;
+			else if (disadv and !adv) natural = roll1 < roll2 ? roll1 : roll2;
+			bool is_crit = (natural == 20);
+			bool is_fumble = (natural == 1);
+			int total = natural + atk_bonus;
+			bool hit = false;
+			string outcome = "";
+			if (is_crit) { hit = true; outcome = "Critical hit!"; }
+			else if (is_fumble) { hit = false; outcome = "Miss!"; }
+			else {
+				hit = total >= attacker.armor_class;
+				outcome = hit ? "Hit!" : "Miss!";
+			}
+			broadcast_announce(sentinel.name + "'s Sentinel — reaction attack against " + attacker.name + " for attacking " + target.name + "!", true);
+			broadcast_roll(sentinel.name, "Sentinel attack", natural, atk_bonus, total, outcome);
+			if (hit) {
+				int dmg_mod = get_damage_modifier_for_attack(sentinel, false);
+				pending_roll dmg_pr;
+				dmg_pr.attack_name = sentinel.main_hand;
+				int base_count = get_attack_damage_count(sentinel, false);
+				dmg_pr.damage_dice_count = is_crit ? base_count * 2 : base_count;
+				dmg_pr.damage_dice_sides = get_attack_damage_dice(sentinel, false);
+				int dmg_natural = roll_attack_damage_natural(sentinel, dmg_pr);
+				int total_damage = dmg_natural + dmg_mod;
+				if (total_damage < 1) total_damage = 1;
+				string dmg_type_name = "damage";
+				if (sentinel.main_hand_damage_type >= 0 and sentinel.main_hand_damage_type < int(DAMAGE_TYPE_NAMES.length())) {
+					dmg_type_name = DAMAGE_TYPE_NAMES[sentinel.main_hand_damage_type] + " damage";
+				}
+				broadcast_roll(sentinel.name, "Sentinel damage", dmg_natural, dmg_mod, total_damage, total_damage + " " + dmg_type_name + " to " + attacker.name + ".");
+				combat.apply_damage(attacker, total_damage, sentinel.main_hand_damage_type, sentinel);
+				// Sentinel Halt: OA hit sets speed to 0
+				attacker.movement_remaining = 0;
+				broadcast_announce(sentinel.name + "'s Sentinel stops " + attacker.name + " in their tracks!", false);
+				maybe_apply_on_kill_features(sentinel, attacker);
+				check_concentration(attacker, total_damage, sentinel);
+				if (attacker.is_dead) {
+					broadcast_announce(attacker.name + " has been slain by " + sentinel.name + "'s Sentinel!", true);
+					broadcast_to_battle({{"type", message_types::creature_died}, {"name", attacker.name}, {"id", attacker.id}, {"killed_by", sentinel.name}, {"was_full_hp", false}, {"was_overkill", total_damage >= attacker.max_hp * 2}, {"was_stealth", false}});
+				} else {
+					broadcast_announce(attacker.name + " has " + attacker.current_hp + " of " + attacker.max_hp + " HP remaining.");
+				}
+				broadcast_state();
+				check_battle_end();
+			}
+			break; // Only one Sentinel reaction per trigger
 		}
 	}
 
@@ -7178,6 +7284,13 @@ class battle_manager {
 			if (c.potion_damage_bonus > 0 and pr.is_weapon_attack) {
 				total_damage += c.potion_damage_bonus;
 			}
+			// PHB 2024 Great Weapon Master (para 7624-7625): "When you hit with a weapon
+			// attack using a Heavy weapon you are proficient with, you can deal extra
+			// damage equal to your Proficiency Bonus."
+			if (!pr.is_spell_effect and pr.is_weapon_attack and c.has_feat("great_weapon_master") and !c.main_hand_is_ranged and weapon_qualifies_great_weapon_fighting(c.main_hand)) {
+				total_damage += c.proficiency;
+				broadcast_announce(c.name + "'s Great Weapon Master adds +" + c.proficiency + " damage.", false);
+			}
 
 			int extra_damage = 0;
 			if (pr.extra_damage_dice_count > 0 and pr.extra_damage_dice_sides > 0) {
@@ -7401,12 +7514,26 @@ class battle_manager {
 				target.y += push_dy;
 				broadcast_announce(c.name + "'s Crusher pushes " + target.name + " back 5 feet!", false);
 			}
+			// PHB 2024 Crusher (para 7579): "Once per turn, on crit with bludgeoning,
+			// attack rolls against target have Advantage until start of your next turn."
+			if (pr.is_crit and c.has_feat("crusher") and pr.damage_type == DMG_BLUDGEONING and !target.is_dead) {
+				target.crusher_crit_advantage = true;
+				target.crusher_crit_source_id = c.id;
+				broadcast_announce(c.name + "'s Crusher critical — all attacks have Advantage against " + target.name + "!", true);
+			}
 			// Feat: Slasher — reduce target speed by 10 on slashing damage (once per turn)
 			if (c.has_feat("slasher") and pr.damage_type == DMG_SLASHING and !c.slasher_used_this_turn) {
 				c.slasher_used_this_turn = true;
 				target.speed -= 10;
 				if (target.speed < 0) target.speed = 0;
 				broadcast_announce(c.name + "'s Slasher reduces " + target.name + "'s speed by 10 feet!", false);
+			}
+			// PHB 2024 Slasher (para 7597): "Once per turn, on crit with slashing,
+			// target has Disadvantage on attack rolls until start of your next turn."
+			if (pr.is_crit and c.has_feat("slasher") and pr.damage_type == DMG_SLASHING and !target.is_dead) {
+				target.slasher_crit_disadvantage = true;
+				target.slasher_crit_source_id = c.id;
+				broadcast_announce(c.name + "'s Slasher critical — " + target.name + " has Disadvantage on attacks!", true);
 			}
 
 			// PHB 2024 Charger feat (para 1394-1403): Charge Attack — after Dash + 10+ ft
@@ -9221,6 +9348,9 @@ class battle_manager {
 				c.blade_flourish_speed_applied = true;
 				c.movement_remaining += 10;
 			}
+			// PHB 2024 Sentinel Guardian — fire on Attack action against non-sentinel target
+			check_sentinel_guardian(c, target);
+			if (c.is_dead or @combat == null or !combat.battle_active) return;
 		}
 
 		int atk_bonus = get_attack_bonus_for_roll(c, false);
