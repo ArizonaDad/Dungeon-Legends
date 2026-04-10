@@ -2778,14 +2778,45 @@ class battle_manager {
 		broadcast_state();
 
 		if (c.current_hp == 0 and c.has_condition(COND_UNCONSCIOUS) and !c.is_dead and !c.is_stable) {
-			user@ u = find_user_for_combatant(c);
-			if (c.is_player) {
-				request_roll(u, c, ROLL_DEATH_SAVE, 20, 0, "death saving throw");
+			// Xanathar's Celestial Warlock L14 Searing Vengeance (paras 2745-2747):
+			// "When you have to make a death saving throw at the start of your turn,
+			// you can instead spring back to your feet with a burst of radiant energy.
+			// You regain hit points equal to half your hit point maximum, and then you
+			// stand up if you so choose. Each creature of your choice that is within
+			// 30 feet of you takes radiant damage equal to 2d8 + your Charisma modifier,
+			// and it is blinded until the end of the current turn."
+			if (c.searing_vengeance_available and !c.searing_vengeance_used) {
+				c.searing_vengeance_used = true;
+				int heal_amt = c.max_hp / 2;
+				c.current_hp = heal_amt;
+				c.remove_condition(COND_UNCONSCIOUS);
+				c.death_save_successes = 0;
+				c.death_save_failures = 0;
+				int cha_mod = c.get_ability_mod(ABILITY_CHA);
+				int sv_dmg = random(1, 8) + random(1, 8) + cha_mod;
+				if (sv_dmg < 1) sv_dmg = 1;
+				broadcast_announce(c.name + " erupts with Searing Vengeance! Regains " + heal_amt + " HP!", true);
+				for (uint svi = 0; svi < combat.combatants.length(); svi++) {
+					combatant@ sv_t = combat.combatants[svi];
+					if (@sv_t == null or sv_t.is_dead or sv_t.id == c.id) continue;
+					if (sv_t.is_player == c.is_player) continue; // skip allies
+					if (feet_distance(c.x, c.y, sv_t.x, sv_t.y) > 30) continue;
+					combat.apply_damage(sv_t, sv_dmg, DMG_RADIANT, c);
+					sv_t.add_condition(COND_BLINDED);
+					broadcast_announce(sv_t.name + " takes " + sv_dmg + " radiant damage and is blinded!", false);
+				}
+				broadcast_state();
+				// Continue turn normally — don't return, fall through to combat actions.
 			} else {
-				c.is_dead = true;
-				advance_turn();
+				user@ u = find_user_for_combatant(c);
+				if (c.is_player) {
+					request_roll(u, c, ROLL_DEATH_SAVE, 20, 0, "death saving throw");
+				} else {
+					c.is_dead = true;
+					advance_turn();
+				}
+				return;
 			}
-			return;
 		}
 
 		if (!c.is_player) {
@@ -7999,6 +8030,13 @@ class battle_manager {
 				and @combat != null and combat.round_number == 1 and !c.dread_ambusher_extra_attack_used) {
 				c.dread_ambusher_extra_attack_used = true;
 				c.attacks_remaining_this_turn++;
+			}
+			// Xanathar's College of Swords L3 Blade Flourish (para 1497): "Whenever
+			// you take the Attack action on your turn, your walking speed increases by
+			// 10 feet until the end of the turn." Free, no BI cost.
+			if (c.class_name == "Bard" and c.subclass == "College of Swords" and c.level >= 3 and !c.blade_flourish_speed_applied) {
+				c.blade_flourish_speed_applied = true;
+				c.movement_remaining += 10;
 			}
 		}
 

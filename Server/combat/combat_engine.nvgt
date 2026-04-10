@@ -350,8 +350,11 @@ class combatant {
 	bool symbiotic_entity_active = false; // Circle of Spores Druid
 	int symbiotic_entity_uses = 0;
 	bool blade_flourish_active = false; // College of Swords Bard
+	bool blade_flourish_speed_applied = false; // Xanathar's Swords Bard L3 (para 1497): +10ft on Attack action
 	bool psychic_blades_pending = false; // College of Whispers Bard
 	bool strength_of_the_grave_used = false; // Shadow Magic Sorcerer
+	bool searing_vengeance_available = false; // Xanathar's Celestial Warlock L14 (para 2745-2747)
+	bool searing_vengeance_used = false;
 	// Ancestral Guardian Barbarian (Xanathar's paras 389-398)
 	int ancestral_protector_target = 0; // who the barbarian marked this turn
 	uint ancestral_protector_marked_by = 0; // ON ANY: ID of Ancestral Guardian who marked this creature
@@ -1414,6 +1417,7 @@ class battle {
 		c.precision_attack_pending = false;
 		c.stalkers_flurry_used_this_turn = false;
 		c.agile_parry_bonus = false;
+		c.blade_flourish_speed_applied = false;
 		c.kenseis_shot_active = false;
 		c.deft_strike_used_this_turn = false;
 		c.unerring_accuracy_used_this_turn = false;

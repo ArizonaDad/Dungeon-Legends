@@ -3032,6 +3032,10 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
                 int self_temp = cs.level + cha_mod;
                 if (self_temp > 0 and c.temp_hp < self_temp) c.temp_hp = self_temp;
             }
+            // Xanathar's Celestial L14 Searing Vengeance (paras 2745-2747):
+            // "When you have to make a death saving throw at the start of your turn,
+            // you can instead spring back to your feet with a burst of radiant energy."
+            if (cs.level >= 14) c.searing_vengeance_available = true;
         }
         // PHB 2024 Warlock Eldritch Invocations: known count scales by level per the
         // Warlock Features table (paras 7607-7762). L1=1, L2-4=3, L5-6=5, L7-8=6,

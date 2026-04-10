@@ -967,7 +967,7 @@ Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 |---------|-------|-------------|--------|
 | **Bonus Proficiencies** (medium armor, scimitar) | 3 | 579-581 | N/A — proficiency tracking exists but not auto-granted by subclass. |
 | **Fighting Style** (Dueling or Two-Weapon Fighting) | 3 | 582-585 | PARTIAL — Dueling/TWF feat system exists; not auto-prompted at subclass selection for Swords Bard. |
-| **Blade Flourish** (on Attack action +10ft speed; on weapon hit spend 1 BI for extra damage + variant) | 3 | 586-591 | PARTIAL — `blade_flourish_active` flag. BA handler spends BI, grants bonus BI-die damage on next weapon hit. Missing: +10ft speed on Attack action, 3 Flourish variants (Defensive=+AC, Slashing=AoE, Mobile=push+move). |
+| **Blade Flourish** (on Attack action +10ft speed; on weapon hit spend 1 BI for extra damage + variant) | 3 | 586-591 | PARTIAL — `blade_flourish_active` BA handler spends BI for bonus BI-die damage. +10ft speed on Attack action wired 2026-04-10 via `blade_flourish_speed_applied`. Missing: 3 Flourish variants (Defensive=+AC, Slashing=AoE, Mobile=push+move) — needs player choice prompt. |
 | **Extra Attack** (attack twice per Attack action) | 6 | 592-593 | ✓ Done — `c.extra_attacks = 1` at L6 in character_data.nvgt. |
 | **Master's Flourish** (Blade Flourish can roll d6 instead of spending BI) | 14 | 594-595 | DEFERRED — requires free-Flourish path that doesn't consume BI. |
 
@@ -1049,7 +1049,7 @@ Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 | **Healing Light** (BA: pool of 1+level d6s, spend 1-CHA mod dice to heal creature within 60ft) | 1 | 2729-2735 | ✓ Done — `healing_light_dice` field initialized to `1 + cs.level`. BA handler with dice spending. Client menu entry wired. |
 | **Radiant Soul** (resistance to radiant damage; when casting fire/radiant spell, add CHA to one damage roll) | 6 | 2736-2739 | ✓ Done 2026-04-10 — radiant resistance at init + CHA mod added to fire/radiant spell damage in both save-based (`resolve_spell_save_damage_roll`) and attack-roll (`ROLL_DAMAGE`) paths. Per-turn flag `radiant_soul_used_this_turn`. |
 | **Celestial Resilience** (temp HP = Warlock level + CHA at end of SR/LR; 5 allies get half Warlock level + CHA) | 10 | 2740-2743 | PARTIAL — self temp HP (level + CHA) applied at combat init. Ally temp HP distribution deferred (no rest system yet). |
-| **Searing Vengeance** (at start of turn while dying: regain half max HP + stand + 2d8+CHA radiant to chosen creatures within 30ft, blinding on fail, 1/LR) | 14 | 2744-2747 | DEFERRED — death save replacement trigger + AoE radiant burst. |
+| **Searing Vengeance** (at start of turn while dying: regain half max HP + stand + 2d8+CHA radiant to chosen creatures within 30ft, blinding on fail, 1/LR) | 14 | 2744-2747 | ✓ Done 2026-04-10 — replaces death save at start of turn. Regains half max HP, removes UNCONSCIOUS, deals 2d8+CHA radiant to enemies within 30ft, blinds them. 1/LR via `searing_vengeance_used`. |
 
 ---
 
