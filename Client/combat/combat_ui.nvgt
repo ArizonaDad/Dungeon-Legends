@@ -183,6 +183,9 @@ bool my_uncanny_metabolism_available = false;
 bool my_superior_defense_active = false;
 int my_superior_defense_rounds_remaining = 0;
 int my_lay_on_hands_pool = 0;
+// PHB 2024 Ranger L10 Tireless / L14 Nature's Veil — synced from server
+int my_natures_veil_uses_remaining = 0;
+int my_tireless_temp_hp_uses_remaining = 0;
 int my_bardic_inspiration_uses = 0;
 int my_bardic_inspiration_grant_die = 0;
 int my_bardic_inspiration_die = 0;
@@ -968,6 +971,9 @@ void show_bonus_action_menu() {
 	int spirit_totem_bear_opt = -1;
 	int spirit_totem_hawk_opt = -1;
 	int spirit_totem_unicorn_opt = -1;
+	// PHB 2024 Ranger L10/L14 base class features
+	int natures_veil_opt = -1;
+	int tireless_temp_hp_opt = -1;
 
 	if (lc == "barbarian" and !my_is_raging and my_rage_uses_remaining > 0) rage_opt = m.add_item("Rage. Bonus action. Uses left: " + my_rage_uses_remaining + ". Damage bonus: " + my_rage_damage_bonus + ".");
 	if (lc == "fighter" and my_second_wind_uses_remaining > 0) second_wind_opt = m.add_item("Second Wind. Bonus action. Heal 1d10 plus fighter level. Uses left: " + my_second_wind_uses_remaining + " of " + my_second_wind_uses_max + ".");
@@ -1184,6 +1190,18 @@ void show_bonus_action_menu() {
 	}
 	if (lc == "ranger" and subclass == "Beast Master") {
 		primal_companion_opt = m.add_item("Primal Companion Attack. Bonus action. Command your animal companion.");
+	}
+	// PHB 2024 Ranger L10 Tireless (para 6178-6180): "As a Magic action, you can give
+	// yourself a number of Temporary Hit Points equal to 1d8 plus your Wisdom modifier."
+	// Wis-mod uses per long rest.
+	if (lc == "ranger" and level >= 10 and my_tireless_temp_hp_uses_remaining > 0) {
+		tireless_temp_hp_opt = m.add_item("Tireless. Magic action. Gain 1d8 + WIS mod temporary hit points. Uses left: " + my_tireless_temp_hp_uses_remaining + ".");
+	}
+	// PHB 2024 Ranger L14 Nature's Veil (para 6184-6186): "As a Bonus Action, you can
+	// give yourself the Invisible condition until the end of your next turn."
+	// Wis-mod uses per long rest.
+	if (lc == "ranger" and level >= 14 and my_natures_veil_uses_remaining > 0) {
+		natures_veil_opt = m.add_item("Nature's Veil. Bonus action. Become Invisible until the end of your next turn. Uses left: " + my_natures_veil_uses_remaining + ".");
 	}
 	if (lc == "ranger" and subclass == "Drakewarden") {
 		drake_attack_opt = m.add_item("Drake Breath. Bonus action. Drake companion breathes fire at target.");
@@ -1464,6 +1482,14 @@ void show_bonus_action_menu() {
 	}
 	else if (superior_defense_opt >= 0 and res == superior_defense_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "superior_defense"}});
+	}
+	else if (natures_veil_opt >= 0 and res == natures_veil_opt) {
+		// PHB 2024 Ranger L14 Nature's Veil (para 6184-6186)
+		send({{"type", message_types::bonus_action}, {"feature", "natures_veil"}});
+	}
+	else if (tireless_temp_hp_opt >= 0 and res == tireless_temp_hp_opt) {
+		// PHB 2024 Ranger L10 Tireless (para 6178-6180)
+		send({{"type", message_types::bonus_action}, {"feature", "tireless_temp_hp"}});
 	}
 	else if (bardic_opt >= 0 and res == bardic_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "bardic_inspiration"}, {"target_id", current_target_id}});
@@ -3049,6 +3075,8 @@ void parse_game_state(json_object@ msg) {
 	my_superior_defense_active = msg.exists("my_superior_defense_active") ? bool(msg["my_superior_defense_active"]) : false;
 	my_superior_defense_rounds_remaining = msg.exists("my_superior_defense_rounds_remaining") ? int(msg["my_superior_defense_rounds_remaining"]) : 0;
 	my_lay_on_hands_pool = msg.exists("my_lay_on_hands_pool") ? int(msg["my_lay_on_hands_pool"]) : 0;
+	my_natures_veil_uses_remaining = msg.exists("my_natures_veil_uses_remaining") ? int(msg["my_natures_veil_uses_remaining"]) : 0;
+	my_tireless_temp_hp_uses_remaining = msg.exists("my_tireless_temp_hp_uses_remaining") ? int(msg["my_tireless_temp_hp_uses_remaining"]) : 0;
 	my_bardic_inspiration_uses = msg.exists("my_bardic_inspiration_uses") ? int(msg["my_bardic_inspiration_uses"]) : 0;
 	my_bardic_inspiration_grant_die = msg.exists("my_bardic_inspiration_grant_die") ? int(msg["my_bardic_inspiration_grant_die"]) : 0;
 	my_bardic_inspiration_die = msg.exists("my_bardic_inspiration_die") ? int(msg["my_bardic_inspiration_die"]) : 0;
@@ -3206,6 +3234,8 @@ void reset_combat_state() {
 	my_superior_defense_active = false;
 	my_superior_defense_rounds_remaining = 0;
 	my_lay_on_hands_pool = 0;
+	my_natures_veil_uses_remaining = 0;
+	my_tireless_temp_hp_uses_remaining = 0;
 	my_bardic_inspiration_uses = 0;
 	my_bardic_inspiration_grant_die = 0;
 	my_bardic_inspiration_die = 0;

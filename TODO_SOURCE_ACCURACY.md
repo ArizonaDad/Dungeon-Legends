@@ -323,8 +323,37 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 - Fighting Style at character creation flow + Blessed Warrior cleric cantrip selection prompt.
 - Weapon Mastery property application to attack resolution (shared with Fighter Tactical Master).
 
+### Ranger Audit (2026-04-09) — Basic Rules 2024 paras 5906-6194
+
+| Feature | Level | Source para | Status |
+|---------|-------|-------------|--------|
+| **Favored Enemy** (Hunter's Mark always prepared, free casts scale 2/3/4/5/6) | 1 | 6155-6157 | ✓ Done 2026-04-09 — `grant_free_cast()` helper sets explicit count; scaling 2 (L1-4), 3 (L5-8), 4 (L9-12), 5 (L13-16), 6 (L17+). |
+| **Spellcasting** (WIS, half-caster, Druidic Focus) | 1 | 6158-6164 | ✓ Done — `cs.is_caster=true`, `spellcasting_ability=ABILITY_WIS`, half-caster slot table. |
+| **Weapon Mastery** (2 weapons) | 1 | 6165-6166 | DEFERRED — base weapon mastery system not yet wired to attack resolution. |
+| **Deft Explorer** (Expertise in 1 of your skills) | 2 | 6167-6168 | DEFERRED — needs player choice prompt at L2 (and again with the 2 added skills at L9 in same feature line). |
+| **Fighting Style** (incl. Druidic Warrior druid cantrips) | 2 | 6169-6170 | DEFERRED — Fighting Style feat selection at character creation not yet implemented for Ranger. Druidic Warrior cantrip choice deferred. |
+| **Ranger Subclass** | 3 | 6171-6172 | ✓ Done — 6+ subclasses (Hunter, Gloom Stalker, Beast Master, Fey Wanderer, Drakewarden, Horizon Walker). |
+| **Ability Score Improvement** | 4/8/12/16/19 | 6173 | ✓ Done — global feat-grant system. |
+| **Roving** (+10 ft speed, climb/swim speed = speed) | 5 | 6174-6175 | ✓ Done 2026-04-09 — applied at init; +10 ft speed with matching climb/swim. |
+| **Extra Attack** (2 attacks) | 5 | 6176-6177 | ✓ Done — `cs.extra_attacks=1` set in init. |
+| **Expertise** (2 more skills) | 9 | 6177 | DEFERRED — needs player choice prompt at L9. |
+| **Tireless** (Magic action 1d8+WIS temp HP, WIS-mod uses/LR; halve exhaustion on SR) | 10 | 6178-6180 | PARTIAL 2026-04-09 — temp HP grant via bonus action menu, WIS mod uses tracked, server enforces action consumption. Exhaustion halving on SR deferred (no exhaustion subsystem yet). |
+| **Nature's Veil** (Bonus Action self-Invisible until end of next turn, WIS-mod uses/LR) | 14 | 6184-6186 | ✓ Done 2026-04-09 — full implementation: bonus action handler, condition application, 2-tick rounds_remaining, end-of-turn cleanup in `advance_turn`. |
+| **Relentless Hunter** (Hunter's Mark concentration cannot be broken by damage) | 13 | 6182-6183 | ✓ Done 2026-04-09 — short-circuit at top of `check_concentration` when target is L13+ Ranger and concentration spell is "Hunter's Mark". |
+| **Precise Hunter** (advantage on attack rolls vs your Hunter's Mark target) | 17 | 6187-6188 | ✓ Done 2026-04-09 — advantage flag set in `apply_attack_advantage_state` after Vow of Enmity check. |
+| **Feral Senses** (Blindsight 30 ft) | 18 | 6189-6190 | ✓ Done 2026-04-09 — sets `blindsight_range = 30` if higher than current at init. |
+| **Foe Slayer** (Hunter's Mark damage die d6 → d10) | 20 | 6193-6194 | ✓ Done 2026-04-09 — Hunter's Mark damage line now picks d10 when caster is L20+ Ranger. |
+| **Epic Boon** | 19 | 6191-6192 | ✓ Done — Epic Boon feat catalog. |
+
+**Pending follow-up Ranger batches:**
+- Deft Explorer L2 Expertise player choice (Skill Expertise selection prompt at character creation/level-up).
+- Expertise L9 (2 more skills player choice).
+- Fighting Style L2 (Archery / Defense / Druidic Warrior / Two-Weapon Fighting / Thrown Weapon Fighting / Blind Fighting). Druidic Warrior also requires a druid-cantrip selection prompt.
+- Tireless L10 exhaustion-halving on Short Rest (deferred until exhaustion subsystem exists).
+- Weapon Mastery property application to attack resolution (shared with Fighter Tactical Master and Paladin L1).
+
 - **Paladin:** Lay on Hands (pool size), Divine Smite (slot-based in 2024), Aura of Courage, Cleansing Touch — all addressed in 2026-04-09 audit; remaining items in pending list above.
-- **Ranger:** Favored Enemy (2024 uses Hunter's Mark), Natural Explorer, Primeval Awareness
+- **Ranger:** Favored Enemy / Roving / Tireless / Relentless Hunter / Nature's Veil / Precise Hunter / Feral Senses / Foe Slayer all addressed 2026-04-09; deferred items in Ranger pending list above.
 - **Rogue:** Sneak Attack dice scaling, Cunning Strike (2024), Reliable Talent
 - **Sorcerer:** Font of Magic, Metamagic options (need full list), Sorcerous Restoration
 - **Warlock:** Pact Boon selection, Mystic Arcanum, Eldritch Master

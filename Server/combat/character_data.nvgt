@@ -2000,6 +2000,45 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         }
     }
     if (cs.class_name == "Ranger") {
+        // PHB 2024 Ranger L1 Favored Enemy (para 6155-6157): "You always have the
+        // Hunter's Mark spell prepared. You can cast it twice without expending a
+        // spell slot, and you regain all expended uses of this ability when you
+        // finish a Long Rest." Free cast count scales: L1-4 = 2, L5-8 = 3,
+        // L9-12 = 4, L13-16 = 5, L17+ = 6.
+        int fe_uses = 2;
+        if (cs.level >= 17) fe_uses = 6;
+        else if (cs.level >= 13) fe_uses = 5;
+        else if (cs.level >= 9) fe_uses = 4;
+        else if (cs.level >= 5) fe_uses = 3;
+        c.grant_free_cast("hunters_mark", fe_uses);
+        // PHB 2024 Ranger L6 Roving (para 6174-6175): "Your Speed increases by 10
+        // feet while you aren't wearing Heavy armor. You also have a Climb Speed
+        // and a Swim Speed equal to your Speed." Half-caster Ranger uses Medium
+        // armor by default, so the +10 ft applies.
+        if (cs.level >= 6) {
+            c.speed += 10;
+            if (c.climb_speed < c.speed) c.climb_speed = c.speed;
+            if (c.swim_speed < c.speed) c.swim_speed = c.speed;
+        }
+        // PHB 2024 Ranger L10 Tireless (para 6178-6180): Magic action grants 1d8
+        // + WIS mod temp HP. Uses = WIS mod (min 1) per long rest.
+        if (cs.level >= 10) {
+            int wis_mod_r = (cs.wisdom - 10) / 2;
+            int t_uses = wis_mod_r > 0 ? wis_mod_r : 1;
+            c.tireless_temp_hp_uses_remaining = t_uses;
+        }
+        // PHB 2024 Ranger L14 Nature's Veil (para 6184-6186): Bonus Action grants
+        // Invisible until end of next turn. Uses = WIS mod (min 1) per long rest.
+        if (cs.level >= 14) {
+            int wis_mod_nv = (cs.wisdom - 10) / 2;
+            int nv_uses = wis_mod_nv > 0 ? wis_mod_nv : 1;
+            c.natures_veil_uses_remaining = nv_uses;
+        }
+        // PHB 2024 Ranger L18 Feral Senses (para 6189-6190): "Your connection to
+        // the forces of nature grants you Blindsight with a range of 30 feet."
+        if (cs.level >= 18) {
+            if (c.blindsight_range < 30) c.blindsight_range = 30;
+        }
         // Fizban's: Drakewarden (Drake Companion HP and stats)
         if (cs.subclass == "Drakewarden" and cs.level >= 3) {
             c.drake_companion_active = false; // toggled by action

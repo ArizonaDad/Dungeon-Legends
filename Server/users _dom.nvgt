@@ -1692,6 +1692,43 @@ void handle_user_message(user@ u, json_object@ msg)
 			text += " " + c.lay_on_hands_pool + " Lay on Hands points remain.";
 			u.room.bm.broadcast_announce(text, true);
 		}
+		else if (feature == "natures_veil") {
+			// PHB 2024 Ranger L14 Nature's Veil (para 6184-6186): "You invoke spirits
+			// of nature to magically hide yourself. As a Bonus Action, you can give
+			// yourself the Invisible condition until the end of your next turn. You
+			// can use this feature a number of times equal to your Wisdom modifier
+			// (minimum of once), and you regain all expended uses when you finish a
+			// Long Rest."
+			if (c.class_name != "Ranger" or c.level < 14) { u.send({{"type", message_types::announce}, {"text", "Your character cannot use Nature's Veil."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
+			if (c.natures_veil_uses_remaining <= 0) { u.send({{"type", message_types::announce}, {"text", "You have no Nature's Veil uses remaining (recovers on Long Rest)."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.natures_veil_uses_remaining--;
+			c.add_condition(COND_INVISIBLE);
+			c.natures_veil_rounds_remaining = 2; // ticks down at start of each turn; ends at end of next turn
+			u.room.bm.broadcast_announce(c.name + " invokes Nature's Veil and vanishes from sight! (" + c.natures_veil_uses_remaining + " uses remaining)", true);
+			u.room.bm.broadcast_to_battle({{"type", message_types::condition_applied}, {"target", c.name}, {"condition", "Invisible"}});
+		}
+		else if (feature == "tireless_temp_hp") {
+			// PHB 2024 Ranger L10 Tireless (para 6178-6180): "As a Magic action, you
+			// can give yourself a number of Temporary Hit Points equal to 1d8 plus
+			// your Wisdom modifier (minimum of 1). You can use this action a number
+			// of times equal to your Wisdom modifier (minimum of once), and you
+			// regain all expended uses when you finish a Long Rest." Implemented as
+			// a bonus action menu entry — the action cost is treated as a Magic
+			// action equivalent (consumes the standard action below).
+			if (c.class_name != "Ranger" or c.level < 10) { u.send({{"type", message_types::announce}, {"text", "Your character cannot use Tireless."}, {"interrupt", true}}); return; }
+			if (!c.has_action) { u.send({{"type", message_types::announce}, {"text", "No action available (Tireless is a Magic action)."}, {"interrupt", true}}); return; }
+			if (c.tireless_temp_hp_uses_remaining <= 0) { u.send({{"type", message_types::announce}, {"text", "You have no Tireless uses remaining (recovers on Long Rest)."}, {"interrupt", true}}); return; }
+			c.has_action = false;
+			c.tireless_temp_hp_uses_remaining--;
+			int wis_mod_t = c.get_ability_mod(ABILITY_WIS);
+			int t_grant = random(1, 8) + wis_mod_t;
+			if (t_grant < 1) t_grant = 1;
+			if (t_grant > c.temp_hp) c.temp_hp = t_grant;
+			u.room.bm.broadcast_announce(c.name + "'s Tireless grants " + t_grant + " temporary HP. (" + c.tireless_temp_hp_uses_remaining + " uses remaining)", true);
+		}
 		else if (feature == "cunning_action") {
 			if (c.class_name != "Rogue" or c.level < 2) { u.send({{"type", message_types::announce}, {"text", "Your character cannot use Cunning Action."}, {"interrupt", true}}); return; }
 			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }

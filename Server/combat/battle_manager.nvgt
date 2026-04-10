@@ -1964,6 +1964,12 @@ class battle_manager {
 		if (attacker.vow_of_enmity_target != 0 and attacker.vow_of_enmity_target == target.id) {
 			adv = true;
 		}
+		// PHB 2024 Ranger L17 Precise Hunter (para 6187-6188): "You have Advantage
+		// on attack rolls against the creature currently marked by your Hunter's
+		// Mark."
+		if (attacker.class_name == "Ranger" and attacker.level >= 17 and attacker.hunters_mark_target_id != 0 and attacker.hunters_mark_target_id == target.id) {
+			adv = true;
+		}
 		// Samurai Fighter: Fighting Spirit — advantage on attacks when active
 		if (attacker.class_name == "Fighter" and attacker.subclass == "Samurai" and attacker.fighting_spirit_active) {
 			adv = true;
@@ -2972,6 +2978,17 @@ class battle_manager {
 		if (@prev != null) {
 			prev.is_dodging = false;
 			prev.remove_condition(COND_DODGING);
+			// PHB 2024 Ranger L14 Nature's Veil (para 6184-6186): Invisible "until the
+			// end of your next turn." Cast sets rounds_remaining = 2; tick down on each
+			// of the Ranger's turn-ends. When it hits 0, remove the Invisible condition.
+			if (prev.natures_veil_rounds_remaining > 0) {
+				prev.natures_veil_rounds_remaining--;
+				if (prev.natures_veil_rounds_remaining <= 0) {
+					prev.remove_condition(COND_INVISIBLE);
+					broadcast_to_battle({{"type", message_types::condition_removed}, {"target", prev.name}, {"condition", "Invisible"}});
+					broadcast_announce(prev.name + "'s Nature's Veil fades.", false);
+				}
+			}
 			if (prev.raging) {
 				if (prev.is_dead or prev.current_hp <= 0) {
 					prev.raging = false;
@@ -3296,6 +3313,10 @@ class battle_manager {
 	void check_concentration(combatant@ target, int damage, combatant@ attacker = null) {
 		if (@target == null or @combat == null) return;
 		if (!target.is_concentrating) return;
+		// PHB 2024 Ranger L13 Relentless Hunter (para 6182-6183): "Taking damage
+		// can't break your Concentration on Hunter's Mark." Skip the save entirely
+		// when the concentrated spell is Hunter's Mark and the caster is L13+ Ranger.
+		if (target.class_name == "Ranger" and target.level >= 13 and target.concentration_spell == "Hunter's Mark") return;
 		if (target.is_dead or target.current_hp <= 0) {
 			// Concentration automatically broken at 0 HP.
 			string ended_spell = target.concentration_spell;
@@ -4898,7 +4919,10 @@ class battle_manager {
 				broadcast_announce(c.name + "'s Divine Smite deals " + smite_damage + " extra radiant damage!", true);
 			}
 			if (!pr.is_spell_effect and c.hunters_mark_target_id == target.id) {
-				int mark_damage = random(1, 6);
+				// PHB 2024 Ranger L20 Foe Slayer (para 6193-6194): "The damage die of
+				// your Hunter's Mark is a d10 rather than a d6."
+				int mark_die = (c.class_name == "Ranger" and c.level >= 20) ? 10 : 6;
+				int mark_damage = random(1, mark_die);
 				total_damage += mark_damage;
 				broadcast_announce(c.name + "'s Hunter's Mark deals " + mark_damage + " extra damage to " + target.name + ".", false);
 			}

@@ -520,6 +520,13 @@ class combatant {
 	uint heroism_source_id = 0;
 	int heroism_temp_hp_amount = 0;
 	uint hunters_mark_target_id = 0;
+	// PHB 2024 Ranger L14 Nature's Veil (para 6184-6186): Bonus Action invisibility
+	// until end of next turn. Uses = WIS mod (min 1) per long rest.
+	int natures_veil_uses_remaining = 0;
+	int natures_veil_rounds_remaining = 0; // ticks down at start of turn; ends at end of next turn
+	// PHB 2024 Ranger L10 Tireless Temporary Hit Points (para 6178-6180): Magic action
+	// grants 1d8 + WIS mod temp HP. Uses = WIS mod per long rest.
+	int tireless_temp_hp_uses_remaining = 0;
 	uint hex_target_id = 0;
 	bool spiritual_weapon_active = false;
 	int spiritual_weapon_slot_level = 0;
@@ -954,6 +961,17 @@ class combatant {
 			if (free_cast_spells[i] == spell_id) return free_cast_uses_remaining[i];
 		}
 		return 0;
+	}
+
+	void grant_free_cast(string spell_id, int uses) {
+		for (uint i = 0; i < free_cast_spells.length() and i < free_cast_uses_remaining.length(); i++) {
+			if (free_cast_spells[i] == spell_id) {
+				if (uses > free_cast_uses_remaining[i]) free_cast_uses_remaining[i] = uses;
+				return;
+			}
+		}
+		free_cast_spells.insert_last(spell_id);
+		free_cast_uses_remaining.insert_last(uses);
 	}
 
 	bool use_free_cast(string spell_id) {
@@ -1572,6 +1590,9 @@ class battle {
 				state["my_portent_2_used"] = c.portent_2_used;
 				state["my_fey_presence_used"] = c.fey_presence_used;
 				state["my_dread_ambusher_used"] = c.dread_ambusher_used;
+				// PHB 2024 Ranger L10 Tireless / L14 Nature's Veil — broadcast use counts
+				state["my_natures_veil_uses_remaining"] = c.natures_veil_uses_remaining;
+				state["my_tireless_temp_hp_uses_remaining"] = c.tireless_temp_hp_uses_remaining;
 				// Potion buff rounds remaining
 				state["my_potion_damage_rounds"] = c.potion_damage_rounds;
 				state["my_potion_ac_rounds"] = c.potion_ac_rounds;
