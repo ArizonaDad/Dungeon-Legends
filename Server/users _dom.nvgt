@@ -1813,8 +1813,12 @@ void handle_user_message(user@ u, json_object@ msg)
 			c.used_bonus_action = true;
 			c.innate_sorcery_active = true;
 			c.innate_sorcery_rounds_remaining = 10; // 1 minute = 10 rounds
+			// PHB 2024 Sorcerer L7 Sorcery Incarnate (para 7004-7006): "While your Innate
+			// Sorcery feature is active, you can use up to two Metamagic options on each spell."
+			c.sorcery_incarnate_active = (c.level >= 7);
 			string activate_msg = c.name + " unleashes Innate Sorcery! Spell save DC +1 and Advantage on Sorcerer spell attack rolls for 1 minute.";
-			if (used_sp) activate_msg += " (Sorcery Incarnate: 2 Sorcery Points spent.)";
+			if (c.sorcery_incarnate_active) activate_msg += " Sorcery Incarnate: two Metamagic options per spell!";
+			if (used_sp) activate_msg += " (2 Sorcery Points spent.)";
 			u.room.bm.broadcast_announce(activate_msg, true);
 		}
 		else if (feature == "dragon_wings") {
@@ -2373,16 +2377,31 @@ void handle_user_message(user@ u, json_object@ msg)
 			int cost = 1;
 			if (option == "heightened" or option == "quickened") cost = 2;
 			if (c.sorcery_points < cost) { u.send({{"type", message_types::announce}, {"text", "Not enough Sorcery Points. Need " + cost + ", have " + c.sorcery_points + "."}, {"interrupt", true}}); return; }
-			// Clear existing primary metamagic (not Empowered/Seeking which can stack per source)
+			// Clear existing primary metamagic (not Empowered/Seeking which can stack per source).
+			// PHB 2024 Sorcery Incarnate (para 7004-7006): while Innate Sorcery is active at L7+,
+			// allow two metamagic options per spell. Count active primary metamagics and only
+			// clear if at the limit (1 normally, 2 with Sorcery Incarnate).
 			if (option != "empowered" and option != "seeking") {
-				c.metamagic_careful_active = false;
-				c.metamagic_distant_active = false;
-				c.metamagic_extended_active = false;
-				c.metamagic_heightened_active = false;
-				c.metamagic_quickened_active = false;
-				c.metamagic_subtle_active = false;
-				c.metamagic_transmuted_active = false;
-				c.metamagic_twinned_active = false;
+				int active_count = 0;
+				if (c.metamagic_careful_active) active_count++;
+				if (c.metamagic_distant_active) active_count++;
+				if (c.metamagic_extended_active) active_count++;
+				if (c.metamagic_heightened_active) active_count++;
+				if (c.metamagic_quickened_active) active_count++;
+				if (c.metamagic_subtle_active) active_count++;
+				if (c.metamagic_transmuted_active) active_count++;
+				if (c.metamagic_twinned_active) active_count++;
+				int max_primary = c.sorcery_incarnate_active ? 2 : 1;
+				if (active_count >= max_primary) {
+					c.metamagic_careful_active = false;
+					c.metamagic_distant_active = false;
+					c.metamagic_extended_active = false;
+					c.metamagic_heightened_active = false;
+					c.metamagic_quickened_active = false;
+					c.metamagic_subtle_active = false;
+					c.metamagic_transmuted_active = false;
+					c.metamagic_twinned_active = false;
+				}
 			}
 			// Deduct SP and activate
 			c.sorcery_points -= cost;

@@ -4231,6 +4231,7 @@ class battle_manager {
 				prev.innate_sorcery_rounds_remaining--;
 				if (prev.innate_sorcery_rounds_remaining <= 0) {
 					prev.innate_sorcery_active = false;
+					prev.sorcery_incarnate_active = false;
 					broadcast_announce(prev.name + "'s Innate Sorcery fades.", false);
 				}
 			}
@@ -8096,7 +8097,8 @@ class battle_manager {
 			// Xanathar's War Magic L6 Power Surge (para 2937-2940): "Once per turn when you deal
 			// damage to a creature with a wizard spell, you can spend one power surge to deal
 			// extra force damage to that target. The extra damage equals half your wizard level."
-			// Applies automatically on spell attack hits. Save-based spell Power Surge deferred.
+			// Currently auto-fires on spell attack hits. Save-based spell damage has ~30 inline
+			// sites — Power Surge for save-based damage deferred to a dedicated coverage batch.
 			if (pr.is_spell_effect and c.class_name == "Wizard" and c.subclass == "War Magic" and c.level >= 6 and c.power_surge_charges > 0 and !c.power_surge_used_this_turn) {
 				int surge_dmg = c.level / 2;
 				if (surge_dmg < 1) surge_dmg = 1;
