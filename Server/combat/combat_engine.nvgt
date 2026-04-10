@@ -255,6 +255,21 @@ class combatant {
 	int bardic_inspiration_grant_die = 0;
 	int bardic_inspiration_die = 0;
 	uint bardic_inspiration_source_id = 0;
+	// PHB 2024 Bard L5 Font of Inspiration (para 2753-2755): regain BI on Short/Long Rest;
+	// also expend a spell slot (no action) to regain 1 BI use.
+	bool font_of_inspiration_active = false;
+	// PHB 2024 Bard L7 Countercharm (para 2756-2757): Reaction to reroll a save with
+	// advantage when an ally within 30 ft fails a save vs Charmed/Frightened.
+	bool countercharm_active = false;
+	// PHB 2024 Bard L10 Magical Secrets (para 2758-2759): can prepare spells from
+	// Bard/Cleric/Druid/Wizard lists. Flag for future spell-prep prompt.
+	bool magical_secrets_active = false;
+	// PHB 2024 Bard L18 Superior Inspiration (para 2760-2761): on initiative roll,
+	// regain expended BI uses until you have 2 if you have fewer.
+	bool superior_inspiration_active = false;
+	// PHB 2024 Bard L20 Words of Creation (para 2764-2765): always prepared Power Word
+	// Heal/Kill; can target a second creature within 10 ft of the first.
+	bool words_of_creation_active = false;
 	int rage_uses_remaining = 0;
 	int rage_damage_bonus = 0;
 	bool raging = false;
@@ -1648,6 +1663,11 @@ class battle {
 				state["my_bardic_inspiration_uses"] = c.bardic_inspiration_uses;
 				state["my_bardic_inspiration_grant_die"] = c.bardic_inspiration_grant_die;
 				state["my_bardic_inspiration_die"] = c.bardic_inspiration_die;
+				state["my_font_of_inspiration_active"] = c.font_of_inspiration_active;
+				state["my_countercharm_active"] = c.countercharm_active;
+				state["my_magical_secrets_active"] = c.magical_secrets_active;
+				state["my_superior_inspiration_active"] = c.superior_inspiration_active;
+				state["my_words_of_creation_active"] = c.words_of_creation_active;
 				state["my_rage_uses_remaining"] = c.rage_uses_remaining;
 				state["my_rage_damage_bonus"] = c.rage_damage_bonus;
 				state["my_is_raging"] = c.raging;

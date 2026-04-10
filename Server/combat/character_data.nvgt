@@ -1686,6 +1686,37 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         }
     }
     if (cs.class_name == "Bard") {
+        // PHB 2024 Bard L5 Font of Inspiration (paras 2753-2755): "You now regain all
+        // your expended uses of Bardic Inspiration when you finish a Short or Long Rest.
+        // In addition, you can expend a spell slot (no action required) to regain one
+        // expended use of Bardic Inspiration."
+        if (cs.level >= 5) c.font_of_inspiration_active = true;
+        // PHB 2024 Bard L7 Countercharm (paras 2756-2757): "If you or a creature within
+        // 30 feet of you fails a saving throw against an effect that applies the Charmed
+        // or Frightened condition, you can take a Reaction to cause the save to be
+        // rerolled, and the new roll has Advantage."
+        if (cs.level >= 7) c.countercharm_active = true;
+        // PHB 2024 Bard L10 Magical Secrets (paras 2758-2759): "you can choose any of
+        // your new prepared spells from the Bard, Cleric, Druid, and Wizard spell lists,
+        // and the chosen spells count as Bard spells for you."
+        if (cs.level >= 10) c.magical_secrets_active = true;
+        // PHB 2024 Bard L18 Superior Inspiration (paras 2760-2761): "When you roll
+        // Initiative, you regain expended uses of Bardic Inspiration until you have
+        // two if you have fewer than that."
+        if (cs.level >= 18) c.superior_inspiration_active = true;
+        // PHB 2024 Bard L20 Words of Creation (paras 2764-2765): "You therefore always
+        // have the Power Word Heal and Power Word Kill spells prepared. When you cast
+        // either spell, you can target a second creature with it if that creature is
+        // within 10 feet of the first target."
+        if (cs.level >= 20) {
+            c.words_of_creation_active = true;
+            bool has_pwh = false;
+            for (uint si = 0; si < c.prepared_spells.length(); si++) if (c.prepared_spells[si] == "power_word_heal") { has_pwh = true; break; }
+            if (!has_pwh) c.prepared_spells.insert_last("power_word_heal");
+            bool has_pwk = false;
+            for (uint si = 0; si < c.prepared_spells.length(); si++) if (c.prepared_spells[si] == "power_word_kill") { has_pwk = true; break; }
+            if (!has_pwk) c.prepared_spells.insert_last("power_word_kill");
+        }
         if (cs.subclass == "College of Spirits" and cs.level >= 3) {
             c.college_spirits_tale = false;
         }

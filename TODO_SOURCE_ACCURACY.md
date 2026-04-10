@@ -180,7 +180,7 @@ Audited against Basic Rules 2024 paras 2301-2359 (full Barbarian class entry).
 Other base class features that still need the same audit:
 - **Barbarian (Brutal Strike line above is the only remaining gap)**
 
-### Bard — RESOLVED 2026-04-09 (mostly)
+### Bard — FULLY RESOLVED 2026-04-09
 Audited against Basic Rules 2024 paras 2722-2765 (full Bard class entry).
 
 | Feature | Level | Source para | Status |
@@ -190,11 +190,11 @@ Audited against Basic Rules 2024 paras 2722-2765 (full Bard class entry).
 | Expertise (2 skills L2, +2 more L9) | 2/9 | 2740-2742 | ✓ Done (system-wide expertise field) |
 | Jack of All Trades (half-prof on non-prof skill checks) | 2 | 2743-2745 | ✓ Done — `combatant.jack_of_all_trades` flag set in `character_data.nvgt` and consumed by `get_skill_bonus` |
 | Bard Subclass | 3 | 2749-2750 | ✓ Done |
-| Font of Inspiration (regen BI on Short Rest, spend slot to regain one) | 5 | 2753-2755 | PARTIAL — regen-on-rest works because in-combat there are no short rests and a long rest (between sessions) restores all uses; the spell-slot-to-BI swap is not yet wired. Defer until a `convert_slot_to_bardic_inspiration` bonus action menu entry exists. |
-| **Countercharm** (Reaction reroll on Charmed/Frightened save fail) | 7 | 2756-2757 | ✗ DEFERRED — requires intercepting save failures at many call sites and offering a Reaction prompt to nearby Bard L7+. Pattern is similar to Cutting Words / Warding Flare. |
-| Magical Secrets (broader spell list at L10) | 10 | 2758 | ✓ Done (out-of-combat spell list expansion, handled by spell menu) |
-| **Superior Inspiration** (top up BI to 2 on Initiative) | 18 | 2760-2761 | ✓ Done 2026-04-09 — `request_next_initiative` restores BI uses to 2 if fewer for Bard L18+ |
-| **Words of Creation** (Power Word Heal/Kill always prepared, target second creature within 10 ft) | 20 | 2764 | ✗ DEFERRED — auto-prepared can be added to `apply_class_defaults`, but the multi-target rider on Power Word Heal/Kill needs custom handler edits |
+| **Font of Inspiration** (regen BI on Short Rest, spend slot to regain one) | 5 | 2753-2755 | ✓ Done 2026-04-09 — `font_of_inspiration_active` flag set on Bard init at L5+. New `font_of_inspiration` handler in `users _dom.nvgt` is a no-action menu entry that finds the lowest-level available spell slot, expends it, and increments `bardic_inspiration_uses` (capped at CHA mod). Short-rest regen is naturally handled because in-session we only have long rests, which already restore all BI. |
+| **Countercharm** (Reaction reroll on Charmed/Frightened save fail) | 7 | 2756-2757 | ✓ Done 2026-04-09 — `countercharm_active` flag set on Bard init at L7+. New `try_countercharm_reroll` helper in `battle_manager.nvgt` scans for any L7+ Bard ally with `countercharm_active` and reaction available within 30 ft of the failing save target (self allowed per RAW), consumes the reaction, rerolls the save with advantage. Wired into 15 Charm/Frighten failed-save sites: cause_fear AoE/single, hypnotic_pattern, phantasmal_killer, mass_suggestion, command, suggestion, eyebite, dominate_person, charm_person, dominate_monster, enthrall, charm_monster, dominate_beast, weird. Polymorph's COND_CHARMED is an implementation marker (not a real charm) so it is intentionally skipped. |
+| Magical Secrets (broader spell list at L10) | 10 | 2758 | ✓ Done — `magical_secrets_active` flag now set on Bard init at L10+ for client UI awareness. Out-of-combat spell list expansion handled by existing spell menu. |
+| **Superior Inspiration** (top up BI to 2 on Initiative) | 18 | 2760-2761 | ✓ Done 2026-04-09 — `superior_inspiration_active` flag set on Bard init at L18+; `request_next_initiative` restores BI uses to 2 if fewer for Bards with the flag. |
+| **Words of Creation** (Power Word Heal/Kill always prepared, target second creature within 10 ft) | 20 | 2764 | ✓ Done 2026-04-09 — `words_of_creation_active` flag set on Bard init at L20+. Power Word Heal and Power Word Kill are auto-added to `c.prepared_spells` for L20 Bards; spell catalog `class_list` updated to "wizard,bard" so they appear in the bard's spell menu. Both `power_word_heal` and `power_word_kill` cast handlers in `battle_manager.nvgt` check `c.words_of_creation_active` and apply the spell to a second creature within 10 ft of the first target — Power Word Heal auto-picks the most-injured ally, Power Word Kill auto-picks the lowest-HP enemy (highest kill chance). |
 
 ### Cleric — RESOLVED 2026-04-09 (almost all features)
 Audited against Basic Rules 2024 paras 3589-3630 (full Cleric class entry).

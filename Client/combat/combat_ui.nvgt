@@ -209,6 +209,11 @@ string my_signature_spell_b_id = "";
 int my_bardic_inspiration_uses = 0;
 int my_bardic_inspiration_grant_die = 0;
 int my_bardic_inspiration_die = 0;
+bool my_font_of_inspiration_active = false;
+bool my_countercharm_active = false;
+bool my_magical_secrets_active = false;
+bool my_superior_inspiration_active = false;
+bool my_words_of_creation_active = false;
 int my_rage_uses_remaining = 0;
 int my_rage_damage_bonus = 0;
 bool my_is_raging = false;
@@ -867,6 +872,7 @@ void show_bonus_action_menu() {
 	int lay_hands_opt = -1;
 	int flurry_opt = -1;
 	int bardic_opt = -1;
+	int font_of_inspiration_opt = -1;
 	int wild_shape_opt = -1;
 	int spiritual_weapon_opt = -1;
 	// Subclass bonus action options
@@ -1075,6 +1081,9 @@ void show_bonus_action_menu() {
 		}
 	}
 	if (lc == "bard" and my_bardic_inspiration_uses > 0) bardic_opt = m.add_item("Bardic Inspiration. Bonus action. Uses left: " + my_bardic_inspiration_uses + ".");
+	// PHB 2024 Bard L5 Font of Inspiration (paras 2753-2755). No action; expend lowest
+	// spell slot to regain one Bardic Inspiration use.
+	if (lc == "bard" and my_font_of_inspiration_active) font_of_inspiration_opt = m.add_item("Font of Inspiration. No action. Expend lowest spell slot to regain one Bardic Inspiration use.");
 	if (lc == "druid" and level >= 2 and (currently_wild_shaped or subclass == "Circle of the Moon")) {
 		if (currently_wild_shaped) wild_shape_opt = m.add_item("Wild Shape. Revert or choose a new beast form.");
 		else wild_shape_opt = m.add_item("Wild Shape. Bonus action. Transform into a beast.");
@@ -1492,6 +1501,7 @@ void show_bonus_action_menu() {
 	if (lay_hands_opt >= 0) options++;
 	if (flurry_opt >= 0) options++;
 	if (bardic_opt >= 0) options++;
+	if (font_of_inspiration_opt >= 0) options++;
 	if (wild_shape_opt >= 0) options++;
 	if (spiritual_weapon_opt >= 0) options++;
 	if (trip_opt >= 0) options++;
@@ -1636,6 +1646,10 @@ void show_bonus_action_menu() {
 	}
 	else if (bardic_opt >= 0 and res == bardic_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "bardic_inspiration"}, {"target_id", current_target_id}});
+	}
+	else if (font_of_inspiration_opt >= 0 and res == font_of_inspiration_opt) {
+		// PHB 2024 Bard L5 Font of Inspiration (paras 2753-2755). No action.
+		send({{"type", message_types::bonus_action}, {"feature", "font_of_inspiration"}});
 	}
 	else if (wild_shape_opt >= 0 and res == wild_shape_opt) {
 		show_wild_shape_menu(currently_wild_shaped);
@@ -3240,6 +3254,11 @@ void parse_game_state(json_object@ msg) {
 	my_bardic_inspiration_uses = msg.exists("my_bardic_inspiration_uses") ? int(msg["my_bardic_inspiration_uses"]) : 0;
 	my_bardic_inspiration_grant_die = msg.exists("my_bardic_inspiration_grant_die") ? int(msg["my_bardic_inspiration_grant_die"]) : 0;
 	my_bardic_inspiration_die = msg.exists("my_bardic_inspiration_die") ? int(msg["my_bardic_inspiration_die"]) : 0;
+	my_font_of_inspiration_active = msg.exists("my_font_of_inspiration_active") ? bool(msg["my_font_of_inspiration_active"]) : false;
+	my_countercharm_active = msg.exists("my_countercharm_active") ? bool(msg["my_countercharm_active"]) : false;
+	my_magical_secrets_active = msg.exists("my_magical_secrets_active") ? bool(msg["my_magical_secrets_active"]) : false;
+	my_superior_inspiration_active = msg.exists("my_superior_inspiration_active") ? bool(msg["my_superior_inspiration_active"]) : false;
+	my_words_of_creation_active = msg.exists("my_words_of_creation_active") ? bool(msg["my_words_of_creation_active"]) : false;
 	my_rage_uses_remaining = msg.exists("my_rage_uses_remaining") ? int(msg["my_rage_uses_remaining"]) : 0;
 	my_rage_damage_bonus = msg.exists("my_rage_damage_bonus") ? int(msg["my_rage_damage_bonus"]) : 0;
 	my_is_raging = msg.exists("my_is_raging") ? bool(msg["my_is_raging"]) : false;
@@ -3416,6 +3435,11 @@ void reset_combat_state() {
 	my_bardic_inspiration_uses = 0;
 	my_bardic_inspiration_grant_die = 0;
 	my_bardic_inspiration_die = 0;
+	my_font_of_inspiration_active = false;
+	my_countercharm_active = false;
+	my_magical_secrets_active = false;
+	my_superior_inspiration_active = false;
+	my_words_of_creation_active = false;
 	my_rage_uses_remaining = 0;
 	my_rage_damage_bonus = 0;
 	my_is_raging = false;

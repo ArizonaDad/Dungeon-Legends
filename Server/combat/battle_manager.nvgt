@@ -2544,6 +2544,37 @@ class battle_manager {
 		return random(1, 4);
 	}
 
+	// PHB 2024 Bard L7 Countercharm (paras 2756-2757): "If you or a creature within
+	// 30 feet of you fails a saving throw against an effect that applies the Charmed
+	// or Frightened condition, you can take a Reaction to cause the save to be
+	// rerolled, and the new roll has Advantage."
+	// Auto-fires for any L7+ Bard ally within 30 ft of the failing target who still
+	// has their reaction. Returns true if the reroll turned the failed save into a
+	// success (caller should treat the save as passed and skip applying the condition).
+	bool try_countercharm_reroll(combatant@ target, int save_dc, int save_bonus, string save_label) {
+		if (@target == null or @combat == null) return false;
+		for (uint i = 0; i < combat.combatants.length(); i++) {
+			combatant@ bard = combat.combatants[i];
+			if (@bard == null or bard.is_dead) continue;
+			if (bard.class_name != "Bard" or bard.level < 7) continue;
+			if (!bard.countercharm_active) continue;
+			if (!bard.has_reaction) continue;
+			// Source allows self ("you or a creature within 30 feet of you").
+			// Allies only (not enemies) unless this is PvP.
+			if (bard.is_player != target.is_player and combat.mode != "pvp") continue;
+			if (feet_distance(bard.x, bard.y, target.x, target.y) > 30) continue;
+			int r1 = random(1, 20);
+			int r2 = random(1, 20);
+			int new_roll = r1 > r2 ? r1 : r2;
+			int new_total = new_roll + save_bonus;
+			bard.has_reaction = false;
+			bool new_saved = new_total >= save_dc;
+			broadcast_announce(bard.name + " uses Countercharm! " + target.name + " rerolls the " + save_label + " with advantage (" + r1 + "/" + r2 + ", total " + new_total + ") — " + (new_saved ? "saved!" : "still failed."), true);
+			return new_saved;
+		}
+		return false;
+	}
+
 	void clear_haste_effect(combatant@ target, bool apply_lethargy = true, bool announce = true) {
 		if (@target == null or !target.hasted) return;
 		target.speed = target.speed / 2;
@@ -2901,7 +2932,7 @@ class battle_manager {
 		// PHB 2024 Bard Level 18: Superior Inspiration (para 2760-2761):
 		// "When you roll Initiative, you regain expended uses of Bardic Inspiration
 		// until you have two if you have fewer than that."
-		if (c.class_name == "Bard" and c.level >= 18 and c.bardic_inspiration_uses < 2) {
+		if (c.class_name == "Bard" and c.superior_inspiration_active and c.bardic_inspiration_uses < 2) {
 			int restored = 2 - c.bardic_inspiration_uses;
 			c.bardic_inspiration_uses = 2;
 			broadcast_announce(c.name + "'s Superior Inspiration restores " + restored + " Bardic Inspiration use" + (restored == 1 ? "" : "s") + ".", false);
@@ -7673,6 +7704,7 @@ class battle_manager {
 					bool saved = save_total >= save_dc;
 					if (bless_bonus > 0) broadcast_announce(t.name + "'s Bless adds " + bless_bonus + " to the save.", false);
 					broadcast_roll(t.name, "WIS save vs Fear", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Frightened!");
+					if (!saved and try_countercharm_reroll(t, save_dc, save_bonus + bless_bonus, "WIS save vs Fear")) saved = true;
 					if (!saved) {
 						t.add_condition(COND_FRIGHTENED);
 						broadcast_to_battle({{"type", message_types::condition_applied}, {"target", t.name}, {"condition", "Frightened"}});
@@ -7699,6 +7731,7 @@ class battle_manager {
 					bool saved = save_total >= save_dc;
 					if (bless_bonus > 0) broadcast_announce(t.name + "'s Bless adds " + bless_bonus + " to the save.", false);
 					broadcast_roll(t.name, "WIS save vs Hypnotic Pattern", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Charmed!");
+					if (!saved and try_countercharm_reroll(t, save_dc, save_bonus + bless_bonus, "WIS save vs Hypnotic Pattern")) saved = true;
 					if (!saved) {
 						t.add_condition(COND_CHARMED);
 						t.add_condition(COND_INCAPACITATED);
@@ -7968,6 +8001,7 @@ class battle_manager {
 				int save_total = save_roll + save_bonus + bless_bonus;
 				bool saved = save_total >= save_dc;
 				broadcast_roll(target.name, "WIS save vs Cause Fear", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Frightened!");
+				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Cause Fear")) saved = true;
 				if (!saved) {
 					target.add_condition(COND_FRIGHTENED);
 					broadcast_announce(target.name + " awakens to their own mortality and is Frightened of " + c.name + "!", true);
@@ -8639,6 +8673,7 @@ class battle_manager {
 				int save_total = save_roll + save_bonus + bless_bonus;
 				bool saved = save_total >= save_dc;
 				broadcast_roll(target.name, "WIS save vs Phantasmal Killer", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Frightened!");
+				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Phantasmal Killer")) saved = true;
 				if (!saved) {
 					combat.apply_damage(target, total_damage, DMG_PSYCHIC, c);
 					target.add_condition(COND_FRIGHTENED);
@@ -8981,6 +9016,7 @@ class battle_manager {
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
 					bool saved = save_total >= save_dc;
+					if (!saved and try_countercharm_reroll(t, save_dc, save_bonus + bless_bonus, "WIS save vs Mass Suggestion")) saved = true;
 					if (!saved) {
 						t.add_condition(COND_CHARMED);
 						count++;
@@ -8999,6 +9035,7 @@ class battle_manager {
 				int save_total = save_roll + save_bonus + bless_bonus;
 				bool saved = save_total >= save_dc;
 				broadcast_roll(target.name, "WIS save vs Command", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Commanded!");
+				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Command")) saved = true;
 				if (!saved) {
 					// Approximation: target loses its action next turn (treated as Incapacitated for one turn)
 					// then immediately recovers. We mark it with the existing COND_CHARMED to suppress its turn.
@@ -9016,6 +9053,7 @@ class battle_manager {
 				int save_total = save_roll + save_bonus + bless_bonus;
 				bool saved = save_total >= save_dc;
 				broadcast_roll(target.name, "WIS save vs Suggestion", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Charmed!");
+				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Suggestion")) saved = true;
 				if (!saved) {
 					target.add_condition(COND_CHARMED);
 					broadcast_announce(target.name + " is charmed by " + c.name + "'s Suggestion. The charm ends if you or an ally damages them.", true);
@@ -9035,6 +9073,32 @@ class battle_manager {
 				target.remove_condition(COND_POISONED);
 				target.remove_condition(COND_STUNNED);
 				broadcast_announce(c.name + "'s Power Word Heal restores " + target.name + " to full health and ends Charmed/Frightened/Paralyzed/Poisoned/Stunned!", true);
+				// PHB 2024 Bard L20 Words of Creation (paras 2764-2765): "When you cast
+				// either spell, you can target a second creature with it if that creature
+				// is within 10 feet of the first target." Auto-pick the most-injured ally
+				// within 10 ft of the first target.
+				if (c.words_of_creation_active) {
+					combatant@ second = null;
+					int best_need = 0;
+					for (uint wi = 0; wi < combat.combatants.length(); wi++) {
+						combatant@ wt = combat.combatants[wi];
+						if (@wt == null or wt.is_dead or wt.id == target.id or wt.id == c.id) continue;
+						if (wt.is_player != target.is_player and combat.mode != "pvp") continue;
+						if (feet_distance(target.x, target.y, wt.x, wt.y) > 10) continue;
+						int need = wt.max_hp - wt.current_hp;
+						if (need > best_need) { best_need = need; @second = wt; }
+					}
+					if (@second != null) {
+						int s_eff = combat.apply_healing(second, second.max_hp - second.current_hp);
+						record_effective_healing(c.player_username, s_eff);
+						second.remove_condition(COND_CHARMED);
+						second.remove_condition(COND_FRIGHTENED);
+						second.remove_condition(COND_PARALYZED);
+						second.remove_condition(COND_POISONED);
+						second.remove_condition(COND_STUNNED);
+						broadcast_announce(c.name + "'s Words of Creation echoes Power Word Heal onto " + second.name + " — full health restored!", true);
+					}
+				}
 			}
 			else if (spell.id == "sunburst") {
 				// Basic Rules para 15267: "Brilliant sunlight flashes in a 60-foot-radius
@@ -9183,6 +9247,7 @@ class battle_manager {
 				int save_total = save_roll + save_bonus + bless_bonus;
 				bool saved = save_total >= save_dc;
 				broadcast_roll(target.name, "WIS save vs Eyebite", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Afflicted!");
+				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Eyebite")) saved = true;
 				if (!saved) {
 					target.add_condition(COND_FRIGHTENED);
 					broadcast_announce(target.name + " is Panicked by " + c.name + "'s Eyebite!", true);
@@ -9270,6 +9335,32 @@ class battle_manager {
 					for (int d = 0; d < 12; d++) pwk_dmg += random(1, 12);
 					combat.apply_damage(target, pwk_dmg, DMG_PSYCHIC, c);
 					broadcast_announce(c.name + "'s Power Word Kill deals " + pwk_dmg + " psychic damage to " + target.name + ".", true);
+				}
+				// PHB 2024 Bard L20 Words of Creation (paras 2764-2765): "When you cast
+				// either spell, you can target a second creature with it if that creature
+				// is within 10 feet of the first target." Auto-pick the lowest-HP enemy
+				// within 10 ft of the first target (highest kill chance).
+				if (c.words_of_creation_active) {
+					combatant@ second = null;
+					int best_hp = 999999;
+					for (uint wi = 0; wi < combat.combatants.length(); wi++) {
+						combatant@ wt = combat.combatants[wi];
+						if (@wt == null or wt.is_dead or wt.id == target.id or wt.id == c.id) continue;
+						if (!combat.are_hostile(c, wt)) continue;
+						if (feet_distance(target.x, target.y, wt.x, wt.y) > 10) continue;
+						if (wt.current_hp < best_hp) { best_hp = wt.current_hp; @second = wt; }
+					}
+					if (@second != null) {
+						if (second.current_hp <= 100) {
+							broadcast_announce(c.name + "'s Words of Creation echoes Power Word Kill onto " + second.name + " — slain!", true);
+							combat.apply_damage(second, second.current_hp + 999, DMG_PSYCHIC, c);
+						} else {
+							int pwk2 = 0;
+							for (int d = 0; d < 12; d++) pwk2 += random(1, 12);
+							combat.apply_damage(second, pwk2, DMG_PSYCHIC, c);
+							broadcast_announce(c.name + "'s Words of Creation echoes Power Word Kill onto " + second.name + " for " + pwk2 + " psychic damage.", true);
+						}
+					}
 				}
 				broadcast_state();
 				check_battle_end();
@@ -9642,6 +9733,7 @@ class battle_manager {
 				bool saved = save_total >= save_dc;
 				if (bless_bonus > 0) broadcast_announce(target.name + "'s Bless adds " + bless_bonus + " to the save.", false);
 				broadcast_roll(target.name, "WIS save vs Dominate Person", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Charmed!");
+				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Dominate Person")) saved = true;
 				if (!saved) {
 					target.add_condition(COND_CHARMED);
 					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Charmed"}});
@@ -9669,6 +9761,7 @@ class battle_manager {
 				bool saved = save_total >= save_dc;
 				if (bless_bonus > 0) broadcast_announce(target.name + "'s Bless adds " + bless_bonus + " to the save.", false);
 				broadcast_roll(target.name, "WIS save vs Charm Person", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Charmed!");
+				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Charm Person")) saved = true;
 				if (!saved) {
 					target.add_condition(COND_CHARMED);
 					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Charmed"}});
@@ -10376,6 +10469,7 @@ class battle_manager {
 				bool saved = save_total >= save_dc;
 				if (bless_bonus > 0) broadcast_announce(target.name + "'s Bless adds " + bless_bonus + " to the save.", false);
 				broadcast_roll(target.name, "WIS save vs Dominate Monster", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Charmed!");
+				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Dominate Monster")) saved = true;
 				if (!saved) {
 					target.add_condition(COND_CHARMED);
 					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Charmed"}});
@@ -10669,6 +10763,7 @@ class battle_manager {
 				int save_total = save_roll + save_bonus + bless_bonus;
 				bool saved = save_total >= save_dc;
 				broadcast_roll(target.name, "WIS save vs Enthrall", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Charmed!");
+				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Enthrall")) saved = true;
 				if (!saved) {
 					target.add_condition(COND_CHARMED);
 					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Charmed"}});
@@ -10781,6 +10876,7 @@ class battle_manager {
 				int save_total = save_roll + save_bonus + bless_bonus;
 				bool saved = save_total >= save_dc;
 				broadcast_roll(target.name, "WIS save vs Charm Monster", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Charmed!");
+				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Charm Monster")) saved = true;
 				if (!saved) {
 					target.add_condition(COND_CHARMED);
 					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Charmed"}});
@@ -10802,6 +10898,7 @@ class battle_manager {
 				int save_total = save_roll + save_bonus + bless_bonus;
 				bool saved = save_total >= save_dc;
 				broadcast_roll(target.name, "WIS save vs Dominate Beast", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Charmed!");
+				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Dominate Beast")) saved = true;
 				if (!saved) {
 					target.add_condition(COND_CHARMED);
 					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Charmed"}});
@@ -11733,6 +11830,7 @@ class battle_manager {
 					int save_total = save_roll + save_bonus + bless_bonus;
 					bool saved = save_total >= save_dc;
 					broadcast_roll(t.name, "WIS save vs Weird", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Terrified!");
+					if (!saved and try_countercharm_reroll(t, save_dc, save_bonus + bless_bonus, "WIS save vs Weird")) saved = true;
 					if (!saved) {
 						combat.apply_damage(t, dmg, DMG_PSYCHIC, c);
 						t.add_condition(COND_FRIGHTENED);

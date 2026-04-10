@@ -2076,6 +2076,24 @@ void handle_user_message(user@ u, json_object@ msg)
 			target.bardic_inspiration_source_id = c.id;
 			u.room.bm.broadcast_announce(c.name + " grants Bardic Inspiration (" + u.room.bm.die_label(c.bardic_inspiration_grant_die) + ") to " + target.name + ". " + c.bardic_inspiration_uses + " use" + (c.bardic_inspiration_uses == 1 ? "" : "s") + " remain.", true);
 		}
+		else if (feature == "font_of_inspiration") {
+			// PHB 2024 Bard L5 Font of Inspiration (paras 2753-2755): "you can expend a
+			// spell slot (no action required) to regain one expended use of Bardic
+			// Inspiration." No action cost.
+			if (c.class_name != "Bard" or !c.font_of_inspiration_active) { u.send({{"type", message_types::announce}, {"text", "Only L5+ Bards can use Font of Inspiration."}, {"interrupt", true}}); return; }
+			int max_uses = c.get_ability_mod(ABILITY_CHA);
+			if (max_uses < 1) max_uses = 1;
+			if (c.bardic_inspiration_uses >= max_uses) { u.send({{"type", message_types::announce}, {"text", "Bardic Inspiration is already at maximum."}, {"interrupt", true}}); return; }
+			// Find the lowest-level spell slot available to expend.
+			int spent_level = 0;
+			for (int sl = 1; sl <= 9; sl++) {
+				if (c.spell_slots_current[sl] > 0) { spent_level = sl; break; }
+			}
+			if (spent_level == 0) { u.send({{"type", message_types::announce}, {"text", "No spell slots available to expend."}, {"interrupt", true}}); return; }
+			c.spell_slots_current[spent_level]--;
+			c.bardic_inspiration_uses++;
+			u.room.bm.broadcast_announce(c.name + " channels Font of Inspiration — expends a level " + spent_level + " spell slot to regain one Bardic Inspiration use (" + c.bardic_inspiration_uses + " now available).", true);
+		}
 		else if (feature == "spiritual_weapon_attack") {
 			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
 			if (!c.spiritual_weapon_active or c.spiritual_weapon_slot_level < 2) {
