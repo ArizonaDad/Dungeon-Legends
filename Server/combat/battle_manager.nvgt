@@ -5041,6 +5041,17 @@ class battle_manager {
 				}
 			}
 
+			// PHB 2024 Paladin L11 Radiant Strikes (para 5684-5685): "Your strikes now
+			// carry supernatural power. When you hit a target with an attack roll using
+			// a Melee weapon or an Unarmed Strike, the target takes an extra 1d8 Radiant
+			// damage." Applies on every qualifying hit (not once per turn). Excludes
+			// ranged weapons (the source restricts to Melee weapons / Unarmed Strikes).
+			if (c.class_name == "Paladin" and c.level >= 11 and pr.is_weapon_attack and !pr.is_spell_effect and !c.main_hand_is_ranged and get_attack_range(c, false) <= 5) {
+				int rs_dmg = random(1, 8);
+				combat.apply_damage(target, rs_dmg, DMG_RADIANT, c);
+				broadcast_announce(c.name + "'s Radiant Strikes deal " + rs_dmg + " extra radiant damage!", false);
+			}
+
 			// Sacred Weapon: add CHA mod to attack (already applied via attack bonus), no damage bonus here
 			// (Sacred Weapon affects attack rolls, handled in advantage section)
 

@@ -419,8 +419,9 @@ Per-class audit of all 13 base class features against `basic_rules_full.txt` (Ba
   - Disciplined Survivor L14 sets all 6 save proficiencies (reroll prompt deferred)
   - Empowered Strikes L6 flag set (Force/normal damage type prompt still deferred)
 - **Rogue Evasion fix** (`5e78f1c`): L7 init was missing — only Monks were getting `evasion_active`. Fixed in `character_data.nvgt` Rogue init block.
+- **Paladin batch 1** (in this commit): Aura of Protection L7 → L6 gating bug fixed; L2 Paladin's Smite free Divine Smite cast wired into bonus action handler; L5 Faithful Steed free Find Steed cast flag added; L10 Aura of Courage Frightened immunity in `add_condition`; L11 Radiant Strikes (+1d8 radiant on melee weapon/unarmed hit) in `apply_attack` damage block. L14 Restoring Touch verified already-implemented in lay_on_hands handler.
 
-**Pending classes (in priority order):** Paladin, Ranger, Rogue full audit, Sorcerer, Warlock, Wizard, Bard, Artificer, Gunslinger.
+**Pending classes (in priority order):** Ranger, Rogue full audit, Sorcerer, Warlock, Wizard, Bard, Artificer, Gunslinger.
 
 **Audit doctrine:** every implementation block carries `// PHB 2024 <Class> L<n> <Feature> (para <X>-<Y>)` comments. Source-quoted commit messages. No invent. No auto-pick for player choices.
 

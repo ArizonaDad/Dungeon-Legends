@@ -588,6 +588,13 @@ class combatant {
 	int attacks_remaining_this_turn = 0; // Tracks remaining attacks in current Attack action
 	bool divine_smite_pending = false;    // Paladin: next melee hit adds radiant damage
 	int divine_smite_slot_level = 0;      // Spell slot level used for smite
+	// PHB 2024 Paladin L2 Paladin's Smite (para 5657): "You always have the Divine
+	// Smite spell prepared. In addition, you can cast it without expending a spell
+	// slot, but you must finish a Long Rest before you can cast it in this way again."
+	bool paladins_smite_free_cast_used = false;
+	// PHB 2024 Paladin L5 Faithful Steed (para 5673-5675): always have Find Steed
+	// prepared, plus 1 free cast per long rest.
+	bool faithful_steed_free_cast_used = false;
 	string[] feats;
 	string[] skill_proficiencies;
 	// Expertise: Bard (L3+), Rogue (L1+), some subclass features (Keeper of History
@@ -753,6 +760,12 @@ class combatant {
 	}
 
 	void add_condition(int cond_id) {
+		// PHB 2024 Paladin L10 Aura of Courage (para 5682-5683): "You and your allies
+		// have Immunity to the Frightened condition while in your Aura of Protection.
+		// If a Frightened ally enters the aura, that condition has no effect on that
+		// ally while there." Self-immunity always applies for L10+ Paladins; ally
+		// coverage is deferred (needs aura range checks).
+		if (cond_id == COND_FRIGHTENED and class_name == "Paladin" and level >= 10) return;
 		if (!has_condition(cond_id)) conditions.insert_last(cond_id);
 	}
 

@@ -1977,9 +1977,14 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         }
     }
     if (cs.class_name == "Paladin") {
-        // PHB 2024 Paladin L7 Aura of Protection: CHA modifier (minimum +1) added to all
-        // saving throws for the paladin (and allies within 10 ft - aura coverage deferred).
-        if (cs.level >= 7) {
+        // PHB 2024 Paladin L6 Aura of Protection (para 5676-5679): "You radiate a
+        // protective, unseeable aura in a 10-foot Emanation that originates from
+        // you. The aura is inactive while you have the Incapacitated condition. You
+        // and your allies in the aura gain a bonus to saving throws equal to your
+        // Charisma modifier (minimum bonus of +1)." L18 Aura Expansion (para 5688-5689)
+        // changes the radius to 30 ft. Self-coverage is wired here; ally aura coverage
+        // is deferred (needs an aura range loop in get_save_bonus).
+        if (cs.level >= 6) {
             int cha_mod_pal = (cs.charisma - 10) / 2;
             c.aura_of_protection_bonus = cha_mod_pal > 0 ? cha_mod_pal : 1;
         }

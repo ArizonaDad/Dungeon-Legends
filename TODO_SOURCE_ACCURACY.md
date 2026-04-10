@@ -294,8 +294,36 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 - Heightened Focus Step of the Wind ally-carry (needs targeting prompt)
 - Empowered Strikes Force/normal damage type prompt (L6) — could be a persistent toggle bonus action
 
-- **Paladin:** Lay on Hands (pool size), Divine Smite (slot-based in 2024), Aura of Courage, Cleansing Touch
-- **Paladin:** Lay on Hands (pool size), Divine Smite (slot-based in 2024), Aura of Courage, Cleansing Touch
+### Paladin Audit (2026-04-09) — Basic Rules 2024 paras 5396-5691
+
+| Feature | Level | Source para | Status |
+|---------|-------|-------------|--------|
+| **Lay On Hands** (5×level pool, Bonus Action heal, 5 HP cure Poisoned) | 1 | 5637-5640 | ✓ Done — pool sized correctly in `character_data.nvgt`, bonus action handler in `users _dom.nvgt` accepts `cleanse_conditions` for Poisoned (always) plus L14 Restoring Touch list. |
+| **Spellcasting** (CHA, Holy Symbol focus) | 1 | 5641-5649 | ✓ Done — `cs.is_caster=true`, `spellcasting_ability=ABILITY_CHA`, half-caster slot table. |
+| **Weapon Mastery** (2 weapons) | 1 | 5650-5652 | DEFERRED — base weapon mastery system not yet wired to attack resolution. |
+| **Fighting Style** (incl. Blessed Warrior cleric cantrips) | 2 | 5653-5655 | DEFERRED — Fighting Style feat selection at character creation not yet implemented for Paladin. Blessed Warrior cantrip choice deferred. |
+| **Paladin's Smite** (Divine Smite always prepared, 1 free cast/LR) | 2 | 5656-5657 | ✓ Done 2026-04-09 — new `paladins_smite_free_cast_used` flag, divine_smite bonus action handler tries the free cast first (L1 base = 2d8 radiant) before consuming a slot. |
+| **Channel Divinity** (2 uses, regain 1 SR, +1 at L11) + Divine Sense | 3 | 5658-5662 | ✓ Done — channel divinity uses present, Divine Sense flavor announce; subclass-specific CD effects (Sacred Weapon, Vow of Enmity, Inspiring Smite, Nature's Wrath) implemented. |
+| **Paladin Subclass** | 3 | 5663-5664 | ✓ Done — 9+ subclasses (Devotion, Vengeance, Ancients, Glory, Conquest, Watchers, Redemption, Hearth, Zeal). |
+| **Ability Score Improvement** | 4/8/12/16 | 5669-5670 | ✓ Done — global feat-grant system. |
+| **Extra Attack** (2 attacks) | 5 | 5671-5672 | ✓ Done — `cs.extra_attacks=1` set in init. |
+| **Faithful Steed** (Find Steed always prepared, 1 free cast/LR) | 5 | 5673-5675 | PARTIAL 2026-04-09 — new `faithful_steed_free_cast_used` flag added; Find Steed companion summon (mount entity with stats) deferred per existing Beast Master/Steel Defender pattern. |
+| **Aura of Protection** (10ft Emanation, +CHA mod to saves) | 6 | 5676-5679 | ✓ Done 2026-04-09 — fixed wrong gating (was L7, source says L6). Self-coverage active in `get_save_bonus`; ally-aura coverage deferred (needs aura range loop). |
+| **Abjure Foes** (CD action, 60ft, CHA mod targets, WIS save Frightened) | 9 | 5680-5681 | DEFERRED — needs target-distribution prompt (CHA mod creatures in 60ft). |
+| **Aura of Courage** (Frightened immunity in aura) | 10 | 5682-5683 | ✓ Done 2026-04-09 — `add_condition` short-circuits when adding `COND_FRIGHTENED` to a Paladin L10+. Self-coverage only; ally aura coverage deferred. |
+| **Radiant Strikes** (+1d8 radiant on melee weapon/unarmed hit) | 11 | 5684-5685 | ✓ Done 2026-04-09 — block added in `battle_manager.nvgt` after Druid Primal Strike: every qualifying hit adds 1d8 radiant. Excludes ranged weapons per source ("Melee weapon or Unarmed Strike"). |
+| **Restoring Touch** (LoH heals + remove condition list, 5 HP each) | 14 | 5686-5687 | ✓ Done — `lay_on_hands` handler already accepts L14 conditions (Blinded/Charmed/Deafened/Frightened/Paralyzed/Stunned) at 5 HP each. |
+| **Aura Expansion** (10ft → 30ft) | 18 | 5688-5689 | DOC ONLY — comment in init notes the radius change. Aura range loop is deferred (currently self-only). |
+| **Epic Boon** | 19 | 5690-5691 | ✓ Done — Epic Boon feat catalog. |
+
+**Pending follow-up Paladin batches:**
+- Abjure Foes L9 Channel Divinity action — needs CHA mod target distribution prompt within 60ft, WIS save vs spell save DC, 1-min Frightened (limited-action while Frightened condition).
+- Aura range loop for ally coverage of Aura of Protection (saves), Aura of Courage (Frightened immunity), and L18 Aura Expansion (10ft → 30ft).
+- Faithful Steed L5 mount summon (full companion entity) — deferred along with the rest of the mount system.
+- Fighting Style at character creation flow + Blessed Warrior cleric cantrip selection prompt.
+- Weapon Mastery property application to attack resolution (shared with Fighter Tactical Master).
+
+- **Paladin:** Lay on Hands (pool size), Divine Smite (slot-based in 2024), Aura of Courage, Cleansing Touch — all addressed in 2026-04-09 audit; remaining items in pending list above.
 - **Ranger:** Favored Enemy (2024 uses Hunter's Mark), Natural Explorer, Primeval Awareness
 - **Rogue:** Sneak Attack dice scaling, Cunning Strike (2024), Reliable Talent
 - **Sorcerer:** Font of Magic, Metamagic options (need full list), Sorcerous Restoration

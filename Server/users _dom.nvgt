@@ -1588,6 +1588,17 @@ void handle_user_message(user@ u, json_object@ msg)
 		}
 		else if (feature == "divine_smite") {
 			if (c.class_name != "Paladin") { u.send({{"type", message_types::announce}, {"text", "Only paladins can prepare Divine Smite."}, {"interrupt", true}}); return; }
+			// PHB 2024 Paladin L2 Paladin's Smite (para 5656-5657): "You always have
+			// the Divine Smite spell prepared. In addition, you can cast it without
+			// expending a spell slot, but you must finish a Long Rest before you can
+			// cast it in this way again."
+			if (c.level >= 2 and !c.paladins_smite_free_cast_used) {
+				c.paladins_smite_free_cast_used = true;
+				c.divine_smite_pending = true;
+				c.divine_smite_slot_level = 1; // Free cast = base spell level (2d8 radiant)
+				u.room.bm.broadcast_announce(c.name + " uses Paladin's Smite (free cast, no slot)! Next melee hit deals 2d8 radiant damage.", false);
+				return;
+			}
 			// Find lowest available spell slot (1-5 for smite)
 			int slot_used = -1;
 			for (int sl = 1; sl <= 5; sl++) {
