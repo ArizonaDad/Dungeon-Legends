@@ -2767,11 +2767,12 @@ class battle_manager {
 	int get_attack_damage_type(combatant@ attacker, bool use_secondary = false) {
 		if (@attacker == null) return DMG_SLASHING;
 		if (!attacker.is_player and use_secondary) return attacker.monster_attack2_type;
-		// Monk Empowered Strikes (PHB 2024 para 6472, L6): "Whenever you deal damage with
-		// your Unarmed Strike, it can deal your choice of Force damage or its normal
-		// damage type." Since this is a choice the player should make, we default to the
-		// normal type and let future UI toggle set a flag. For now, force damage is only
-		// applied to subclass features that auto-wire to it (e.g., Way of the Aether).
+		// PHB 2024 Monk L6 Empowered Strikes (para 5350-5351): "Whenever you deal damage
+		// with your Unarmed Strike, it can deal your choice of Force damage or its normal
+		// damage type." Toggle via empowered_strikes_force (bonus action menu).
+		if (attacker.empowered_strikes_active and attacker.empowered_strikes_force and attack_name_is_unarmed(attacker.main_hand)) {
+			return DMG_FORCE;
+		}
 		return attacker.main_hand_damage_type;
 	}
 

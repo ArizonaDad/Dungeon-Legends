@@ -152,6 +152,7 @@ class combatant {
 	int stunning_strike_speed_orig = 0;    // L5 success rider: orig speed to restore at start of monk's next turn
 	bool uncanny_metabolism_available = false; // L2: 1/long rest, regain all FP + heal at initiative
 	bool empowered_strikes_active = false; // L6+: unarmed strike can deal force damage instead
+	bool empowered_strikes_force = true;  // L6+: toggle — true = Force damage, false = normal type
 	bool evasion_active = false;           // L7+: succeed on DEX save = 0 damage, fail = half (uncapped)
 	bool self_restoration_active = false;  // L10: end-of-turn remove Charmed/Frightened/Poisoned
 	bool heightened_focus_active = false;  // L10: Flurry 3 strikes, Patient Defense temp HP, Step of Wind ally move
@@ -2170,6 +2171,8 @@ class battle {
 				state["my_uncanny_metabolism_available"] = c.uncanny_metabolism_available;
 				state["my_superior_defense_active"] = c.superior_defense_active;
 				state["my_superior_defense_rounds_remaining"] = c.superior_defense_rounds_remaining;
+				state["my_empowered_strikes_active"] = c.empowered_strikes_active;
+				state["my_empowered_strikes_force"] = c.empowered_strikes_force;
 				state["my_lay_on_hands_pool"] = c.lay_on_hands_pool;
 				state["my_bardic_inspiration_uses"] = c.bardic_inspiration_uses;
 				state["my_bardic_inspiration_grant_die"] = c.bardic_inspiration_grant_die;

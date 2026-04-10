@@ -2523,6 +2523,14 @@ void handle_user_message(user@ u, json_object@ msg)
 				return;
 			}
 		}
+		else if (feature == "empowered_strikes_toggle") {
+			// PHB 2024 Monk L6 Empowered Strikes (para 5350-5351): toggle Force/normal.
+			// Free action toggle (no bonus action cost).
+			if (!c.empowered_strikes_active) { u.send({{"type", message_types::announce}, {"text", "Empowered Strikes requires Monk level 6+."}, {"interrupt", true}}); return; }
+			c.empowered_strikes_force = !c.empowered_strikes_force;
+			string mode = c.empowered_strikes_force ? "Force" : "normal bludgeoning";
+			u.room.bm.broadcast_announce(c.name + "'s Empowered Strikes set to " + mode + " damage.", false);
+		}
 		else if (feature == "flurry_of_blows") {
 			// PHB 2024 Monk L2 Flurry of Blows (para 5329): "You can expend 1 Focus
 			// Point to make two Unarmed Strikes as a Bonus Action."

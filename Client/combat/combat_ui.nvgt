@@ -182,6 +182,8 @@ int my_focus_points_max = 0;
 bool my_uncanny_metabolism_available = false;
 bool my_superior_defense_active = false;
 int my_superior_defense_rounds_remaining = 0;
+bool my_empowered_strikes_active = false;
+bool my_empowered_strikes_force = true;
 int my_lay_on_hands_pool = 0;
 // PHB 2024 Ranger L10 Tireless / L14 Nature's Veil — synced from server
 int my_natures_veil_uses_remaining = 0;
@@ -1010,6 +1012,7 @@ void show_bonus_action_menu() {
 	int cunning_opt = -1;
 	int lay_hands_opt = -1;
 	int flurry_opt = -1;
+	int empowered_strikes_toggle_opt = -1;
 	int bardic_opt = -1;
 	int font_of_inspiration_opt = -1;
 	int wild_shape_opt = -1;
@@ -1334,6 +1337,10 @@ void show_bonus_action_menu() {
 		if (level >= 18 and !my_superior_defense_active and my_focus_points >= 3) {
 			// PHB 2024 Monk L18 Superior Defense (para 5372-5373)
 			superior_defense_opt = m.add_item("Superior Defense. Spend 3 Focus Points. Resistance to all damage except Force for 1 minute.");
+		}
+		if (my_empowered_strikes_active) {
+			string es_mode = my_empowered_strikes_force ? "Force" : "normal";
+			empowered_strikes_toggle_opt = m.add_item("Empowered Strikes: currently " + es_mode + " damage. Toggle. Free action.");
 		}
 	}
 	if (lc == "bard" and my_bardic_inspiration_uses > 0) bardic_opt = m.add_item("Bardic Inspiration. Bonus action. Uses left: " + my_bardic_inspiration_uses + ".");
@@ -2093,6 +2100,9 @@ void show_bonus_action_menu() {
 	}
 	else if (superior_defense_opt >= 0 and res == superior_defense_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "superior_defense"}});
+	}
+	else if (empowered_strikes_toggle_opt >= 0 and res == empowered_strikes_toggle_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "empowered_strikes_toggle"}});
 	}
 	else if (natures_veil_opt >= 0 and res == natures_veil_opt) {
 		// PHB 2024 Ranger L14 Nature's Veil (para 6184-6186)
@@ -3912,6 +3922,8 @@ void parse_game_state(json_object@ msg) {
 	my_focus_points_max = msg.exists("my_focus_points_max") ? int(msg["my_focus_points_max"]) : 0;
 	my_uncanny_metabolism_available = msg.exists("my_uncanny_metabolism_available") ? bool(msg["my_uncanny_metabolism_available"]) : false;
 	my_superior_defense_active = msg.exists("my_superior_defense_active") ? bool(msg["my_superior_defense_active"]) : false;
+	my_empowered_strikes_active = msg.exists("my_empowered_strikes_active") ? bool(msg["my_empowered_strikes_active"]) : false;
+	my_empowered_strikes_force = msg.exists("my_empowered_strikes_force") ? bool(msg["my_empowered_strikes_force"]) : true;
 	my_superior_defense_rounds_remaining = msg.exists("my_superior_defense_rounds_remaining") ? int(msg["my_superior_defense_rounds_remaining"]) : 0;
 	my_lay_on_hands_pool = msg.exists("my_lay_on_hands_pool") ? int(msg["my_lay_on_hands_pool"]) : 0;
 	my_natures_veil_uses_remaining = msg.exists("my_natures_veil_uses_remaining") ? int(msg["my_natures_veil_uses_remaining"]) : 0;
@@ -4199,6 +4211,8 @@ void reset_combat_state() {
 	my_uncanny_metabolism_available = false;
 	my_superior_defense_active = false;
 	my_superior_defense_rounds_remaining = 0;
+	my_empowered_strikes_active = false;
+	my_empowered_strikes_force = true;
 	my_lay_on_hands_pool = 0;
 	my_natures_veil_uses_remaining = 0;
 	my_tireless_temp_hp_uses_remaining = 0;
