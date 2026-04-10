@@ -2445,6 +2445,9 @@ class battle_manager {
 		if (target.has_condition(COND_PRONE) and !attack_is_ranged and dist <= 5) adv = true;
 		if (target.has_condition(COND_PRONE) and (attack_is_ranged or dist > 5)) disadv = true;
 		if (target.has_condition(COND_PARALYZED) or target.has_condition(COND_STUNNED) or target.has_condition(COND_UNCONSCIOUS)) adv = true;
+		// PHB 2024 Blinded condition (para 16208): "Attack rolls against the creature
+		// have Advantage." Mirrors Invisible mechanic but for defender side.
+		if (target.has_condition(COND_BLINDED)) adv = true;
 		if (attacker.has_condition(COND_BLINDED) or attacker.has_condition(COND_POISONED) or attacker.has_condition(COND_FRIGHTENED) or attacker.has_condition(COND_RESTRAINED)) disadv = true;
 		// Valda's Spire Gunslinger L5 Gut Shot (paras 184-185): the gut-shot creature
 		// "has Disadvantage on attack rolls" until it dislodges or 1 minute passes.
@@ -2799,6 +2802,16 @@ class battle_manager {
 		if (dist > attack_range) return false;
 		if (!combat.can_see(monster, target)) return false;
 
+		// Basic Rules 2024 Sanctuary (para 14826): WIS save before targeting
+		if (target.sanctuary_active and target.sanctuary_dc > 0) {
+			int sanc_roll = random(1, 20) + monster.get_save_bonus(ABILITY_WIS);
+			if (sanc_roll < target.sanctuary_dc) {
+				broadcast_announce(monster.name + " is deterred by " + target.name + "'s Sanctuary!", false);
+				return false;
+			}
+			broadcast_announce(monster.name + " resists " + target.name + "'s Sanctuary.", false);
+		}
+
 		bool attack_is_ranged = use_secondary ? monster_secondary_is_ranged(monster) : (monster.main_hand_range > 5 and attack_name_is_ranged(monster.main_hand));
 		bool adv = false;
 		bool disadv = false;
@@ -2849,6 +2862,16 @@ class battle_manager {
 		int dist = feet_distance(bot.x, bot.y, target.x, target.y);
 		if (dist > bot.main_hand_range) return false;
 		if (!combat.can_see(bot, target)) return false;
+
+		// Basic Rules 2024 Sanctuary (para 14826): WIS save before targeting
+		if (target.sanctuary_active and target.sanctuary_dc > 0) {
+			int sanc_roll = random(1, 20) + bot.get_save_bonus(ABILITY_WIS);
+			if (sanc_roll < target.sanctuary_dc) {
+				broadcast_announce(bot.name + " is deterred by " + target.name + "'s Sanctuary!", false);
+				return false;
+			}
+			broadcast_announce(bot.name + " resists " + target.name + "'s Sanctuary.", false);
+		}
 
 		if (bot.attacks_remaining_this_turn > 0) {
 			bot.attacks_remaining_this_turn--;
@@ -9434,11 +9457,37 @@ class battle_manager {
 		combatant@ target = combat.get_combatant(target_id);
 		if (@target == null or target.is_dead) { u.send({{"type", message_types::error}, {"text", "Invalid target. Use I J K L to scan and Enter to lock a target."}});  return; }
 
+		// Basic Rules 2024 Sanctuary (para 14826): "If the warded creature makes an
+		// attack, casts a spell that affects an enemy, or deals damage to another
+		// creature, this spell ends." Before the attacker can target a Sanctuary'd
+		// creature, they must succeed on a WIS save vs the spell DC or choose a
+		// different target (the attack is wasted).
+		if (target.sanctuary_active and target.sanctuary_dc > 0) {
+			int sanc_roll = random(1, 20);
+			int sanc_bonus = c.get_save_bonus(ABILITY_WIS);
+			int sanc_total = sanc_roll + sanc_bonus;
+			if (sanc_total >= target.sanctuary_dc) {
+				broadcast_announce(c.name + " resists " + target.name + "'s Sanctuary (WIS " + sanc_total + " vs DC " + target.sanctuary_dc + ").", false);
+			} else {
+				broadcast_announce(c.name + " is deterred by " + target.name + "'s Sanctuary! (WIS " + sanc_total + " vs DC " + target.sanctuary_dc + ")", true);
+				return;
+			}
+		}
+
 		// Range check.
 		int dist = feet_distance(c.x, c.y, target.x, target.y);
 		if (dist > c.main_hand_range) {
 			u.send({{"type", message_types::error}, {"text", "Target is out of range. Distance: " + dist + " feet, range: " + c.main_hand_range + " feet. Move closer with W A S D or choose a ranged option."}});
 			return;
+		}
+
+		// Basic Rules 2024 Sanctuary (para 14826): "If the warded creature makes an
+		// attack... this spell ends." Self-break when the protected creature attacks.
+		if (c.sanctuary_active) {
+			c.sanctuary_active = false;
+			c.sanctuary_dc = 0;
+			c.sanctuary_source_id = 0;
+			broadcast_announce(c.name + "'s Sanctuary ends — they chose to attack!", false);
 		}
 
 		// Track attacks: first attack starts the Attack action, extras use remaining count.
@@ -10249,6 +10298,20 @@ class battle_manager {
 		}
 		else if (spell.casting_time == 1) { c.has_bonus_action = false; c.used_bonus_action = true; }
 		else if (spell.casting_time == 2) { c.has_reaction = false; }
+
+		// Basic Rules 2024 Sanctuary (para 14826): "If the warded creature makes an
+		// attack, casts a spell that affects an enemy, or deals damage to another
+		// creature, this spell ends on that creature."
+		if (c.sanctuary_active) {
+			bool spell_affects_enemy = (spell.damage_count > 0 or spell.save_type >= 0);
+			if (!spell_affects_enemy and @target != null and combat.are_hostile(c, target)) spell_affects_enemy = true;
+			if (spell_affects_enemy) {
+				c.sanctuary_active = false;
+				c.sanctuary_dc = 0;
+				c.sanctuary_source_id = 0;
+				broadcast_announce(c.name + "'s Sanctuary ends — they cast a spell affecting an enemy!", false);
+			}
+		}
 
 		// PHB 2024 Sorcerer Metamagic: Twinned Spell (para 7043-7044)
 		// "When you cast a spell that targets only one creature and doesn't have a
