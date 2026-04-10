@@ -2345,9 +2345,18 @@ void handle_user_message(user@ u, json_object@ msg)
 				return;
 			}
 			c.focus_points--;
+			// Xanathar's Drunken Master L3 Drunken Technique (para 1796-1797):
+			// "When you use Flurry of Blows, you gain the benefit of the Disengage
+			// action, and your walking speed increases by 10 feet until the end of
+			// the current turn."
+			if (c.drunken_technique_active) {
+				c.took_disengage = true;
+				c.movement_remaining += 10;
+			}
 			string flurry_msg = c.heightened_focus_active
 				? c.name + " spends 1 Focus Point and unleashes Flurry of Blows for three strikes (Heightened Focus)!"
 				: c.name + " spends 1 Focus Point and unleashes Flurry of Blows!";
+			if (c.drunken_technique_active) flurry_msg += " Drunken Technique: Disengage + 10 ft speed!";
 			u.room.bm.broadcast_announce(flurry_msg, true);
 		}
 		else if (feature == "patient_defense") {
@@ -3265,6 +3274,43 @@ void handle_user_message(user@ u, json_object@ msg)
 			if (c.class_name != "Monk" or c.subclass != "Way of the Kensei") { u.send({{"type", message_types::announce}, {"text", "Only Way of the Kensei monks can use this."}, {"interrupt", true}}); return; }
 			c.kensei_weapon_active = true;
 			u.room.bm.broadcast_announce(c.name + " declares their Kensei weapon!", false);
+		}
+
+		else if (feature == "kensei_shot") {
+			// Xanathar's Kensei L3 Kensei's Shot (para 1814-1817): "You can use a bonus
+			// action on your turn to make your ranged attacks with a kensei weapon more
+			// deadly. Any target you hit with a ranged attack using a kensei weapon takes
+			// an extra 1d4 damage of the weapon's damage type."
+			if (c.class_name != "Monk" or c.subclass != "Way of the Kensei") { u.send({{"type", message_types::announce}, {"text", "Only Way of the Kensei monks can use Kensei's Shot."}, {"interrupt", true}}); return; }
+			if (c.level < 3) { u.send({{"type", message_types::announce}, {"text", "Kensei's Shot requires level 3."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.kenseis_shot_active = true;
+			u.room.bm.broadcast_announce(c.name + " activates Kensei's Shot! Ranged kensei attacks deal +1d4 damage this turn.", false);
+		}
+
+		else if (feature == "sharpen_the_blade") {
+			// Xanathar's Kensei L11 Sharpen the Blade (para 1832-1835): "As a bonus action,
+			// you can expend up to 3 ki points to grant one kensei weapon you touch a bonus
+			// to attack and damage rolls when you attack with it. The bonus equals the number
+			// of ki points you spent. This bonus lasts for 1 minute."
+			if (c.class_name != "Monk" or c.subclass != "Way of the Kensei") { u.send({{"type", message_types::announce}, {"text", "Only Way of the Kensei monks can use Sharpen the Blade."}, {"interrupt", true}}); return; }
+			if (c.level < 11) { u.send({{"type", message_types::announce}, {"text", "Sharpen the Blade requires level 11."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			if (c.focus_points <= 0) { u.send({{"type", message_types::announce}, {"text", "No Focus Points remaining."}, {"interrupt", true}}); return; }
+			// "This feature has no effect on a magic weapon that already has a bonus."
+			if (c.magic_weapon_bonus > 0) { u.send({{"type", message_types::announce}, {"text", "Sharpen the Blade has no effect on a magic weapon that already has a bonus."}, {"interrupt", true}}); return; }
+			int ki_to_spend = msg.exists("ki_amount") ? int(msg["ki_amount"]) : 1;
+			if (ki_to_spend < 1) ki_to_spend = 1;
+			if (ki_to_spend > 3) ki_to_spend = 3;
+			if (ki_to_spend > c.focus_points) ki_to_spend = c.focus_points;
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.focus_points -= ki_to_spend;
+			c.sharpen_the_blade_bonus = ki_to_spend;
+			c.sharpen_the_blade_rounds = 10;
+			u.room.bm.broadcast_announce(c.name + " sharpens their blade! +" + ki_to_spend + " to attack and damage rolls for 1 minute. (" + ki_to_spend + " Focus Points spent)", false);
 		}
 
 		else if (feature == "drunken_master_redirect") {

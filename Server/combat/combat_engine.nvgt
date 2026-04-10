@@ -342,7 +342,9 @@ class combatant {
 	bool stalkers_flurry_used_this_turn = false; // once per turn
 	bool shadowy_dodge_active = false; // L15: reaction to impose disadvantage
 	int superiority_maneuvers_known = 0; // Battle Master
-	int drunken_master_advantage = 0; // Drunken Master Monk
+	int drunken_master_advantage = 0; // Drunken Master Monk (unused legacy field)
+	// Way of the Drunken Master (Xanathar's paras 1780-1805)
+	bool drunken_technique_active = false; // L3: Disengage + 10ft on Flurry
 	int divine_soul_magic_used = 0; // Divine Soul sorcerer
 	bool symbiotic_entity_active = false; // Circle of Spores Druid
 	int symbiotic_entity_uses = 0;
@@ -425,8 +427,19 @@ class combatant {
 	string starry_form_type = ""; // Archer/Chalice/Dragon
 	bool land_stride_active = false; // Circle of the Land
 	bool open_hand_ki_used = false; // Way of the Open Hand
-	bool kensei_weapon_active = false; // Way of the Kensei
-	bool sun_bolt_ready = false; // Way of the Sun Soul
+	// Way of the Kensei (Xanathar's paras 1806-1835)
+	bool kensei_weapon_active = false; // L3: kensei weapon designation
+	bool agile_parry_bonus = false; // L3: +2 AC if unarmed strike + holding kensei weapon this turn
+	bool kenseis_shot_active = false; // L3: +1d4 ranged damage this turn (BA)
+	bool deft_strike_active = false; // L6: spend 1 ki on hit for +MA die damage
+	bool deft_strike_used_this_turn = false; // once per turn
+	int sharpen_the_blade_bonus = 0; // L11: +1/2/3 attack and damage (BA, 1 min)
+	int sharpen_the_blade_rounds = 0; // duration tracking
+	bool unerring_accuracy_active = false; // L17: reroll miss 1/turn
+	bool unerring_accuracy_used_this_turn = false;
+	// Way of the Sun Soul (Xanathar's paras 1836-1865)
+	bool sun_bolt_ready = false; // L3: Radiant Sun Bolt (existing)
+	bool sun_shield_active = false; // L17: reaction dmg on melee hit + aura toggle
 	bool rebuke_violent_ready = false; // Oath of Redemption
 	bool beast_companion_active = false; // Beast Master Ranger
 	uint beast_companion_id = 0;
@@ -1378,6 +1391,10 @@ class battle {
 		c.trip_attack_pending = false;
 		c.precision_attack_pending = false;
 		c.stalkers_flurry_used_this_turn = false;
+		c.agile_parry_bonus = false;
+		c.kenseis_shot_active = false;
+		c.deft_strike_used_this_turn = false;
+		c.unerring_accuracy_used_this_turn = false;
 
 		// Reaction resets at start of YOUR turn
 		c.has_reaction = true;
@@ -2021,6 +2038,13 @@ class battle {
 				// Xanathar's Gloom Stalker Ranger (paras 2130-2163)
 				state["my_stalkers_flurry_active"] = c.stalkers_flurry_active;
 				state["my_shadowy_dodge_active"] = c.shadowy_dodge_active;
+				// Xanathar's Monk Subclasses (paras 1780-1865)
+				state["my_drunken_technique_active"] = c.drunken_technique_active;
+				state["my_kenseis_shot_active"] = c.kenseis_shot_active;
+				state["my_deft_strike_active"] = c.deft_strike_active;
+				state["my_sharpen_the_blade_bonus"] = c.sharpen_the_blade_bonus;
+				state["my_unerring_accuracy_active"] = c.unerring_accuracy_active;
+				state["my_sun_shield_active"] = c.sun_shield_active;
 				// Potion buff rounds remaining
 				state["my_potion_damage_rounds"] = c.potion_damage_rounds;
 				state["my_potion_ac_rounds"] = c.potion_ac_rounds;

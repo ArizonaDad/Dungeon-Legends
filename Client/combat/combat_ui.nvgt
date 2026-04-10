@@ -251,6 +251,13 @@ bool my_invincible_conqueror_active = false;
 // Gloom Stalker Ranger (Xanathar's paras 2130-2163)
 bool my_stalkers_flurry_active = false;
 bool my_shadowy_dodge_active = false;
+// Xanathar's Monk Subclasses — Drunken Master / Kensei / Sun Soul (paras 1780-1865)
+bool my_drunken_technique_active = false;
+bool my_kenseis_shot_active = false;
+bool my_deft_strike_active = false;
+int my_sharpen_the_blade_bonus = 0;
+bool my_unerring_accuracy_active = false;
+bool my_sun_shield_active = false;
 // PHB 2024 Warlock L2 Magical Cunning / L9 Contact Patron / L11+ Mystic Arcanum — synced from server
 bool my_magical_cunning_available = false;
 bool my_contact_patron_available = false;
@@ -997,6 +1004,10 @@ void show_bonus_action_menu() {
 	int fast_hands_opt = -1;
 	int sun_bolt_opt = -1;
 	int kensei_weapon_opt = -1;
+	int kensei_shot_opt = -1;
+	int sharpen_blade_1_opt = -1;
+	int sharpen_blade_2_opt = -1;
+	int sharpen_blade_3_opt = -1;
 	int breath_dragon_opt = -1;
 	int astral_arms_opt = -1;
 	int tentacle_opt = -1;
@@ -1402,6 +1413,13 @@ void show_bonus_action_menu() {
 	}
 	if (lc == "monk" and subclass == "Way of the Kensei") {
 		kensei_weapon_opt = m.add_item("Kensei Weapon. Choose your kensei weapon for this battle.");
+		if (level >= 3) kensei_shot_opt = m.add_item("Kensei's Shot. Bonus action. Ranged kensei attacks deal +1d4 damage this turn.");
+		if (level >= 11 and my_focus_points > 0 and my_sharpen_the_blade_bonus == 0) {
+			int max_ki = my_focus_points > 3 ? 3 : my_focus_points;
+			if (max_ki >= 1) sharpen_blade_1_opt = m.add_item("Sharpen the Blade (+1). Bonus action. 1 Focus Point. +1 attack and damage for 1 minute. Focus: " + my_focus_points + ".");
+			if (max_ki >= 2) sharpen_blade_2_opt = m.add_item("Sharpen the Blade (+2). Bonus action. 2 Focus Points. +2 attack and damage for 1 minute. Focus: " + my_focus_points + ".");
+			if (max_ki >= 3) sharpen_blade_3_opt = m.add_item("Sharpen the Blade (+3). Bonus action. 3 Focus Points. +3 attack and damage for 1 minute. Focus: " + my_focus_points + ".");
+		}
 	}
 	if (lc == "monk" and subclass == "Way of the Ascendant Dragon") {
 		breath_dragon_opt = m.add_item("Breath of the Dragon. Action + 1 Focus Point. 15ft cone of fire damage.");
@@ -2144,6 +2162,17 @@ void show_bonus_action_menu() {
 	else if (kensei_weapon_opt >= 0 and res == kensei_weapon_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "kensei_weapon"}});
 		speak("Kensei weapon declared.", true);
+	}
+	else if (kensei_shot_opt >= 0 and res == kensei_shot_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "kensei_shot"}});
+		speak("Kensei's Shot activated. Ranged attacks deal extra damage this turn.", true);
+	}
+	else if ((sharpen_blade_1_opt >= 0 and res == sharpen_blade_1_opt) or (sharpen_blade_2_opt >= 0 and res == sharpen_blade_2_opt) or (sharpen_blade_3_opt >= 0 and res == sharpen_blade_3_opt)) {
+		int ki_amt = 1;
+		if (sharpen_blade_2_opt >= 0 and res == sharpen_blade_2_opt) ki_amt = 2;
+		if (sharpen_blade_3_opt >= 0 and res == sharpen_blade_3_opt) ki_amt = 3;
+		send({{"type", message_types::bonus_action}, {"feature", "sharpen_the_blade"}, {"ki_amount", ki_amt}});
+		speak("Sharpen the Blade! Plus " + ki_amt + " to attack and damage rolls.", true);
 	}
 	else if (breath_dragon_opt >= 0 and res == breath_dragon_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "breath_of_dragon"}});
@@ -3639,6 +3668,13 @@ void parse_game_state(json_object@ msg) {
 	// Gloom Stalker Ranger
 	my_stalkers_flurry_active = msg.exists("my_stalkers_flurry_active") ? bool(msg["my_stalkers_flurry_active"]) : false;
 	my_shadowy_dodge_active = msg.exists("my_shadowy_dodge_active") ? bool(msg["my_shadowy_dodge_active"]) : false;
+	// Xanathar's Monk Subclasses — Drunken Master / Kensei / Sun Soul
+	my_drunken_technique_active = msg.exists("my_drunken_technique_active") ? bool(msg["my_drunken_technique_active"]) : false;
+	my_kenseis_shot_active = msg.exists("my_kenseis_shot_active") ? bool(msg["my_kenseis_shot_active"]) : false;
+	my_deft_strike_active = msg.exists("my_deft_strike_active") ? bool(msg["my_deft_strike_active"]) : false;
+	my_sharpen_the_blade_bonus = msg.exists("my_sharpen_the_blade_bonus") ? int(msg["my_sharpen_the_blade_bonus"]) : 0;
+	my_unerring_accuracy_active = msg.exists("my_unerring_accuracy_active") ? bool(msg["my_unerring_accuracy_active"]) : false;
+	my_sun_shield_active = msg.exists("my_sun_shield_active") ? bool(msg["my_sun_shield_active"]) : false;
 	my_magical_cunning_available = msg.exists("my_magical_cunning_available") ? bool(msg["my_magical_cunning_available"]) : false;
 	my_contact_patron_available = msg.exists("my_contact_patron_available") ? bool(msg["my_contact_patron_available"]) : false;
 	my_mystic_arcanum_6_available = msg.exists("my_mystic_arcanum_6_available") ? bool(msg["my_mystic_arcanum_6_available"]) : false;
@@ -3889,6 +3925,12 @@ void reset_combat_state() {
 	my_invincible_conqueror_active = false;
 	my_stalkers_flurry_active = false;
 	my_shadowy_dodge_active = false;
+	my_drunken_technique_active = false;
+	my_kenseis_shot_active = false;
+	my_deft_strike_active = false;
+	my_sharpen_the_blade_bonus = 0;
+	my_unerring_accuracy_active = false;
+	my_sun_shield_active = false;
 	my_magical_cunning_available = false;
 	my_contact_patron_available = false;
 	my_mystic_arcanum_6_available = false;

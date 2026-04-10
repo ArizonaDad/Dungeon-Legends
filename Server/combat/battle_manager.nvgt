@@ -2286,6 +2286,9 @@ class battle_manager {
 		atk_bonus -= get_bane_penalty(attacker);
 		// Magic Weapon spell (Basic Rules para 14108): +1/+2/+3 to attack rolls
 		if (attacker.magic_weapon_bonus > 0) atk_bonus += attacker.magic_weapon_bonus;
+		// Xanathar's Kensei L11 Sharpen the Blade (para 1832-1835): +1/+2/+3 to attack rolls.
+		// "This feature has no effect on a magic weapon that already has a bonus."
+		if (attacker.sharpen_the_blade_bonus > 0 and attacker.magic_weapon_bonus == 0) atk_bonus += attacker.sharpen_the_blade_bonus;
 		return atk_bonus;
 	}
 
@@ -2300,6 +2303,8 @@ class battle_manager {
 		if (attacker.has_feat("thrown_weapon_fighting") and attacker.main_hand_is_ranged and attacker.main_hand_range <= 60) mod += 2;
 		// Magic Weapon spell (Basic Rules para 14108): +1/+2/+3 to damage rolls
 		if (attacker.magic_weapon_bonus > 0) mod += attacker.magic_weapon_bonus;
+		// Xanathar's Kensei L11 Sharpen the Blade (para 1832-1835): +1/+2/+3 to damage rolls.
+		if (attacker.sharpen_the_blade_bonus > 0 and attacker.magic_weapon_bonus == 0) mod += attacker.sharpen_the_blade_bonus;
 		return mod;
 	}
 
@@ -3471,6 +3476,14 @@ class battle_manager {
 				if (prev.innate_sorcery_rounds_remaining <= 0) {
 					prev.innate_sorcery_active = false;
 					broadcast_announce(prev.name + "'s Innate Sorcery fades.", false);
+				}
+			}
+			// Xanathar's Kensei L11 Sharpen the Blade (para 1832-1833): "lasts 1 minute"
+			if (prev.sharpen_the_blade_rounds > 0) {
+				prev.sharpen_the_blade_rounds--;
+				if (prev.sharpen_the_blade_rounds <= 0) {
+					prev.sharpen_the_blade_bonus = 0;
+					broadcast_announce(prev.name + "'s Sharpen the Blade fades.", false);
 				}
 			}
 			// PHB 2024 Sorcerer Draconic Sorcery L14 Dragon Wings (para 7561-7563):
@@ -5118,6 +5131,28 @@ class battle_manager {
 			broadcast_announce(attacker.name + "'s Righteous Strike adds " + prof_dmg + " radiant damage! (1 focus spent)", false);
 		}
 
+		// Xanathar's Kensei L6 Deft Strike (para 1828-1831): "When you hit a target
+		// with a kensei weapon, you can spend 1 ki point to cause the weapon to deal
+		// extra damage to the target equal to your Martial Arts die."
+		if (attacker.class_name == "Monk" and attacker.subclass == "Way of the Kensei" and attacker.deft_strike_active and !attacker.deft_strike_used_this_turn and attacker.focus_points > 0 and is_weapon_attack) {
+			attacker.deft_strike_used_this_turn = true;
+			attacker.focus_points--;
+			int ma_die = monk_martial_arts_die(attacker);
+			int deft_dmg = random(1, ma_die);
+			bonus += deft_dmg;
+			broadcast_announce(attacker.name + "'s Deft Strike deals " + deft_dmg + " extra damage! (1 Focus Point spent)", false);
+		}
+
+		// Xanathar's Kensei L3 Kensei's Shot (para 1814-1817): "You can use a bonus
+		// action on your turn to make your ranged attacks with a kensei weapon more
+		// deadly. Any target you hit with a ranged attack using a kensei weapon takes
+		// an extra 1d4 damage of the weapon's damage type."
+		if (attacker.class_name == "Monk" and attacker.subclass == "Way of the Kensei" and attacker.kenseis_shot_active and is_weapon_attack and attacker.main_hand_is_ranged) {
+			int shot_dmg = random(1, 4);
+			bonus += shot_dmg;
+			broadcast_announce(attacker.name + "'s Kensei's Shot adds " + shot_dmg + " extra damage!", false);
+		}
+
 		// PHB 2024 Rogue L1 Sneak Attack (para 6537-6540): "Once per turn, you can deal
 		// an extra 1d6 damage to one creature you hit with an attack roll if you have
 		// Advantage on the roll and the attack uses a Finesse or a Ranged weapon. The
@@ -5533,6 +5568,29 @@ class battle_manager {
 						send_roll_request(sf_user, sf_pr);
 					}
 					return;
+				}
+			}
+
+			// Xanathar's Kensei L17 Unerring Accuracy (para 1836-1838): "If you miss
+			// with an attack roll using a monk weapon on your turn, you can reroll it.
+			// You can use this feature only once on each of your turns."
+			if (!hit and !is_fumble and pr.is_weapon_attack and !pr.is_spell_effect and c.unerring_accuracy_active and !c.unerring_accuracy_used_this_turn and !target.is_dead) {
+				c.unerring_accuracy_used_this_turn = true;
+				int ua_roll = random(1, 20);
+				int ua_total = ua_roll + pr.modifier;
+				if (c.sharpen_the_blade_bonus > 0) ua_total += c.sharpen_the_blade_bonus;
+				bool ua_hit = ua_total >= target.armor_class and ua_roll != 1;
+				if (ua_roll == 20) ua_hit = true;
+				string ua_outcome = ua_hit ? "hits!" : "misses.";
+				broadcast_roll(c.name, "Unerring Accuracy reroll", ua_roll, pr.modifier, ua_total, ua_outcome);
+				if (ua_hit) {
+					hit = true;
+					natural_roll = ua_roll;
+					total = ua_total;
+					reported_modifier = pr.modifier;
+					outcome = ua_outcome;
+					is_fumble = false;
+					pr.is_crit = (ua_roll == 20);
 				}
 			}
 
@@ -6270,6 +6328,18 @@ class battle_manager {
 				if (rebuke_dmg < 1) rebuke_dmg = 1;
 				combat.apply_damage(c, rebuke_dmg, DMG_PSYCHIC, target);
 				broadcast_announce(target.name + "'s Scornful Rebuke deals " + rebuke_dmg + " psychic damage to " + c.name + "!", true);
+			}
+
+			// Xanathar's Sun Soul L17 Sun Shield (para 1863-1865): "If a creature hits
+			// you with a melee attack while this light shines, you can use your reaction
+			// to deal radiant damage to the creature. The radiant damage equals 5 + your
+			// Wisdom modifier."
+			if (target.sun_shield_active and target.has_reaction and !target.is_dead and !c.main_hand_is_ranged and !pr.is_spell_effect and feet_distance(c.x, c.y, target.x, target.y) <= 5) {
+				target.has_reaction = false;
+				int ss_dmg = 5 + target.get_ability_mod(ABILITY_WIS);
+				if (ss_dmg < 1) ss_dmg = 1;
+				combat.apply_damage(c, ss_dmg, DMG_RADIANT, target);
+				broadcast_announce(target.name + "'s Sun Shield flares! " + ss_dmg + " radiant damage to " + c.name + "!", true);
 			}
 
 			// Xanathar's Cavalier L3 Unwavering Mark retaliation trigger (para 1671-1672):

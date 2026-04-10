@@ -2320,6 +2320,33 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
             int prof_ad = proficiency_bonus(cs.level);
             c.ascendant_dragon_breath_uses = prof_ad;
         }
+        // Xanathar's Way of the Drunken Master (paras 1780-1805)
+        if (cs.subclass == "Way of the Drunken Master") {
+            // L3 Drunken Technique (para 1796-1797): Disengage + 10ft on Flurry
+            if (cs.level >= 3) c.drunken_technique_active = true;
+            // L6 Tipsy Sway — Redirect Attack: handled via existing drunken_master_opportunity
+            // L11 Drunkard's Luck: deferred (needs disadvantage-cancel prompt system)
+            // L17 Intoxicated Frenzy: deferred (needs flurry multi-target extension)
+        }
+        // Xanathar's Way of the Kensei (paras 1806-1835)
+        if (cs.subclass == "Way of the Kensei") {
+            // L3 Path of the Kensei (para 1822-1827): kensei weapon designation
+            if (cs.level >= 3) c.kensei_weapon_active = true;
+            // L6 Deft Strike (para 1828-1831): 1 ki on hit for +MA die damage
+            if (cs.level >= 6) c.deft_strike_active = true;
+            // L11 Sharpen the Blade (para 1832-1833): BA handled in users_dom
+            // L17 Unerring Accuracy (para 1834-1835): reroll missed monk weapon attack
+            if (cs.level >= 17) c.unerring_accuracy_active = true;
+        }
+        // Xanathar's Way of the Sun Soul (paras 1836-1865)
+        if (cs.subclass == "Way of the Sun Soul") {
+            // L3 Radiant Sun Bolt (para 1851-1855): existing sun_bolt_ready
+            if (cs.level >= 3) c.sun_bolt_ready = true;
+            // L6 Searing Arc Strike: deferred (needs ki-cast burning_hands system)
+            // L11 Searing Sunburst: deferred (needs new AoE action)
+            // L17 Sun Shield (para 1863-1865): reaction 5+WIS radiant on melee hit
+            if (cs.level >= 17) c.sun_shield_active = true;
+        }
     }
     if (cs.class_name == "Paladin") {
         // PHB 2024 Paladin L6 Aura of Protection (para 5676-5679): "You radiate a
