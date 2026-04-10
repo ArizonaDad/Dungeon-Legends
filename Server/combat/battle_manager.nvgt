@@ -3825,12 +3825,16 @@ class battle_manager {
 
 		// Skip dead combatants.
 		if (c.is_dead) {
+			check_battle_end();
+			if (!combat.battle_active) return;
 			advance_turn();
 			return;
 		}
 
 		// Skip stable unconscious combatants (they do nothing on their turn).
 		if (c.is_stable and c.current_hp == 0) {
+			check_battle_end();
+			if (!combat.battle_active) return;
 			advance_turn();
 			return;
 		}

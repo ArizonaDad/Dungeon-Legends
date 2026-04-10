@@ -2590,8 +2590,8 @@ void show_bonus_action_menu() {
 	}
 	// Shield Master shove is automatic now (2024 rules)
 	else if (blessing_of_trickery_opt >= 0 and res == blessing_of_trickery_opt) {
-		send({{"type", message_types::bonus_action}, {"feature", "blessing_of_trickery"}, {"target_id", current_target_id}});
-		speak("Blessing of Trickery granted.", true);
+		send({{"type", message_types::bonus_action}, {"feature", "blessing_of_the_trickster"}, {"target_id", current_target_id}});
+		speak("Blessing of the Trickster granted.", true);
 	}
 	else if (spirit_totem_bear_opt >= 0 and res == spirit_totem_bear_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "spirit_totem_bear"}});
