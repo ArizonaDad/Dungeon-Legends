@@ -2192,11 +2192,64 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         }
     }
     if (cs.class_name == "Artificer") {
+        // PHB 2024 Forge of the Artificer base class features (paras 455-675)
+        int int_mod_art = (cs.intelligence - 10) / 2;
+        if (int_mod_art < 1) int_mod_art = 1;
+        if (cs.level >= 1) {
+            // L1 Tinker's Magic (paras 467-502): "You can use this feature a number of
+            // times equal to your Intelligence modifier (minimum of once)". Magic-action
+            // mundane item creation infrastructure deferred (no hazards system).
+            c.tinkers_magic_uses_max = int_mod_art;
+            c.tinkers_magic_uses_current = c.tinkers_magic_uses_max;
+        }
+        if (cs.level >= 2) {
+            // L2 Replicate Magic Item (paras 503-513): plans-known flag. Actual item
+            // creation requires DMG plan tables + item infrastructure — deferred.
+            c.replicate_magic_item_known = true;
+        }
+        if (cs.level >= 7) {
+            // L7 Flash of Genius (paras 655-657): "When you or a creature you can see
+            // within 30 feet of you fails an ability check or a saving throw, you can
+            // take a Reaction to add a bonus to the roll, potentially causing it to
+            // succeed. The bonus equals your Intelligence modifier (minimum of +1).
+            // You can take this Reaction a number of times equal to your Intelligence
+            // modifier (minimum of once)."
+            c.flash_of_genius_uses_max = int_mod_art;
+            c.flash_of_genius_uses_current = c.flash_of_genius_uses_max;
+        }
+        if (cs.level >= 10) {
+            // L10 Magic Item Adept (para 659): "You can now attune to up to four magic items at once."
+            c.magic_item_attunement_max = 4;
+        }
+        if (cs.level >= 11) {
+            // L11 Spell-Storing Item (paras 660-663): flag for client awareness. Actual
+            // item-storage infrastructure deferred.
+            c.spell_storing_item_known = true;
+        }
+        if (cs.level >= 14) {
+            // L14 Advanced Artifice (paras 664-667):
+            // - Magic Item Savant: "You can now attune to up to five magic items at once."
+            // - Refreshed Genius: "When you finish a Short Rest, you regain one expended
+            //   use of your Flash of Genius feature." (Short rest plumbing deferred.)
+            c.magic_item_attunement_max = 5;
+            c.refreshed_genius_active = true;
+        }
+        if (cs.level >= 18) {
+            // L18 Magic Item Master (paras 668-669): "You can now attune to up to six magic items at once."
+            c.magic_item_attunement_max = 6;
+        }
+        if (cs.level >= 20) {
+            // L20 Soul of Artifice (paras 672-675):
+            // - Cheat Death: deferred — needs Replicate Magic Item infrastructure.
+            // - Magical Guidance: "When you finish a Short Rest, you regain all expended
+            //   uses of your Flash of Genius if you have Attunement to at least one magic item."
+            c.magical_guidance_active = true;
+        }
+        // Subclass-specific
         if (cs.subclass == "Cartographer" and cs.level >= 3) {
             // Eberron Forge of the Artificer L3: Adventurer's Atlas map holders get +1d4 initiative
             c.cartographer_marked = true;
-            int int_mod_cart = (cs.intelligence - 10) / 2;
-            c.illuminated_cartography_uses = int_mod_cart > 0 ? int_mod_cart : 1;
+            c.illuminated_cartography_uses = int_mod_art;
             c.initiative_bonus += 2; // +1d4 initiative approximation (avg 2.5)
         }
     }

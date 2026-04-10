@@ -458,13 +458,42 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 - Memorize Spell L5 — short rest subsystem dependency.
 - Ritual Adept L1 spell pipeline integration — needs `Ritual` tag on spell data entries and a separate ritual cast path that consumes 10 minutes (or 11 minutes per source) and skips slot/prep requirements for spellbook ritual spells.
 
+### Artificer Audit (2026-04-09) — Forgotten Realms PHB Forge of the Artificer paras 455-675
+
+| Feature | Level | Source para | Status |
+|---|---|---|---|
+| **Spellcasting** (INT, half-caster, Artisan's/Thieves'/Tinker's Tools as focus) | 1 | 455-466 | ✓ Done — `cs.is_caster=true`, `spellcasting_ability=ABILITY_INT`, `apply_half_caster_slots`. |
+| **Tinker's Magic** (Mending cantrip + Magic action create mundane item, INT mod uses/LR) | 1 | 467-502 | PARTIAL 2026-04-09 — `tinkers_magic_uses_max` and `tinkers_magic_uses_current` fields set on init at INT-mod-min-1 uses. The Magic action mundane-item creation handler is deferred — needs a hazards system for ball bearings/caltrops to have combat effect, and a player-side item picker for the 30-item list. Use tracking is wired so future batches can add the action handler. |
+| **Replicate Magic Item** (4 plans, craft during LR, items vanish 1d4 days post-death) | 2 | 503-513 | DEFERRED — `replicate_magic_item_known` flag set on init for client awareness. Full implementation requires the DMG magic item plan tables, a long-rest crafting subsystem, item-attunement-from-this-feature tracking, and per-item vanish timers. None of those subsystems exist. |
+| **Artificer Subclass** | 3 | 646-647 | ✓ Done — Alchemist, Armorer, Artillerist, Battle Smith, Cartographer (Eberron). |
+| **Ability Score Improvement** | 4/8/12/16 | 648-649 | ✓ Done — global feat-grant system. |
+| **Magic Item Tinker** (Charge BA / Drain BA / Transmute Action options on Replicate items) | 6 | 650-654 | DEFERRED — depends on Replicate Magic Item infrastructure. Without the plan + crafted-item registry there is no item to charge/drain/transmute. Documented for the same future batch as Replicate Magic Item. |
+| **Flash of Genius** (Reaction +INT mod to failed ability check or save w/in 30 ft, INT mod uses/LR) | 7 | 655-657 | ✓ Done 2026-04-09 — `flash_of_genius_uses_max` and `flash_of_genius_uses_current` set on init at INT-mod-min-1 uses. New `try_flash_of_genius` helper in `battle_manager.nvgt` scans for any L7+ Artificer with the feature available and reaction free within 30 ft of the failing target (self allowed per RAW), smart-spends only when the bonus would actually turn the failure into a success, decrements the use, consumes the reaction, and returns the new total. Wired into 20 save sites: 5 end-of-turn condition saves (Hold Person, Web, Blindness/Deafness, Fear, Tasha's Hideous Laughter) and 15 charm/frighten failed-save sites (mirrors Bard Countercharm coverage). Also wired into `finalize_roll_result` for failed `ROLL_ABILITY_CHECK` paths so any skill check or hide check routed through the pending_roll system gets Flash of Genius coverage automatically. Damage saves (Fireball/Lightning Bolt/Cone of Cold/etc.) coverage left for a future Flash of Genius coverage extension batch — there are 80+ inline save sites and the pattern repeats; to be wired in a focused follow-up. |
+| **Magic Item Adept** (4 attunements) | 10 | 658-659 | ✓ Done 2026-04-09 — `magic_item_attunement_max = 4` set on init at L10+. |
+| **Spell-Storing Item** (LR-store 1 L1-3 Artificer spell in object, 2×INT mod uses) | 11 | 660-663 | DEFERRED — `spell_storing_item_known` flag set for client awareness. Full implementation requires per-item spell-storage state on the inventory item objects, plus a Magic action handler that anyone holding the item can trigger. Item infrastructure not present. |
+| **Advanced Artifice — Magic Item Savant** (5 attunements) | 14 | 664-666 | ✓ Done 2026-04-09 — `magic_item_attunement_max = 5` overrides the L10 cap. |
+| **Advanced Artifice — Refreshed Genius** (regain 1 Flash of Genius use on Short Rest) | 14 | 664-667 | PARTIAL 2026-04-09 — `refreshed_genius_active` flag set on init at L14+. Actual SR regen requires the short rest subsystem. Currently combat sessions only have long rests, which already restore all uses. The flag is in place so when SR is added it will hook in correctly. |
+| **Magic Item Master** (6 attunements) | 18 | 668-669 | ✓ Done 2026-04-09 — `magic_item_attunement_max = 6` overrides L14 cap. |
+| **Epic Boon** | 19 | 670-671 | ✓ Done — Epic Boon feat catalog. |
+| **Soul of Artifice — Cheat Death** (disintegrate Uncommon/Rare items for 20 HP each when reduced to 0 HP) | 20 | 672-674 | DEFERRED — depends on Replicate Magic Item infrastructure. Without a per-character registry of items created via Replicate Magic Item there is nothing to disintegrate. |
+| **Soul of Artifice — Magical Guidance** (Flash of Genius full regen on Short Rest if attuned to ≥1 magic item) | 20 | 672-675 | PARTIAL 2026-04-09 — `magical_guidance_active` flag set on init at L20+. Same SR-subsystem dependency as Refreshed Genius. Flag is in place for the eventual SR hook. |
+
+**Pending follow-up Artificer batches:**
+- Replicate Magic Item L2 — needs DMG magic item plan tables (Levels 2/6/10/14 from source paras 517-645), a long-rest crafting subsystem, attunement-from-this-feature tracking, and per-item vanish timers. Bag of Holding, Cap of Water Breathing, Sending Stones, Wand of the War Mage are recommended starting plans.
+- Magic Item Tinker L6 — Charge/Drain/Transmute Bonus/Magic actions on Replicate Magic Items. Requires the Replicate registry above.
+- Spell-Storing Item L11 — store an Artificer L1-3 spell in an object during Long Rest, anyone holding can use Magic action to cast (`2*INT mod` uses).
+- Refreshed Genius L14 + Magical Guidance L20 — Short Rest subsystem dependency.
+- Cheat Death L20 — depends on Replicate Magic Item infrastructure.
+- Flash of Genius coverage extension — wire `try_flash_of_genius` into the remaining ~80 inline save sites (damage saves for Fireball, Lightning Bolt, Cone of Cold, Disintegrate, etc.) so it provides full RAW coverage on every failed save.
+- Tinker's Magic L1 Magic action — needs a hazards system for ball bearings/caltrops in adjacent tiles.
+
 - **Paladin:** Lay on Hands (pool size), Divine Smite (slot-based in 2024), Aura of Courage, Cleansing Touch — all addressed in 2026-04-09 audit; remaining items in pending list above.
 - **Ranger:** Favored Enemy / Roving / Tireless / Relentless Hunter / Nature's Veil / Precise Hunter / Feral Senses / Foe Slayer all addressed 2026-04-09; deferred items in Ranger pending list above.
 - **Rogue:** Sneak Attack base case / Steady Aim / Uncanny Dodge / Reliable Talent L7 fix / Slippery Mind / Elusive / Stroke of Luck flag all addressed 2026-04-09; deferred Cunning Strike family in Rogue pending list above.
 - **Sorcerer:** Innate Sorcery, Font of Magic, Sorcery Incarnate fallback, Eldritch Master prep all addressed 2026-04-09; metamagic pipeline + Sorcerous Restoration deferred.
 - **Warlock:** Magical Cunning, Contact Patron, Mystic Arcanum L11/13/15/17, Eldritch Master, invocation count fix all addressed 2026-04-09; individual invocation effects deferred.
 - **Wizard:** Arcane Recovery, Spell Mastery, Signature Spells
-- **Artificer:** Infusions, Flash of Genius, Spell Storing Item
+- **Artificer:** Tinker's Magic uses, Flash of Genius (20 sites + finalize_roll_result), Magic Item Adept/Savant/Master attunement caps, Magical Guidance flag
 
 ---
 

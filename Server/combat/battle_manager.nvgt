@@ -2575,6 +2575,39 @@ class battle_manager {
 		return false;
 	}
 
+	// PHB 2024 Forge Artificer L7 Flash of Genius (paras 655-657): "When you or a
+	// creature you can see within 30 feet of you fails an ability check or a saving
+	// throw, you can take a Reaction to add a bonus to the roll, potentially causing
+	// it to succeed. The bonus equals your Intelligence modifier (minimum of +1)."
+	// Smart-spend: only auto-fires for an L7+ Artificer ally with reaction available
+	// AND only if the bonus would actually turn the failure into a success. Returns
+	// the new total (unchanged if no Flash of Genius applied). For checks vs DC use
+	// this on the rolled total before comparing to dc; for saves use it on save_total.
+	int try_flash_of_genius(combatant@ target, int dc, int current_total, string label) {
+		if (@target == null or @combat == null) return current_total;
+		if (current_total >= dc) return current_total; // not failing
+		for (uint i = 0; i < combat.combatants.length(); i++) {
+			combatant@ art = combat.combatants[i];
+			if (@art == null or art.is_dead) continue;
+			if (art.class_name != "Artificer" or art.level < 7) continue;
+			if (art.flash_of_genius_uses_current <= 0) continue;
+			if (!art.has_reaction) continue;
+			// Source allows self ("you or a creature you can see within 30 feet of you").
+			// Allies only (not enemies) unless this is PvP.
+			if (art.is_player != target.is_player and combat.mode != "pvp") continue;
+			if (feet_distance(art.x, art.y, target.x, target.y) > 30) continue;
+			int int_mod = art.get_ability_mod(ABILITY_INT);
+			if (int_mod < 1) int_mod = 1;
+			int new_total = current_total + int_mod;
+			if (new_total < dc) continue; // smart-spend: don't waste the use if it can't succeed
+			art.flash_of_genius_uses_current--;
+			art.has_reaction = false;
+			broadcast_announce(art.name + " uses Flash of Genius! " + target.name + " adds +" + int_mod + " to the " + label + " (new total " + new_total + ") — succeeded!", true);
+			return new_total;
+		}
+		return current_total;
+	}
+
 	void clear_haste_effect(combatant@ target, bool apply_lethargy = true, bool announce = true) {
 		if (@target == null or !target.hasted) return;
 		target.speed = target.speed / 2;
@@ -3080,6 +3113,7 @@ class battle_manager {
 						int save_total = save_roll + save_bonus;
 						bool saved = save_total >= save_dc_val;
 						broadcast_roll(prev.name, "WIS save vs Hold Person (end of turn)", save_roll, save_bonus, save_total, saved ? "Freed!" : "Still paralyzed!");
+						if (!saved) { int new_total = try_flash_of_genius(prev, save_dc_val, save_total, "WIS save vs Hold Person"); if (new_total >= save_dc_val) saved = true; }
 						if (saved) {
 							prev.remove_condition(COND_PARALYZED);
 							broadcast_to_battle({{"type", message_types::condition_removed}, {"target", prev.name}, {"condition", "Paralyzed"}});
@@ -3100,6 +3134,7 @@ class battle_manager {
 						int save_total = save_roll + save_bonus;
 						bool saved = save_total >= save_dc_val;
 						broadcast_roll(prev.name, "DEX save vs Web (end of turn)", save_roll, save_bonus, save_total, saved ? "Freed!" : "Still restrained!");
+						if (!saved) { int new_total = try_flash_of_genius(prev, save_dc_val, save_total, "DEX save vs Web"); if (new_total >= save_dc_val) saved = true; }
 						if (saved) {
 							prev.remove_condition(COND_RESTRAINED);
 							broadcast_to_battle({{"type", message_types::condition_removed}, {"target", prev.name}, {"condition", "Restrained"}});
@@ -3120,6 +3155,7 @@ class battle_manager {
 						int save_total = save_roll + save_bonus;
 						bool saved = save_total >= save_dc_val;
 						broadcast_roll(prev.name, "CON save vs Blindness/Deafness (end of turn)", save_roll, save_bonus, save_total, saved ? "Recovered!" : "Still blinded!");
+						if (!saved) { int new_total = try_flash_of_genius(prev, save_dc_val, save_total, "CON save vs Blindness/Deafness"); if (new_total >= save_dc_val) saved = true; }
 						if (saved) {
 							prev.remove_condition(COND_BLINDED);
 							broadcast_to_battle({{"type", message_types::condition_removed}, {"target", prev.name}, {"condition", "Blinded"}});
@@ -3140,6 +3176,7 @@ class battle_manager {
 						int save_total = save_roll + save_bonus;
 						bool saved = save_total >= save_dc_val;
 						broadcast_roll(prev.name, "WIS save vs Fear (end of turn)", save_roll, save_bonus, save_total, saved ? "Courage returns!" : "Still frightened!");
+						if (!saved) { int new_total = try_flash_of_genius(prev, save_dc_val, save_total, "WIS save vs Fear"); if (new_total >= save_dc_val) saved = true; }
 						if (saved) {
 							prev.remove_condition(COND_FRIGHTENED);
 							broadcast_to_battle({{"type", message_types::condition_removed}, {"target", prev.name}, {"condition", "Frightened"}});
@@ -3160,6 +3197,7 @@ class battle_manager {
 						int save_total = save_roll + save_bonus;
 						bool saved = save_total >= save_dc_val;
 						broadcast_roll(prev.name, "WIS save vs Tasha's Hideous Laughter (end of turn)", save_roll, save_bonus, save_total, saved ? "Laughter fades!" : "Still laughing!");
+						if (!saved) { int new_total = try_flash_of_genius(prev, save_dc_val, save_total, "WIS save vs Tasha's Hideous Laughter"); if (new_total >= save_dc_val) saved = true; }
 						if (saved) {
 							prev.remove_condition(COND_INCAPACITATED);
 							prev.remove_condition(COND_PRONE);
@@ -4663,6 +4701,18 @@ class battle_manager {
 					natural_roll = 10;
 					total = natural_roll + pr.modifier + bless_bonus + bardic_bonus;
 				}
+			}
+		}
+
+		// PHB 2024 Forge Artificer L7 Flash of Genius (paras 655-657): for failed ability
+		// checks routed through the pending_roll system (skill checks, hide, etc.) — try
+		// to grant a +INT mod bonus from any nearby L7+ Artificer with the reaction and
+		// uses available. Smart-spend: only fires if it would turn the failure into a success.
+		if (pr.roll_type == ROLL_ABILITY_CHECK and pr.dc > 0 and total < pr.dc) {
+			int new_total = try_flash_of_genius(c, pr.dc, total, pr.reason);
+			if (new_total > total) {
+				reported_modifier += (new_total - total);
+				total = new_total;
 			}
 		}
 
@@ -7705,6 +7755,7 @@ class battle_manager {
 					if (bless_bonus > 0) broadcast_announce(t.name + "'s Bless adds " + bless_bonus + " to the save.", false);
 					broadcast_roll(t.name, "WIS save vs Fear", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Frightened!");
 					if (!saved and try_countercharm_reroll(t, save_dc, save_bonus + bless_bonus, "WIS save vs Fear")) saved = true;
+					if (!saved) { int new_total = try_flash_of_genius(t, save_dc, save_total, "WIS save vs Fear"); if (new_total >= save_dc) saved = true; }
 					if (!saved) {
 						t.add_condition(COND_FRIGHTENED);
 						broadcast_to_battle({{"type", message_types::condition_applied}, {"target", t.name}, {"condition", "Frightened"}});
@@ -7732,6 +7783,7 @@ class battle_manager {
 					if (bless_bonus > 0) broadcast_announce(t.name + "'s Bless adds " + bless_bonus + " to the save.", false);
 					broadcast_roll(t.name, "WIS save vs Hypnotic Pattern", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Charmed!");
 					if (!saved and try_countercharm_reroll(t, save_dc, save_bonus + bless_bonus, "WIS save vs Hypnotic Pattern")) saved = true;
+					if (!saved) { int new_total = try_flash_of_genius(t, save_dc, save_total, "WIS save vs Hypnotic Pattern"); if (new_total >= save_dc) saved = true; }
 					if (!saved) {
 						t.add_condition(COND_CHARMED);
 						t.add_condition(COND_INCAPACITATED);
@@ -8002,6 +8054,7 @@ class battle_manager {
 				bool saved = save_total >= save_dc;
 				broadcast_roll(target.name, "WIS save vs Cause Fear", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Frightened!");
 				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Cause Fear")) saved = true;
+				if (!saved) { int new_total = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Cause Fear"); if (new_total >= save_dc) saved = true; }
 				if (!saved) {
 					target.add_condition(COND_FRIGHTENED);
 					broadcast_announce(target.name + " awakens to their own mortality and is Frightened of " + c.name + "!", true);
@@ -8674,6 +8727,7 @@ class battle_manager {
 				bool saved = save_total >= save_dc;
 				broadcast_roll(target.name, "WIS save vs Phantasmal Killer", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Frightened!");
 				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Phantasmal Killer")) saved = true;
+				if (!saved) { int new_total = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Phantasmal Killer"); if (new_total >= save_dc) saved = true; }
 				if (!saved) {
 					combat.apply_damage(target, total_damage, DMG_PSYCHIC, c);
 					target.add_condition(COND_FRIGHTENED);
@@ -9017,6 +9071,7 @@ class battle_manager {
 					int save_total = save_roll + save_bonus + bless_bonus;
 					bool saved = save_total >= save_dc;
 					if (!saved and try_countercharm_reroll(t, save_dc, save_bonus + bless_bonus, "WIS save vs Mass Suggestion")) saved = true;
+					if (!saved) { int new_total = try_flash_of_genius(t, save_dc, save_total, "WIS save vs Mass Suggestion"); if (new_total >= save_dc) saved = true; }
 					if (!saved) {
 						t.add_condition(COND_CHARMED);
 						count++;
@@ -9036,6 +9091,7 @@ class battle_manager {
 				bool saved = save_total >= save_dc;
 				broadcast_roll(target.name, "WIS save vs Command", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Commanded!");
 				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Command")) saved = true;
+				if (!saved) { int new_total = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Command"); if (new_total >= save_dc) saved = true; }
 				if (!saved) {
 					// Approximation: target loses its action next turn (treated as Incapacitated for one turn)
 					// then immediately recovers. We mark it with the existing COND_CHARMED to suppress its turn.
@@ -9054,6 +9110,7 @@ class battle_manager {
 				bool saved = save_total >= save_dc;
 				broadcast_roll(target.name, "WIS save vs Suggestion", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Charmed!");
 				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Suggestion")) saved = true;
+				if (!saved) { int new_total = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Suggestion"); if (new_total >= save_dc) saved = true; }
 				if (!saved) {
 					target.add_condition(COND_CHARMED);
 					broadcast_announce(target.name + " is charmed by " + c.name + "'s Suggestion. The charm ends if you or an ally damages them.", true);
@@ -9248,6 +9305,7 @@ class battle_manager {
 				bool saved = save_total >= save_dc;
 				broadcast_roll(target.name, "WIS save vs Eyebite", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Afflicted!");
 				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Eyebite")) saved = true;
+				if (!saved) { int new_total = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Eyebite"); if (new_total >= save_dc) saved = true; }
 				if (!saved) {
 					target.add_condition(COND_FRIGHTENED);
 					broadcast_announce(target.name + " is Panicked by " + c.name + "'s Eyebite!", true);
@@ -9734,6 +9792,7 @@ class battle_manager {
 				if (bless_bonus > 0) broadcast_announce(target.name + "'s Bless adds " + bless_bonus + " to the save.", false);
 				broadcast_roll(target.name, "WIS save vs Dominate Person", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Charmed!");
 				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Dominate Person")) saved = true;
+				if (!saved) { int new_total = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Dominate Person"); if (new_total >= save_dc) saved = true; }
 				if (!saved) {
 					target.add_condition(COND_CHARMED);
 					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Charmed"}});
@@ -9762,6 +9821,7 @@ class battle_manager {
 				if (bless_bonus > 0) broadcast_announce(target.name + "'s Bless adds " + bless_bonus + " to the save.", false);
 				broadcast_roll(target.name, "WIS save vs Charm Person", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Charmed!");
 				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Charm Person")) saved = true;
+				if (!saved) { int new_total = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Charm Person"); if (new_total >= save_dc) saved = true; }
 				if (!saved) {
 					target.add_condition(COND_CHARMED);
 					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Charmed"}});
@@ -10470,6 +10530,7 @@ class battle_manager {
 				if (bless_bonus > 0) broadcast_announce(target.name + "'s Bless adds " + bless_bonus + " to the save.", false);
 				broadcast_roll(target.name, "WIS save vs Dominate Monster", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Charmed!");
 				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Dominate Monster")) saved = true;
+				if (!saved) { int new_total = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Dominate Monster"); if (new_total >= save_dc) saved = true; }
 				if (!saved) {
 					target.add_condition(COND_CHARMED);
 					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Charmed"}});
@@ -10764,6 +10825,7 @@ class battle_manager {
 				bool saved = save_total >= save_dc;
 				broadcast_roll(target.name, "WIS save vs Enthrall", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Charmed!");
 				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Enthrall")) saved = true;
+				if (!saved) { int new_total = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Enthrall"); if (new_total >= save_dc) saved = true; }
 				if (!saved) {
 					target.add_condition(COND_CHARMED);
 					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Charmed"}});
@@ -10877,6 +10939,7 @@ class battle_manager {
 				bool saved = save_total >= save_dc;
 				broadcast_roll(target.name, "WIS save vs Charm Monster", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Charmed!");
 				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Charm Monster")) saved = true;
+				if (!saved) { int new_total = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Charm Monster"); if (new_total >= save_dc) saved = true; }
 				if (!saved) {
 					target.add_condition(COND_CHARMED);
 					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Charmed"}});
@@ -10899,6 +10962,7 @@ class battle_manager {
 				bool saved = save_total >= save_dc;
 				broadcast_roll(target.name, "WIS save vs Dominate Beast", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Charmed!");
 				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Dominate Beast")) saved = true;
+				if (!saved) { int new_total = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Dominate Beast"); if (new_total >= save_dc) saved = true; }
 				if (!saved) {
 					target.add_condition(COND_CHARMED);
 					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Charmed"}});
@@ -11831,6 +11895,7 @@ class battle_manager {
 					bool saved = save_total >= save_dc;
 					broadcast_roll(t.name, "WIS save vs Weird", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Terrified!");
 					if (!saved and try_countercharm_reroll(t, save_dc, save_bonus + bless_bonus, "WIS save vs Weird")) saved = true;
+					if (!saved) { int new_total = try_flash_of_genius(t, save_dc, save_total, "WIS save vs Weird"); if (new_total >= save_dc) saved = true; }
 					if (!saved) {
 						combat.apply_damage(t, dmg, DMG_PSYCHIC, c);
 						t.add_condition(COND_FRIGHTENED);

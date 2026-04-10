@@ -342,6 +342,16 @@ class combatant {
 	bool eldritch_cannon_active = false; // Artillerist Artificer
 	int eldritch_cannon_hp = 0;
 	bool experimental_elixir_available = false; // Alchemist Artificer
+	// PHB 2024 Forge Artificer base class (paras 455-675)
+	int tinkers_magic_uses_max = 0; // L1: INT mod uses/LR, Magic action create mundane item
+	int tinkers_magic_uses_current = 0;
+	int flash_of_genius_uses_max = 0; // L7: INT mod uses/LR, Reaction +INT to failed check/save w/in 30 ft
+	int flash_of_genius_uses_current = 0;
+	int magic_item_attunement_max = 3; // L1: 3, L10: 4, L14: 5, L18: 6
+	bool replicate_magic_item_known = false; // L2: plans-known flag (item creation infra deferred)
+	bool spell_storing_item_known = false; // L11: store spell in item (item infra deferred)
+	bool refreshed_genius_active = false; // L14: regain 1 Flash of Genius use on Short Rest
+	bool magical_guidance_active = false; // L20 Soul of Artifice: regain ALL Flash uses on SR if attuned
 	bool tentacle_of_deeps_active = false; // Fathomless Warlock
 	bool wildfire_spirit_active = false; // Wildfire Druid
 	// PHB core remaining
@@ -1729,6 +1739,13 @@ class battle {
 				state["my_signature_spells_charges_max"] = c.signature_spells_charges_max;
 				state["my_signature_spell_a_id"] = c.signature_spell_a_id;
 				state["my_signature_spell_b_id"] = c.signature_spell_b_id;
+				// PHB 2024 Forge Artificer L1 Tinker's Magic / L7 Flash of Genius / L10/14/18 attunement / L20 Magical Guidance
+				state["my_tinkers_magic_uses_current"] = c.tinkers_magic_uses_current;
+				state["my_tinkers_magic_uses_max"] = c.tinkers_magic_uses_max;
+				state["my_flash_of_genius_uses_current"] = c.flash_of_genius_uses_current;
+				state["my_flash_of_genius_uses_max"] = c.flash_of_genius_uses_max;
+				state["my_magic_item_attunement_max"] = c.magic_item_attunement_max;
+				state["my_magical_guidance_active"] = c.magical_guidance_active;
 				// Potion buff rounds remaining
 				state["my_potion_damage_rounds"] = c.potion_damage_rounds;
 				state["my_potion_ac_rounds"] = c.potion_ac_rounds;
