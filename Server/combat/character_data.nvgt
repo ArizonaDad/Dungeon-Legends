@@ -418,6 +418,8 @@ void calculate_hp(character_sheet@ cs) {
 void calculate_ac(character_sheet@ cs) {
     int dex_mod = ability_modifier(cs.dexterity);
     int base_ac = 10 + dex_mod; // Unarmored default
+    // PHB 2024 Medium Armor Master (para 7698): max DEX bonus for medium armor is +3 instead of +2
+    int med_dex_cap = character_sheet_has_feat(cs, "medium_armor_master") ? 3 : 2;
 
     // Natural AC overrides (species)
     if (cs.natural_ac_override > 0) {
@@ -438,13 +440,14 @@ void calculate_ac(character_sheet@ cs) {
         base_ac = 13 + dex_mod;
     }
     // Actual armor types (D&D 5e 2024 PHB)
+    // PHB 2024 Medium Armor Master (para 7698): max DEX bonus for medium armor is +3 instead of +2
     else if (cs.armor_type == "leather") { base_ac = 11 + dex_mod; }
     else if (cs.armor_type == "studded_leather") { base_ac = 12 + dex_mod; }
-    else if (cs.armor_type == "hide") { base_ac = 12 + (dex_mod > 2 ? 2 : dex_mod); }
-    else if (cs.armor_type == "chain_shirt") { base_ac = 13 + (dex_mod > 2 ? 2 : dex_mod); }
-    else if (cs.armor_type == "scale_mail") { base_ac = 14 + (dex_mod > 2 ? 2 : dex_mod); }
-    else if (cs.armor_type == "breastplate") { base_ac = 14 + (dex_mod > 2 ? 2 : dex_mod); }
-    else if (cs.armor_type == "half_plate") { base_ac = 15 + (dex_mod > 2 ? 2 : dex_mod); }
+    else if (cs.armor_type == "hide") { int cap = dex_mod > med_dex_cap ? med_dex_cap : dex_mod; base_ac = 12 + cap; }
+    else if (cs.armor_type == "chain_shirt") { int cap = dex_mod > med_dex_cap ? med_dex_cap : dex_mod; base_ac = 13 + cap; }
+    else if (cs.armor_type == "scale_mail") { int cap = dex_mod > med_dex_cap ? med_dex_cap : dex_mod; base_ac = 14 + cap; }
+    else if (cs.armor_type == "breastplate") { int cap = dex_mod > med_dex_cap ? med_dex_cap : dex_mod; base_ac = 14 + cap; }
+    else if (cs.armor_type == "half_plate") { int cap = dex_mod > med_dex_cap ? med_dex_cap : dex_mod; base_ac = 15 + cap; }
     else if (cs.armor_type == "ring_mail") { base_ac = 14; }
     else if (cs.armor_type == "chain_mail") { base_ac = 16; }
     else if (cs.armor_type == "splint") { base_ac = 17; }

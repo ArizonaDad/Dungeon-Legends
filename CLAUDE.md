@@ -558,6 +558,17 @@ Epic Boon feats: combat_prowess, dimensional_travel, energy_resistance, fate, fo
 - **Interception Fighting Style** (PHB 2024 para 7864): Reaction reduces damage to adjacent ally by 1d10+prof. Auto-resolved.
 - **Protection Fighting Style** (PHB 2024 para 7868): Reaction imposes disadvantage on attack vs adjacent ally. Requires shield. Auto-resolved before Elusive override.
 
+**Batch 2026-04-10 continued (commit c9174d7):**
+- **Crusher Push Size Check** (PHB 2024 para 7579): Push only works if target is no more than one size larger.
+- **Slasher Hamstring Expiry** (PHB 2024 para 7597): -10ft speed now properly expires at start of attacker's next turn via `slasher_hamstring_active/source_id` tracking.
+- **Piercer Non-Crit Reroll** (PHB 2024 para 7707): Once per turn on piercing hit, reroll lowest damage die (must use new roll). Wired in `roll_attack_damage_natural` before Savage Attacker.
+- **Musician Origin Feat**: Grant Heroic Inspiration to prof+CHA allies within 30ft at battle start and short rest.
+- **Chef Feat** (PHB 2024 para 7568): Extra 1d8 HP to up to 4+prof allies during short rest.
+- **Hex Warrior** (Xanathar's paras 2275-2277): Hexblade Warlocks use highest of STR/DEX/CHA for non-two-handed melee attacks.
+- **Shield Master +2 DEX Save** (PHB 2024 para 7796): Shield AC bonus added to DEX saves in `get_save_bonus`.
+- **Shield Master Interpose** (PHB 2024 para 7797): Reaction on successful DEX save for half damage → take 0 damage. Costs reaction, only fires if no Evasion.
+- **Athlete Free Stand** (PHB 2024 para 7557): Standing from prone costs 0 movement instead of half speed.
+
 **Previously implemented:** combat_prowess (+1d6 weapon miss → hit 1/turn), fortitude (+40 HP), irresistible_offense (+2d10 force 1/turn), skill (+1d10 ability check 1/turn), speed (+30ft), the_night_spirit (300ft darkvision + see invisible), truesight (Truesight 60ft)
 
 ### Audio System
