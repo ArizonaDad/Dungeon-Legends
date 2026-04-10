@@ -8439,14 +8439,28 @@ class battle_manager {
 				}
 			}
 
-			// Shield Master 2024: after hitting with a melee weapon as part of Attack action with a shield, shove
+			// PHB 2024 Shield Master (para 7797): after hitting with a melee weapon with a shield, shove
+			// Attacker chooses Push 5ft OR Prone via shield_master_push_mode toggle
 			if (c.has_feat("shield_master") and c.has_shield and !c.main_hand_is_ranged and !pr.is_spell_effect and !c.shield_bash_used_this_turn and !target.is_dead and feet_distance(c.x, c.y, target.x, target.y) <= 5) {
 				c.shield_bash_used_this_turn = true;
 				int sb_dc = 8 + c.get_ability_mod(ABILITY_STR) + c.proficiency;
 				int sb_save = target.apply_indomitable_might(random(1, 20) + target.get_save_bonus(ABILITY_STR), ABILITY_STR);
 				if (sb_save < sb_dc) {
-					target.add_condition(COND_PRONE);
-					broadcast_announce(c.name + "'s Shield Master knocks " + target.name + " prone! (save " + sb_save + " vs DC " + sb_dc + ")", true);
+					if (c.shield_master_push_mode) {
+						// Push 5ft (1 tile) straight away from attacker
+						int push_dir_x = 0; int push_dir_y = 0;
+						if (target.x > c.x) push_dir_x = 1;
+						else if (target.x < c.x) push_dir_x = -1;
+						if (target.y > c.y) push_dir_y = 1;
+						else if (target.y < c.y) push_dir_y = -1;
+						if (push_dir_x != 0 or push_dir_y != 0) {
+							target.x += push_dir_x; target.y += push_dir_y; // 5 ft = 1 tile
+						}
+						broadcast_announce(c.name + "'s Shield Master pushes " + target.name + " 5 feet away! (save " + sb_save + " vs DC " + sb_dc + ")", true);
+					} else {
+						target.add_condition(COND_PRONE);
+						broadcast_announce(c.name + "'s Shield Master knocks " + target.name + " prone! (save " + sb_save + " vs DC " + sb_dc + ")", true);
+					}
 				} else {
 					broadcast_announce(target.name + " resists " + c.name + "'s Shield Master shove (save " + sb_save + " vs DC " + sb_dc + ").", false);
 				}

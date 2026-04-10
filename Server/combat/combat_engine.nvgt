@@ -648,6 +648,8 @@ class combatant {
 	bool fire_shield_warm = true; // true=warm (cold resist, reflects fire), false=chill (fire resist, reflects cold)
 	// Shield Master 2024: once per turn, Shield Bash rider on melee hit
 	bool shield_bash_used_this_turn = false;
+	// PHB 2024 Shield Master (para 7797): player choice of Push 5ft OR Prone
+	bool shield_master_push_mode = false; // false=Prone (default), true=Push 5ft
 	// PHB 2024 Weapon Mastery properties — per-turn tracking
 	bool cleave_used_this_turn = false;
 	bool mastery_slow_applied = false; // target flag: speed reduced by Slow mastery

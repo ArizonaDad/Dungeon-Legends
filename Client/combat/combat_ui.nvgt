@@ -1800,7 +1800,8 @@ void show_bonus_action_menu() {
 	}
 	// Feat-based bonus actions (server validates feat ownership)
 	polearm_master_attack_opt = m.add_item("Polearm Master Attack. Bonus action. Strike with the polearm butt for 1d4. (Requires Polearm Master feat)");
-	// Shield Master Shove is automatic now (2024 rules: rider on melee hit with shield, not a bonus action)
+	// PHB 2024 Shield Master (para 7797): free toggle for Push 5ft vs Prone on auto-shove
+	shield_master_shove_opt = m.add_item("Shield Master Shove Mode. Free action. Choose Push 5 feet or Prone for automatic shove on melee hit. (Requires Shield Master feat)");
 	// Valda's Spire Gunslinger maneuvers (Critical Shot is now passive crit-range,
 	// Gut Shot is now an automatic on-crit debuff — neither is a menu entry).
 	// Grazing Shot fires automatically on miss; Maverick Spirit fires automatically on
@@ -2869,7 +2870,21 @@ void show_bonus_action_menu() {
 		send({{"type", message_types::bonus_action}, {"feature", "polearm_master_attack"}, {"target_id", current_target_id}});
 		speak("Polearm butt strike.", true);
 	}
-	// Shield Master shove is automatic now (2024 rules)
+	// PHB 2024 Shield Master (para 7797): toggle Push 5ft vs Prone preference
+	else if (shield_master_shove_opt >= 0 and res == shield_master_shove_opt) {
+		menu@ smm = setup_sub_menu("Choose Shield Master shove mode.");
+		smm.add_item("Push 5 feet. Shove the target 5 feet away from you.");
+		smm.add_item("Knock Prone. Knock the target prone.");
+		int sm_res = smm.run();
+		if (sm_res < 0) { speak("Cancelled.", true); }
+		else if (sm_res == 0) {
+			send({{"type", message_types::bonus_action}, {"feature", "shield_master_toggle"}, {"mode", "push"}});
+			speak("Shield Master set to push.", true);
+		} else {
+			send({{"type", message_types::bonus_action}, {"feature", "shield_master_toggle"}, {"mode", "prone"}});
+			speak("Shield Master set to prone.", true);
+		}
+	}
 	else if (blessing_of_trickery_opt >= 0 and res == blessing_of_trickery_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "blessing_of_the_trickster"}, {"target_id", current_target_id}});
 		speak("Blessing of the Trickster granted.", true);

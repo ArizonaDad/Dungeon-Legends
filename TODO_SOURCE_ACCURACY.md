@@ -689,21 +689,21 @@ alert, archery, athlete (BATCH 4A), blind_fighting (BATCH 4B), boon_of_combat_pr
 ### Key complex feat effects — status:
 - ~~**Polearm Master Reactive Strike**~~ RESOLVED (commit 2813154) — entering-reach OA trigger wired.
 - ~~**Shield Master Interpose Shield**~~ RESOLVED 2026-04-10 — Reaction on successful DEX save → 0 damage.
-- **Shield Master push option** — player choice of Push 5ft OR Prone (currently always Prone).
+- ~~**Shield Master push option**~~ RESOLVED 2026-04-10 — player choice of Push 5ft OR Prone via B-menu toggle.
 - ~~**Mage Slayer Guarded Mind**~~ RESOLVED (commit 7a47504) — 1/SR auto-succeed on failed INT/WIS/CHA save, wired into 40+ save sites.
 - ~~**Charger**~~ RESOLVED 2026-04-10 — +1d8 charge damage wired.
 - ~~**Inspiring Leader**~~ RESOLVED 2026-04-10 — temp HP at battle start + short rest.
 - ~~**Elemental Adept**~~ RESOLVED — resistance bypass + dice floor of 2 wired.
 - ~~**Fey Touched / Shadow Touched**~~ RESOLVED 2026-04-10 — Free-cast tracking wired.
 - ~~**Telekinetic**~~ RESOLVED 2026-04-10 — bonus action shove wired.
-- **Telepathic** — telepathic communication (non-combat) + Detect Thoughts spell (free cast deferred).
-- ~~**Sharpshooter**~~ RESOLVED — skips ranged-in-melee disadvantage. -5/+10 trade deferred (needs attack-time toggle).
+- ~~**Telepathic**~~ RESOLVED 2026-04-10 — Detect Thoughts free cast 1/LR via grant_free_cast. Telepathic communication is non-combat flavor.
+- ~~**Sharpshooter**~~ RESOLVED — skips ranged-in-melee disadvantage. PHB 2024 removed the -5/+10 trade (2014 only).
 - ~~**Spell Sniper**~~ RESOLVED — skips ranged-spell-in-melee disadvantage.
 - ~~**Poisoner**~~ RESOLVED — poison damage bypasses Resistance.
 - ~~**Resilient**~~ RESOLVED — saving throw proficiency wired.
 - **Ability Score Improvement** — data only, no combat logic needed.
 
-**Remaining feats without combat logic:** ~15-20, mostly non-combat (actor, crafter, keen_mind, skilled, magic_initiate variants, armor/weapon proficiency feats). The only combat-relevant gaps are: Sharpshooter -5/+10 toggle, Shield Master Push/Prone choice, Telepathic free Detect Thoughts, and medium_armor_master (+3 DEX cap).
+**Remaining feats without combat logic:** ~15, mostly non-combat (actor, crafter, keen_mind, skilled, magic_initiate variants, armor/weapon proficiency feats). All combat-relevant feat gaps are now RESOLVED (Shield Master choice, Telepathic free cast, medium_armor_master +3 DEX cap already implemented).
 
 ---
 

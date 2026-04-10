@@ -5726,6 +5726,20 @@ void handle_user_message(user@ u, json_object@ msg)
 			c.blade_breaker_stance = !c.blade_breaker_stance;
 			u.room.bm.broadcast_announce(c.name + (c.blade_breaker_stance ? " enters Blade Breaker stance!" : " leaves Blade Breaker stance."), true);
 		}
+		// PHB 2024 Shield Master (para 7797): toggle Push 5ft vs Prone preference.
+		// No action cost — free preference toggle, applies on next Shield Master shove.
+		else if (feature == "shield_master_toggle") {
+			if (!c.has_feat("shield_master")) { u.send({{"type", message_types::announce}, {"text", "Requires Shield Master feat."}, {"interrupt", true}}); return; }
+			string mode = "";
+			if (msg.exists("mode")) mode = string(msg["mode"]);
+			if (mode == "push") {
+				c.shield_master_push_mode = true;
+				u.room.bm.broadcast_announce(c.name + " sets Shield Master to Push 5 feet.", false);
+			} else {
+				c.shield_master_push_mode = false;
+				u.room.bm.broadcast_announce(c.name + " sets Shield Master to knock Prone.", false);
+			}
+		}
 		else if (feature == "festus_blessing") {
 			// Festus Domain Cleric: bestow festive blessing on allies
 			if (c.class_name != "Cleric" or c.subclass != "Festus Domain") { u.send({{"type", message_types::announce}, {"text", "Only Festus Clerics can bless feasts."}, {"interrupt", true}}); return; }

@@ -996,6 +996,7 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         bool has_dt = false;
         for (uint si = 0; si < c.prepared_spells.length(); si++) if (c.prepared_spells[si] == "detect_thoughts") { has_dt = true; break; }
         if (!has_dt) c.prepared_spells.insert_last("detect_thoughts");
+        c.grant_free_cast("detect_thoughts", 1);
     }
     // Feat: Skilled (PHB Origin) - "You gain proficiency in any combination of three
     // skills or tools of your choice." Default: Perception, Investigation, Insight (the
