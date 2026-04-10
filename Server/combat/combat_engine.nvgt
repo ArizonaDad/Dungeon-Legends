@@ -418,7 +418,14 @@ class combatant {
 	bool unearthly_recovery_available = false;
 	bool sculpt_spells_active = false; // Evoker Wizard
 	bool improved_illusions = false; // Illusionist Wizard
-	bool arcane_deflection_available = false; // War Magic Wizard
+	bool arcane_deflection_available = false; // War Magic Wizard L2
+	// Xanathar's War Magic (paras 2915-2944)
+	bool tactical_wit_active = false; // L2: +INT mod to initiative
+	int power_surge_charges = 0; // L6: stored surges for bonus damage
+	int power_surge_max = 0;
+	bool power_surge_used_this_turn = false; // L6: 1/turn flag
+	bool durable_magic_active = false; // L10: +2 AC/saves while concentrating
+	bool deflecting_shroud_active = false; // L14: damage on Arcane Deflection
 	// PHB 2024 Sorcerer Draconic Sorcery L6 Elemental Affinity (para 7559): choose Acid/Cold/Fire/Lightning/Poison
 	string elemental_affinity_type = ""; // "acid"/"cold"/"fire"/"lightning"/"poison"
 	// PHB 2024 Sorcerer Draconic Sorcery L14 Dragon Wings (para 7561-7563)
@@ -964,6 +971,9 @@ class combatant {
 		if (aura_of_protection_bonus > 0) {
 			mod += aura_of_protection_bonus;
 		}
+		// Xanathar's War Magic L10 Durable Magic (para 2941-2942): "While you maintain
+		// concentration on a spell, you have a +2 bonus to... all saving throws."
+		if (durable_magic_active and is_concentrating) mod += 2;
 		return mod;
 	}
 
@@ -1939,6 +1949,12 @@ class battle {
 				state["my_trance_of_order_active"] = c.trance_of_order_active;
 				state["my_trance_of_order_rounds"] = c.trance_of_order_rounds;
 				state["my_clockwork_cavalcade_available"] = c.clockwork_cavalcade_available;
+				// Xanathar's War Magic (paras 2915-2944)
+				state["my_tactical_wit_active"] = c.tactical_wit_active;
+				state["my_power_surge_charges"] = c.power_surge_charges;
+				state["my_power_surge_max"] = c.power_surge_max;
+				state["my_durable_magic_active"] = c.durable_magic_active;
+				state["my_deflecting_shroud_active"] = c.deflecting_shroud_active;
 				// Potion buff rounds remaining
 				state["my_potion_damage_rounds"] = c.potion_damage_rounds;
 				state["my_potion_ac_rounds"] = c.potion_ac_rounds;

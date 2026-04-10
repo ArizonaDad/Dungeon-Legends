@@ -223,6 +223,12 @@ int my_bastion_of_law_dice = 0;
 bool my_trance_of_order_active = false;
 int my_trance_of_order_rounds = 0;
 bool my_clockwork_cavalcade_available = false;
+// Xanathar's War Magic (paras 2915-2944) — synced from server
+bool my_tactical_wit_active = false;
+int my_power_surge_charges = 0;
+int my_power_surge_max = 0;
+bool my_durable_magic_active = false;
+bool my_deflecting_shroud_active = false;
 // PHB 2024 Warlock L2 Magical Cunning / L9 Contact Patron / L11+ Mystic Arcanum — synced from server
 bool my_magical_cunning_available = false;
 bool my_contact_patron_available = false;
@@ -3583,6 +3589,12 @@ void parse_game_state(json_object@ msg) {
 	my_trance_of_order_active = msg.exists("my_trance_of_order_active") ? bool(msg["my_trance_of_order_active"]) : false;
 	my_trance_of_order_rounds = msg.exists("my_trance_of_order_rounds") ? int(msg["my_trance_of_order_rounds"]) : 0;
 	my_clockwork_cavalcade_available = msg.exists("my_clockwork_cavalcade_available") ? bool(msg["my_clockwork_cavalcade_available"]) : false;
+	// Xanathar's War Magic (paras 2915-2944)
+	my_tactical_wit_active = msg.exists("my_tactical_wit_active") ? bool(msg["my_tactical_wit_active"]) : false;
+	my_power_surge_charges = msg.exists("my_power_surge_charges") ? int(msg["my_power_surge_charges"]) : 0;
+	my_power_surge_max = msg.exists("my_power_surge_max") ? int(msg["my_power_surge_max"]) : 0;
+	my_durable_magic_active = msg.exists("my_durable_magic_active") ? bool(msg["my_durable_magic_active"]) : false;
+	my_deflecting_shroud_active = msg.exists("my_deflecting_shroud_active") ? bool(msg["my_deflecting_shroud_active"]) : false;
 	my_magical_cunning_available = msg.exists("my_magical_cunning_available") ? bool(msg["my_magical_cunning_available"]) : false;
 	my_contact_patron_available = msg.exists("my_contact_patron_available") ? bool(msg["my_contact_patron_available"]) : false;
 	my_mystic_arcanum_6_available = msg.exists("my_mystic_arcanum_6_available") ? bool(msg["my_mystic_arcanum_6_available"]) : false;
@@ -3811,6 +3823,11 @@ void reset_combat_state() {
 	my_trance_of_order_active = false;
 	my_trance_of_order_rounds = 0;
 	my_clockwork_cavalcade_available = false;
+	my_tactical_wit_active = false;
+	my_power_surge_charges = 0;
+	my_power_surge_max = 0;
+	my_durable_magic_active = false;
+	my_deflecting_shroud_active = false;
 	my_magical_cunning_available = false;
 	my_contact_patron_available = false;
 	my_mystic_arcanum_6_available = false;

@@ -1659,9 +1659,27 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         c.improved_illusions = true;
     }
 
-    // Wizard War Magic: Arcane Deflection reaction (level 2+)
-    if (cs.class_name == "Wizard" and cs.subclass == "War Magic" and cs.level >= 2) {
-        c.arcane_deflection_available = true;
+    // Xanathar's War Magic (paras 2915-2944)
+    if (cs.class_name == "Wizard" and cs.subclass == "War Magic") {
+        // L2 Arcane Deflection (para 2932-2934): reaction +2 AC or +4 save
+        if (cs.level >= 2) {
+            c.arcane_deflection_available = true;
+            // L2 Tactical Wit (para 2935-2936): +INT mod to initiative rolls
+            c.tactical_wit_active = true;
+        }
+        // L6 Power Surge (para 2937-2940): store surges, max = INT mod (min 1),
+        // start with INT mod surges, spend for half-level force damage 1/turn
+        if (cs.level >= 6) {
+            int int_mod = ability_modifier(cs.intelligence);
+            if (int_mod < 1) int_mod = 1;
+            c.power_surge_max = int_mod;
+            c.power_surge_charges = int_mod;
+            c.power_surge_used_this_turn = false;
+        }
+        // L10 Durable Magic (para 2941-2942): +2 AC and saves while concentrating
+        if (cs.level >= 10) c.durable_magic_active = true;
+        // L14 Deflecting Shroud (para 2943-2944): damage on Arcane Deflection use
+        if (cs.level >= 14) c.deflecting_shroud_active = true;
     }
 
     // Circle of the Stars Druid: Starry Form (level 2+)

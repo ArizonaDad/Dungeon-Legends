@@ -2873,6 +2873,11 @@ class battle_manager {
 
 	void clear_concentration_effects(combatant@ caster) {
 		if (@caster == null or @combat == null) return;
+		// Xanathar's War Magic L10 Durable Magic (para 2941-2942): remove +2 AC
+		// granted while concentrating.
+		if (caster.durable_magic_active and caster.is_concentrating) {
+			caster.armor_class -= 2;
+		}
 		// Bane is a concentration spell but we don't currently track the source per target,
 		// so we blanket-clear all baned flags when the caster had bane as their concentration.
 		// This is an approximation — if two bards cast Bane on the same target and one drops,
@@ -3202,6 +3207,9 @@ class battle_manager {
 
 		combatant@ c = combat.combatants[initiative_index];
 		int mod = c.initiative_bonus;
+		// Xanathar's War Magic L2 Tactical Wit (para 2935-2936): "You gain a bonus to
+		// your initiative rolls equal to your Intelligence modifier."
+		if (c.tactical_wit_active) mod += c.get_ability_mod(ABILITY_INT);
 		user@ u = find_user_for_combatant(c);
 
 		pending_roll pr;
@@ -3736,6 +3744,8 @@ class battle_manager {
 		c.ricochet_used_this_turn = false;
 		c.gun_spinning_used_this_turn = false;
 		c.long_arm_used_this_turn = false;
+		// Xanathar's War Magic L6 Power Surge (para 2940): once per turn reset.
+		c.power_surge_used_this_turn = false;
 		// Valda's Spire Gunslinger White Hat L10 Long Arm of the Law (paras 462-463):
 		// "The creature can't move on its next turn unless it first takes the Disengage
 		// action." If this combatant was hobbled, zero out movement at turn start. The
@@ -5353,7 +5363,7 @@ class battle_manager {
 							else if (reaction_options[oi] == "restore_balance") opts += "Restore Balance (cancel advantage)";
 							else if (reaction_options[oi] == "spirit_shield") opts += "Spirit Shield (reduce damage by 2d6+)";
 							else if (reaction_options[oi] == "entropic_ward") opts += "Entropic Ward (force the hit to miss)";
-							else if (reaction_options[oi] == "arcane_deflection") opts += "Arcane Deflection (+4 AC)";
+							else if (reaction_options[oi] == "arcane_deflection") opts += "Arcane Deflection (+2 AC)";
 							else if (reaction_options[oi] == "deflect_attacks") opts += "Deflect Attacks (reduce by 1d10+DEX+level)";
 							else if (reaction_options[oi] == "uncanny_dodge") opts += "Uncanny Dodge (halve the damage)";
 							else if (reaction_options[oi] == "storms_fury") opts += "Storm's Fury (" + target.level + " lightning damage to attacker + STR save or pushed 20 ft)";
@@ -5816,6 +5826,19 @@ class battle_manager {
 				int rs_dmg = random(1, 8);
 				combat.apply_damage(target, rs_dmg, DMG_RADIANT, c);
 				broadcast_announce(c.name + "'s Radiant Strikes deal " + rs_dmg + " extra radiant damage!", false);
+			}
+
+			// Xanathar's War Magic L6 Power Surge (para 2937-2940): "Once per turn when you deal
+			// damage to a creature with a wizard spell, you can spend one power surge to deal
+			// extra force damage to that target. The extra damage equals half your wizard level."
+			// Applies automatically on spell attack hits. Save-based spell Power Surge deferred.
+			if (pr.is_spell_effect and c.class_name == "Wizard" and c.subclass == "War Magic" and c.level >= 6 and c.power_surge_charges > 0 and !c.power_surge_used_this_turn) {
+				int surge_dmg = c.level / 2;
+				if (surge_dmg < 1) surge_dmg = 1;
+				c.power_surge_charges--;
+				c.power_surge_used_this_turn = true;
+				combat.apply_damage(target, surge_dmg, DMG_FORCE, c);
+				broadcast_announce(c.name + "'s Power Surge deals " + surge_dmg + " extra force damage! (" + c.power_surge_charges + "/" + c.power_surge_max + " surges remaining)", false);
 			}
 
 			// Sacred Weapon: add CHA mod to attack (already applied via attack bonus), no damage bonus here
@@ -6662,12 +6685,36 @@ class battle_manager {
 			}
 		}
 		else if (choice == "arcane_deflection" and defender.is_player) {
-			// War Magic Wizard: Arcane Deflection — +4 AC vs this attack
+			// Xanathar's War Magic L2 Arcane Deflection (para 2932-2934): "When you are hit
+			// by an attack... you can use your reaction to gain a +2 bonus to your AC against
+			// that attack." (NOT +4 — +4 is for saving throws only.)
 			if (defender.class_name == "Wizard" and defender.subclass == "War Magic") {
 				defender.has_reaction = false;
-				defender.armor_class += 4;
-				defender.temp_ac_bonus_this_attack = 4;
-				broadcast_announce(defender.name + " invokes Arcane Deflection! +4 AC against this attack.", true);
+				defender.armor_class += 2;
+				defender.temp_ac_bonus_this_attack = 2;
+				broadcast_announce(defender.name + " invokes Arcane Deflection! +2 AC against this attack.", true);
+				// L14 Deflecting Shroud (para 2943-2944): "When you use your Arcane Deflection,
+				// up to three creatures of your choice within 60 feet take force damage equal
+				// to half your wizard level."
+				if (defender.deflecting_shroud_active and defender.level >= 14) {
+					int shroud_dmg = defender.level / 2;
+					if (shroud_dmg < 1) shroud_dmg = 1;
+					int targets_hit = 0;
+					for (uint dsi = 0; dsi < combat.combatants.length(); dsi++) {
+						if (targets_hit >= 3) break;
+						combatant@ ds_target = combat.combatants[dsi];
+						if (@ds_target == null or ds_target.is_dead) continue;
+						if (ds_target.is_player == defender.is_player) continue; // Only enemies
+						float dsx = float(ds_target.x - defender.x);
+						float dsy = float(ds_target.y - defender.y);
+						float ds_dist = sqrt(dsx * dsx + dsy * dsy) * 5.0f;
+						if (ds_dist <= 60) {
+							combat.apply_damage(ds_target, shroud_dmg, DMG_FORCE, defender);
+							broadcast_announce(ds_target.name + " takes " + shroud_dmg + " force damage from Deflecting Shroud!", false);
+							targets_hit++;
+						}
+					}
+				}
 			}
 		}
 		else if (choice == "deflect_attacks" and defender.is_player) {
@@ -7965,6 +8012,9 @@ class battle_manager {
 			c.is_concentrating = true;
 			c.concentration_spell = spell.name;
 			c.add_condition(COND_CONCENTRATING);
+			// Xanathar's War Magic L10 Durable Magic (para 2941-2942): "While you maintain
+			// concentration on a spell, you have a +2 bonus to AC..."
+			if (c.durable_magic_active) c.armor_class += 2;
 		}
 
 		// Calculate spell attack bonus and save DC
@@ -9027,6 +9077,12 @@ class battle_manager {
 				}
 				if (dispelled > 0) {
 					broadcast_announce(c.name + "'s Dispel Magic strips " + dispelled + " magical effect" + (dispelled == 1 ? "" : "s") + " from " + target.name + "!", true);
+					// Xanathar's War Magic L6 Power Surge (para 2939): "You gain one power surge
+					// whenever you successfully end a spell with dispel magic or counterspell."
+					if (c.class_name == "Wizard" and c.subclass == "War Magic" and c.level >= 6 and c.power_surge_charges < c.power_surge_max) {
+						c.power_surge_charges++;
+						broadcast_announce(c.name + " stores a Power Surge! (" + c.power_surge_charges + "/" + c.power_surge_max + ")", false);
+					}
 				} else {
 					broadcast_announce(c.name + "'s Dispel Magic finds no magic to dispel on " + target.name + ".", false);
 				}
