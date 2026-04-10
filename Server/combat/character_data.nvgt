@@ -112,6 +112,8 @@ class character_sheet {
     // PHB 2024 Sorcerer Draconic Sorcery L6 Elemental Affinity (para 7559-7560):
     // "acid" / "cold" / "fire" / "lightning" / "poison". Set via set_elemental_affinity.
     string elemental_affinity_type = "";
+    // Xanathar's Divine Soul L1 affinity: "good"/"evil"/"law"/"chaos"/"neutrality". Set via set_divine_soul_affinity.
+    string divine_soul_affinity = "";
 }
 
 int bardic_inspiration_die_for_level(int level) {
@@ -1576,9 +1578,31 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         c.monster_slayer_prey = true;
     }
 
-    // Storm Sorcery: Tempestuous Magic (level 1+, bonus action fly 10ft after casting)
-    if (cs.class_name == "Sorcerer" and cs.subclass == "Storm Sorcery" and cs.level >= 1) {
-        c.tempestuous_magic_active = true;
+    // Xanathar's Storm Sorcery (paras 2608-2639)
+    if (cs.class_name == "Sorcerer" and cs.subclass == "Storm Sorcery") {
+        if (cs.level >= 1) {
+            // L1 Tempestuous Magic (para 2627-2628): BA fly 10 ft after L1+ spell cast
+            c.tempestuous_magic_active = true;
+        }
+        if (cs.level >= 6) {
+            // L6 Heart of the Storm (para 2629-2630): lightning+thunder resistance +
+            // eruption damage (half sorcerer level) to nearby enemies on L1+ lightning/thunder cast
+            c.heart_of_the_storm_active = true;
+            c.lightning_resistance = true;
+            c.thunder_resistance = true;
+        }
+        if (cs.level >= 14) {
+            // L14 Storm's Fury (para 2635-2636): reaction on melee hit — deal sorcerer-
+            // level lightning damage + STR save vs spell DC, push 20 ft on fail
+            c.storms_fury_active = true;
+        }
+        if (cs.level >= 18) {
+            // L18 Wind Soul (para 2637-2639): immunity to lightning+thunder, fly 60 ft
+            c.wind_soul_active = true;
+            c.lightning_immunity = true;
+            c.thunder_immunity = true;
+            c.flying_speed = 60;
+        }
     }
 
     // Undead Warlock: Form of Dread (level 1+, uses per rest)
@@ -1721,6 +1745,31 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
             c.light_weaver_active = true;
             c.light_weaver_dark_shifted = false; // Default to light-shifted; player can toggle on long rest
             c.light_weaver_aura_radius = 15;     // Source: 15 ft starting bright light radius
+        }
+        // Xanathar's Divine Soul (paras 2515-2556)
+        if (cs.subclass == "Divine Soul") {
+            // L1 Divine Magic (para 2532-2546): affinity spell always prepared.
+            // Player must choose affinity via Shift+P set_divine_soul_affinity.
+            c.divine_soul_affinity = cs.divine_soul_affinity;
+            if (cs.divine_soul_affinity == "good" and !c.knows_spell("cure_wounds")) c.prepared_spells.insert_last("cure_wounds");
+            else if (cs.divine_soul_affinity == "evil" and !c.knows_spell("inflict_wounds")) c.prepared_spells.insert_last("inflict_wounds");
+            else if (cs.divine_soul_affinity == "law" and !c.knows_spell("bless")) c.prepared_spells.insert_last("bless");
+            else if (cs.divine_soul_affinity == "chaos" and !c.knows_spell("bane")) c.prepared_spells.insert_last("bane");
+            else if (cs.divine_soul_affinity == "neutrality" and !c.knows_spell("protection_from_evil_and_good")) c.prepared_spells.insert_last("protection_from_evil_and_good");
+            // L1 Favored by the Gods (para 2547-2548): add 2d4 on failed save/attack, 1/SR
+            if (cs.level >= 1) {
+                c.favored_by_gods_available = true;
+            }
+            // L6 Empowered Healing (para 2549-2550): spend 1 SP to reroll heal dice, 1/turn
+            if (cs.level >= 6) {
+                c.empowered_healing_active = true;
+            }
+            // L14 Otherworldly Wings (para 2551-2553): BA permanent fly 30
+            // (activated via bonus action handler, not auto on init)
+            // L18 Unearthly Recovery (para 2554-2556): BA heal half max HP when < half, 1/LR
+            if (cs.level >= 18) {
+                c.unearthly_recovery_available = true;
+            }
         }
     }
     if (cs.class_name == "Fighter") {

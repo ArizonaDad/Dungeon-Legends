@@ -200,6 +200,14 @@ bool my_potent_cantrip_active = false;
 bool my_empowered_evocation_active = false;
 bool my_overchannel_pending = false;
 int my_overchannel_uses_this_rest = 0;
+// Xanathar's Storm Sorcery + Divine Soul — synced from server
+bool my_heart_of_the_storm_active = false;
+bool my_storms_fury_active = false;
+bool my_wind_soul_active = false;
+bool my_favored_by_gods_available = false;
+string my_divine_soul_affinity = "";
+bool my_otherworldly_wings_active = false;
+bool my_unearthly_recovery_available = false;
 // PHB 2024 Warlock L2 Magical Cunning / L9 Contact Patron / L11+ Mystic Arcanum — synced from server
 bool my_magical_cunning_available = false;
 bool my_contact_patron_available = false;
@@ -1039,6 +1047,9 @@ void show_bonus_action_menu() {
 	int dragon_wings_opt = -1;
 	int dragon_wings_restore_opt = -1;
 	int summon_dragon_free_opt = -1;
+	// Xanathar's Divine Soul L14 Otherworldly Wings / L18 Unearthly Recovery (paras 2551-2556)
+	int otherworldly_wings_opt = -1;
+	int unearthly_recovery_opt = -1;
 	// PHB 2024 Wizard Evoker L14 Overchannel (paras 9265-9268)
 	int overchannel_opt = -1;
 	// PHB 2024 Warlock L2 Magical Cunning / L9 Contact Patron / L11+ Mystic Arcanum
@@ -1078,6 +1089,15 @@ void show_bonus_action_menu() {
 	// Summon Dragon without a slot or material components. 1/Long Rest.
 	if (lc == "sorcerer" and subclass == "Draconic Sorcery" and level >= 18 and !my_dragon_companion_used_this_rest) {
 		summon_dragon_free_opt = m.add_item("Dragon Companion: cast Summon Dragon without a slot. 1 per long rest.");
+	}
+	// Xanathar's Divine Soul L14 Otherworldly Wings (para 2551-2553)
+	if (lc == "sorcerer" and subclass == "Divine Soul" and level >= 14) {
+		string wings_label = my_otherworldly_wings_active ? "Dismiss Otherworldly Wings. Bonus action." : "Otherworldly Wings. Bonus action. Fly 30 feet (permanent until dismissed).";
+		otherworldly_wings_opt = m.add_item(wings_label);
+	}
+	// Xanathar's Divine Soul L18 Unearthly Recovery (para 2554-2556)
+	if (lc == "sorcerer" and subclass == "Divine Soul" and level >= 18 and my_unearthly_recovery_available) {
+		unearthly_recovery_opt = m.add_item("Unearthly Recovery. Bonus action. Below half HP: regain half max HP. 1 per long rest.");
 	}
 	// PHB 2024 Wizard Evoker L14 Overchannel (paras 9265-9268): When you cast a Wizard
 	// spell of levels 1-5 that deals damage, deal max damage. After first use per long
@@ -1571,6 +1591,8 @@ void show_bonus_action_menu() {
 	if (dragon_wings_opt >= 0) options++;
 	if (dragon_wings_restore_opt >= 0) options++;
 	if (summon_dragon_free_opt >= 0) options++;
+	if (otherworldly_wings_opt >= 0) options++;
+	if (unearthly_recovery_opt >= 0) options++;
 	if (overchannel_opt >= 0) options++;
 	if (magical_cunning_opt >= 0) options++;
 	if (contact_patron_opt >= 0) options++;
@@ -1684,6 +1706,14 @@ void show_bonus_action_menu() {
 	else if (summon_dragon_free_opt >= 0 and res == summon_dragon_free_opt) {
 		// PHB 2024 Sorcerer Draconic Sorcery L18 Dragon Companion (paras 7564-7566)
 		send({{"type", message_types::bonus_action}, {"feature", "summon_dragon_free"}});
+	}
+	else if (otherworldly_wings_opt >= 0 and res == otherworldly_wings_opt) {
+		// Xanathar's Divine Soul L14 Otherworldly Wings (paras 2551-2553)
+		send({{"type", message_types::bonus_action}, {"feature", "otherworldly_wings"}});
+	}
+	else if (unearthly_recovery_opt >= 0 and res == unearthly_recovery_opt) {
+		// Xanathar's Divine Soul L18 Unearthly Recovery (paras 2554-2556)
+		send({{"type", message_types::bonus_action}, {"feature", "unearthly_recovery"}});
 	}
 	else if (overchannel_opt >= 0 and res == overchannel_opt) {
 		// PHB 2024 Wizard Evoker L14 Overchannel (paras 9265-9268)
@@ -2571,6 +2601,11 @@ void show_phase1_menu() {
 	if (lc_class == "sorcerer" and current_subclass_name() == "Draconic Sorcery" and current_character_level() >= 6) {
 		elemental_affinity_opt = m.add_item("Set Draconic Elemental Affinity damage type (Acid, Cold, Fire, Lightning, or Poison).");
 	}
+	// Xanathar's Divine Soul L1 Divine Magic affinity (para 2532-2546).
+	int divine_soul_affinity_opt = -1;
+	if (lc_class == "sorcerer" and current_subclass_name() == "Divine Soul") {
+		divine_soul_affinity_opt = m.add_item("Set Divine Soul affinity (Good, Evil, Law, Chaos, or Neutrality). Grants an additional spell.");
+	}
 	int status_opt = m.add_item("Show full Phase 1 status.");
 	int cancel_opt = m.add_item("Cancel.");
 
@@ -2791,6 +2826,26 @@ void show_phase1_menu() {
 		else if (pick == po) chosen = "poison";
 		send({{"type", message_types::bonus_action}, {"feature", "set_elemental_affinity"}, {"value", chosen}});
 		speak("Elemental Affinity set to " + chosen + ".", true);
+	}
+	else if (divine_soul_affinity_opt >= 0 and res == divine_soul_affinity_opt) {
+		// Xanathar's Divine Soul L1 Divine Magic affinity (para 2532-2546)
+		menu@ dam = setup_sub_menu("Choose Divine Soul affinity. This grants an additional spell.");
+		int go = dam.add_item("Good. Grants Cure Wounds.");
+		int ev = dam.add_item("Evil. Grants Inflict Wounds.");
+		int la = dam.add_item("Law. Grants Bless.");
+		int ch = dam.add_item("Chaos. Grants Bane.");
+		int ne = dam.add_item("Neutrality. Grants Protection from Evil and Good.");
+		int cnc = dam.add_item("Cancel.");
+		int pick = dam.run();
+		if (pick < 0 or pick == cnc) return;
+		string chosen = "";
+		if (pick == go) chosen = "good";
+		else if (pick == ev) chosen = "evil";
+		else if (pick == la) chosen = "law";
+		else if (pick == ch) chosen = "chaos";
+		else if (pick == ne) chosen = "neutrality";
+		send({{"type", message_types::bonus_action}, {"feature", "set_divine_soul_affinity"}, {"value", chosen}});
+		speak("Divine Soul affinity set to " + chosen + ".", true);
 	}
 	else if (res == status_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "query_phase1"}});
@@ -3390,6 +3445,14 @@ void parse_game_state(json_object@ msg) {
 	my_empowered_evocation_active = msg.exists("my_empowered_evocation_active") ? bool(msg["my_empowered_evocation_active"]) : false;
 	my_overchannel_pending = msg.exists("my_overchannel_pending") ? bool(msg["my_overchannel_pending"]) : false;
 	my_overchannel_uses_this_rest = msg.exists("my_overchannel_uses_this_rest") ? int(msg["my_overchannel_uses_this_rest"]) : 0;
+	// Xanathar's Storm Sorcery + Divine Soul
+	my_heart_of_the_storm_active = msg.exists("my_heart_of_the_storm_active") ? bool(msg["my_heart_of_the_storm_active"]) : false;
+	my_storms_fury_active = msg.exists("my_storms_fury_active") ? bool(msg["my_storms_fury_active"]) : false;
+	my_wind_soul_active = msg.exists("my_wind_soul_active") ? bool(msg["my_wind_soul_active"]) : false;
+	my_favored_by_gods_available = msg.exists("my_favored_by_gods_available") ? bool(msg["my_favored_by_gods_available"]) : false;
+	my_divine_soul_affinity = msg.exists("my_divine_soul_affinity") ? string(msg["my_divine_soul_affinity"]) : "";
+	my_otherworldly_wings_active = msg.exists("my_otherworldly_wings_active") ? bool(msg["my_otherworldly_wings_active"]) : false;
+	my_unearthly_recovery_available = msg.exists("my_unearthly_recovery_available") ? bool(msg["my_unearthly_recovery_available"]) : false;
 	my_magical_cunning_available = msg.exists("my_magical_cunning_available") ? bool(msg["my_magical_cunning_available"]) : false;
 	my_contact_patron_available = msg.exists("my_contact_patron_available") ? bool(msg["my_contact_patron_available"]) : false;
 	my_mystic_arcanum_6_available = msg.exists("my_mystic_arcanum_6_available") ? bool(msg["my_mystic_arcanum_6_available"]) : false;
@@ -3596,6 +3659,13 @@ void reset_combat_state() {
 	my_empowered_evocation_active = false;
 	my_overchannel_pending = false;
 	my_overchannel_uses_this_rest = 0;
+	my_heart_of_the_storm_active = false;
+	my_storms_fury_active = false;
+	my_wind_soul_active = false;
+	my_favored_by_gods_available = false;
+	my_divine_soul_affinity = "";
+	my_otherworldly_wings_active = false;
+	my_unearthly_recovery_available = false;
 	my_magical_cunning_available = false;
 	my_contact_patron_available = false;
 	my_mystic_arcanum_6_available = false;

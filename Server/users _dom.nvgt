@@ -1459,7 +1459,8 @@ void handle_user_message(user@ u, json_object@ msg)
 			or feature == "set_divine_strike_damage_type"
 			or feature == "set_primal_order" or feature == "set_elemental_fury"
 			or feature == "set_primal_strike_damage_type"
-			or feature == "set_elemental_affinity";
+			or feature == "set_elemental_affinity"
+			or feature == "set_divine_soul_affinity";
 		combatant@ c = null;
 		if (is_phase1_config) {
 			@c = u.room.bm.find_player_combatant(u.username);
@@ -1859,6 +1860,54 @@ void handle_user_message(user@ u, json_object@ msg)
 			c.overchannel_pending = true;
 			string warn = c.overchannel_uses_this_rest >= 1 ? " WARNING: this is use #" + (c.overchannel_uses_this_rest + 1) + " — you will take " + (2 + c.overchannel_uses_this_rest - 1) + "d12 necrotic damage per spell level after the cast." : " First use this rest is free.";
 			u.room.bm.broadcast_announce(c.name + " primes Overchannel — your next L1-5 damage spell will deal maximum damage." + warn, true);
+		}
+		else if (feature == "otherworldly_wings") {
+			// Xanathar's Divine Soul L14 Otherworldly Wings (para 2551-2553): "you can
+			// use a bonus action to manifest a pair of spectral wings from your back.
+			// While the wings are present, you have a flying speed of 30 feet. The wings
+			// last until you're incapacitated, you die, or you dismiss them as a bonus action."
+			if (c.class_name != "Sorcerer" or c.subclass != "Divine Soul" or c.level < 14) {
+				u.send({{"type", message_types::announce}, {"text", "Your character cannot use Otherworldly Wings."}, {"interrupt", true}});
+				return;
+			}
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
+			if (c.otherworldly_wings_active) {
+				// Dismiss
+				c.otherworldly_wings_active = false;
+				c.flying_speed = 0;
+				u.room.bm.broadcast_announce(c.name + " dismisses their spectral wings.", false);
+			} else {
+				c.otherworldly_wings_active = true;
+				c.flying_speed = 30;
+				u.room.bm.broadcast_announce(c.name + " manifests spectral wings and gains a Fly Speed of 30 feet!", true);
+			}
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+		}
+		else if (feature == "unearthly_recovery") {
+			// Xanathar's Divine Soul L18 Unearthly Recovery (para 2554-2556): "As a
+			// bonus action when you have fewer than half of your hit points remaining,
+			// you can regain a number of hit points equal to half your hit point maximum.
+			// Once you use this feature, you can't use it again until you finish a long rest."
+			if (c.class_name != "Sorcerer" or c.subclass != "Divine Soul" or c.level < 18) {
+				u.send({{"type", message_types::announce}, {"text", "Your character cannot use Unearthly Recovery."}, {"interrupt", true}});
+				return;
+			}
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
+			if (!c.unearthly_recovery_available) {
+				u.send({{"type", message_types::announce}, {"text", "Unearthly Recovery already used this long rest."}, {"interrupt", true}});
+				return;
+			}
+			if (c.current_hp >= c.max_hp / 2) {
+				u.send({{"type", message_types::announce}, {"text", "You must be below half HP to use Unearthly Recovery."}, {"interrupt", true}});
+				return;
+			}
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.unearthly_recovery_available = false;
+			int heal = c.max_hp / 2;
+			u.room.bm.combat.apply_healing(c, heal);
+			u.room.bm.broadcast_announce(c.name + " invokes Unearthly Recovery and regains " + heal + " hit points!", true);
 		}
 		else if (feature == "font_of_magic_to_slot") {
 			// PHB 2024 Sorcerer L2 Font of Magic — Creating Spell Slots (para 6973-6993):
@@ -3548,6 +3597,41 @@ void handle_user_message(user@ u, json_object@ msg)
 				}
 			}
 			u.send({{"type", message_types::announce}, {"text", "Elemental Affinity set to " + ea_choice + ". You now have resistance to " + ea_choice + " damage and add CHA to one damage roll of " + ea_choice + " spells."}, {"interrupt", true}});
+		}
+		else if (feature == "set_divine_soul_affinity") {
+			// Xanathar's Divine Soul L1 Divine Magic (para 2532-2546): "choose an
+			// affinity for the source of your divine power: good, evil, law, chaos,
+			// or neutrality. You learn an additional spell based on that affinity."
+			string dsa = msg.exists("value") ? string(msg["value"]) : "";
+			if (dsa != "good" and dsa != "evil" and dsa != "law" and dsa != "chaos" and dsa != "neutrality") {
+				u.send({{"type", message_types::announce}, {"text", "Divine Soul affinity must be good, evil, law, chaos, or neutrality."}, {"interrupt", true}});
+				return;
+			}
+			if (c.class_name != "Sorcerer" or c.subclass != "Divine Soul") {
+				u.send({{"type", message_types::announce}, {"text", "Only Divine Soul Sorcerers can choose this."}, {"interrupt", true}});
+				return;
+			}
+			c.divine_soul_affinity = dsa;
+			// Also grant the affinity spell
+			string affinity_spell = "";
+			if (dsa == "good") affinity_spell = "cure_wounds";
+			else if (dsa == "evil") affinity_spell = "inflict_wounds";
+			else if (dsa == "law") affinity_spell = "bless";
+			else if (dsa == "chaos") affinity_spell = "bane";
+			else if (dsa == "neutrality") affinity_spell = "protection_from_evil_and_good";
+			if (affinity_spell != "" and !c.knows_spell(affinity_spell)) {
+				c.prepared_spells.insert_last(affinity_spell);
+			}
+			if (@u.account != null) {
+				json_object@ data = u.account.data;
+				string ckey = get_character_storage_key(u.room.game_type);
+				if (data.exists(ckey)) {
+					json_object@ ch = data[ckey];
+					ch["divine_soul_affinity"] = dsa;
+					u.account.commit();
+				}
+			}
+			u.send({{"type", message_types::announce}, {"text", "Divine Soul affinity set to " + dsa + ". Affinity spell: " + affinity_spell + "."}, {"interrupt", true}});
 		}
 		else if (feature == "wild_companion") {
 			// PHB 2024 Druid L2 Wild Companion (para 4420-4422): "As a Magic action, you

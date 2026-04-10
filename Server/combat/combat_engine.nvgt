@@ -283,7 +283,10 @@ class combatant {
 	bool piercing_resistance = false;
 	bool bludgeoning_resistance = false;
 	bool slashing_resistance = false;
+	bool thunder_resistance = false;
 	bool poison_resistance = false;
+	bool lightning_immunity = false; // Xanathar's Storm Sorcery L18 Wind Soul
+	bool thunder_immunity = false;   // Xanathar's Storm Sorcery L18 Wind Soul
 	bool poison_immunity = false;
 	bool magic_resistance = false;
 	// Armor (used for Heavy Armor Master check)
@@ -380,7 +383,23 @@ class combatant {
 	bool monster_slayer_prey = false; // Monster Slayer Ranger
 	uint monster_slayer_target = 0;
 	bool drake_companion_active = false; // Drakewarden Ranger
-	bool tempestuous_magic_active = false; // Storm Sorcery
+	bool tempestuous_magic_active = false; // Storm Sorcery L1
+	// Xanathar's Storm Sorcery L6 Heart of the Storm (para 2629-2630): lightning+thunder resistance + eruption damage
+	bool heart_of_the_storm_active = false;
+	// Xanathar's Storm Sorcery L14 Storm's Fury (para 2635-2636): reaction on melee hit, sorcerer-level lightning + push
+	bool storms_fury_active = false;
+	// Xanathar's Storm Sorcery L18 Wind Soul (para 2637-2639): immunity to lightning+thunder, fly 60
+	bool wind_soul_active = false;
+	// Xanathar's Divine Soul L1 Favored by the Gods (para 2547-2548): add 2d4 on failed save/attack, 1/SR
+	bool favored_by_gods_available = false;
+	// Xanathar's Divine Soul L1 Divine Magic affinity (para 2532-2546): good/evil/law/chaos/neutrality
+	string divine_soul_affinity = "";
+	// Xanathar's Divine Soul L6 Empowered Healing (para 2549-2550): SP-powered heal reroll
+	// (empowered_healing_active field lives at line 325 in the older block)
+	// Xanathar's Divine Soul L14 Otherworldly Wings (para 2551-2553): permanent fly 30
+	bool otherworldly_wings_active = false;
+	// Xanathar's Divine Soul L18 Unearthly Recovery (para 2554-2556): BA heal half max HP when below half, 1/LR
+	bool unearthly_recovery_available = false;
 	bool sculpt_spells_active = false; // Evoker Wizard
 	bool improved_illusions = false; // Illusionist Wizard
 	bool arcane_deflection_available = false; // War Magic Wizard
@@ -1399,7 +1418,10 @@ class battle {
 		// Aberrant Sorcery: Psychic Defenses — psychic resistance at level 6+
 		if (damage_type == DMG_PSYCHIC and target.psionic_defenses_active) amount = (amount + 1) / 2;
 		if (damage_type == DMG_ACID and target.acid_resistance) amount = (amount + 1) / 2;
-		if (damage_type == DMG_LIGHTNING and target.lightning_resistance) amount = (amount + 1) / 2;
+		if (damage_type == DMG_LIGHTNING and target.lightning_immunity) amount = 0;
+		if (damage_type == DMG_THUNDER and target.thunder_immunity) amount = 0;
+		if (damage_type == DMG_LIGHTNING and target.lightning_resistance and !target.lightning_immunity) amount = (amount + 1) / 2;
+		if (damage_type == DMG_THUNDER and target.thunder_resistance and !target.thunder_immunity) amount = (amount + 1) / 2;
 		if (damage_type == DMG_PIERCING and target.piercing_resistance) amount = (amount + 1) / 2;
 		if (damage_type == DMG_BLUDGEONING and target.bludgeoning_resistance) amount = (amount + 1) / 2;
 		if (damage_type == DMG_SLASHING and target.slashing_resistance) amount = (amount + 1) / 2;
@@ -1854,6 +1876,14 @@ class battle {
 				state["my_empowered_evocation_active"] = c.empowered_evocation_active;
 				state["my_overchannel_pending"] = c.overchannel_pending;
 				state["my_overchannel_uses_this_rest"] = c.overchannel_uses_this_rest;
+				// Xanathar's Storm Sorcery + Divine Soul
+				state["my_heart_of_the_storm_active"] = c.heart_of_the_storm_active;
+				state["my_storms_fury_active"] = c.storms_fury_active;
+				state["my_wind_soul_active"] = c.wind_soul_active;
+				state["my_favored_by_gods_available"] = c.favored_by_gods_available;
+				state["my_divine_soul_affinity"] = c.divine_soul_affinity;
+				state["my_otherworldly_wings_active"] = c.otherworldly_wings_active;
+				state["my_unearthly_recovery_available"] = c.unearthly_recovery_available;
 				// Potion buff rounds remaining
 				state["my_potion_damage_rounds"] = c.potion_damage_rounds;
 				state["my_potion_ac_rounds"] = c.potion_ac_rounds;

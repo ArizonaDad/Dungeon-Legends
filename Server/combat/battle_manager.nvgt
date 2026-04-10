@@ -2996,6 +2996,8 @@ class battle_manager {
 					if (ch.exists("primal_strike_damage_type")) cs.primal_strike_damage_type = string(ch["primal_strike_damage_type"]);
 					// PHB 2024 Sorcerer Draconic Sorcery L6 Elemental Affinity choice (para 7559-7560)
 					if (ch.exists("elemental_affinity_type")) cs.elemental_affinity_type = string(ch["elemental_affinity_type"]);
+					// Xanathar's Divine Soul L1 Divine Magic affinity (para 2532-2546)
+					if (ch.exists("divine_soul_affinity")) cs.divine_soul_affinity = string(ch["divine_soul_affinity"]);
 					has_char = true;
 				} else if (lobby_game_type == GAME_TYPE_SANDBOX and data.exists(ACCOUNT_KEY_LEGACY_CHARACTER)) {
 					json_object@ ch = data[ACCOUNT_KEY_LEGACY_CHARACTER];
@@ -5271,6 +5273,12 @@ class battle_manager {
 				if (target.class_name == "Rogue" and target.level >= 5 and !target.has_condition(COND_INCAPACITATED)) {
 					reaction_options.insert_last("uncanny_dodge");
 				}
+				// Xanathar's Storm Sorcery L14 Storm's Fury (para 2635-2636): "when you
+				// are hit by a melee attack, you can use your reaction to deal lightning
+				// damage to the attacker. The damage equals your sorcerer level."
+				if (target.storms_fury_active and target.class_name == "Sorcerer" and target.level >= 14 and pr.is_weapon_attack and !c.main_hand_is_ranged) {
+					reaction_options.insert_last("storms_fury");
+				}
 
 				if (reaction_options.length() > 0) {
 					user@ def_user = find_user_for_combatant(target);
@@ -5303,6 +5311,7 @@ class battle_manager {
 							else if (reaction_options[oi] == "arcane_deflection") opts += "Arcane Deflection (+4 AC)";
 							else if (reaction_options[oi] == "deflect_attacks") opts += "Deflect Attacks (reduce by 1d10+DEX+level)";
 							else if (reaction_options[oi] == "uncanny_dodge") opts += "Uncanny Dodge (halve the damage)";
+							else if (reaction_options[oi] == "storms_fury") opts += "Storm's Fury (" + target.level + " lightning damage to attacker + STR save or pushed 20 ft)";
 						}
 						def_user.send({{"type", message_types::reaction_prompt}, {"attacker", c.name}, {"options", opts}, {"options_csv", opts_csv}});
 						return; // Pause — wait for reaction_response
@@ -6196,6 +6205,22 @@ class battle_manager {
 		if (@pr == null or @c == null) return false;
 		int total = natural_roll + pr.modifier + bless_bonus + bardic_bonus;
 		if (!roll_would_fail(pr, c, natural_roll, total)) return false;
+		// Xanathar's Divine Soul L1 Favored by the Gods (para 2547-2548): "If you fail
+		// a saving throw or miss with an attack roll, you can roll 2d4 and add it to the
+		// total, possibly changing the outcome. Once you use this feature, you can't use
+		// it again until you finish a short or long rest."
+		if (c.favored_by_gods_available and (pr.roll_type == ROLL_ATTACK or pr.roll_type == ROLL_CONCENTRATION or pr.roll_type == ROLL_DEATH_SAVE or pr.roll_type == ROLL_ABILITY_CHECK)) {
+			int fbg_bonus = random(1, 4) + random(1, 4);
+			c.favored_by_gods_available = false;
+			bardic_bonus += fbg_bonus; // piggyback on additive bonus path
+			broadcast_announce(c.name + "'s Favored by the Gods adds +" + fbg_bonus + " to the roll!", true);
+			// Recheck if this turned the failure into a success
+			int new_total = natural_roll + pr.modifier + bless_bonus + bardic_bonus;
+			if (!roll_would_fail(pr, c, natural_roll, new_total)) {
+				finalize_roll_result(pr, natural_roll, bless_bonus, bardic_bonus);
+				return true;
+			}
+		}
 		if (maybe_prompt_lucky(pr, c, natural_roll, bless_bonus, bardic_bonus)) return true;
 		if (maybe_prompt_heroic(pr, c, natural_roll, bless_bonus, bardic_bonus)) return true;
 		if (maybe_prompt_tactical_mind(pr, c, natural_roll, bless_bonus, bardic_bonus)) return true;
@@ -6623,6 +6648,41 @@ class battle_manager {
 				defender.has_reaction = false;
 				defender.uncanny_dodge_pending = true;
 				broadcast_announce(defender.name + " uses Uncanny Dodge! Incoming damage will be halved.", true);
+			}
+		}
+		else if (choice == "storms_fury" and defender.is_player) {
+			// Xanathar's Storm Sorcery L14 Storm's Fury (para 2635-2636): "when you
+			// are hit by a melee attack, you can use your reaction to deal lightning
+			// damage to the attacker. The damage equals your sorcerer level. The
+			// attacker must also make a Strength saving throw against your sorcerer
+			// spell save DC. On a failed save, the attacker is pushed in a straight
+			// line up to 20 feet away from you."
+			if (defender.storms_fury_active and defender.class_name == "Sorcerer" and defender.level >= 14) {
+				defender.has_reaction = false;
+				int sf_damage = defender.level;
+				combat.apply_damage(attacker, sf_damage, DMG_LIGHTNING, defender);
+				broadcast_announce(defender.name + "'s Storm's Fury deals " + sf_damage + " lightning damage to " + attacker.name + "!", true);
+				if (attacker.is_dead) {
+					broadcast_to_battle({{"type", message_types::creature_died}, {"name", attacker.name}, {"is_player", attacker.is_player}, {"killed_by", defender.name}, {"was_full_hp", false}, {"was_overkill", false}, {"was_stealth", false}});
+				} else {
+					int spell_dc = 8 + defender.proficiency + defender.get_ability_mod(ABILITY_CHA);
+					int str_save = random(1, 20) + attacker.get_ability_mod(ABILITY_STR);
+					if (str_save < spell_dc) {
+						broadcast_announce(attacker.name + " fails the STR save (DC " + spell_dc + ") and is pushed 20 feet!", false);
+						// Push 20 ft away from defender
+						int dx = attacker.x - defender.x;
+						int dy = attacker.y - defender.y;
+						if (dx == 0 and dy == 0) dx = 1; // default push direction
+						int push_dist = 20;
+						if (dx != 0 or dy != 0) {
+							float mag = sqrt(float(dx * dx + dy * dy));
+							attacker.x += int(float(dx) / mag * float(push_dist));
+							attacker.y += int(float(dy) / mag * float(push_dist));
+						}
+					} else {
+						broadcast_announce(attacker.name + " resists the push (STR save " + str_save + " vs DC " + spell_dc + ").", false);
+					}
+				}
 			}
 		}
 
@@ -7777,6 +7837,39 @@ class battle_manager {
 		if (spell.casting_time == 0) { c.has_action = false; c.used_action = true; }
 		else if (spell.casting_time == 1) { c.has_bonus_action = false; c.used_bonus_action = true; }
 		else if (spell.casting_time == 2) { c.has_reaction = false; }
+
+		// Xanathar's Storm Sorcery L6 Heart of the Storm (para 2629-2630): "whenever you
+		// start casting a spell of 1st level or higher that deals lightning or thunder damage,
+		// stormy magic erupts from you. This eruption causes creatures of your choice that you
+		// can see within 10 feet of you to take lightning or thunder damage (choose each time
+		// this ability activates) equal to half your sorcerer level."
+		if (c.heart_of_the_storm_active and spell.level >= 1 and c.class_name == "Sorcerer") {
+			// Check if the spell deals lightning or thunder damage
+			bool spell_has_lightning_or_thunder = false;
+			if (spell.damage_type == DMG_LIGHTNING or spell.damage_type == DMG_THUNDER) spell_has_lightning_or_thunder = true;
+			if (spell_has_lightning_or_thunder) {
+				int eruption_damage = c.level / 2;
+				if (eruption_damage < 1) eruption_damage = 1;
+				int eruption_type = spell.damage_type; // match the spell's damage type
+				string eruption_type_name = (eruption_type == DMG_LIGHTNING) ? "lightning" : "thunder";
+				int eruption_count = 0;
+				for (uint hi = 0; hi < combat.combatants.length(); hi++) {
+					combatant@ ht = combat.combatants[hi];
+					if (@ht == null or ht.is_dead or ht.id == c.id) continue;
+					if (ht.is_player == c.is_player and combat.mode != "pvp") continue; // skip allies
+					if (feet_distance(c.x, c.y, ht.x, ht.y) <= 10 and combat.can_see(c, ht)) {
+						combat.apply_damage(ht, eruption_damage, eruption_type, c);
+						eruption_count++;
+						if (ht.is_dead) {
+							broadcast_to_battle({{"type", message_types::creature_died}, {"name", ht.name}, {"is_player", ht.is_player}, {"killed_by", c.name}, {"was_full_hp", false}, {"was_overkill", false}, {"was_stealth", false}});
+						}
+					}
+				}
+				if (eruption_count > 0) {
+					broadcast_announce(c.name + "'s Heart of the Storm erupts for " + eruption_damage + " " + eruption_type_name + " damage to " + eruption_count + " nearby " + (eruption_count == 1 ? "creature" : "creatures") + "!", true);
+				}
+			}
+		}
 
 		// Order Domain Cleric: Voice of Authority - if targeting an ally with a 1st+ level spell, that ally can make a weapon attack as a reaction
 		if (c.class_name == "Cleric" and c.subclass == "Order Domain" and spell.level >= 1 and @target != null and target.id != c.id and target.is_player == c.is_player and !target.is_dead and target.has_reaction) {
