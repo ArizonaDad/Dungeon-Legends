@@ -1744,6 +1744,35 @@ class battle_manager {
 			}
 		}
 
+		// Basic Rules 2024 Hex (para 13730): "If the target drops to 0 Hit Points
+		// before this spell ends, you can use a Bonus Action on a later turn to
+		// curse a new creature." Auto-transfer to nearest hostile within 90ft.
+		if (target.is_dead) {
+			for (uint hx2 = 0; hx2 < combat.combatants.length(); hx2++) {
+				combatant@ hxc2 = combat.combatants[hx2];
+				if (@hxc2 == null or hxc2.is_dead) continue;
+				if (hxc2.hex_target_id != target.id) continue;
+				combatant@ hex_new = null;
+				float hex_best = 999;
+				for (uint hxt = 0; hxt < combat.combatants.length(); hxt++) {
+					combatant@ hxt_c = combat.combatants[hxt];
+					if (@hxt_c == null or hxt_c.is_dead or hxt_c.id == target.id) continue;
+					if (!combat.are_hostile(hxc2, hxt_c)) continue;
+					int hx_dist = feet_distance(hxc2.x, hxc2.y, hxt_c.x, hxt_c.y);
+					if (hx_dist <= 90 and float(hx_dist) < hex_best) {
+						hex_best = float(hx_dist);
+						@hex_new = hxt_c;
+					}
+				}
+				if (@hex_new != null) {
+					hxc2.hex_target_id = hex_new.id;
+					broadcast_announce(hxc2.name + "'s Hex transfers to " + hex_new.name + "!", false);
+				} else {
+					hxc2.hex_target_id = 0;
+				}
+			}
+		}
+
 		// Xanathar's Grave Domain L17 Keeper of Souls (para 802-803): "At the start
 		// of your turn, if there is a creature that has died since the start of your
 		// last turn within 60 feet... you or one creature within 60 feet regains HP
@@ -3672,6 +3701,12 @@ class battle_manager {
 		caster.heat_metal_active = false;
 		caster.heat_metal_target_id = 0;
 		caster.heat_metal_dice_count = 0;
+		// Call Lightning: per-turn bolt action ends with concentration
+		caster.call_lightning_active = false;
+		caster.call_lightning_dice_count = 0;
+		// Flaming Sphere: BA re-damage ends with concentration
+		caster.flaming_sphere_active = false;
+		caster.flaming_sphere_dice_count = 0;
 		// Extended Spell: advantage on concentration saves ends with concentration
 		caster.extended_spell_concentration = false;
 	}
@@ -5714,6 +5749,41 @@ class battle_manager {
 		}
 
 		broadcast_state();
+
+		// Step 1b: If still out of range and has action, Dash to double movement.
+		if (monster.has_action and nearest_dist > desired_attack_range and !monster_frightened_blocked) {
+			monster.has_action = false;
+			monster.used_action = true;
+			monster.movement_remaining += monster.speed;
+			broadcast_announce(monster.name + " dashes!", false);
+			// Continue moving with the extra movement
+			while (monster.movement_remaining >= FEET_PER_TILE and nearest_dist > desired_attack_range) {
+				int od_x = monster.x;
+				int od_y = monster.y;
+				int ddx = 0;
+				int ddy = 0;
+				if (nearest.x > monster.x) ddx = 1;
+				else if (nearest.x < monster.x) ddx = -1;
+				if (nearest.y > monster.y) ddy = 1;
+				else if (nearest.y < monster.y) ddy = -1;
+				// Frightened: can't move closer to fear source
+				if (monster.has_condition(COND_FRIGHTENED) and monster.frightened_source_id > 0) {
+					combatant@ dfs = combat.get_combatant(monster.frightened_source_id);
+					if (@dfs != null and !dfs.is_dead) {
+						int dfd = feet_distance(monster.x, monster.y, dfs.x, dfs.y);
+						int nfd = feet_distance(monster.x + (ddx != 0 ? ddx : 0), monster.y + (ddx == 0 and ddy != 0 ? ddy : 0), dfs.x, dfs.y);
+						if (nfd < dfd) break;
+					}
+				}
+				if (ddx != 0) { monster.x += ddx; monster.movement_remaining -= FEET_PER_TILE; }
+				else if (ddy != 0) { monster.y += ddy; monster.movement_remaining -= FEET_PER_TILE; }
+				else break;
+				check_opportunity_attacks(monster, od_x, od_y, monster.x, monster.y);
+				if (@current_roll != null or monster.is_dead or monster.current_hp == 0) { broadcast_state(); return; }
+				nearest_dist = feet_distance(monster.x, monster.y, nearest.x, nearest.y);
+			}
+			broadcast_state();
+		}
 
 		// Step 2: Attack if the target is in range and the monster still has an action.
 		if (monster.has_action and nearest_dist <= desired_attack_range) {
@@ -10187,6 +10257,63 @@ class battle_manager {
 			broadcast_announce(c.name + " fails to stabilize " + target.name + ".", false);
 		}
 		broadcast_state();
+	}
+
+	// Basic Rules 2024 Call Lightning (para 12321-12323): "On each of your subsequent
+	// turns, you can use your action to call down lightning in this way again,
+	// targeting the same point or a different one."
+	void handle_call_lightning_bolt(user@ u, json_object@ msg) {
+		if (@combat == null or @u == null or @msg == null) return;
+		combatant@ c = combat.current_combatant();
+		if (@c == null or !c.is_player or c.player_username != u.username) return;
+		if (!c.call_lightning_active or c.call_lightning_dice_count == 0) {
+			u.send({{"type", message_types::error}, {"text", "You don't have an active Call Lightning."}});
+			return;
+		}
+		if (!c.has_action) {
+			u.send({{"type", message_types::error}, {"text", "You've already used your action this turn."}});
+			return;
+		}
+		if (c.is_incapacitated_check()) {
+			u.send({{"type", message_types::announce}, {"text", "You are incapacitated and cannot take actions."}, {"interrupt", true}});
+			return;
+		}
+
+		uint target_id = 0;
+		if (msg.exists("target_id")) target_id = uint(msg["target_id"]);
+		combatant@ target = combat.get_combatant(target_id);
+		if (@target == null or target.is_dead) {
+			u.send({{"type", message_types::error}, {"text", "Invalid target."}});
+			return;
+		}
+
+		c.has_action = false;
+		c.used_action = true;
+
+		int center_x = target.x;
+		int center_y = target.y;
+		int total_damage = 0;
+		for (int d = 0; d < c.call_lightning_dice_count; d++) total_damage += random(1, 10);
+		int cl_dc = spell_save_dc(c, "call_lightning");
+		broadcast_announce(c.name + " calls another bolt of lightning!", true);
+		for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+			combatant@ t = combat.combatants[ti];
+			if (@t == null or t.is_dead or t.id == c.id) continue;
+			if (feet_distance(center_x, center_y, t.x, t.y) > 5) continue;
+			int save_roll = random(1, 20);
+			apply_hound_save_disadvantage(t, c.id, save_roll);
+			int save_bonus = t.get_save_bonus(ABILITY_DEX);
+			int bless_bonus = roll_bless_bonus(t);
+			int save_total = save_roll + save_bonus + bless_bonus;
+			bool saved = save_total >= cl_dc;
+			int dmg = saved ? total_damage / 2 : total_damage;
+			if (dmg < 1) dmg = 1;
+			broadcast_roll(t.name, "DEX save vs Call Lightning", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+			combat.apply_damage(t, dmg, DMG_LIGHTNING, c);
+			check_concentration(t, dmg, c);
+		}
+		broadcast_state();
+		check_battle_end();
 	}
 
 	// ---- Consumable Usage ----
@@ -15198,9 +15325,12 @@ class battle_manager {
 				return;
 			}
 			else if (spell.id == "flaming_sphere" and @target != null) {
-				// Basic Rules: 5 ft sphere, DEX save, 2d6 fire, half on success.
-				// Simplified: instant 2d6 fire on target. Upcast +1d6 per level.
+				// Basic Rules 2024 Flaming Sphere (para 13310-13312): "As a Bonus Action,
+				// you can move the Sphere up to 30 feet, and when it moves within 5 feet
+				// of a creature, that creature must make a DEX save." Concentration.
 				int dice_count = 2 + upcast_levels;
+				c.flaming_sphere_active = true;
+				c.flaming_sphere_dice_count = dice_count;
 				int total_damage = 0;
 				for (int d = 0; d < dice_count; d++) total_damage += random(1, 6);
 				int save_roll = random(1, 20);
@@ -15304,8 +15434,12 @@ class battle_manager {
 				broadcast_announce(c.name + " casts Prayer of Healing, restoring " + heal + " HP to " + healed + " ally" + (healed == 1 ? "" : "ies") + ".", true);
 			}
 			else if (spell.id == "call_lightning") {
-				// Basic Rules: DEX save, 3d10 lightning in 5 ft radius of target. Upcast +1d10 per level.
+				// Basic Rules 2024 Call Lightning (para 12321-12323): DEX save, 3d10
+				// lightning in 5 ft radius. Concentration. "On each of your subsequent
+				// turns, you can use your action to call down lightning in this way again."
 				int dice_count = 3 + upcast_levels;
+				c.call_lightning_active = true;
+				c.call_lightning_dice_count = dice_count;
 				int center_x = @target != null ? target.x : c.x;
 				int center_y = @target != null ? target.y : c.y;
 				int total_damage = 0;

@@ -970,6 +970,14 @@ class combatant {
 	bool heat_metal_active = false;
 	uint heat_metal_target_id = 0;
 	int heat_metal_dice_count = 0;
+	// Basic Rules 2024 Call Lightning (para 12321-12323): concentration, action each
+	// turn to call another bolt of lightning.
+	bool call_lightning_active = false;
+	int call_lightning_dice_count = 0;
+	// Basic Rules 2024 Flaming Sphere (para 13310-13312): concentration, BA each
+	// turn to move the sphere and re-deal damage.
+	bool flaming_sphere_active = false;
+	int flaming_sphere_dice_count = 0;
 	bool sanctuary_active = false;         // Attackers must WIS save to target
 	int sanctuary_dc = 0;
 	uint sanctuary_source_id = 0;
@@ -2158,6 +2166,8 @@ class battle {
 				state["my_attacks_remaining"] = c.attacks_remaining_this_turn;
 				state["my_spiritual_weapon_active"] = c.spiritual_weapon_active;
 				state["my_heat_metal_active"] = c.heat_metal_active;
+				state["my_call_lightning_active"] = c.call_lightning_active;
+				state["my_flaming_sphere_active"] = c.flaming_sphere_active;
 				state["my_luck_points"] = c.luck_points;
 				state["my_luck_points_max"] = c.luck_points_max;
 				state["my_has_heroic_inspiration"] = c.has_heroic_inspiration;

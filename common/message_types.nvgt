@@ -75,6 +75,7 @@ namespace message_types
 	const string action_grapple = "action_grapple";           // Client grapples a target.
 	const string action_grapple_escape = "action_grapple_escape"; // Client attempts to escape a grapple.
 	const string action_stabilize = "action_stabilize";         // Client attempts to stabilize a dying ally.
+	const string action_call_lightning = "action_call_lightning"; // Client uses action to call another lightning bolt.
 	const string bonus_action = "bonus_action";               // Client uses bonus action.
 	const string reaction_opportunity = "reaction_opp";       // Server triggers opportunity attack.
 	const string reaction_spell = "reaction_spell";           // Client uses a reaction spell.

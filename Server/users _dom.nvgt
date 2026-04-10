@@ -2712,6 +2712,36 @@ void handle_user_message(user@ u, json_object@ msg)
 			}
 			u.room.bm.broadcast_announce(c.name + " commands Spiritual Weapon to strike " + target.name + "!", true);
 		}
+		else if (feature == "flaming_sphere_redamage") {
+			// Basic Rules 2024 Flaming Sphere (para 13310-13312): "As a Bonus Action,
+			// you can move the Sphere up to 30 feet, and when it moves within 5 feet
+			// of a creature, that creature must make the save against the sphere."
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
+			if (!c.flaming_sphere_active or c.flaming_sphere_dice_count == 0) {
+				u.send({{"type", message_types::announce}, {"text", "You don't have an active Flaming Sphere."}, {"interrupt", true}});
+				return;
+			}
+			combatant@ fs_target = u.room.bm.combat.get_combatant(target_id);
+			if (@fs_target == null or fs_target.is_dead) {
+				u.send({{"type", message_types::announce}, {"text", "Choose a valid target for Flaming Sphere."}, {"interrupt", true}});
+				return;
+			}
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			int fs_dmg = 0;
+			for (int d = 0; d < c.flaming_sphere_dice_count; d++) fs_dmg += random(1, 6);
+			int fs_dc = spell_save_dc(c);
+			int fs_save = random(1, 20) + fs_target.get_save_bonus(ABILITY_DEX);
+			bool fs_saved = fs_save >= fs_dc;
+			int fs_final = fs_saved ? fs_dmg / 2 : fs_dmg;
+			if (fs_final < 1) fs_final = 1;
+			u.room.bm.broadcast_roll(fs_target.name, "DEX save vs Flaming Sphere (DC " + fs_dc + ")", fs_save - fs_target.get_save_bonus(ABILITY_DEX), fs_target.get_save_bonus(ABILITY_DEX), fs_save, fs_saved ? "Half damage!" : "Full damage!");
+			u.room.bm.combat.apply_damage(fs_target, fs_final, DMG_FIRE, c);
+			u.room.bm.broadcast_announce(c.name + "'s Flaming Sphere rams into " + fs_target.name + " for " + fs_final + " fire damage!", true);
+			u.room.bm.check_concentration(fs_target, fs_final, c);
+			u.room.bm.broadcast_state();
+			if (fs_target.is_dead) u.room.bm.check_battle_end();
+		}
 		else if (feature == "heat_metal_redamage") {
 			// Basic Rules 2024 Heat Metal (para 13734-13735): "Until the spell ends,
 			// you can take a Bonus Action on each of your turns to cause this damage again."
@@ -5802,6 +5832,11 @@ void handle_user_message(user@ u, json_object@ msg)
 	else if (msg_type == message_types::action_stabilize) {
 		if (@u.room != null and @u.room.bm != null) {
 			u.room.bm.handle_stabilize(u, msg);
+		}
+	}
+	else if (msg_type == message_types::action_call_lightning) {
+		if (@u.room != null and @u.room.bm != null) {
+			u.room.bm.handle_call_lightning_bolt(u, msg);
 		}
 	}
 	else if (msg_type == message_types::set_target) {
