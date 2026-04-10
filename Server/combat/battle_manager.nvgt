@@ -4336,6 +4336,112 @@ class battle_manager {
 		}
 	}
 
+	// ---- Short Rest (between waves) ----
+
+	void apply_short_rest(combatant@ c) {
+		if (@c == null or c.is_dead) return;
+		// Heal 25% max HP
+		int heal_amount = c.max_hp / 4;
+		if (heal_amount < 1) heal_amount = 1;
+		int old_hp = c.current_hp;
+		c.current_hp += heal_amount;
+		if (c.current_hp > c.max_hp) c.current_hp = c.max_hp;
+		int actual_heal = c.current_hp - old_hp;
+
+		// PHB 2024 Fighter Second Wind: regain 1 use on SR (para 5105)
+		if (c.class_name == "Fighter" and c.second_wind_uses_remaining < c.second_wind_uses_max) {
+			c.second_wind_uses_remaining++;
+			c.second_wind_available = c.second_wind_uses_remaining > 0;
+		}
+		// PHB 2024 Fighter Action Surge: regain all uses on SR
+		if (c.class_name == "Fighter" and c.level >= 2) {
+			int max_surge = c.level >= 17 ? 2 : 1;
+			c.action_surge_uses_remaining = max_surge;
+		}
+		// PHB 2024 Warlock Pact Magic: regain all pact slots on SR
+		if (c.class_name == "Warlock") {
+			for (int si = 0; si < 10; si++) c.spell_slots_current[si] = c.spell_slots_max[si];
+			c.magical_cunning_available = true;
+		}
+		// PHB 2024 Wizard L1 Arcane Recovery: regain 1 charge on SR
+		if (c.class_name == "Wizard") {
+			c.arcane_recovery_charges = 1;
+			// L20 Signature Spells: regain charges on SR
+			if (c.signature_spells_charges_max > 0) {
+				c.signature_spells_charges_remaining = c.signature_spells_charges_max;
+			}
+		}
+		// PHB 2024 Druid Wild Shape: regain uses on SR (2 base)
+		if (c.class_name == "Druid" and c.wild_shape_uses < 2) {
+			c.wild_shape_uses = 2;
+		}
+		// Xanathar's Arcane Archer: regain all Arcane Shot uses on SR (para 1620)
+		if (c.class_name == "Fighter" and c.subclass == "Arcane Archer") {
+			c.arcane_shot_uses = 2;
+		}
+		// War Magic L6 Power Surge: floor at 1 on SR
+		if (c.class_name == "Wizard" and c.subclass == "War Magic" and c.power_surge_charges < 1) {
+			c.power_surge_charges = 1;
+		}
+		// Xanathar's Samurai Fighting Spirit: 3 uses restored on SR
+		if (c.class_name == "Fighter" and c.subclass == "Samurai") {
+			c.fighting_spirit_uses = 3;
+		}
+		// Xanathar's Cavalier Warding Maneuver: CON mod uses restored on SR
+		if (c.class_name == "Fighter" and c.subclass == "Cavalier") {
+			int con_mod = c.get_ability_mod(ABILITY_CON);
+			if (con_mod < 1) con_mod = 1;
+			c.warding_maneuver_uses = con_mod;
+			c.unwavering_mark_ba_uses = c.unwavering_mark_ba_uses_max;
+		}
+		// Battle Master superiority dice: regain all on SR
+		if (c.class_name == "Fighter" and c.subclass == "Battle Master") {
+			c.superiority_dice = c.superiority_dice_max;
+		}
+		// Gunslinger Risk Dice: regain all on SR
+		if (c.class_name == "Gunslinger") {
+			c.risk_dice_current = c.risk_dice_max;
+		}
+		// Bard Bardic Inspiration: regain uses on SR via Font of Inspiration (L5+)
+		if (c.class_name == "Bard" and c.level >= 5) {
+			int cha_mod = c.get_ability_mod(ABILITY_CHA);
+			if (cha_mod < 1) cha_mod = 1;
+			c.bardic_inspiration_uses = cha_mod;
+		}
+		// Monk Focus Points: regain all on SR (PHB 2024 para 5322)
+		if (c.class_name == "Monk") {
+			c.focus_points = c.focus_points_max;
+		}
+		// Cleric Channel Divinity: 1 use regained on SR (PHB 2024)
+		if (c.class_name == "Cleric" or c.class_name == "Paladin") {
+			int cd_max = 1;
+			if (c.class_name == "Cleric" and c.level >= 6) cd_max = 2;
+			if (c.class_name == "Cleric" and c.level >= 18) cd_max = 3;
+			if (c.channel_divinity_uses < cd_max) c.channel_divinity_uses++;
+		}
+
+		// Clear conditions and concentration
+		c.remove_condition(COND_FRIGHTENED);
+		c.remove_condition(COND_CHARMED);
+		c.remove_condition(COND_POISONED);
+		c.is_concentrating = false;
+		c.concentration_spell = "";
+
+		if (actual_heal > 0) {
+			broadcast_announce(c.name + " rests and recovers " + actual_heal + " HP. (" + c.current_hp + "/" + c.max_hp + ")", false);
+		}
+	}
+
+	void apply_short_rest_all_players() {
+		broadcast_announce("Short rest! Players recover resources between waves.", true);
+		for (uint i = 0; i < combat.combatants.length(); i++) {
+			if (combat.combatants[i].is_player) {
+				apply_short_rest(combat.combatants[i]);
+			}
+		}
+		broadcast_state();
+	}
+
 	// ---- Battle End Detection ----
 
 	void check_battle_end() {
@@ -4441,6 +4547,9 @@ class battle_manager {
 					}
 				}
 
+				// Short rest between endless waves — heal + restore SR resources
+				apply_short_rest_all_players();
+
 				// Increment wave
 				combat.wave_number++;
 
@@ -4532,6 +4641,8 @@ class battle_manager {
 				if (combat.mode == "wave") {
 					wave_scenario@ ws = get_scenario(scenario_id);
 					if (@ws != null and combat.wave_number < int(ws.waves.length())) {
+						// Short rest between waves — heal + restore SR resources
+						apply_short_rest_all_players();
 						// Remove dead monsters from combatants
 						for (int ri = int(combat.combatants.length()) - 1; ri >= 0; ri--) {
 							if (!combat.combatants[ri].is_player) combat.combatants.remove_at(ri);
