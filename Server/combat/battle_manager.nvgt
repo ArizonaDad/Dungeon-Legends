@@ -54,6 +54,9 @@ class pending_roll {
 	int first_natural = 0;
 	int savage_attacker_first_total = 0;
 	bool savage_attacker_reroll = false;
+	// Tasha's College of Eloquence Unfailing/Infectious Inspiration tracking
+	uint bardic_source_id = 0; // Who gave the Bardic Inspiration die
+	int bardic_die_used = 0;   // Die size consumed (0 = none)
 	// Distribution chain: comma-separated list of remaining target IDs for spells like
 	// Scorching Ray and Eldritch Blast where each ray/beam may target a different creature.
 	// Consumed front-to-back by start_followup_spell_attack.
@@ -1371,6 +1374,49 @@ class battle_manager {
 		target.bardic_inspiration_source_id = 0;
 		if (announce) {
 			broadcast_announce("Bardic Inspiration fades from " + target.name + " (" + die_label(old_die) + ").", false);
+		}
+	}
+
+	// Tasha's College of Eloquence L6 Unfailing Inspiration (para 1709-1711) and
+	// L14 Infectious Inspiration (para 1716-1719). Called after a roll resolves
+	// when Bardic Inspiration was consumed during that roll.
+	void check_eloquence_inspiration(combatant@ c, pending_roll@ pr, bool roll_succeeded, int bardic_bonus) {
+		if (@c == null or @pr == null or bardic_bonus <= 0) return;
+		if (pr.bardic_die_used <= 0 or pr.bardic_source_id == 0) return;
+		combatant@ source = combat.get_combatant(pr.bardic_source_id);
+		if (@source == null or source.subclass != "College of Eloquence") return;
+
+		// Unfailing Inspiration (L6): "When a creature adds one of your Bardic
+		// Inspiration dice to its ability check, attack roll, or saving throw and
+		// the roll fails, the creature can keep the Bardic Inspiration die."
+		if (!roll_succeeded and source.level >= 6) {
+			c.bardic_inspiration_die = pr.bardic_die_used;
+			c.bardic_inspiration_source_id = pr.bardic_source_id;
+			broadcast_announce(c.name + " keeps the Bardic Inspiration die — " + source.name + "'s Unfailing Inspiration!", false);
+		}
+
+		// Infectious Inspiration (L14): "When a creature within 60 feet of you adds
+		// one of your Bardic Inspiration dice to its ability check, attack roll, or
+		// saving throw and the roll succeeds, you can use your reaction to encourage
+		// a different creature (other than yourself) within 60 feet..."
+		if (roll_succeeded and source.level >= 14 and source.infectious_inspiration_uses > 0 and source.has_reaction) {
+			combatant@ best = null;
+			float best_d = 999;
+			for (uint ii = 0; ii < combat.combatants.length(); ii++) {
+				combatant@ ally = combat.combatants[ii];
+				if (@ally == null or ally.is_dead or ally.id == source.id or ally.id == c.id) continue;
+				if (ally.is_player != source.is_player) continue;
+				if (ally.bardic_inspiration_die > 0) continue;
+				float d = feet_distance(source.x, source.y, ally.x, ally.y);
+				if (d <= 60 and d < best_d) { best_d = d; @best = ally; }
+			}
+			if (@best != null) {
+				source.infectious_inspiration_uses--;
+				source.has_reaction = false;
+				best.bardic_inspiration_die = pr.bardic_die_used;
+				best.bardic_inspiration_source_id = source.id;
+				broadcast_announce(source.name + "'s Infectious Inspiration grants Bardic Inspiration to " + best.name + "! (" + source.infectious_inspiration_uses + " uses remain)", true);
+			}
 		}
 	}
 
@@ -4953,6 +4999,8 @@ class battle_manager {
 		if (!c.is_player or @roller_user == null or roller_user.is_bot) {
 			if (failure_margin > die_size) return false;
 			int bardic_bonus = random(1, die_size);
+			pr.bardic_source_id = c.bardic_inspiration_source_id; // Track for Eloquence features
+			pr.bardic_die_used = die_size;
 			clear_bardic_inspiration(c, false);
 			broadcast_announce(c.name + " uses Bardic Inspiration (" + die_label(die_size) + ") and adds " + bardic_bonus + " to the roll.", false);
 			finalize_roll_result(pr, natural_roll, bless_bonus, bardic_bonus);
@@ -5790,6 +5838,9 @@ class battle_manager {
 			string attack_reason = pr.attack_name != "" ? pr.attack_name + " attack against " + target.name : "to attack " + target.name;
 			broadcast_roll(c.name, attack_reason, natural_roll, reported_modifier, total, outcome);
 
+			// Tasha's Eloquence Unfailing/Infectious Inspiration check
+			check_eloquence_inspiration(c, pr, hit, bardic_bonus);
+
 			// Xanathar's Kensei L3 Agile Parry (para 1825): "If you make an unarmed
 			// strike as part of the Attack action on your turn and are holding a kensei
 			// weapon, you can use it to defend yourself. You gain a +2 bonus to AC
@@ -5994,8 +6045,11 @@ class battle_manager {
 				if (target.has_feat("defensive_duelist") and target.main_hand_finesse and !target.main_hand_is_ranged) {
 					reaction_options.insert_last("defensive_duelist");
 				}
-				// Clockwork Soul: Restore Balance reaction — cancel advantage/disadvantage
-				if (target.class_name == "Sorcerer" and target.subclass == "Clockwork Sorcery" and target.restore_balance_uses > 0) {
+				// Tasha's Clockwork Soul L1 Restore Balance (para 3993-3996): "When a creature
+				// you can see within 60 feet of you is about to roll a d20 with advantage or
+				// disadvantage, you can use your reaction to prevent the roll from being
+				// affected by advantage and disadvantage." Only offered when attack has advantage.
+				if (target.class_name == "Sorcerer" and target.subclass == "Clockwork Sorcery" and target.restore_balance_uses > 0 and has_effective_advantage(@current_roll)) {
 					reaction_options.insert_last("restore_balance");
 				}
 				// Path of the Ancestral Guardian: Spirit Shield reaction — reduce damage
@@ -6869,6 +6923,9 @@ class battle_manager {
 			else outcome = "Failure!";
 
 			broadcast_roll(c.name, "death saving throw", natural_roll, reported_modifier, total, outcome);
+			// Tasha's Eloquence Unfailing/Infectious Inspiration check
+			bool ds_success = (natural_roll == 20 or (natural_roll != 1 and total >= DEATH_SAVE_DC));
+			check_eloquence_inspiration(c, pr, ds_success, bardic_bonus);
 			combat.process_death_save(c, natural_roll, total);
 
 			if (c.is_dead) {
@@ -6911,6 +6968,8 @@ class battle_manager {
 				int ff_total = try_fanatical_focus(c, dc, total, pr.modifier + bless_bonus, "CON save (concentration)");
 				if (ff_total >= dc) { total = ff_total; success = true; }
 			}
+			// Tasha's Eloquence Unfailing/Infectious Inspiration check
+			check_eloquence_inspiration(c, pr, success, bardic_bonus);
 			string outcome = success ? "Maintains concentration!" : "Concentration broken!";
 			broadcast_roll(c.name, "Constitution save (DC " + dc + ")", natural_roll, reported_modifier, total, outcome);
 
@@ -6932,6 +6991,7 @@ class battle_manager {
 			if (pr.resolution_tag == "hide") {
 				bool success = total >= pr.dc;
 				broadcast_roll(c.name, "Hide", natural_roll, reported_modifier, total, success ? "Hidden!" : "Not hidden.");
+				check_eloquence_inspiration(c, pr, success, bardic_bonus);
 				if (success) {
 					c.is_hidden = true;
 					c.hide_dc = total;
@@ -6945,7 +7005,9 @@ class battle_manager {
 				}
 				broadcast_state();
 			} else {
+				bool check_success = (pr.dc > 0 and total >= pr.dc);
 				broadcast_roll(c.name, pr.reason, natural_roll, reported_modifier, total, "Total: " + total + ".");
+				check_eloquence_inspiration(c, pr, check_success, bardic_bonus);
 			}
 		}
 	}
@@ -7070,6 +7132,8 @@ class battle_manager {
 		int bardic_bonus = 0;
 		if (use_die and c.bardic_inspiration_die > 0) {
 			int die_size = c.bardic_inspiration_die;
+			pr.bardic_source_id = c.bardic_inspiration_source_id; // Track for Eloquence features
+			pr.bardic_die_used = die_size;
 			bardic_bonus = random(1, die_size);
 			clear_bardic_inspiration(c, false);
 			broadcast_announce(c.name + " uses Bardic Inspiration (" + die_label(die_size) + ") and adds " + bardic_bonus + " to the roll.", false);
@@ -7494,13 +7558,16 @@ class battle_manager {
 			// Tasha's Clockwork Soul L1 Restore Balance (para 3993-3996): "When a creature
 			// you can see within 60 feet of you is about to roll a d20 with advantage or
 			// disadvantage, you can use your reaction to prevent the roll from being affected
-			// by advantage and disadvantage." Approximation: reduce attack roll by 5 to
-			// represent cancelled advantage (the roll has already happened in our system).
+			// by advantage and disadvantage." Reroll a single d20 to replace the advantaged
+			// roll (since the advantage roll already resolved, we substitute a flat d20).
 			if (defender.restore_balance_uses > 0) {
 				defender.restore_balance_uses--;
 				defender.has_reaction = false;
-				rp.attack_total -= 5;
-				broadcast_announce(defender.name + " invokes Restore Balance! Attack advantage canceled. (" + defender.restore_balance_uses + " uses remain)", true);
+				int reroll = random(1, 20);
+				int diff = rp.natural_roll - reroll;
+				rp.natural_roll = reroll;
+				rp.attack_total -= diff;
+				broadcast_announce(defender.name + " invokes Restore Balance! Advantage canceled — rerolled to " + reroll + ". (" + defender.restore_balance_uses + " uses remain)", true);
 			}
 		}
 		else if (choice == "spirit_shield" and defender.is_player) {

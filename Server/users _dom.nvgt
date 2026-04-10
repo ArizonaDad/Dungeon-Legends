@@ -2127,19 +2127,26 @@ void handle_user_message(user@ u, json_object@ msg)
 				u.send({{"type", message_types::announce}, {"text", "Trance of Order is already active."}, {"interrupt", true}});
 				return;
 			}
-			// Check 1/LR or 5 SP
+			// Tasha's para 4003-4004: "Once you take this bonus action, you can't do so
+			// again until you finish a long rest, unless you spend 5 sorcery points to
+			// use it again."
 			bool used_sp = false;
-			// First use is free (1/LR), tracked by checking if rounds were set before
-			// Use a simple pattern: if not available via LR, try SP
-			bool lr_available = !c.trance_of_order_active; // Always available if not currently active
-			if (c.sorcery_points >= 5) {
-				// Can always use SP if first use was consumed
+			if (c.trance_of_order_used) {
+				if (c.sorcery_points >= 5) {
+					c.sorcery_points -= 5;
+					used_sp = true;
+				} else {
+					u.send({{"type", message_types::announce}, {"text", "Trance of Order already used this rest. Costs 5 SP to reuse."}, {"interrupt", true}});
+					return;
+				}
 			}
 			c.has_bonus_action = false;
 			c.used_bonus_action = true;
 			c.trance_of_order_active = true;
 			c.trance_of_order_rounds = 10;
-			u.room.bm.broadcast_announce(c.name + " enters a Trance of Order — attacks can't benefit from advantage, and d20 rolls of 9 or lower are treated as 10!", true);
+			if (!used_sp) c.trance_of_order_used = true;
+			string cost_note = used_sp ? " (5 SP)" : "";
+			u.room.bm.broadcast_announce(c.name + " enters a Trance of Order" + cost_note + " — attacks can't benefit from advantage, and d20 rolls of 9 or lower are treated as 10!", true);
 		}
 		else if (feature == "clockwork_cavalcade") {
 			// Tasha's Clockwork Soul L18 Clockwork Cavalcade (para 4005-4011): "As an action,

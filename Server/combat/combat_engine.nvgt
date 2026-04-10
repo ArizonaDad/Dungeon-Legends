@@ -380,6 +380,7 @@ class combatant {
 	int bastion_of_law_dice = 0; // L6: Nd8 ward dice to absorb damage
 	bool trance_of_order_active = false; // L14: can't be hit with advantage, treat d20 ≤9 as 10
 	int trance_of_order_rounds = 0;
+	bool trance_of_order_used = false; // Tasha's Clockwork Soul L14 (para 4001-4004): 1/LR free, then 5 SP
 	bool clockwork_cavalcade_available = false; // L18: 100 HP heal + dispel L6-
 	bool twilight_sanctuary_active = false; // Twilight Domain Cleric
 	int twilight_sanctuary_rounds = 0;
@@ -537,6 +538,7 @@ class combatant {
 	bool silver_tongue_active = false; // College of Eloquence Bard - min 10 on persuade/deceive
 	bool unsettling_words_pending = false; // College of Eloquence - subtract bardic die from save
 	uint unsettling_words_target = 0;
+	int infectious_inspiration_uses = 0; // Tasha's Eloquence L14 (para 1716-1719): CHA mod uses/LR
 	bool voice_of_authority_active = false; // Order Domain Cleric - ally bonus attack on spell target
 	uint voice_of_authority_ally = 0;
 	bool orders_demand_used = false; // Order Domain Cleric Channel Divinity
@@ -2098,6 +2100,7 @@ class battle {
 				state["my_bastion_of_law_dice"] = c.bastion_of_law_dice;
 				state["my_trance_of_order_active"] = c.trance_of_order_active;
 				state["my_trance_of_order_rounds"] = c.trance_of_order_rounds;
+				state["my_trance_of_order_used"] = c.trance_of_order_used;
 				state["my_clockwork_cavalcade_available"] = c.clockwork_cavalcade_available;
 				// Xanathar's War Magic (paras 2915-2944)
 				state["my_tactical_wit_active"] = c.tactical_wit_active;

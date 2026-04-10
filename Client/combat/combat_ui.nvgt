@@ -222,6 +222,7 @@ bool my_warping_implosion_available = false;
 int my_bastion_of_law_dice = 0;
 bool my_trance_of_order_active = false;
 int my_trance_of_order_rounds = 0;
+bool my_trance_of_order_used = false;
 bool my_clockwork_cavalcade_available = false;
 // Xanathar's War Magic (paras 2915-2944) — synced from server
 bool my_tactical_wit_active = false;
@@ -1209,7 +1210,9 @@ void show_bonus_action_menu() {
 	}
 	// Tasha's Clockwork Soul L14 Trance of Order (para 4001-4004)
 	if (lc == "sorcerer" and subclass == "Clockwork Sorcery" and level >= 14 and !my_trance_of_order_active) {
-		trance_of_order_opt = m.add_item("Trance of Order. Bonus action. 1 min: no advantage vs you + d20 9- treated as 10.");
+		string trance_label = "Trance of Order. Bonus action. 1 min: no advantage vs you + d20 9- treated as 10.";
+		if (my_trance_of_order_used) trance_label += " (5 SP to reuse)";
+		trance_of_order_opt = m.add_item(trance_label);
 	}
 	// Tasha's Clockwork Soul L18 Clockwork Cavalcade (para 4005-4011)
 	if (lc == "sorcerer" and subclass == "Clockwork Sorcery" and level >= 18) {
@@ -3685,6 +3688,7 @@ void parse_game_state(json_object@ msg) {
 	my_bastion_of_law_dice = msg.exists("my_bastion_of_law_dice") ? int(msg["my_bastion_of_law_dice"]) : 0;
 	my_trance_of_order_active = msg.exists("my_trance_of_order_active") ? bool(msg["my_trance_of_order_active"]) : false;
 	my_trance_of_order_rounds = msg.exists("my_trance_of_order_rounds") ? int(msg["my_trance_of_order_rounds"]) : 0;
+	my_trance_of_order_used = msg.exists("my_trance_of_order_used") ? bool(msg["my_trance_of_order_used"]) : false;
 	my_clockwork_cavalcade_available = msg.exists("my_clockwork_cavalcade_available") ? bool(msg["my_clockwork_cavalcade_available"]) : false;
 	// Xanathar's War Magic (paras 2915-2944)
 	my_tactical_wit_active = msg.exists("my_tactical_wit_active") ? bool(msg["my_tactical_wit_active"]) : false;
@@ -3955,6 +3959,7 @@ void reset_combat_state() {
 	my_bastion_of_law_dice = 0;
 	my_trance_of_order_active = false;
 	my_trance_of_order_rounds = 0;
+	my_trance_of_order_used = false;
 	my_clockwork_cavalcade_available = false;
 	my_tactical_wit_active = false;
 	my_power_surge_charges = 0;

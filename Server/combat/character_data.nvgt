@@ -2960,9 +2960,17 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         if (cs.subclass == "College of Swords" and cs.level >= 6) {
             c.extra_attacks = 1;
         }
-        // College of Eloquence Bard - Silver Tongue, Unsettling Words
+        // Tasha's College of Eloquence Bard (paras 1703-1719)
         if (cs.subclass == "College of Eloquence" and cs.level >= 3) {
-            c.silver_tongue_active = true;
+            c.silver_tongue_active = true; // L3 Silver Tongue (para 1703-1705)
+        }
+        // L6 Unfailing Inspiration (para 1709-1711): passive, handled in check_eloquence_inspiration
+        // L6 Universal Speech (para 1712-1715): non-combat flavor, deferred
+        if (cs.subclass == "College of Eloquence" and cs.level >= 14) {
+            // L14 Infectious Inspiration (para 1716-1719): CHA mod uses per long rest
+            int cha_mod = ability_modifier(cs.charisma);
+            if (cha_mod < 1) cha_mod = 1;
+            c.infectious_inspiration_uses = cha_mod;
         }
     }
 

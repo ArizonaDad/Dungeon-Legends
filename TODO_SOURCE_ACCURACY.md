@@ -1051,6 +1051,36 @@ Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 | **Celestial Resilience** (temp HP = Warlock level + CHA at end of SR/LR; 5 allies get half Warlock level + CHA) | 10 | 2740-2743 | PARTIAL — self temp HP (level + CHA) applied at combat init. Ally temp HP distribution deferred (no rest system yet). |
 | **Searing Vengeance** (at start of turn while dying: regain half max HP + stand + 2d8+CHA radiant to chosen creatures within 30ft, blinding on fail, 1/LR) | 14 | 2744-2747 | ✓ Done 2026-04-10 — replaces death save at start of turn. Regains half max HP, removes UNCONSCIOUS, deals 2d8+CHA radiant to enemies within 30ft, blinds them. 1/LR via `searing_vengeance_used`. |
 
+### Path of the Zealot Barbarian Subclass Audit (2026-04-10) — Xanathar's paras 435-450
+
+| Feature | Level | Source para | Status |
+|---------|-------|-------------|--------|
+| **Divine Fury** (first melee weapon hit per turn while raging: +1d6 + half level radiant/necrotic) | 3 | 439-440 | ✓ Fixed 2026-04-10 — was missing `+ half level` scaling and `is_weapon_attack` gate. Now `random(1, 6) + attacker.level / 2` gated on `is_weapon_attack`. |
+| **Warrior of the Gods** (resurrection spells cost no material components) | 3 | 441-442 | DEFERRED — non-combat / resurrection system not yet implemented. |
+| **Fanatical Focus** (while raging, reroll failed save 1/rage) | 6 | 443-444 | ✓ Done 2026-04-10 — `try_fanatical_focus` helper, wired into 5 EOT saves + concentration save, before Flash of Genius in reroll chain. `fanatical_focus_used_this_rage` flag reset on rage start. |
+| **Zealous Presence** (BA 1/LR: up to 10 allies within 60ft gain advantage on attacks and saves until start of your next turn) | 10 | 445-447 | ✓ Done 2026-04-10 — BA handler in users_dom.nvgt, attack advantage via `apply_attack_advantage_state`, buff cleanup at start of Zealot's turn. Save advantage for inline spell saves deferred (only EOT/pending_roll saves benefit). |
+| **Rage Beyond Death** (while raging at 0 HP: don't fall unconscious, death saves still accumulate, die when rage ends if at 0 HP) | 14 | 448-450 | ✓ Done 2026-04-10 — 3-site implementation: apply_damage (stay conscious), process_death_save (defer death), advance_turn rage expiry (death on rage end if 0 HP). |
+
+### Clockwork Soul Sorcerer Subclass Audit (2026-04-10) — Tasha's paras 3953-4011
+
+| Feature | Level | Source para | Status |
+|---------|-------|-------------|--------|
+| **Clockwork Magic** (auto-prepared abjuration/transmutation spells by level) | 1 | 3958-3974 | ✓ Done — protection_from_evil_and_good, aid, lesser_restoration, dispel_magic, protection_from_energy, greater_restoration, wall_of_force. L7 freedom_of_movement + summon_construct skipped (not in spell catalog). Alarm skipped (non-combat). |
+| **Restore Balance** (reaction: cancel advantage/disadvantage on d20 test within 60ft, PB uses/LR) | 1 | 3993-3996 | PARTIAL — reaction fires only on attacks against self with advantage (source allows any creature within 60ft on any d20 test). Fixed 2026-04-10: now gated on `has_effective_advantage` and rerolls a flat d20 instead of the old -5 flat penalty. |
+| **Bastion of Law** (action: 1-5 SP, create Nd8 ward dice on self/ally within 30ft) | 6 | 3997-4000 | ✓ Done — ward dice absorb damage in `apply_damage` (auto-optimal one-at-a-time spend). Source says creature chooses how many dice to spend; auto-optimization is acceptable. |
+| **Trance of Order** (BA 1 min: attacks against you can't benefit from advantage, d20 ≤9→10 on attack/check/save, 1/LR or 5 SP) | 14 | 4001-4004 | ✓ Fixed 2026-04-10 — was missing 1/LR tracking entirely (unlimited free uses). Added `trance_of_order_used` field. Handler now properly gates: first use free, subsequent uses cost 5 SP. Anti-advantage in `apply_attack_advantage_state`, d20 clamp in `finalize_roll_result`, duration tickdown in `advance_turn` all verified. |
+| **Clockwork Cavalcade** (action: 30ft cube, 100 HP heal split among chosen + dispel ≤6th level spells, 1/LR or 7 SP) | 18 | 4005-4011 | PARTIAL — 100 HP healing correctly distributed among allies within 30ft, 1/LR with 7 SP reuse. Dispel effect ("every spell of 6th level or lower ends") is NOT implemented (requires spell tracking on creatures). |
+
+### College of Eloquence Bard Subclass Audit (2026-04-10) — Tasha's paras 1703-1719
+
+| Feature | Level | Source para | Status |
+|---------|-------|-------------|--------|
+| **Silver Tongue** (Persuasion/Deception check: treat d20 ≤9 as 10) | 3 | 1703-1705 | ✓ Done — `silver_tongue_active` flag, clamp in `finalize_roll_result` on `skill_persuasion`/`skill_deception`. |
+| **Unsettling Words** (BA: expend Bardic Inspiration, target subtracts die from next save before start of your next turn) | 3 | 1706-1708 | ✓ Done — `unsettling_words_pending` flag with `unsettling_words_target`. Applied in end-of-turn save resolution. Consumed on next save. Turn-start expiry not implemented (persists until consumed). |
+| **Unfailing Inspiration** (when creature uses your Bardic Inspiration die and the roll fails, they keep the die) | 6 | 1709-1711 | ✓ Done 2026-04-10 — `check_eloquence_inspiration` helper tracks `bardic_source_id`/`bardic_die_used` on pending_roll. On failed roll with bardic die from Eloquence L6+ Bard, die is restored to the creature. Wired into all 5 resolution points (attack, death save, concentration, hide, ability check). |
+| **Universal Speech** (action: CHA mod creatures within 60ft understand you for 1 hour, 1/LR or spell slot) | 6 | 1712-1715 | DEFERRED — non-combat flavor/social feature. |
+| **Infectious Inspiration** (reaction: when creature succeeds with your Bardic die, grant a free die to another ally within 60ft, CHA mod uses/LR) | 14 | 1716-1719 | ✓ Done 2026-04-10 — `infectious_inspiration_uses` field (CHA mod, min 1). Auto-resolved: on successful bardic-aided roll, nearest eligible ally within 60ft without a die gets one free. Consumes source Bard's reaction. |
+
 ---
 
 ## Working Rule Going Forward
