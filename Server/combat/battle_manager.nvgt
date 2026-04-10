@@ -12164,6 +12164,12 @@ class battle_manager {
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = t.apply_indomitable_might(save_roll + save_bonus + bless_bonus, ABILITY_STR);
 					bool saved = save_total >= save_dc;
+					// Save failure chain (STR — bludgeoning damage)
+					if (!saved and try_arcane_deflection_save(t, save_dc, save_total)) saved = true;
+					if (!saved) { int fg = try_flash_of_genius(t, save_dc, save_total, "STR save vs Storm Sphere"); if (fg >= save_dc) { saved = true; save_total = fg; } }
+					if (!saved) { int mv = try_maverick_spirit(t, save_dc, save_total, "STR save vs Storm Sphere"); if (mv >= save_dc) { saved = true; save_total = mv; } }
+					if (!saved) { int bf = try_boon_of_fate_bonus(t, save_total, save_dc); if (bf >= save_dc) { saved = true; save_total = bf; } }
+					if (!saved and try_stroke_of_luck_save(t, save_dc, save_bonus + bless_bonus)) saved = true;
 					broadcast_roll(t.name, "STR save vs Storm Sphere", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Damaged!");
 					if (!saved) {
 						combat.apply_damage(t, total_damage, DMG_BLUDGEONING, c);
@@ -12376,6 +12382,12 @@ class battle_manager {
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = t.apply_indomitable_might(save_roll + save_bonus + bless_bonus, ABILITY_STR);
 					bool saved = save_total >= save_dc;
+					// Save failure chain (STR — push effect)
+					if (!saved and try_arcane_deflection_save(t, save_dc, save_total)) saved = true;
+					if (!saved) { int fg = try_flash_of_genius(t, save_dc, save_total, "STR save vs Gust of Wind"); if (fg >= save_dc) { saved = true; save_total = fg; } }
+					if (!saved) { int mv = try_maverick_spirit(t, save_dc, save_total, "STR save vs Gust of Wind"); if (mv >= save_dc) { saved = true; save_total = mv; } }
+					if (!saved) { int bf = try_boon_of_fate_bonus(t, save_total, save_dc); if (bf >= save_dc) { saved = true; save_total = bf; } }
+					if (!saved and try_stroke_of_luck_save(t, save_dc, save_bonus + bless_bonus)) saved = true;
 					broadcast_roll(t.name, "STR save vs Gust of Wind", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Pushed!");
 					if (!saved) {
 						// Push 15 ft (3 tiles) directly away from caster
@@ -12536,6 +12548,12 @@ class battle_manager {
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
 				bool saved = save_total >= save_dc;
+				// Save failure chain (WIS — damage + baned)
+				if (!saved and try_arcane_deflection_save(target, save_dc, save_total)) saved = true;
+				if (!saved) { int fg = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Vicious Mockery"); if (fg >= save_dc) { saved = true; save_total = fg; } }
+				if (!saved) { int mv = try_maverick_spirit(target, save_dc, save_total, "WIS save vs Vicious Mockery"); if (mv >= save_dc) { saved = true; save_total = mv; } }
+				if (!saved) { int bf = try_boon_of_fate_bonus(target, save_total, save_dc); if (bf >= save_dc) { saved = true; save_total = bf; } }
+				if (!saved and try_stroke_of_luck_save(target, save_dc, save_bonus + bless_bonus)) saved = true;
 				broadcast_roll(target.name, "WIS save vs Vicious Mockery", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Mocked!");
 				if (!saved) {
 					combat.apply_damage(target, total_damage, DMG_PSYCHIC, c);
@@ -13026,6 +13044,13 @@ class battle_manager {
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
 					bool saved = save_total >= save_dc;
+					// Save failure chain (DEX — Outlined condition)
+					if (!saved and try_arcane_deflection_save(t, save_dc, save_total)) saved = true;
+					if (!saved) { int ds = try_disciplined_survivor_reroll(t, save_dc, save_total, save_bonus + bless_bonus, "DEX save vs Faerie Fire"); if (ds >= save_dc) saved = true; }
+					if (!saved) { int fg = try_flash_of_genius(t, save_dc, save_total, "DEX save vs Faerie Fire"); if (fg >= save_dc) { saved = true; save_total = fg; } }
+					if (!saved) { int mv = try_maverick_spirit(t, save_dc, save_total, "DEX save vs Faerie Fire"); if (mv >= save_dc) { saved = true; save_total = mv; } }
+					if (!saved) { int bf = try_boon_of_fate_bonus(t, save_total, save_dc); if (bf >= save_dc) { saved = true; save_total = bf; } }
+					if (!saved and try_stroke_of_luck_save(t, save_dc, save_bonus + bless_bonus)) saved = true;
 					broadcast_roll(t.name, "DEX save vs Faerie Fire", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Outlined!");
 					if (!saved) {
 						// Use guiding_bolt_advantage flag as approximation - next attack vs them gets advantage
@@ -13051,6 +13076,14 @@ class battle_manager {
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
 				bool saved = save_total >= save_dc;
+				// Save failure chain (WIS — Cursed condition)
+				if (!saved and try_arcane_deflection_save(target, save_dc, save_total)) saved = true;
+				if (!saved) { int ds = try_disciplined_survivor_reroll(target, save_dc, save_total, save_bonus + bless_bonus, "WIS save vs Bestow Curse"); if (ds >= save_dc) saved = true; }
+				if (!saved) { int fg = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Bestow Curse"); if (fg >= save_dc) { saved = true; save_total = fg; } }
+				if (!saved) { int mv = try_maverick_spirit(target, save_dc, save_total, "WIS save vs Bestow Curse"); if (mv >= save_dc) { saved = true; save_total = mv; } }
+				if (!saved and try_mage_slayer_guarded_mind(target, ABILITY_WIS)) saved = true;
+				if (!saved) { int bf = try_boon_of_fate_bonus(target, save_total, save_dc); if (bf >= save_dc) { saved = true; save_total = bf; } }
+				if (!saved and try_stroke_of_luck_save(target, save_dc, save_bonus + bless_bonus)) saved = true;
 				broadcast_roll(target.name, "WIS save vs Bestow Curse", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Cursed!");
 				if (!saved) {
 					// Use the existing baned flag as the closest approximation
@@ -13467,9 +13500,15 @@ class battle_manager {
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
 					bool saved = save_total >= save_dc;
-					broadcast_roll(t.name, "CHA save vs Bane", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Baned!");
+					// Save failure chain (CHA — Baned condition)
+					if (!saved and try_arcane_deflection_save(t, save_dc, save_total)) saved = true;
+					if (!saved) { int ds = try_disciplined_survivor_reroll(t, save_dc, save_total, save_bonus + bless_bonus, "CHA save vs Bane"); if (ds >= save_dc) saved = true; }
+					if (!saved) { int fg = try_flash_of_genius(t, save_dc, save_total, "CHA save vs Bane"); if (fg >= save_dc) { saved = true; save_total = fg; } }
+					if (!saved) { int mv = try_maverick_spirit(t, save_dc, save_total, "CHA save vs Bane"); if (mv >= save_dc) { saved = true; save_total = mv; } }
 					if (!saved and try_mage_slayer_guarded_mind(t, ABILITY_CHA)) saved = true;
-					if (!saved) { int bf = try_boon_of_fate_bonus(t, save_total, save_dc); if (bf > 0) saved = true; }
+					if (!saved) { int bf = try_boon_of_fate_bonus(t, save_total, save_dc); if (bf >= save_dc) { saved = true; save_total = bf; } }
+					if (!saved and try_stroke_of_luck_save(t, save_dc, save_bonus + bless_bonus)) saved = true;
+					broadcast_roll(t.name, "CHA save vs Bane", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Baned!");
 					if (!saved) {
 						t.baned = true;
 						banned++;
@@ -13718,6 +13757,13 @@ class battle_manager {
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
 					bool saved = save_total >= save_dc;
+					// Save failure chain (DEX — Prone condition)
+					if (!saved and try_arcane_deflection_save(t, save_dc, save_total)) saved = true;
+					if (!saved) { int ds = try_disciplined_survivor_reroll(t, save_dc, save_total, save_bonus + bless_bonus, "DEX save vs Earthquake"); if (ds >= save_dc) saved = true; }
+					if (!saved) { int fg = try_flash_of_genius(t, save_dc, save_total, "DEX save vs Earthquake"); if (fg >= save_dc) { saved = true; save_total = fg; } }
+					if (!saved) { int mv = try_maverick_spirit(t, save_dc, save_total, "DEX save vs Earthquake"); if (mv >= save_dc) { saved = true; save_total = mv; } }
+					if (!saved) { int bf = try_boon_of_fate_bonus(t, save_total, save_dc); if (bf >= save_dc) { saved = true; save_total = bf; } }
+					if (!saved and try_stroke_of_luck_save(t, save_dc, save_bonus + bless_bonus)) saved = true;
 					broadcast_roll(t.name, "DEX save vs Earthquake", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Prone!");
 					if (!saved) {
 						t.add_condition(COND_PRONE);
@@ -14060,6 +14106,13 @@ class battle_manager {
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
 					bool saved = save_total >= save_dc;
+					// Save failure chain (DEX — Prone condition)
+					if (!saved and try_arcane_deflection_save(t, save_dc, save_total)) saved = true;
+					if (!saved) { int ds = try_disciplined_survivor_reroll(t, save_dc, save_total, save_bonus + bless_bonus, "DEX save vs Sleet Storm"); if (ds >= save_dc) saved = true; }
+					if (!saved) { int fg = try_flash_of_genius(t, save_dc, save_total, "DEX save vs Sleet Storm"); if (fg >= save_dc) { saved = true; save_total = fg; } }
+					if (!saved) { int mv = try_maverick_spirit(t, save_dc, save_total, "DEX save vs Sleet Storm"); if (mv >= save_dc) { saved = true; save_total = mv; } }
+					if (!saved) { int bf = try_boon_of_fate_bonus(t, save_total, save_dc); if (bf >= save_dc) { saved = true; save_total = bf; } }
+					if (!saved and try_stroke_of_luck_save(t, save_dc, save_bonus + bless_bonus)) saved = true;
 					broadcast_roll(t.name, "DEX save vs Sleet Storm", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Prone!");
 					if (!saved) {
 						t.add_condition(COND_PRONE);
@@ -15039,6 +15092,12 @@ class battle_manager {
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
 				bool saved = save_total >= save_dc;
+				// Save failure chain (WIS — radiant damage)
+				if (!saved and try_arcane_deflection_save(target, save_dc, save_total)) saved = true;
+				if (!saved) { int fg = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Holy Word"); if (fg >= save_dc) { saved = true; save_total = fg; } }
+				if (!saved) { int mv = try_maverick_spirit(target, save_dc, save_total, "WIS save vs Holy Word"); if (mv >= save_dc) { saved = true; save_total = mv; } }
+				if (!saved) { int bf = try_boon_of_fate_bonus(target, save_total, save_dc); if (bf >= save_dc) { saved = true; save_total = bf; } }
+				if (!saved and try_stroke_of_luck_save(target, save_dc, save_bonus + bless_bonus)) saved = true;
 				broadcast_roll(target.name, "WIS save vs Holy Word", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Hit!");
 				if (!saved) {
 					combat.apply_damage(target, total_damage, DMG_RADIANT, c);
@@ -15080,6 +15139,12 @@ class battle_manager {
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
 				bool saved = save_total >= save_dc;
+				// Save failure chain (CON — poison damage)
+				if (!saved and try_arcane_deflection_save(target, save_dc, save_total)) saved = true;
+				if (!saved) { int fg = try_flash_of_genius(target, save_dc, save_total, "CON save vs Poison Spray"); if (fg >= save_dc) { saved = true; save_total = fg; } }
+				if (!saved) { int mv = try_maverick_spirit(target, save_dc, save_total, "CON save vs Poison Spray"); if (mv >= save_dc) { saved = true; save_total = mv; } }
+				if (!saved) { int bf = try_boon_of_fate_bonus(target, save_total, save_dc); if (bf >= save_dc) { saved = true; save_total = bf; } }
+				if (!saved and try_stroke_of_luck_save(target, save_dc, save_bonus + bless_bonus)) saved = true;
 				broadcast_roll(target.name, "CON save vs Poison Spray", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Hit!");
 				if (!saved) {
 					combat.apply_damage(target, total_damage, DMG_POISON, c);
@@ -15126,6 +15191,12 @@ class battle_manager {
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
 				bool saved = save_total >= save_dc;
+				// Save failure chain (DEX — radiant damage)
+				if (!saved and try_arcane_deflection_save(target, save_dc, save_total)) saved = true;
+				if (!saved) { int fg = try_flash_of_genius(target, save_dc, save_total, "DEX save vs Sacred Flame"); if (fg >= save_dc) { saved = true; save_total = fg; } }
+				if (!saved) { int mv = try_maverick_spirit(target, save_dc, save_total, "DEX save vs Sacred Flame"); if (mv >= save_dc) { saved = true; save_total = mv; } }
+				if (!saved) { int bf = try_boon_of_fate_bonus(target, save_total, save_dc); if (bf >= save_dc) { saved = true; save_total = bf; } }
+				if (!saved and try_stroke_of_luck_save(target, save_dc, save_bonus + bless_bonus)) saved = true;
 				broadcast_roll(target.name, "DEX save vs Sacred Flame", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Hit!");
 				if (!saved) {
 					combat.apply_damage(target, total_damage, DMG_RADIANT, c);
@@ -15401,6 +15472,13 @@ class battle_manager {
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
 				bool saved = save_total >= save_dc;
+				// Save failure chain (DEX — Restrained condition)
+				if (!saved and try_arcane_deflection_save(target, save_dc, save_total)) saved = true;
+				if (!saved) { int ds = try_disciplined_survivor_reroll(target, save_dc, save_total, save_bonus + bless_bonus, "DEX save vs Otiluke's Resilient Sphere"); if (ds >= save_dc) saved = true; }
+				if (!saved) { int fg = try_flash_of_genius(target, save_dc, save_total, "DEX save vs Otiluke's Resilient Sphere"); if (fg >= save_dc) { saved = true; save_total = fg; } }
+				if (!saved) { int mv = try_maverick_spirit(target, save_dc, save_total, "DEX save vs Otiluke's Resilient Sphere"); if (mv >= save_dc) { saved = true; save_total = mv; } }
+				if (!saved) { int bf = try_boon_of_fate_bonus(target, save_total, save_dc); if (bf >= save_dc) { saved = true; save_total = bf; } }
+				if (!saved and try_stroke_of_luck_save(target, save_dc, save_bonus + bless_bonus)) saved = true;
 				broadcast_roll(target.name, "DEX save vs Otiluke's Resilient Sphere", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Trapped!");
 				if (!saved) {
 					target.add_condition(COND_RESTRAINED);
@@ -15433,6 +15511,12 @@ class battle_manager {
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
 				bool saved = save_total >= save_dc;
+				// Save failure chain (INT — psychic damage)
+				if (!saved and try_arcane_deflection_save(target, save_dc, save_total)) saved = true;
+				if (!saved) { int fg = try_flash_of_genius(target, save_dc, save_total, "INT save vs Contact Other Plane"); if (fg >= save_dc) { saved = true; save_total = fg; } }
+				if (!saved) { int mv = try_maverick_spirit(target, save_dc, save_total, "INT save vs Contact Other Plane"); if (mv >= save_dc) { saved = true; save_total = mv; } }
+				if (!saved) { int bf = try_boon_of_fate_bonus(target, save_total, save_dc); if (bf >= save_dc) { saved = true; save_total = bf; } }
+				if (!saved and try_stroke_of_luck_save(target, save_dc, save_bonus + bless_bonus)) saved = true;
 				broadcast_roll(target.name, "INT save vs Contact Other Plane", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Hit!");
 				if (!saved) {
 					int total_damage = 0;
@@ -15590,6 +15674,14 @@ class battle_manager {
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
 					bool saved = save_total >= save_dc;
+					// Save failure chain (WIS — Blinded/Stunned condition)
+					if (!saved and try_arcane_deflection_save(t, save_dc, save_total)) saved = true;
+					if (!saved) { int ds = try_disciplined_survivor_reroll(t, save_dc, save_total, save_bonus + bless_bonus, "WIS save vs Divine Word"); if (ds >= save_dc) saved = true; }
+					if (!saved) { int fg = try_flash_of_genius(t, save_dc, save_total, "WIS save vs Divine Word"); if (fg >= save_dc) { saved = true; save_total = fg; } }
+					if (!saved) { int mv = try_maverick_spirit(t, save_dc, save_total, "WIS save vs Divine Word"); if (mv >= save_dc) { saved = true; save_total = mv; } }
+					if (!saved and try_mage_slayer_guarded_mind(t, ABILITY_WIS)) saved = true;
+					if (!saved) { int bf = try_boon_of_fate_bonus(t, save_total, save_dc); if (bf >= save_dc) { saved = true; save_total = bf; } }
+					if (!saved and try_stroke_of_luck_save(t, save_dc, save_bonus + bless_bonus)) saved = true;
 					broadcast_roll(t.name, "WIS save vs Divine Word", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Struck down!");
 					if (!saved) {
 						if (t.current_hp < 30) {
@@ -15622,12 +15714,15 @@ class battle_manager {
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
 				bool saved = save_total >= save_dc;
-				broadcast_roll(target.name, "INT save vs Befuddlement", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Hit!");
+				// Save failure chain (INT — psychic damage)
 				if (!saved and try_arcane_deflection_save(target, save_dc, save_total)) saved = true;
 				if (!saved) { int ds = try_disciplined_survivor_reroll(target, save_dc, save_total, save_bonus + bless_bonus, "INT save vs Befuddlement"); if (ds >= save_dc) saved = true; }
+				if (!saved) { int fg = try_flash_of_genius(target, save_dc, save_total, "INT save vs Befuddlement"); if (fg >= save_dc) { saved = true; save_total = fg; } }
+				if (!saved) { int mv = try_maverick_spirit(target, save_dc, save_total, "INT save vs Befuddlement"); if (mv >= save_dc) { saved = true; save_total = mv; } }
 				if (!saved and try_mage_slayer_guarded_mind(target, ABILITY_INT)) saved = true;
-				if (!saved) { int bf = try_boon_of_fate_bonus(target, save_total, save_dc); if (bf > 0) saved = true; }
+				if (!saved) { int bf = try_boon_of_fate_bonus(target, save_total, save_dc); if (bf >= save_dc) { saved = true; save_total = bf; } }
 				if (!saved and try_stroke_of_luck_save(target, save_dc, save_bonus + bless_bonus)) saved = true;
+				broadcast_roll(target.name, "INT save vs Befuddlement", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Hit!");
 				if (!saved) {
 					int total_damage = 0;
 					for (int d = 0; d < 12; d++) total_damage += random(1, 6);
@@ -15655,6 +15750,12 @@ class battle_manager {
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
 				bool saved = save_total >= save_dc;
+				// Save failure chain (DEX — acid damage)
+				if (!saved and try_arcane_deflection_save(target, save_dc, save_total)) saved = true;
+				if (!saved) { int fg = try_flash_of_genius(target, save_dc, save_total, "DEX save vs Acid Splash"); if (fg >= save_dc) { saved = true; save_total = fg; } }
+				if (!saved) { int mv = try_maverick_spirit(target, save_dc, save_total, "DEX save vs Acid Splash"); if (mv >= save_dc) { saved = true; save_total = mv; } }
+				if (!saved) { int bf = try_boon_of_fate_bonus(target, save_total, save_dc); if (bf >= save_dc) { saved = true; save_total = bf; } }
+				if (!saved and try_stroke_of_luck_save(target, save_dc, save_bonus + bless_bonus)) saved = true;
 				broadcast_roll(target.name, "DEX save vs Acid Splash", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Hit!");
 				if (!saved) {
 					combat.apply_damage(target, total_damage, DMG_ACID, c);
@@ -15676,6 +15777,12 @@ class battle_manager {
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
 				bool saved = save_total >= save_dc;
+				// Save failure chain (INT — psychic damage)
+				if (!saved and try_arcane_deflection_save(target, save_dc, save_total)) saved = true;
+				if (!saved) { int fg = try_flash_of_genius(target, save_dc, save_total, "INT save vs Mind Sliver"); if (fg >= save_dc) { saved = true; save_total = fg; } }
+				if (!saved) { int mv = try_maverick_spirit(target, save_dc, save_total, "INT save vs Mind Sliver"); if (mv >= save_dc) { saved = true; save_total = mv; } }
+				if (!saved) { int bf = try_boon_of_fate_bonus(target, save_total, save_dc); if (bf >= save_dc) { saved = true; save_total = bf; } }
+				if (!saved and try_stroke_of_luck_save(target, save_dc, save_bonus + bless_bonus)) saved = true;
 				broadcast_roll(target.name, "INT save vs Mind Sliver", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Hit!");
 				if (!saved) {
 					combat.apply_damage(target, total_damage, DMG_PSYCHIC, c);
@@ -15701,6 +15808,12 @@ class battle_manager {
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
 					bool saved = save_total >= save_dc;
+					// Save failure chain (CON — thunder damage)
+					if (!saved and try_arcane_deflection_save(t, save_dc, save_total)) saved = true;
+					if (!saved) { int fg = try_flash_of_genius(t, save_dc, save_total, "CON save vs Thunderclap"); if (fg >= save_dc) { saved = true; save_total = fg; } }
+					if (!saved) { int mv = try_maverick_spirit(t, save_dc, save_total, "CON save vs Thunderclap"); if (mv >= save_dc) { saved = true; save_total = mv; } }
+					if (!saved) { int bf = try_boon_of_fate_bonus(t, save_total, save_dc); if (bf >= save_dc) { saved = true; save_total = bf; } }
+					if (!saved and try_stroke_of_luck_save(t, save_dc, save_bonus + bless_bonus)) saved = true;
 					broadcast_roll(t.name, "CON save vs Thunderclap", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Hit!");
 					if (!saved) combat.apply_damage(t, total_damage, DMG_THUNDER, c);
 				}
@@ -15724,6 +15837,12 @@ class battle_manager {
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
 					bool saved = save_total >= save_dc;
+					// Save failure chain (CON — radiant damage)
+					if (!saved and try_arcane_deflection_save(t, save_dc, save_total)) saved = true;
+					if (!saved) { int fg = try_flash_of_genius(t, save_dc, save_total, "CON save vs Word of Radiance"); if (fg >= save_dc) { saved = true; save_total = fg; } }
+					if (!saved) { int mv = try_maverick_spirit(t, save_dc, save_total, "CON save vs Word of Radiance"); if (mv >= save_dc) { saved = true; save_total = mv; } }
+					if (!saved) { int bf = try_boon_of_fate_bonus(t, save_total, save_dc); if (bf >= save_dc) { saved = true; save_total = bf; } }
+					if (!saved and try_stroke_of_luck_save(t, save_dc, save_bonus + bless_bonus)) saved = true;
 					broadcast_roll(t.name, "CON save vs Word of Radiance", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Hit!");
 					if (!saved) combat.apply_damage(t, total_damage, DMG_RADIANT, c);
 				}
@@ -16457,6 +16576,12 @@ class battle_manager {
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
 					bool saved = save_total >= save_dc;
+					// Save failure chain (DEX — multi-type damage)
+					if (!saved and try_arcane_deflection_save(t, save_dc, save_total)) saved = true;
+					if (!saved) { int fg = try_flash_of_genius(t, save_dc, save_total, "DEX save vs Prismatic Wall"); if (fg >= save_dc) { saved = true; save_total = fg; } }
+					if (!saved) { int mv = try_maverick_spirit(t, save_dc, save_total, "DEX save vs Prismatic Wall"); if (mv >= save_dc) { saved = true; save_total = mv; } }
+					if (!saved) { int bf = try_boon_of_fate_bonus(t, save_total, save_dc); if (bf >= save_dc) { saved = true; save_total = bf; } }
+					if (!saved and try_stroke_of_luck_save(t, save_dc, save_bonus + bless_bonus)) saved = true;
 					broadcast_roll(t.name, "DEX save vs Prismatic Wall", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
 					for (uint pi = 0; pi < pw_types.length(); pi++) {
 						int layer_dmg = 0;
