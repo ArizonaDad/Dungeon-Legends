@@ -1817,6 +1817,84 @@ void handle_user_message(user@ u, json_object@ msg)
 			c.sorcery_points += slot_level;
 			u.room.bm.broadcast_announce(c.name + " converts a level " + slot_level + " spell slot into " + slot_level + " Sorcery Points.", true);
 		}
+		else if (feature == "magical_cunning") {
+			// PHB 2024 Warlock L2 Magical Cunning (paras 7782-7783): "You can perform an
+			// esoteric rite for 1 minute. At the end of it, you regain expended Pact Magic
+			// spell slots but no more than a number equal to half your maximum (round up).
+			// Once you use this feature, you can't do so again until you finish a Long Rest."
+			// L20 Eldritch Master (paras 7798-7799): "When you use your Magical Cunning
+			// feature, you regain all your expended Pact Magic spell slots."
+			// Implementation: in combat we collapse the 1-minute rite into a Magic action
+			// since 10 rounds of standing still is functionally unusable; the per-LR cap
+			// preserves source balance.
+			if (c.class_name != "Warlock" or c.level < 2) { u.send({{"type", message_types::announce}, {"text", "Only Warlocks of level 2 or higher can use Magical Cunning."}, {"interrupt", true}}); return; }
+			if (!c.magical_cunning_available) { u.send({{"type", message_types::announce}, {"text", "Magical Cunning has been used; finish a Long Rest to recover it."}, {"interrupt", true}}); return; }
+			if (!c.has_action) { u.send({{"type", message_types::announce}, {"text", "No action remaining (Magical Cunning takes a Magic action in combat)."}, {"interrupt", true}}); return; }
+			c.has_action = false;
+			c.used_action = true;
+			c.magical_cunning_available = false;
+			// Find the Pact Magic slot level (Warlocks have all slots at one level — the
+			// highest slot level whose max > 0).
+			int pact_slot_level = 0;
+			int pact_slot_max = 0;
+			for (int sl = 5; sl >= 1; sl--) {
+				if (c.spell_slots_max[sl] > 0) {
+					pact_slot_level = sl;
+					pact_slot_max = c.spell_slots_max[sl];
+					break;
+				}
+			}
+			if (pact_slot_level == 0) { u.send({{"type", message_types::announce}, {"text", "You have no Pact Magic slots."}, {"interrupt", true}}); return; }
+			int slots_to_recover = (pact_slot_max + 1) / 2; // half max round up
+			if (c.level >= 20) slots_to_recover = pact_slot_max; // Eldritch Master: all
+			int actually_recovered = 0;
+			while (actually_recovered < slots_to_recover and c.spell_slots_current[pact_slot_level] < pact_slot_max) {
+				c.spell_slots_current[pact_slot_level]++;
+				actually_recovered++;
+			}
+			string suffix = (c.level >= 20) ? " (Eldritch Master: all slots restored!)" : "";
+			u.room.bm.broadcast_announce(c.name + " performs an esoteric rite — Magical Cunning restores " + actually_recovered + " level " + pact_slot_level + " Pact Magic slot" + (actually_recovered == 1 ? "" : "s") + "." + suffix, true);
+		}
+		else if (feature == "mystic_arcanum") {
+			// PHB 2024 Warlock L11+ Mystic Arcanum (paras 7791-7795): "You can cast your
+			// arcanum spell once without expending a spell slot, and you must finish a Long
+			// Rest before you can cast it in this way again."
+			// Gained at L11 (level 6 spell), L13 (7), L15 (8), L17 (9). The actual spell
+			// chosen is a player choice; this handler just marks the per-level slot as used
+			// and the client should pair it with a cast of the chosen Warlock spell.
+			if (c.class_name != "Warlock") { u.send({{"type", message_types::announce}, {"text", "Only Warlocks have Mystic Arcanum."}, {"interrupt", true}}); return; }
+			int arc_level = msg.exists("arc_level") ? int(msg["arc_level"]) : 6;
+			if (arc_level < 6 or arc_level > 9) { u.send({{"type", message_types::announce}, {"text", "Mystic Arcanum is for spell levels 6-9."}, {"interrupt", true}}); return; }
+			bool available = false;
+			if (arc_level == 6 and c.mystic_arcanum_6_available) available = true;
+			else if (arc_level == 7 and c.mystic_arcanum_7_available) available = true;
+			else if (arc_level == 8 and c.mystic_arcanum_8_available) available = true;
+			else if (arc_level == 9 and c.mystic_arcanum_9_available) available = true;
+			if (!available) { u.send({{"type", message_types::announce}, {"text", "Your Mystic Arcanum (level " + arc_level + ") is unavailable or not yet unlocked."}, {"interrupt", true}}); return; }
+			// Mark the arcanum as used. The actual spell cast must follow as a normal
+			// action_cast — the player's chosen spell at that level is consumed without
+			// spending a Pact Magic slot. We grant a temporary phantom slot of that level.
+			if (arc_level == 6) c.mystic_arcanum_6_available = false;
+			else if (arc_level == 7) c.mystic_arcanum_7_available = false;
+			else if (arc_level == 8) c.mystic_arcanum_8_available = false;
+			else if (arc_level == 9) c.mystic_arcanum_9_available = false;
+			// Grant one phantom slot at the arcanum level so the next spell cast at that
+			// level consumes the phantom slot instead of a real one.
+			c.spell_slots_current[arc_level]++;
+			if (c.spell_slots_max[arc_level] < c.spell_slots_current[arc_level]) c.spell_slots_max[arc_level] = c.spell_slots_current[arc_level];
+			u.room.bm.broadcast_announce(c.name + " unlocks a Mystic Arcanum (level " + arc_level + " spell available without expending a Pact slot until next cast).", true);
+		}
+		else if (feature == "contact_patron") {
+			// PHB 2024 Warlock L9 Contact Patron (paras 7788-7790): "you always have the
+			// Contact Other Plane spell prepared. With this feature, you can cast the spell
+			// without expending a spell slot to contact your patron, and you automatically
+			// succeed on the spell's saving throw. Once you cast the spell with this feature,
+			// you can't do so in this way again until you finish a Long Rest."
+			if (c.class_name != "Warlock" or c.level < 9) { u.send({{"type", message_types::announce}, {"text", "Only Warlocks of level 9 or higher can Contact Patron."}, {"interrupt", true}}); return; }
+			if (!c.contact_patron_available) { u.send({{"type", message_types::announce}, {"text", "Contact Patron has already been used; finish a Long Rest."}, {"interrupt", true}}); return; }
+			c.contact_patron_available = false;
+			u.room.bm.broadcast_announce(c.name + " contacts their patron — Contact Other Plane is cast without a slot, automatically succeeding on the save.", true);
+		}
 		else if (feature == "cunning_action") {
 			if (c.class_name != "Rogue" or c.level < 2) { u.send({{"type", message_types::announce}, {"text", "Your character cannot use Cunning Action."}, {"interrupt", true}}); return; }
 			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }

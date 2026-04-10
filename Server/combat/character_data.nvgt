@@ -2253,22 +2253,42 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         if (cs.subclass == "Celestial Patron") {
             c.healing_light_dice = 1 + cs.level;
         }
-        // PHB 2024 Warlock Eldritch Invocations: known count scales by level.
-        // L1: 0, L2: 2, L5: 3, L7: 4, L9: 5, L12: 6, L15: 7, L18: 8.
-        int inv_count = 0;
-        if (cs.level >= 2) inv_count = 2;
-        if (cs.level >= 5) inv_count = 3;
-        if (cs.level >= 7) inv_count = 4;
-        if (cs.level >= 9) inv_count = 5;
-        if (cs.level >= 12) inv_count = 6;
-        if (cs.level >= 15) inv_count = 7;
-        if (cs.level >= 18) inv_count = 8;
+        // PHB 2024 Warlock Eldritch Invocations: known count scales by level per the
+        // Warlock Features table (paras 7607-7762). L1=1, L2-4=3, L5-6=5, L7-8=6,
+        // L9-11=7, L12-15=8, L16-17=9, L18-20=10.
+        int inv_count = 1;
+        if (cs.level >= 2) inv_count = 3;
+        if (cs.level >= 5) inv_count = 5;
+        if (cs.level >= 7) inv_count = 6;
+        if (cs.level >= 9) inv_count = 7;
+        if (cs.level >= 12) inv_count = 8;
+        if (cs.level >= 16) inv_count = 9;
+        if (cs.level >= 18) inv_count = 10;
         c.eldritch_invocations_known = inv_count;
         // PHB 2024 Warlock L3 Pact Boon: 4 options (Blade/Chain/Tome/Talisman). Default
         // to Pact of the Tome (broadest utility) since the source mandates a player choice.
         if (cs.level >= 3) {
             c.pact_of_the_tome = true;
         }
+        // PHB 2024 Warlock L2 Magical Cunning (paras 7782-7783): 1/LR esoteric rite.
+        if (cs.level >= 2) {
+            c.magical_cunning_available = true;
+        }
+        // PHB 2024 Warlock L9 Contact Patron (paras 7788-7790): 1/LR free Contact Other
+        // Plane with auto-success on the save.
+        if (cs.level >= 9) {
+            c.contact_patron_available = true;
+        }
+        // PHB 2024 Warlock L11+ Mystic Arcanum (paras 7791-7795): one free cast per LR
+        // of a chosen high-level Warlock spell, gained at L11/13/15/17 for spell levels
+        // 6/7/8/9 respectively.
+        if (cs.level >= 11) c.mystic_arcanum_6_available = true;
+        if (cs.level >= 13) c.mystic_arcanum_7_available = true;
+        if (cs.level >= 15) c.mystic_arcanum_8_available = true;
+        if (cs.level >= 17) c.mystic_arcanum_9_available = true;
+        // PHB 2024 Warlock L20 Eldritch Master (paras 7798-7799): Magical Cunning regains
+        // all expended Pact Magic spell slots. Flag is read by the Magical Cunning handler.
+        if (cs.level >= 20) c.eldritch_master_active = true;
     }
 
     // Ranger subclasses

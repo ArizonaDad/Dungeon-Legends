@@ -191,6 +191,13 @@ int my_innate_sorcery_uses_remaining = 0;
 bool my_innate_sorcery_active = false;
 int my_sorcery_points = 0;
 int my_sorcery_points_max = 0;
+// PHB 2024 Warlock L2 Magical Cunning / L9 Contact Patron / L11+ Mystic Arcanum — synced from server
+bool my_magical_cunning_available = false;
+bool my_contact_patron_available = false;
+bool my_mystic_arcanum_6_available = false;
+bool my_mystic_arcanum_7_available = false;
+bool my_mystic_arcanum_8_available = false;
+bool my_mystic_arcanum_9_available = false;
 int my_bardic_inspiration_uses = 0;
 int my_bardic_inspiration_grant_die = 0;
 int my_bardic_inspiration_die = 0;
@@ -986,6 +993,10 @@ void show_bonus_action_menu() {
 	int innate_sorcery_opt = -1;
 	int font_of_magic_to_slot_opt = -1;
 	int font_of_magic_to_sp_opt = -1;
+	// PHB 2024 Warlock L2 Magical Cunning / L9 Contact Patron / L11+ Mystic Arcanum
+	int magical_cunning_opt = -1;
+	int contact_patron_opt = -1;
+	int mystic_arcanum_opt = -1;
 
 	if (lc == "barbarian" and !my_is_raging and my_rage_uses_remaining > 0) rage_opt = m.add_item("Rage. Bonus action. Uses left: " + my_rage_uses_remaining + ". Damage bonus: " + my_rage_damage_bonus + ".");
 	if (lc == "fighter" and my_second_wind_uses_remaining > 0) second_wind_opt = m.add_item("Second Wind. Bonus action. Heal 1d10 plus fighter level. Uses left: " + my_second_wind_uses_remaining + " of " + my_second_wind_uses_max + ".");
@@ -1006,6 +1017,31 @@ void show_bonus_action_menu() {
 	}
 	if (lc == "sorcerer" and level >= 2 and my_sorcery_points < my_sorcery_points_max) {
 		font_of_magic_to_sp_opt = m.add_item("Font of Magic: convert a spell slot to Sorcery Points. Sorcery Points: " + my_sorcery_points + " of " + my_sorcery_points_max + ".");
+	}
+	// PHB 2024 Warlock L2 Magical Cunning (paras 7782-7783): Magic action; perform an
+	// esoteric rite for 1 minute. Regain Pact Magic spell slots, no more than half max
+	// (round up). 1/Long Rest. L20 Eldritch Master regains all instead.
+	if (lc == "warlock" and level >= 2 and my_magical_cunning_available) {
+		string mc_label = "Magical Cunning. Magic action. Perform a 1-minute rite to regain half your Pact Magic slots (round up). 1 per long rest.";
+		if (level >= 20) mc_label = "Magical Cunning (Eldritch Master). Magic action. Perform a 1-minute rite to regain ALL your Pact Magic slots. 1 per long rest.";
+		magical_cunning_opt = m.add_item(mc_label);
+	}
+	// PHB 2024 Warlock L9 Contact Patron (paras 7788-7790): cast Contact Other Plane
+	// without a slot, automatic save success. 1/Long Rest.
+	if (lc == "warlock" and level >= 9 and my_contact_patron_available) {
+		contact_patron_opt = m.add_item("Contact Patron. Cast Contact Other Plane without a slot. Automatically succeed on the save. 1 per long rest.");
+	}
+	// PHB 2024 Warlock L11+ Mystic Arcanum (paras 7791-7795): cast a chosen 6th-9th
+	// level Warlock spell once per long rest without expending a slot.
+	if (lc == "warlock" and (my_mystic_arcanum_6_available or my_mystic_arcanum_7_available or my_mystic_arcanum_8_available or my_mystic_arcanum_9_available)) {
+		string arc_label = "Mystic Arcanum. Cast one of your chosen high-level Warlock spells without a slot. 1 per long rest each. Available: ";
+		string parts = "";
+		if (my_mystic_arcanum_6_available) parts += "level 6";
+		if (my_mystic_arcanum_7_available) { if (parts != "") parts += ", "; parts += "level 7"; }
+		if (my_mystic_arcanum_8_available) { if (parts != "") parts += ", "; parts += "level 8"; }
+		if (my_mystic_arcanum_9_available) { if (parts != "") parts += ", "; parts += "level 9"; }
+		arc_label += parts + ".";
+		mystic_arcanum_opt = m.add_item(arc_label);
 	}
 	if (lc == "paladin" and my_lay_on_hands_pool > 0) lay_hands_opt = m.add_item("Lay on Hands. Bonus action. Pool: " + my_lay_on_hands_pool + ".");
 	if (lc == "monk" and level >= 2) flurry_opt = m.add_item("Flurry of Blows. 1 Focus Point. Focus Points: " + my_focus_points + ".");
@@ -1442,6 +1478,9 @@ void show_bonus_action_menu() {
 	if (innate_sorcery_opt >= 0) options++;
 	if (font_of_magic_to_slot_opt >= 0) options++;
 	if (font_of_magic_to_sp_opt >= 0) options++;
+	if (magical_cunning_opt >= 0) options++;
+	if (contact_patron_opt >= 0) options++;
+	if (mystic_arcanum_opt >= 0) options++;
 	if (lay_hands_opt >= 0) options++;
 	if (flurry_opt >= 0) options++;
 	if (bardic_opt >= 0) options++;
@@ -1529,6 +1568,28 @@ void show_bonus_action_menu() {
 		}
 		if (picked_level < 1) return;
 		send({{"type", message_types::bonus_action}, {"feature", "font_of_magic_to_sp"}, {"slot_level", picked_level}});
+	}
+	else if (magical_cunning_opt >= 0 and res == magical_cunning_opt) {
+		// PHB 2024 Warlock L2 Magical Cunning (paras 7782-7783) — server uses Magic action,
+		// not bonus action; route through bonus_action message channel for handler dispatch.
+		send({{"type", message_types::bonus_action}, {"feature", "magical_cunning"}});
+	}
+	else if (contact_patron_opt >= 0 and res == contact_patron_opt) {
+		// PHB 2024 Warlock L9 Contact Patron (paras 7788-7790)
+		send({{"type", message_types::bonus_action}, {"feature", "contact_patron"}});
+	}
+	else if (mystic_arcanum_opt >= 0 and res == mystic_arcanum_opt) {
+		// PHB 2024 Warlock L11+ Mystic Arcanum (paras 7791-7795). Choose which arcanum
+		// level to unlock for the next cast.
+		menu@ ma = setup_sub_menu("Mystic Arcanum: choose which arcanum to unlock for your next cast:");
+		int[] arc_levels;
+		if (my_mystic_arcanum_6_available) { ma.add_item("Level 6 arcanum."); arc_levels.insert_last(6); }
+		if (my_mystic_arcanum_7_available) { ma.add_item("Level 7 arcanum."); arc_levels.insert_last(7); }
+		if (my_mystic_arcanum_8_available) { ma.add_item("Level 8 arcanum."); arc_levels.insert_last(8); }
+		if (my_mystic_arcanum_9_available) { ma.add_item("Level 9 arcanum."); arc_levels.insert_last(9); }
+		int ap = ma.run();
+		if (ap < 0 or ap >= int(arc_levels.length())) return;
+		send({{"type", message_types::bonus_action}, {"feature", "mystic_arcanum"}, {"arc_level", arc_levels[ap]}});
 	}
 	else if (lay_hands_opt >= 0 and res == lay_hands_opt) {
 		use_lay_on_hands();
@@ -3155,6 +3216,12 @@ void parse_game_state(json_object@ msg) {
 	my_innate_sorcery_active = msg.exists("my_innate_sorcery_active") ? bool(msg["my_innate_sorcery_active"]) : false;
 	my_sorcery_points = msg.exists("my_sorcery_points") ? int(msg["my_sorcery_points"]) : 0;
 	my_sorcery_points_max = msg.exists("my_sorcery_points_max") ? int(msg["my_sorcery_points_max"]) : 0;
+	my_magical_cunning_available = msg.exists("my_magical_cunning_available") ? bool(msg["my_magical_cunning_available"]) : false;
+	my_contact_patron_available = msg.exists("my_contact_patron_available") ? bool(msg["my_contact_patron_available"]) : false;
+	my_mystic_arcanum_6_available = msg.exists("my_mystic_arcanum_6_available") ? bool(msg["my_mystic_arcanum_6_available"]) : false;
+	my_mystic_arcanum_7_available = msg.exists("my_mystic_arcanum_7_available") ? bool(msg["my_mystic_arcanum_7_available"]) : false;
+	my_mystic_arcanum_8_available = msg.exists("my_mystic_arcanum_8_available") ? bool(msg["my_mystic_arcanum_8_available"]) : false;
+	my_mystic_arcanum_9_available = msg.exists("my_mystic_arcanum_9_available") ? bool(msg["my_mystic_arcanum_9_available"]) : false;
 	my_bardic_inspiration_uses = msg.exists("my_bardic_inspiration_uses") ? int(msg["my_bardic_inspiration_uses"]) : 0;
 	my_bardic_inspiration_grant_die = msg.exists("my_bardic_inspiration_grant_die") ? int(msg["my_bardic_inspiration_grant_die"]) : 0;
 	my_bardic_inspiration_die = msg.exists("my_bardic_inspiration_die") ? int(msg["my_bardic_inspiration_die"]) : 0;
@@ -3318,6 +3385,12 @@ void reset_combat_state() {
 	my_innate_sorcery_active = false;
 	my_sorcery_points = 0;
 	my_sorcery_points_max = 0;
+	my_magical_cunning_available = false;
+	my_contact_patron_available = false;
+	my_mystic_arcanum_6_available = false;
+	my_mystic_arcanum_7_available = false;
+	my_mystic_arcanum_8_available = false;
+	my_mystic_arcanum_9_available = false;
 	my_bardic_inspiration_uses = 0;
 	my_bardic_inspiration_grant_die = 0;
 	my_bardic_inspiration_die = 0;

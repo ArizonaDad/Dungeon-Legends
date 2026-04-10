@@ -194,6 +194,25 @@ class combatant {
 	bool pact_of_the_chain = false;
 	bool pact_of_the_tome = false;
 	bool pact_of_the_talisman = false;
+	// PHB 2024 Warlock L2 Magical Cunning (para 7782-7783): "perform an esoteric rite for
+	// 1 minute. At the end of it, you regain expended Pact Magic spell slots but no more
+	// than a number equal to half your maximum (round up). Once you use this feature, you
+	// can't do so again until you finish a Long Rest."
+	bool magical_cunning_available = false;
+	// PHB 2024 Warlock L9 Contact Patron (paras 7788-7790): always have Contact Other Plane
+	// prepared, can cast it without expending a slot, auto-success on the spell save. 1/LR.
+	bool contact_patron_available = false;
+	// PHB 2024 Warlock L11/13/15/17 Mystic Arcanum (paras 7791-7795): chosen high-level
+	// Warlock spell castable once without a slot, refreshes on Long Rest.
+	bool mystic_arcanum_6_available = false; // L11
+	bool mystic_arcanum_7_available = false; // L13
+	bool mystic_arcanum_8_available = false; // L15
+	bool mystic_arcanum_9_available = false; // L17
+	// PHB 2024 Warlock L20 Eldritch Master (para 7798-7799): "When you use your Magical
+	// Cunning feature, you regain all your expended Pact Magic spell slots." (Flag is
+	// passive — Magical Cunning handler reads class+level instead of a separate field,
+	// but tracking here keeps state symmetric for the broadcast.)
+	bool eldritch_master_active = false;
 	// --- Companion / Summon System (TODO §7C) ---
 	// Companions are full combatants tracked in combat.combatants with their own initiative,
 	// HP, AC, attacks, and conditions. They're owned by another combatant via owner_id and
@@ -1651,6 +1670,13 @@ class battle {
 				state["my_innate_sorcery_active"] = c.innate_sorcery_active;
 				state["my_sorcery_points"] = c.sorcery_points;
 				state["my_sorcery_points_max"] = c.sorcery_points_max;
+				// PHB 2024 Warlock L2 Magical Cunning / L9 Contact Patron / L11+ Mystic Arcanum
+				state["my_magical_cunning_available"] = c.magical_cunning_available;
+				state["my_contact_patron_available"] = c.contact_patron_available;
+				state["my_mystic_arcanum_6_available"] = c.mystic_arcanum_6_available;
+				state["my_mystic_arcanum_7_available"] = c.mystic_arcanum_7_available;
+				state["my_mystic_arcanum_8_available"] = c.mystic_arcanum_8_available;
+				state["my_mystic_arcanum_9_available"] = c.mystic_arcanum_9_available;
 				// Potion buff rounds remaining
 				state["my_potion_damage_rounds"] = c.potion_damage_rounds;
 				state["my_potion_ac_rounds"] = c.potion_ac_rounds;

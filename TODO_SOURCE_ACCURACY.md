@@ -413,11 +413,34 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 - Sorcerous Restoration L5 — needs short rest subsystem (currently we only have long rest reset).
 - Arcane Apotheosis L20 — escalate to user; basic_rules_full.txt para 7009 has no body text.
 
+### Warlock Audit (2026-04-09) — Basic Rules 2024 paras 7589-7799
+
+| Feature | Level | Source para | Status |
+|---------|-------|-------------|--------|
+| **Eldritch Invocations** (1 known at L1; scales to 10 at L18) | 1+ | 7607-7762 (Warlock Features table), 7764-7769 | PARTIAL — `eldritch_invocations_known` count corrected 2026-04-09 to match source table (was 0/2/3/4/5/6/7/8; now 1/3/3/3/5/5/6/6/7/7/7/8/8/8/8/9/9/10/10/10). Invocation selection / effects on individual invocations still subclass-specific. |
+| **Pact Magic** (CHA, all slots same level, recover on Short Rest) | 1 | 7770-7781 | ✓ Done — `apply_warlock_slots()` matches source table (1 slot at L1, 2 at L2-10, 3 at L11-16, 4 at L17-20; slot levels 1/1/2/2/3/3/4/4/5/5...). Spellcasting=CHA. |
+| **Magical Cunning** (1-min rite to recover half max Pact slots round up, 1/LR) | 2 | 7782-7783 | ✓ Done 2026-04-09 — Magic action handler in `users _dom.nvgt`, `magical_cunning_available` flag, recovers `(max+1)/2` slots at the Pact slot level (or all at L20 via Eldritch Master). Init in `character_data.nvgt`. |
+| **Warlock Subclass** | 3 | 7784-7785 | ✓ Done — Fiend, Archfey, Great Old One, Hexblade, Celestial, Genie, Fathomless, Undead, Undying, Pact of the Astral Griffon, Pact of the Many, Mother of Sorrows, etc. |
+| **Ability Score Improvement** | 4/8/12/16 | 7786-7787 | ✓ Done — global feat-grant system. |
+| **Contact Patron** (free Contact Other Plane, auto-success on save, 1/LR) | 9 | 7788-7790 | ✓ Done 2026-04-09 — bonus_action handler `contact_patron`, sets `contact_patron_available=false`, broadcast announcement. Spell narrative (revelations) deferred — combat sim doesn't need scryer flavor. |
+| **Mystic Arcanum (level 6 spell)** | 11 | 7791-7795 | ✓ Done 2026-04-09 — bonus_action handler `mystic_arcanum` with `arc_level=6`, grants phantom L6 slot for next cast. Spell choice = player. |
+| **Mystic Arcanum (level 7 spell)** | 13 | 7791-7795 | ✓ Done 2026-04-09 — same handler, `arc_level=7`. |
+| **Mystic Arcanum (level 8 spell)** | 15 | 7791-7795 | ✓ Done 2026-04-09 — same handler, `arc_level=8`. |
+| **Mystic Arcanum (level 9 spell)** | 17 | 7791-7795 | ✓ Done 2026-04-09 — same handler, `arc_level=9`. |
+| **Epic Boon** | 19 | 7796-7797 | ✓ Done — Epic Boon feat catalog. |
+| **Eldritch Master** (Magical Cunning regains all slots) | 20 | 7798-7799 | ✓ Done 2026-04-09 — `eldritch_master_active` flag set on init at L20; Magical Cunning handler reads `c.level >= 20` and grants full pact slot recovery. |
+
+**Pending follow-up Warlock batches:**
+- Eldritch Invocation effects: many invocations need their own logic (Agonizing Blast cantrip CHA-mod damage rider, Devil's Sight darkvision, Pact of the Blade weapon conjure, Pact of the Chain familiar attack, Pact of the Tome cantrip/ritual prep, Repelling Blast push 10 ft, Thirsting Blade extra attack, Devouring Blade two extra attacks, Eldritch Smite force damage + prone, Lifedrinker bonus necrotic/psychic/radiant damage on pact weapon hit, Misty Visions/Mask of Many Faces/etc. as free at-will casts). Source: paras 7800-7927.
+- Mystic Arcanum spell choice prompt at level-up — currently any chosen Warlock spell at the appropriate level can be cast. Source allows the player to designate one specific spell per arcanum level.
+- Magical Cunning duration — currently collapses the 1-minute rite to a single Magic action because 10 rounds of standing still is unusable in combat. Source-accurate behavior would require a "rite in progress" state that ticks down per round and breaks on offensive actions.
+- Pact Boon (Blade/Chain/Tome/Talisman) selection prompt at L3 — currently defaults to Pact of the Tome since the source mandates a player choice.
+
 - **Paladin:** Lay on Hands (pool size), Divine Smite (slot-based in 2024), Aura of Courage, Cleansing Touch — all addressed in 2026-04-09 audit; remaining items in pending list above.
 - **Ranger:** Favored Enemy / Roving / Tireless / Relentless Hunter / Nature's Veil / Precise Hunter / Feral Senses / Foe Slayer all addressed 2026-04-09; deferred items in Ranger pending list above.
 - **Rogue:** Sneak Attack base case / Steady Aim / Uncanny Dodge / Reliable Talent L7 fix / Slippery Mind / Elusive / Stroke of Luck flag all addressed 2026-04-09; deferred Cunning Strike family in Rogue pending list above.
-- **Sorcerer:** Font of Magic, Metamagic options (need full list), Sorcerous Restoration
-- **Warlock:** Pact Boon selection, Mystic Arcanum, Eldritch Master
+- **Sorcerer:** Innate Sorcery, Font of Magic, Sorcery Incarnate fallback, Eldritch Master prep all addressed 2026-04-09; metamagic pipeline + Sorcerous Restoration deferred.
+- **Warlock:** Magical Cunning, Contact Patron, Mystic Arcanum L11/13/15/17, Eldritch Master, invocation count fix all addressed 2026-04-09; individual invocation effects deferred.
 - **Wizard:** Arcane Recovery, Spell Mastery, Signature Spells
 - **Artificer:** Infusions, Flash of Genius, Spell Storing Item
 
