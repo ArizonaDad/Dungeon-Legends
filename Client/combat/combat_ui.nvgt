@@ -208,6 +208,9 @@ bool my_favored_by_gods_available = false;
 string my_divine_soul_affinity = "";
 bool my_otherworldly_wings_active = false;
 bool my_unearthly_recovery_available = false;
+// PHB 2024 Epic Boon state
+bool my_boon_of_recovery_used = false;
+bool my_boon_of_spell_recall_used = false;
 // Xanathar's Shadow Magic (paras 2557-2607)
 bool my_shadow_walk_available = false;
 bool my_shadow_umbral_active = false;
@@ -1047,6 +1050,7 @@ void show_bonus_action_menu() {
 	int creeping_fog_opt = -1;
 	int consume_darkness_opt = -1;
 	int telekinetic_shove_opt = -1;
+	int boon_of_recovery_opt = -1;
 	int piety_devotee_opt = -1;
 	int group_assistance_opt = -1;
 	int summon_primal_companion_opt = -1;
@@ -1581,6 +1585,10 @@ void show_bonus_action_menu() {
 	// Telekinetic feat (PHB para 7813) - bonus action shove available to anyone with the feat
 	if (feat_selected("telekinetic")) {
 		telekinetic_shove_opt = m.add_item("Telekinetic Shove. Bonus action. Push a creature within 30ft 5 feet (STR save vs DC 8 + PB + spellcasting mod).");
+	}
+	// Epic Boon: Recovery (PHB 2024 para 7879) — bonus action heal half max HP, 1/LR
+	if (feat_selected("boon_of_recovery") and !my_boon_of_recovery_used) {
+		boon_of_recovery_opt = m.add_item("Boon of Recovery. Bonus action. Regain half your maximum HP. 1 per long rest.");
 	}
 	// Theros Piety Devotee trait (Mythic Odysseys of Theros paras 1328-1329) —
 	// bonus action that casts the god's devotee spell for free, a number of
@@ -2416,6 +2424,10 @@ void show_bonus_action_menu() {
 		if (current_target_id == 0) { speak("No target selected.", true); return; }
 		send({{"type", message_types::bonus_action}, {"feature", "telekinetic_shove"}, {"target_id", current_target_id}});
 		speak("Telekinetic shove.", true);
+	}
+	else if (boon_of_recovery_opt >= 0 and res == boon_of_recovery_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "boon_of_recovery"}});
+		speak("Boon of Recovery.", true);
 	}
 	else if (summon_primal_companion_opt >= 0 and res == summon_primal_companion_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "summon_primal_companion"}});
@@ -3826,6 +3838,9 @@ void parse_game_state(json_object@ msg) {
 	my_divine_soul_affinity = msg.exists("my_divine_soul_affinity") ? string(msg["my_divine_soul_affinity"]) : "";
 	my_otherworldly_wings_active = msg.exists("my_otherworldly_wings_active") ? bool(msg["my_otherworldly_wings_active"]) : false;
 	my_unearthly_recovery_available = msg.exists("my_unearthly_recovery_available") ? bool(msg["my_unearthly_recovery_available"]) : false;
+	// PHB 2024 Epic Boon state
+	my_boon_of_recovery_used = msg.exists("my_boon_of_recovery_used") ? bool(msg["my_boon_of_recovery_used"]) : false;
+	my_boon_of_spell_recall_used = msg.exists("my_boon_of_spell_recall_used") ? bool(msg["my_boon_of_spell_recall_used"]) : false;
 	// Xanathar's Shadow Magic state
 	my_shadow_walk_available = msg.exists("my_shadow_walk_available") ? bool(msg["my_shadow_walk_available"]) : false;
 	my_shadow_umbral_active = msg.exists("my_shadow_umbral_active") ? bool(msg["my_shadow_umbral_active"]) : false;
@@ -4098,6 +4113,8 @@ void reset_combat_state() {
 	my_divine_soul_affinity = "";
 	my_otherworldly_wings_active = false;
 	my_unearthly_recovery_available = false;
+	my_boon_of_recovery_used = false;
+	my_boon_of_spell_recall_used = false;
 	// Xanathar's Shadow Magic
 	my_shadow_walk_available = false;
 	my_shadow_umbral_active = false;

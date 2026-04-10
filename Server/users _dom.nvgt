@@ -1939,6 +1939,26 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.room.bm.combat.apply_healing(c, heal);
 			u.room.bm.broadcast_announce(c.name + " invokes Unearthly Recovery and regains " + heal + " hit points!", true);
 		}
+		else if (feature == "boon_of_recovery") {
+			// PHB 2024 Boon of Recovery (para 7879): "You can use a Bonus Action to regain
+			// a number of Hit Points equal to half your Hit Point Maximum (round down). Once
+			// you use this benefit, you can't use it again until you finish a Long Rest."
+			if (!c.has_feat("boon_of_recovery")) {
+				u.send({{"type", message_types::announce}, {"text", "Your character does not have Boon of Recovery."}, {"interrupt", true}});
+				return;
+			}
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
+			if (c.boon_of_recovery_used) {
+				u.send({{"type", message_types::announce}, {"text", "Boon of Recovery already used this long rest."}, {"interrupt", true}});
+				return;
+			}
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.boon_of_recovery_used = true;
+			int heal = c.max_hp / 2;
+			u.room.bm.combat.apply_healing(c, heal);
+			u.room.bm.broadcast_announce(c.name + " invokes Boon of Recovery and regains " + heal + " hit points!", true);
+		}
 		else if (feature == "hound_of_ill_omen") {
 			// Xanathar's Shadow Magic L6 Hound of Ill Omen (para 2596-2602): "As a bonus
 			// action, you can spend 3 sorcery points to magically summon a hound of ill

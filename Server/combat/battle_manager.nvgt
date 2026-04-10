@@ -3212,6 +3212,23 @@ class battle_manager {
 		return current_total;
 	}
 
+	// PHB 2024 Mage Slayer feat Guarded Mind (para 7693): "If you fail an Intelligence,
+	// Wisdom, or Charisma saving throw, you can cause yourself to succeed instead.
+	// Once you use this benefit, you can't use it again until you finish a Short or
+	// Long Rest." Returns true if the save was auto-succeeded.
+	bool try_mage_slayer_guarded_mind(combatant@ target, int ability_id) {
+		if (@target == null) return false;
+		if (!target.has_feat("mage_slayer")) return false;
+		if (target.mage_slayer_guarded_mind_used) return false;
+		if (ability_id != ABILITY_INT and ability_id != ABILITY_WIS and ability_id != ABILITY_CHA) return false;
+		target.mage_slayer_guarded_mind_used = true;
+		string ability_name = "WIS";
+		if (ability_id == ABILITY_INT) ability_name = "INT";
+		else if (ability_id == ABILITY_CHA) ability_name = "CHA";
+		broadcast_announce(target.name + "'s Mage Slayer (Guarded Mind) auto-succeeds the " + ability_name + " saving throw!", true);
+		return true;
+	}
+
 	// Valda's Spire Gunslinger maneuver Grazing Shot (paras 213-214): "When you miss with
 	// a ranged attack roll using a weapon, you can expend one Risk Die (no action required)
 	// to deal damage to that creature equal to a roll of the die plus your Dexterity
@@ -4036,6 +4053,7 @@ class battle_manager {
 						if (!saved) { int ff_total = try_fanatical_focus(prev, save_dc_val, save_total, save_bonus, "WIS save vs Hold Person"); if (ff_total >= save_dc_val) saved = true; }
 						if (!saved) { int new_total = try_flash_of_genius(prev, save_dc_val, save_total, "WIS save vs Hold Person"); if (new_total >= save_dc_val) saved = true; }
 						if (!saved) { int ms_total = try_maverick_spirit(prev, save_dc_val, save_total, "WIS save vs Hold Person"); if (ms_total >= save_dc_val) saved = true; }
+						if (!saved and try_mage_slayer_guarded_mind(prev, ABILITY_WIS)) saved = true;
 						if (saved) {
 							prev.remove_condition(COND_PARALYZED);
 							broadcast_to_battle({{"type", message_types::condition_removed}, {"target", prev.name}, {"condition", "Paralyzed"}});
@@ -4108,6 +4126,7 @@ class battle_manager {
 						if (!saved) { int ff_total = try_fanatical_focus(prev, save_dc_val, save_total, save_bonus, "WIS save vs Fear"); if (ff_total >= save_dc_val) saved = true; }
 						if (!saved) { int new_total = try_flash_of_genius(prev, save_dc_val, save_total, "WIS save vs Fear"); if (new_total >= save_dc_val) saved = true; }
 						if (!saved) { int ms_total = try_maverick_spirit(prev, save_dc_val, save_total, "WIS save vs Fear"); if (ms_total >= save_dc_val) saved = true; }
+						if (!saved and try_mage_slayer_guarded_mind(prev, ABILITY_WIS)) saved = true;
 						if (saved) {
 							prev.remove_condition(COND_FRIGHTENED);
 							broadcast_to_battle({{"type", message_types::condition_removed}, {"target", prev.name}, {"condition", "Frightened"}});
@@ -4132,6 +4151,7 @@ class battle_manager {
 						if (!saved) { int ff_total = try_fanatical_focus(prev, save_dc_val, save_total, save_bonus, "WIS save vs Tasha's Hideous Laughter"); if (ff_total >= save_dc_val) saved = true; }
 						if (!saved) { int new_total = try_flash_of_genius(prev, save_dc_val, save_total, "WIS save vs Tasha's Hideous Laughter"); if (new_total >= save_dc_val) saved = true; }
 						if (!saved) { int ms_total = try_maverick_spirit(prev, save_dc_val, save_total, "WIS save vs Tasha's Hideous Laughter"); if (ms_total >= save_dc_val) saved = true; }
+						if (!saved and try_mage_slayer_guarded_mind(prev, ABILITY_WIS)) saved = true;
 						if (saved) {
 							prev.remove_condition(COND_INCAPACITATED);
 							prev.remove_condition(COND_PRONE);
@@ -4722,6 +4742,8 @@ class battle_manager {
 		c.headshot_used = false;
 		// Monster Slayer L11 Magic User's Nemesis: 1/SR
 		c.magic_users_nemesis_used = false;
+		// Mage Slayer Guarded Mind: 1/SR (PHB 2024 para 7693)
+		c.mage_slayer_guarded_mind_used = false;
 		// Ebon Tides / Grim Hollow subclass 1/SR features
 		c.shadow_martyr_used = false;
 		c.exit_strategy_used = false;
@@ -9736,6 +9758,7 @@ class battle_manager {
 			// slot consumption.
 			bool used_spell_mastery = false;
 			bool used_signature_spell = false;
+			bool used_boon_of_spell_recall = false;
 			if (c.divine_intervention_ready and c.class_name == "Cleric" and spell.level <= 5) {
 				c.divine_intervention_ready = false;
 				used_divine_intervention = true;
@@ -9765,6 +9788,13 @@ class battle_manager {
 				if (c.signature_spells_charges_remaining > 0) c.signature_spells_charges_remaining--;
 				used_signature_spell = true;
 				cast_slot_level = 3;
+			} else if (c.has_feat("boon_of_spell_recall") and !c.boon_of_spell_recall_used) {
+				// PHB 2024 Boon of Spell Recall (para 7882): "You can cast any spell you
+				// have prepared without expending a spell slot. Once you use this benefit,
+				// you can't do so again until you finish a Long Rest."
+				c.boon_of_spell_recall_used = true;
+				used_boon_of_spell_recall = true;
+				cast_slot_level = spell.level;
 			} else {
 				int slot_used = -1;
 				for (int sl = spell.level; sl <= 9; sl++) {
@@ -9785,6 +9815,7 @@ class battle_manager {
 			else if (used_free_cast) broadcast_announce(c.name + " casts " + spell.name + " using a free casting.", false);
 			else if (used_spell_mastery) broadcast_announce(c.name + " casts " + spell.name + " through Spell Mastery — no spell slot consumed!", true);
 			else if (used_signature_spell) broadcast_announce(c.name + " unleashes " + spell.name + " as a Signature Spell — no spell slot consumed!", true);
+			else if (used_boon_of_spell_recall) broadcast_announce(c.name + " invokes Boon of Spell Recall to cast " + spell.name + " — no spell slot consumed!", true);
 			else broadcast_announce(c.name + " casts " + spell.name + " using a level " + cast_slot_level + " spell slot.", false);
 
 			// Wild Magic Sorcerer: Wild Magic Surge (d20, on 1 trigger a random effect)
@@ -10410,6 +10441,7 @@ class battle_manager {
 					if (!saved and try_countercharm_reroll(t, save_dc, save_bonus + bless_bonus, "WIS save vs Fear")) saved = true;
 					if (!saved) { int new_total = try_flash_of_genius(t, save_dc, save_total, "WIS save vs Fear"); if (new_total >= save_dc) saved = true; }
 				if (!saved) { int ms_total = try_maverick_spirit(t, save_dc, save_total, "WIS save vs Fear"); if (ms_total >= save_dc) saved = true; }
+					if (!saved and try_mage_slayer_guarded_mind(t, ABILITY_WIS)) saved = true;
 					if (!saved) {
 						t.add_condition(COND_FRIGHTENED);
 						broadcast_to_battle({{"type", message_types::condition_applied}, {"target", t.name}, {"condition", "Frightened"}});
@@ -10440,6 +10472,7 @@ class battle_manager {
 					if (!saved and try_countercharm_reroll(t, save_dc, save_bonus + bless_bonus, "WIS save vs Hypnotic Pattern")) saved = true;
 					if (!saved) { int new_total = try_flash_of_genius(t, save_dc, save_total, "WIS save vs Hypnotic Pattern"); if (new_total >= save_dc) saved = true; }
 				if (!saved) { int ms_total = try_maverick_spirit(t, save_dc, save_total, "WIS save vs Hypnotic Pattern"); if (ms_total >= save_dc) saved = true; }
+					if (!saved and try_mage_slayer_guarded_mind(t, ABILITY_WIS)) saved = true;
 					if (!saved) {
 						t.add_condition(COND_CHARMED);
 						t.add_condition(COND_INCAPACITATED);
@@ -10720,6 +10753,7 @@ class battle_manager {
 				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Cause Fear")) saved = true;
 				if (!saved) { int new_total = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Cause Fear"); if (new_total >= save_dc) saved = true; }
 			if (!saved) { int ms_total = try_maverick_spirit(target, save_dc, save_total, "WIS save vs Cause Fear"); if (ms_total >= save_dc) saved = true; }
+				if (!saved and try_mage_slayer_guarded_mind(target, ABILITY_WIS)) saved = true;
 				if (!saved) {
 					target.add_condition(COND_FRIGHTENED);
 					broadcast_announce(target.name + " awakens to their own mortality and is Frightened of " + c.name + "!", true);
@@ -11402,6 +11436,7 @@ class battle_manager {
 				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Phantasmal Killer")) saved = true;
 				if (!saved) { int new_total = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Phantasmal Killer"); if (new_total >= save_dc) saved = true; }
 			if (!saved) { int ms_total = try_maverick_spirit(target, save_dc, save_total, "WIS save vs Phantasmal Killer"); if (ms_total >= save_dc) saved = true; }
+				if (!saved and try_mage_slayer_guarded_mind(target, ABILITY_WIS)) saved = true;
 				if (!saved) {
 					combat.apply_damage(target, total_damage, DMG_PSYCHIC, c);
 					target.add_condition(COND_FRIGHTENED);
@@ -11747,6 +11782,7 @@ class battle_manager {
 					if (!saved and try_countercharm_reroll(t, save_dc, save_bonus + bless_bonus, "WIS save vs Mass Suggestion")) saved = true;
 					if (!saved) { int new_total = try_flash_of_genius(t, save_dc, save_total, "WIS save vs Mass Suggestion"); if (new_total >= save_dc) saved = true; }
 				if (!saved) { int ms_total = try_maverick_spirit(t, save_dc, save_total, "WIS save vs Mass Suggestion"); if (ms_total >= save_dc) saved = true; }
+					if (!saved and try_mage_slayer_guarded_mind(t, ABILITY_WIS)) saved = true;
 					if (!saved) {
 						t.add_condition(COND_CHARMED);
 						count++;
@@ -11768,6 +11804,7 @@ class battle_manager {
 				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Command")) saved = true;
 				if (!saved) { int new_total = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Command"); if (new_total >= save_dc) saved = true; }
 			if (!saved) { int ms_total = try_maverick_spirit(target, save_dc, save_total, "WIS save vs Command"); if (ms_total >= save_dc) saved = true; }
+				if (!saved and try_mage_slayer_guarded_mind(target, ABILITY_WIS)) saved = true;
 				if (!saved) {
 					// Approximation: target loses its action next turn (treated as Incapacitated for one turn)
 					// then immediately recovers. We mark it with the existing COND_CHARMED to suppress its turn.
@@ -11788,6 +11825,7 @@ class battle_manager {
 				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Suggestion")) saved = true;
 				if (!saved) { int new_total = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Suggestion"); if (new_total >= save_dc) saved = true; }
 			if (!saved) { int ms_total = try_maverick_spirit(target, save_dc, save_total, "WIS save vs Suggestion"); if (ms_total >= save_dc) saved = true; }
+				if (!saved and try_mage_slayer_guarded_mind(target, ABILITY_WIS)) saved = true;
 				if (!saved) {
 					target.add_condition(COND_CHARMED);
 					broadcast_announce(target.name + " is charmed by " + c.name + "'s Suggestion. The charm ends if you or an ally damages them.", true);
@@ -11903,6 +11941,7 @@ class battle_manager {
 					int save_total = save_roll + save_bonus + bless_bonus;
 					bool saved = save_total >= save_dc;
 					broadcast_roll(t.name, "CHA save vs Bane", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Baned!");
+					if (!saved and try_mage_slayer_guarded_mind(t, ABILITY_CHA)) saved = true;
 					if (!saved) {
 						t.baned = true;
 						banned++;
@@ -11958,6 +11997,7 @@ class battle_manager {
 				int save_total = save_roll + save_bonus + bless_bonus;
 				bool saved = save_total >= save_dc;
 				broadcast_roll(target.name, "INT save vs Feeblemind", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Feebleminded!");
+				if (!saved and try_mage_slayer_guarded_mind(target, ABILITY_INT)) saved = true;
 				int dmg = total_damage;
 				combat.apply_damage(target, dmg, DMG_PSYCHIC, c);
 				if (!saved) {
@@ -11987,6 +12027,7 @@ class battle_manager {
 				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Eyebite")) saved = true;
 				if (!saved) { int new_total = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Eyebite"); if (new_total >= save_dc) saved = true; }
 			if (!saved) { int ms_total = try_maverick_spirit(target, save_dc, save_total, "WIS save vs Eyebite"); if (ms_total >= save_dc) saved = true; }
+				if (!saved and try_mage_slayer_guarded_mind(target, ABILITY_WIS)) saved = true;
 				if (!saved) {
 					target.add_condition(COND_FRIGHTENED);
 					broadcast_announce(target.name + " is Panicked by " + c.name + "'s Eyebite!", true);
@@ -12476,6 +12517,7 @@ class battle_manager {
 				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Dominate Person")) saved = true;
 				if (!saved) { int new_total = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Dominate Person"); if (new_total >= save_dc) saved = true; }
 			if (!saved) { int ms_total = try_maverick_spirit(target, save_dc, save_total, "WIS save vs Dominate Person"); if (ms_total >= save_dc) saved = true; }
+				if (!saved and try_mage_slayer_guarded_mind(target, ABILITY_WIS)) saved = true;
 				if (!saved) {
 					target.add_condition(COND_CHARMED);
 					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Charmed"}});
@@ -12490,6 +12532,7 @@ class battle_manager {
 				bool saved = save_total >= save_dc;
 				if (bless_bonus > 0) broadcast_announce(target.name + "'s Bless adds " + bless_bonus + " to the save.", false);
 				broadcast_roll(target.name, "CHA save vs Banishment", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Banished!");
+				if (!saved and try_mage_slayer_guarded_mind(target, ABILITY_CHA)) saved = true;
 				if (!saved) {
 					target.add_condition(COND_INCAPACITATED);
 					broadcast_announce(target.name + " is banished to a harmless demiplane!", true);
@@ -12507,6 +12550,7 @@ class battle_manager {
 				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Charm Person")) saved = true;
 				if (!saved) { int new_total = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Charm Person"); if (new_total >= save_dc) saved = true; }
 			if (!saved) { int ms_total = try_maverick_spirit(target, save_dc, save_total, "WIS save vs Charm Person"); if (ms_total >= save_dc) saved = true; }
+				if (!saved and try_mage_slayer_guarded_mind(target, ABILITY_WIS)) saved = true;
 				if (!saved) {
 					target.add_condition(COND_CHARMED);
 					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Charmed"}});
@@ -13218,6 +13262,7 @@ class battle_manager {
 				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Dominate Monster")) saved = true;
 				if (!saved) { int new_total = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Dominate Monster"); if (new_total >= save_dc) saved = true; }
 			if (!saved) { int ms_total = try_maverick_spirit(target, save_dc, save_total, "WIS save vs Dominate Monster"); if (ms_total >= save_dc) saved = true; }
+				if (!saved and try_mage_slayer_guarded_mind(target, ABILITY_WIS)) saved = true;
 				if (!saved) {
 					target.add_condition(COND_CHARMED);
 					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Charmed"}});
@@ -13531,6 +13576,7 @@ class battle_manager {
 				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Enthrall")) saved = true;
 				if (!saved) { int new_total = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Enthrall"); if (new_total >= save_dc) saved = true; }
 			if (!saved) { int ms_total = try_maverick_spirit(target, save_dc, save_total, "WIS save vs Enthrall"); if (ms_total >= save_dc) saved = true; }
+				if (!saved and try_mage_slayer_guarded_mind(target, ABILITY_WIS)) saved = true;
 				if (!saved) {
 					target.add_condition(COND_CHARMED);
 					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Charmed"}});
@@ -13647,6 +13693,7 @@ class battle_manager {
 				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Charm Monster")) saved = true;
 				if (!saved) { int new_total = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Charm Monster"); if (new_total >= save_dc) saved = true; }
 			if (!saved) { int ms_total = try_maverick_spirit(target, save_dc, save_total, "WIS save vs Charm Monster"); if (ms_total >= save_dc) saved = true; }
+				if (!saved and try_mage_slayer_guarded_mind(target, ABILITY_WIS)) saved = true;
 				if (!saved) {
 					target.add_condition(COND_CHARMED);
 					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Charmed"}});
@@ -13672,6 +13719,7 @@ class battle_manager {
 				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Dominate Beast")) saved = true;
 				if (!saved) { int new_total = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Dominate Beast"); if (new_total >= save_dc) saved = true; }
 			if (!saved) { int ms_total = try_maverick_spirit(target, save_dc, save_total, "WIS save vs Dominate Beast"); if (ms_total >= save_dc) saved = true; }
+				if (!saved and try_mage_slayer_guarded_mind(target, ABILITY_WIS)) saved = true;
 				if (!saved) {
 					target.add_condition(COND_CHARMED);
 					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Charmed"}});
@@ -13909,6 +13957,7 @@ class battle_manager {
 				int save_total = save_roll + save_bonus + bless_bonus;
 				bool saved = save_total >= save_dc;
 				broadcast_roll(target.name, "INT save vs Befuddlement", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Hit!");
+				if (!saved and try_mage_slayer_guarded_mind(target, ABILITY_INT)) saved = true;
 				if (!saved) {
 					int total_damage = 0;
 					for (int d = 0; d < 12; d++) total_damage += random(1, 6);
@@ -14607,6 +14656,7 @@ class battle_manager {
 					if (!saved and try_countercharm_reroll(t, save_dc, save_bonus + bless_bonus, "WIS save vs Weird")) saved = true;
 					if (!saved) { int new_total = try_flash_of_genius(t, save_dc, save_total, "WIS save vs Weird"); if (new_total >= save_dc) saved = true; }
 				if (!saved) { int ms_total = try_maverick_spirit(t, save_dc, save_total, "WIS save vs Weird"); if (ms_total >= save_dc) saved = true; }
+					if (!saved and try_mage_slayer_guarded_mind(t, ABILITY_WIS)) saved = true;
 					if (!saved) {
 						combat.apply_damage(t, dmg, DMG_PSYCHIC, c);
 						t.add_condition(COND_FRIGHTENED);
