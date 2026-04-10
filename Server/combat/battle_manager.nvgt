@@ -4185,6 +4185,20 @@ class battle_manager {
 			return;
 		}
 
+		// PHB 2024: Stunned (para 16246), Paralyzed (para 16230), Unconscious
+		// (para 16250) — creature can't take actions, bonus actions, or reactions
+		// and can't move. Auto-skip turn (end-of-turn saves still fire in
+		// advance_turn's condition save block above).
+		if (c.has_condition(COND_STUNNED) or c.has_condition(COND_PARALYZED) or c.has_condition(COND_UNCONSCIOUS)) {
+			string reason = "Stunned";
+			if (c.has_condition(COND_PARALYZED)) reason = "Paralyzed";
+			if (c.has_condition(COND_UNCONSCIOUS)) reason = "Unconscious";
+			broadcast_announce(c.name + " is " + reason + " and loses their turn.", true);
+			broadcast_state();
+			advance_turn();
+			return;
+		}
+
 		if (c.haste_loses_next_turn) {
 			c.has_action = false;
 			c.has_bonus_action = false;
