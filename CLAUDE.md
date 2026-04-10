@@ -158,7 +158,7 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 
 - **Extra Attack**: Fighters level 5 (2 attacks), 11 (3 attacks), 17 (3 attacks + 2 Action Surge). Other martials get 1 extra at level 5.
 
-- **Reaction Prompt System**: When a player is about to be hit, they are prompted for available reactions before hit resolves. Options: Shield (+5 AC), Cutting Words (-Id4-d12), Warding Flare (force reroll), Defensive Duelist (+Prof AC), Restore Balance (cancel advantage), Spirit Shield (reduce damage 2d6+), Entropic Ward (force miss), Arcane Deflection (+4 AC)
+- **Reaction Prompt System**: When a player is about to be hit, they are prompted for available reactions before hit resolves. Options: Shield (+5 AC), Cutting Words (-Id4-d12), Warding Flare (force reroll), Defensive Duelist (+Prof AC), Restore Balance (cancel advantage), Spirit Shield (reduce damage 2d6+), Entropic Ward (force miss), Arcane Deflection (+2 AC), Armor of Hexes (d6 roll, 4+ forces miss on cursed attacker)
 - **Resistance System**: Species and feats grant resistances to fire, cold, necrotic, psychic, acid, lightning, piercing, poison (+ immunity) — half damage on applicable types
 - **Wild Magic Surge**: Wild Magic Sorcerers roll d20 on 1+ level spell cast. On natural 1, a random surge effect triggers (fire burst, temp HP, healing, invisibility, spell slot recovery, etc.)
 - **Divine Smite**: Dual mode — bonus action pre-cast OR auto-prompt on melee hit (keys 1-5 for slot level, Escape to skip)
@@ -454,8 +454,10 @@ Per-class audit of all 13 base class features against `basic_rules_full.txt` (Ba
 - **Gunslinger**: Deadeye, High Roller, Secret Agent, Spellslinger, Trick Shot, White Hat
 
 **Key Combat Features:**
-- Grave Cleric Path to the Grave, Forge +1 AC, Peace Emboldening Bond, Twilight Sanctuary, Order Voice of Authority
-- Hexblade Curse, Samurai Fighting Spirit, Horizon Walker Planar Warrior
+- Grave Cleric Path to the Grave (vulnerability doubling on TARGET), Circle of Mortality, Sentinel at Death's Door (auto-resolve crit negation within 30ft), Keeper of Souls (on-kill heal most-injured ally)
+- Forge +1 AC, Peace Emboldening Bond, Twilight Sanctuary, Order Voice of Authority
+- Hexblade Curse (prof bonus damage, crit 19-20, heal on kill), Armor of Hexes (reaction d6 miss), Master of Hexes (auto-transfer curse on kill)
+- Samurai Fighting Spirit, Horizon Walker Planar Warrior
 - Storm Herald Storm Aura, Rune Knight Giant Might, Wild Magic Surge table
 - Sun Soul Radiant Bolt, Ascendant Dragon Breath, Shadow Sorcerer Strength of the Grave
 - Heart of the Storm eruption damage, Storm's Fury melee reaction

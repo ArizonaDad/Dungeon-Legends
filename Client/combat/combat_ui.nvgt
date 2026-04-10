@@ -236,6 +236,14 @@ bool my_keeper_of_souls_active = false;
 bool my_hexblade_curse_used = false;
 bool my_armor_of_hexes_active = false;
 bool my_master_of_hexes_active = false;
+// Cavalier Fighter (Xanathar's paras 1669-1682)
+bool my_cavalier_retaliation_available = false;
+int my_unwavering_mark_ba_uses = 0;
+int my_unwavering_mark_ba_uses_max = 0;
+int my_warding_maneuver_uses = 0;
+int my_warding_maneuver_uses_max = 0;
+bool my_hold_the_line_active = false;
+bool my_vigilant_defender_active = false;
 // PHB 2024 Warlock L2 Magical Cunning / L9 Contact Patron / L11+ Mystic Arcanum — synced from server
 bool my_magical_cunning_available = false;
 bool my_contact_patron_available = false;
@@ -964,7 +972,7 @@ void show_bonus_action_menu() {
 	int symbiotic_entity_opt = -1;
 	int blade_flourish_opt = -1;
 	int psychic_blades_bard_opt = -1;
-	int cavalier_mark_opt = -1;
+	int cavalier_retaliation_opt = -1;
 	int balm_summer_opt = -1;
 	int guided_strike_opt = -1;
 	int giants_might_opt = -1;
@@ -1342,8 +1350,8 @@ void show_bonus_action_menu() {
 	if (lc == "bard" and subclass == "College of Whispers") {
 		psychic_blades_bard_opt = m.add_item("Psychic Blades. Bonus action. Next weapon attack deals bonus psychic damage.");
 	}
-	if (lc == "fighter" and subclass == "Cavalier") {
-		cavalier_mark_opt = m.add_item("Cavalier Mark. Bonus action. Mark a target for extra damage.");
+	if (lc == "fighter" and subclass == "Cavalier" and my_cavalier_retaliation_available and my_unwavering_mark_ba_uses > 0) {
+		cavalier_retaliation_opt = m.add_item("Unwavering Mark Retaliation. Bonus action. Attack marked creature with advantage and +" + (level / 2) + " bonus damage. (" + my_unwavering_mark_ba_uses + "/" + my_unwavering_mark_ba_uses_max + " uses)");
 	}
 	if (lc == "druid" and subclass == "Circle of Dreams") {
 		balm_summer_opt = m.add_item("Balm of the Summer Court. Bonus action. Heal a target from your pool.");
@@ -2058,13 +2066,9 @@ void show_bonus_action_menu() {
 		send({{"type", message_types::bonus_action}, {"feature", "psychic_blades"}});
 		speak("Psychic Blades. Your next weapon attack deals bonus psychic damage.", true);
 	}
-	else if (cavalier_mark_opt >= 0 and res == cavalier_mark_opt) {
-		if (current_target_id == 0) {
-			speak("No target selected. Scan with I J K L and press Enter to lock a target.", true);
-			return;
-		}
-		send({{"type", message_types::bonus_action}, {"feature", "cavalier_mark"}, {"target_id", current_target_id}});
-		speak("Cavalier Mark applied to target.", true);
+	else if (cavalier_retaliation_opt >= 0 and res == cavalier_retaliation_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "cavalier_retaliation"}});
+		speak("Unwavering Mark retaliation attack!", true);
 	}
 	else if (balm_summer_opt >= 0 and res == balm_summer_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "balm_of_summer_court"}, {"target_id", current_target_id}});
@@ -3609,6 +3613,14 @@ void parse_game_state(json_object@ msg) {
 	my_hexblade_curse_used = msg.exists("my_hexblade_curse_used") ? bool(msg["my_hexblade_curse_used"]) : false;
 	my_armor_of_hexes_active = msg.exists("my_armor_of_hexes_active") ? bool(msg["my_armor_of_hexes_active"]) : false;
 	my_master_of_hexes_active = msg.exists("my_master_of_hexes_active") ? bool(msg["my_master_of_hexes_active"]) : false;
+	// Cavalier Fighter
+	my_cavalier_retaliation_available = msg.exists("my_cavalier_retaliation_available") ? bool(msg["my_cavalier_retaliation_available"]) : false;
+	my_unwavering_mark_ba_uses = msg.exists("my_unwavering_mark_ba_uses") ? int(msg["my_unwavering_mark_ba_uses"]) : 0;
+	my_unwavering_mark_ba_uses_max = msg.exists("my_unwavering_mark_ba_uses_max") ? int(msg["my_unwavering_mark_ba_uses_max"]) : 0;
+	my_warding_maneuver_uses = msg.exists("my_warding_maneuver_uses") ? int(msg["my_warding_maneuver_uses"]) : 0;
+	my_warding_maneuver_uses_max = msg.exists("my_warding_maneuver_uses_max") ? int(msg["my_warding_maneuver_uses_max"]) : 0;
+	my_hold_the_line_active = msg.exists("my_hold_the_line_active") ? bool(msg["my_hold_the_line_active"]) : false;
+	my_vigilant_defender_active = msg.exists("my_vigilant_defender_active") ? bool(msg["my_vigilant_defender_active"]) : false;
 	my_magical_cunning_available = msg.exists("my_magical_cunning_available") ? bool(msg["my_magical_cunning_available"]) : false;
 	my_contact_patron_available = msg.exists("my_contact_patron_available") ? bool(msg["my_contact_patron_available"]) : false;
 	my_mystic_arcanum_6_available = msg.exists("my_mystic_arcanum_6_available") ? bool(msg["my_mystic_arcanum_6_available"]) : false;
@@ -3847,6 +3859,13 @@ void reset_combat_state() {
 	my_hexblade_curse_used = false;
 	my_armor_of_hexes_active = false;
 	my_master_of_hexes_active = false;
+	my_cavalier_retaliation_available = false;
+	my_unwavering_mark_ba_uses = 0;
+	my_unwavering_mark_ba_uses_max = 0;
+	my_warding_maneuver_uses = 0;
+	my_warding_maneuver_uses_max = 0;
+	my_hold_the_line_active = false;
+	my_vigilant_defender_active = false;
 	my_magical_cunning_available = false;
 	my_contact_patron_available = false;
 	my_mystic_arcanum_6_available = false;

@@ -1463,6 +1463,30 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         c.fighting_spirit_uses = proficiency_bonus(cs.level);
     }
 
+    // Xanathar's Cavalier Fighter (paras 1669-1682)
+    if (cs.class_name == "Fighter" and cs.subclass == "Cavalier") {
+        // L3 Unwavering Mark (para 1669-1673): STR mod uses per LR for retaliation BA
+        if (cs.level >= 3) {
+            int str_mod = ability_modifier(cs.strength);
+            if (str_mod < 1) str_mod = 1;
+            c.unwavering_mark_ba_uses_max = str_mod;
+            c.unwavering_mark_ba_uses = str_mod;
+        }
+        // L7 Warding Maneuver (para 1674-1676): CON mod uses per LR
+        if (cs.level >= 7) {
+            int con_mod = ability_modifier(cs.constitution);
+            if (con_mod < 1) con_mod = 1;
+            c.warding_maneuver_uses_max = con_mod;
+            c.warding_maneuver_uses = con_mod;
+        }
+        // L10 Hold the Line (para 1677-1678): deferred — needs OA trigger on 5ft movement
+        if (cs.level >= 10) c.hold_the_line_active = true;
+        // L15 Ferocious Charger (para 1679-1680): deferred — needs movement path tracking
+        if (cs.level >= 15) c.ferocious_charger_active = true;
+        // L18 Vigilant Defender (para 1681-1682): deferred — needs multi-reaction per turn
+        if (cs.level >= 18) c.vigilant_defender_active = true;
+    }
+
     // Circle of Spores Druid: Symbiotic Entity (uses Wild Shape slots)
     if (cs.class_name == "Druid" and cs.subclass == "Circle of Spores" and cs.level >= 2) {
         c.symbiotic_entity_uses = 2;

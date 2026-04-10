@@ -317,8 +317,20 @@ class combatant {
 	bool master_of_hexes_active = false; // Xanathar's Hexblade L14 (para 2794-2795)
 	bool fighting_spirit_active = false; // Samurai Fighter
 	int fighting_spirit_uses = 0; // Samurai
-	bool cavalier_mark_active = false; // Cavalier Fighter
-	uint cavalier_mark_target = 0;
+	// Cavalier Fighter (Xanathar's paras 1669-1682)
+	uint marked_by_cavalier_id = 0; // ON ANY COMBATANT: ID of Cavalier who marked this creature
+	bool cavalier_mark_turn_flag = false; // expiry: true = marks placed this turn, false = clear next turn start
+	bool cavalier_retaliation_available = false; // BA retaliation available (marked creature damaged someone else)
+	uint cavalier_retaliation_target = 0; // target for BA retaliation attack
+	int unwavering_mark_ba_uses = 0; // STR mod uses per LR for retaliation BA
+	int unwavering_mark_ba_uses_max = 0;
+	int warding_maneuver_uses = 0; // L7: CON mod uses per LR (para 1674-1676)
+	int warding_maneuver_uses_max = 0;
+	bool warding_maneuver_resistance = false; // consumed in apply_damage to halve damage
+	bool hold_the_line_active = false; // L10: deferred (needs OA trigger on 5ft move)
+	bool ferocious_charger_active = false; // L15: deferred (needs movement path tracking)
+	bool ferocious_charger_used_this_turn = false;
+	bool vigilant_defender_active = false; // L18: deferred (needs multi-reaction system)
 	int superiority_maneuvers_known = 0; // Battle Master
 	int drunken_master_advantage = 0; // Drunken Master Monk
 	int divine_soul_magic_used = 0; // Divine Soul sorcerer
@@ -1346,6 +1358,7 @@ class battle {
 		c.slasher_used_this_turn = false;
 		c.piercer_reroll_used_this_turn = false;
 		c.fighting_spirit_active = false;
+		c.ferocious_charger_used_this_turn = false;
 		c.planar_warrior_active = false;
 		c.swashbuckler_attacked_this_turn = false;
 		c.trip_attack_pending = false;
@@ -1436,6 +1449,13 @@ class battle {
 		if (target.uncanny_dodge_pending) {
 			amount = amount / 2;
 			target.uncanny_dodge_pending = false;
+		}
+
+		// Xanathar's Cavalier L7 Warding Maneuver (para 1674-1676): "If the attack
+		// still hits, the target has resistance against the attack's damage."
+		if (target.warding_maneuver_resistance) {
+			amount = amount / 2;
+			target.warding_maneuver_resistance = false;
 		}
 
 		// Heavy Armor Master: reduce B/P/S damage by Proficiency Bonus when wearing heavy armor
@@ -1971,6 +1991,14 @@ class battle {
 				state["my_hexblade_curse_used"] = c.hexblade_curse_used;
 				state["my_armor_of_hexes_active"] = c.armor_of_hexes_active;
 				state["my_master_of_hexes_active"] = c.master_of_hexes_active;
+				// Xanathar's Cavalier Fighter (paras 1669-1682)
+				state["my_cavalier_retaliation_available"] = c.cavalier_retaliation_available;
+				state["my_unwavering_mark_ba_uses"] = c.unwavering_mark_ba_uses;
+				state["my_unwavering_mark_ba_uses_max"] = c.unwavering_mark_ba_uses_max;
+				state["my_warding_maneuver_uses"] = c.warding_maneuver_uses;
+				state["my_warding_maneuver_uses_max"] = c.warding_maneuver_uses_max;
+				state["my_hold_the_line_active"] = c.hold_the_line_active;
+				state["my_vigilant_defender_active"] = c.vigilant_defender_active;
 				// Potion buff rounds remaining
 				state["my_potion_damage_rounds"] = c.potion_damage_rounds;
 				state["my_potion_ac_rounds"] = c.potion_ac_rounds;

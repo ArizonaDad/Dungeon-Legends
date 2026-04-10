@@ -2187,8 +2187,22 @@ class battle_manager {
 			adv = true;
 		}
 		// Hexblade Warlock: Hexblade's Curse — crit on 19-20 vs cursed target (handled in crit threshold)
-		// Cavalier: marked target gets advantage if attacking Cavalier's ally
-		// (simplified implementation: no marker bonus for now)
+		// Xanathar's Cavalier L3 Unwavering Mark (para 1670): "While it is within 5 feet
+		// of you, a creature marked by you has disadvantage on any attack roll that doesn't
+		// target you."
+		if (attacker.marked_by_cavalier_id != 0 and @target != null and @combat != null) {
+			for (uint cav = 0; cav < combat.combatants.length(); cav++) {
+				combatant@ cav_c = combat.combatants[cav];
+				if (@cav_c == null or cav_c.is_dead or cav_c.id != attacker.marked_by_cavalier_id) continue;
+				if (target.id != cav_c.id) { // attacking someone other than the Cavalier
+					float cdx = float(attacker.x - cav_c.x);
+					float cdy = float(attacker.y - cav_c.y);
+					float cav_dist = sqrt(cdx * cdx + cdy * cdy) * 5.0f;
+					if (cav_dist <= 5) disadv = true;
+				}
+				break;
+			}
+		}
 		// Sacred Weapon: add CHA mod to attack rolls (handled via attack bonus modification)
 
 		// PHB 2024 Rogue L18 Elusive (para 6576-6577): "No attack roll can have
@@ -3829,6 +3843,19 @@ class battle_manager {
 		c.power_surge_used_this_turn = false;
 		// Xanathar's Grave Domain L17 Keeper of Souls (para 802-803): once per round.
 		c.keeper_of_souls_used_this_turn = false;
+		// Xanathar's Cavalier L3 Unwavering Mark expiry (para 1669): "until the end of
+		// your next turn." On the Cavalier's turn start: if flag is false, clear all marks
+		// by this Cavalier; if true, set to false (marks persist through this turn).
+		if (c.class_name == "Fighter" and c.subclass == "Cavalier") {
+			if (!c.cavalier_mark_turn_flag) {
+				for (uint um = 0; um < combat.combatants.length(); um++) {
+					if (combat.combatants[um].marked_by_cavalier_id == c.id) {
+						combat.combatants[um].marked_by_cavalier_id = 0;
+					}
+				}
+			}
+			c.cavalier_mark_turn_flag = false;
+		}
 		// Valda's Spire Gunslinger White Hat L10 Long Arm of the Law (paras 462-463):
 		// "The creature can't move on its next turn unless it first takes the Disengage
 		// action." If this combatant was hobbled, zero out movement at turn start. The
@@ -4713,11 +4740,7 @@ class battle_manager {
 			broadcast_announce(attacker.name + "'s Psychic Blades add " + psychic_dmg + " psychic damage!", false);
 		}
 
-		// Cavalier Fighter: Marked target takes +Prof damage from marker
-		if (attacker.class_name == "Fighter" and attacker.subclass == "Cavalier" and attacker.cavalier_mark_target == target.id) {
-			bonus += attacker.proficiency;
-			broadcast_announce(attacker.name + "'s Cavalier Mark adds " + attacker.proficiency + " damage!", false);
-		}
+		// Cavalier Unwavering Mark: old +prof bonus removed — retaliation is now a BA attack per source (para 1671-1672)
 
 		// Rune Knight Fighter: Giant's Might — +1d6 damage while active
 		if (attacker.class_name == "Fighter" and attacker.subclass == "Rune Knight" and attacker.giants_might_active and is_weapon_attack) {
@@ -5337,6 +5360,13 @@ class battle_manager {
 			if (!hit and c.studied_attacks_active and pr.is_weapon_attack) {
 				c.studied_attacks_target_id = target.id;
 			}
+			// Xanathar's Cavalier L3 Unwavering Mark (para 1669): "When you hit a
+			// creature with a melee weapon attack, you can mark the creature until the
+			// end of your next turn." Auto-applied on every melee weapon hit.
+			if (hit and c.class_name == "Fighter" and c.subclass == "Cavalier" and c.level >= 3 and pr.is_weapon_attack and !c.main_hand_is_ranged and !pr.is_spell_effect) {
+				target.marked_by_cavalier_id = c.id;
+				c.cavalier_mark_turn_flag = true;
+			}
 
 			string attack_reason = pr.attack_name != "" ? pr.attack_name + " attack against " + target.name : "to attack " + target.name;
 			broadcast_roll(c.name, attack_reason, natural_roll, reported_modifier, total, outcome);
@@ -5369,6 +5399,35 @@ class battle_manager {
 					if (target.is_dead) {
 						broadcast_to_battle({{"type", message_types::creature_died}, {"name", target.name}, {"is_player", target.is_player}, {"killed_by", c.name}, {"was_full_hp", false}, {"was_overkill", false}, {"was_stealth", false}});
 					}
+				}
+			}
+
+			// Xanathar's Cavalier L7 Warding Maneuver (para 1674-1676): "If you or a
+			// creature you can see within 5 feet of you is hit by an attack, you can roll
+			// 1d8 as a reaction [...] add the number rolled to the target's AC. If the
+			// attack still hits, the target has resistance." Auto-resolved for allies.
+			if (hit and !is_fumble and @combat != null) {
+				for (uint wm = 0; wm < combat.combatants.length(); wm++) {
+					combatant@ wmc = combat.combatants[wm];
+					if (@wmc == null or wmc.is_dead or wmc.id == target.id) continue; // skip self (self handled in reaction prompt)
+					if (wmc.class_name != "Fighter" or wmc.subclass != "Cavalier") continue;
+					if (wmc.level < 7 or wmc.warding_maneuver_uses <= 0 or !wmc.has_reaction) continue;
+					float wdx = float(wmc.x - target.x);
+					float wdy = float(wmc.y - target.y);
+					float wm_dist = sqrt(wdx * wdx + wdy * wdy) * 5.0f;
+					if (wm_dist > 5) continue;
+					int ward_roll = random(1, 8);
+					wmc.warding_maneuver_uses--;
+					wmc.has_reaction = false;
+					if (total < target.armor_class + ward_roll) {
+						hit = false;
+						outcome = "Miss! (Warding Maneuver +" + ward_roll + " AC)";
+						broadcast_announce(wmc.name + "'s Warding Maneuver (+"+ward_roll+" AC) turns the hit on " + target.name + " into a miss!", true);
+					} else {
+						target.warding_maneuver_resistance = true;
+						broadcast_announce(wmc.name + "'s Warding Maneuver (+"+ward_roll+" AC) grants " + target.name + " resistance against the attack!", true);
+					}
+					break;
 				}
 			}
 
@@ -5413,6 +5472,10 @@ class battle_manager {
 				// War Magic Wizard: Arcane Deflection — reduce damage or save by 4
 				if (target.class_name == "Wizard" and target.subclass == "War Magic" and target.arcane_deflection_available) {
 					reaction_options.insert_last("arcane_deflection");
+				}
+				// Xanathar's Cavalier L7 Warding Maneuver (para 1674-1676): self-defense
+				if (target.class_name == "Fighter" and target.subclass == "Cavalier" and target.level >= 7 and target.warding_maneuver_uses > 0) {
+					reaction_options.insert_last("warding_maneuver");
 				}
 				// Xanathar's Hexblade L10 Armor of Hexes (para 2792-2793): "If the target
 				// cursed by your Hexblade's Curse hits you with an attack roll, you can use
@@ -5473,6 +5536,7 @@ class battle_manager {
 							else if (reaction_options[oi] == "spirit_shield") opts += "Spirit Shield (reduce damage by 2d6+)";
 							else if (reaction_options[oi] == "entropic_ward") opts += "Entropic Ward (force the hit to miss)";
 							else if (reaction_options[oi] == "arcane_deflection") opts += "Arcane Deflection (+2 AC)";
+							else if (reaction_options[oi] == "warding_maneuver") opts += "Warding Maneuver (+1d8 AC, resistance if still hit)";
 						else if (reaction_options[oi] == "armor_of_hexes") opts += "Armor of Hexes (d6, 4+ = miss)";
 							else if (reaction_options[oi] == "deflect_attacks") opts += "Deflect Attacks (reduce by 1d10+DEX+level)";
 							else if (reaction_options[oi] == "uncanny_dodge") opts += "Uncanny Dodge (halve the damage)";
@@ -6040,6 +6104,23 @@ class battle_manager {
 				string rs_name = target.light_weaver_dark_shifted ? "necrotic" : "radiant";
 				combat.apply_damage(c, rs_dmg, rs_type, target);
 				broadcast_announce(target.name + "'s Refraction Shield flashes, dealing " + rs_dmg + " " + rs_name + " damage to " + c.name + "!", true);
+			}
+
+			// Xanathar's Cavalier L3 Unwavering Mark retaliation trigger (para 1671-1672):
+			// "if a creature marked by you deals damage to anyone other than you, you can
+			// make a special melee weapon attack against the marked creature as a bonus
+			// action on your next turn."
+			if (c.marked_by_cavalier_id != 0 and @combat != null) {
+				for (uint umr = 0; umr < combat.combatants.length(); umr++) {
+					combatant@ cav = combat.combatants[umr];
+					if (@cav == null or cav.is_dead or cav.id != c.marked_by_cavalier_id) continue;
+					if (target.id != cav.id and cav.unwavering_mark_ba_uses > 0 and !cav.cavalier_retaliation_available) {
+						cav.cavalier_retaliation_available = true;
+						cav.cavalier_retaliation_target = c.id;
+						broadcast_announce(c.name + " damaged " + target.name + " while marked! " + cav.name + " can retaliate on their next turn.", false);
+					}
+					break;
+				}
 			}
 
 			// Shield Master 2024: after hitting with a melee weapon as part of Attack action with a shield, shove
@@ -6838,6 +6919,23 @@ class battle_manager {
 							targets_hit++;
 						}
 					}
+				}
+			}
+		}
+		else if (choice == "warding_maneuver" and defender.is_player) {
+			// Xanathar's Cavalier L7 Warding Maneuver (para 1674-1676): "roll 1d8 as a
+			// reaction [...] add the number rolled to the target's AC. If the attack still
+			// hits, the target has resistance against the attack's damage."
+			if (defender.class_name == "Fighter" and defender.subclass == "Cavalier" and defender.warding_maneuver_uses > 0) {
+				defender.has_reaction = false;
+				defender.warding_maneuver_uses--;
+				int ward_roll = random(1, 8);
+				if (rp.attack_total < defender.armor_class + ward_roll) {
+					rp.attack_total = 0; // miss
+					broadcast_announce(defender.name + "'s Warding Maneuver rolls +" + ward_roll + " AC — the attack misses! (" + defender.warding_maneuver_uses + " uses remaining)", true);
+				} else {
+					defender.warding_maneuver_resistance = true;
+					broadcast_announce(defender.name + "'s Warding Maneuver rolls +" + ward_roll + " AC — attack still hits, but grants resistance! (" + defender.warding_maneuver_uses + " uses remaining)", true);
 				}
 			}
 		}
