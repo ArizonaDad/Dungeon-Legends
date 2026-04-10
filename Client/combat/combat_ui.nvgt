@@ -1000,11 +1000,13 @@ void show_bonus_action_menu() {
 	int scout_skirmish_opt = -1;
 	int unsettling_words_opt = -1;
 	int orders_demand_opt = -1;
-	int deadeye_stance_opt = -1;
-	int liars_dice_opt = -1;
-	int license_to_kill_opt = -1;
-	int trick_shot_ricochet_opt = -1;
 	int white_hat_protect_opt = -1;
+	// Valda's Spire Gunslinger subclass bonus actions (Deadeye, High Roller, Secret Agent, Spellslinger)
+	int focused_shot_opt = -1;            // Deadeye L14
+	int risky_business_opt = -1;          // High Roller L6
+	int license_to_kill_one_opt = -1;     // Secret Agent L14: spend 1 Risk Die
+	int license_to_kill_two_opt = -1;     // Secret Agent L14: spend 2 Risk Dice
+	int bang_youre_dead_opt = -1;         // Spellslinger L3
 	int jinx_target_opt = -1;
 	int rune_tag_opt = -1;
 	int blade_breaker_stance_opt = -1;
@@ -1464,9 +1466,26 @@ void show_bonus_action_menu() {
 		orders_demand_opt = m.add_item("Order's Demand. Action. Channel Divinity to charm enemies within 30ft (WIS save).");
 	}
 	// Gunslinger subclass bonus actions. Most Gunslinger subclass features are triggered maneuvers,
-	// not standalone bonus actions, so only Lay Down the Law appears here.
+	// not standalone bonus actions, so only the explicit bonus-action toggles appear here.
 	if (lc == "gunslinger" and subclass == "White Hat" and level >= 3) {
 		white_hat_protect_opt = m.add_item("Lay Down the Law. Bonus action. Spend a Risk Die to grant an ally temp HP and retaliation.");
+	}
+	// Valda's Spire Gunslinger Deadeye L14 Focused Shot (paras 252-253)
+	if (lc == "gunslinger" and subclass == "Deadeye" and level >= 14) {
+		focused_shot_opt = m.add_item("Focused Shot. Toggle. Next ranged attack gains Advantage and is a Critical Hit on a hit.");
+	}
+	// Valda's Spire Gunslinger High Roller L6 Risky Business (paras 265-266)
+	if (lc == "gunslinger" and subclass == "High Roller" and level >= 6) {
+		risky_business_opt = m.add_item("Risky Business. Toggle. Next attack will be made with Disadvantage and refund a Risk Die. (1/turn)");
+	}
+	// Valda's Spire Gunslinger Secret Agent L14 License to Kill (paras 290-291)
+	if (lc == "gunslinger" and subclass == "Secret Agent" and level >= 14) {
+		license_to_kill_one_opt = m.add_item("License to Kill (1 Die). Toggle. Next ranged damage roll spends 1 Risk Die with explosions.");
+		license_to_kill_two_opt = m.add_item("License to Kill (2 Dice). Toggle. Next ranged damage roll spends 2 Risk Dice with explosions.");
+	}
+	// Valda's Spire Gunslinger Spellslinger L3 Bang You're Dead (paras 423-426)
+	if (lc == "gunslinger" and subclass == "Spellslinger" and level >= 3) {
+		bang_youre_dead_opt = m.add_item("Bang You're Dead. Bonus action toggle. Next Finger Guns hit spends a Risk Die for bonus damage.");
 	}
 	// Setting subclass bonus actions
 	if (lc == "rogue" and subclass == "Misfortune Bringer" and level >= 3) {
@@ -1536,6 +1555,15 @@ void show_bonus_action_menu() {
 	if (heal_light_opt >= 0) options++;
 	if (fey_opt >= 0) options++;
 	if (mantle_opt >= 0) options++;
+	if (focused_shot_opt >= 0) options++;
+	if (risky_business_opt >= 0) options++;
+	if (license_to_kill_one_opt >= 0) options++;
+	if (license_to_kill_two_opt >= 0) options++;
+	if (bang_youre_dead_opt >= 0) options++;
+	if (white_hat_protect_opt >= 0) options++;
+	if (bite_the_bullet_opt >= 0) options++;
+	if (dodge_roll_opt >= 0) options++;
+	if (blindfire_opt >= 0) options++;
 	if (options == 1) {
 		speak("No class bonus actions are available right now. You can still use a bonus action spell if you know one.", true);
 	}
@@ -2221,6 +2249,26 @@ void show_bonus_action_menu() {
 		}
 		send({{"type", message_types::bonus_action}, {"feature", "lay_down_the_law"}, {"target_id", current_target_id}});
 		speak("Lay Down the Law.", true);
+	}
+	else if (focused_shot_opt >= 0 and res == focused_shot_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "focused_shot"}});
+		speak("Focused Shot readied.", true);
+	}
+	else if (risky_business_opt >= 0 and res == risky_business_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "risky_business"}});
+		speak("Risky Business readied.", true);
+	}
+	else if (license_to_kill_one_opt >= 0 and res == license_to_kill_one_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "license_to_kill_one"}});
+		speak("License to Kill: 1 Risk Die.", true);
+	}
+	else if (license_to_kill_two_opt >= 0 and res == license_to_kill_two_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "license_to_kill_two"}});
+		speak("License to Kill: 2 Risk Dice.", true);
+	}
+	else if (bang_youre_dead_opt >= 0 and res == bang_youre_dead_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "bang_youre_dead"}});
+		speak("Bang You're Dead readied.", true);
 	}
 	else if (jinx_target_opt >= 0 and res == jinx_target_opt) {
 		if (current_target_id == 0) {

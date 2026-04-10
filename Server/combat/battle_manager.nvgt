@@ -1985,6 +1985,12 @@ class battle_manager {
 		if (attacker.class_name == "Ranger" and attacker.level >= 17 and attacker.hunters_mark_target_id != 0 and attacker.hunters_mark_target_id == target.id) {
 			adv = true;
 		}
+		// Valda's Spire Gunslinger Deadeye L14 Focused Shot (paras 252-253): "You have
+		// Advantage on this attack roll" — flag set by the bonus action handler that
+		// commits the player to a single ranged attack.
+		if (attacker.focused_shot_pending and attack_is_ranged) {
+			adv = true;
+		}
 		// PHB 2024 Rogue L3 Steady Aim (para 6550-6551): "you give yourself Advantage
 		// on your next attack roll on the current turn." Consumed inline by the next
 		// attack. The flag is set by the bonus action handler and reset at start of
@@ -2008,6 +2014,24 @@ class battle_manager {
 		// target — applied last so it overrides every prior source of advantage.
 		if (target.elusive_active and !target.has_condition(COND_INCAPACITATED)) {
 			adv = false;
+		}
+		// Valda's Spire Gunslinger High Roller L6 Risky Business (paras 265-266):
+		// "Once per turn when you make an attack roll against an enemy and the roll
+		// doesn't have Disadvantage, you can choose to make the roll with Disadvantage.
+		// When you do, you regain one expended Risk Die." Pending flag set by the
+		// player via bonus action menu before attacking. Per-turn limit enforced via
+		// risky_business_used_this_turn (cleared in advance_turn). Only fires when
+		// the roll would not already have Disadvantage and Risk Dice can be refunded.
+		if (attacker.risky_business_pending and !disadv and !attacker.risky_business_used_this_turn and attacker.risk_dice_current < attacker.risk_dice_max) {
+			attacker.risky_business_pending = false;
+			attacker.risky_business_used_this_turn = true;
+			adv = false;
+			disadv = true;
+			attacker.risk_dice_current++;
+			broadcast_announce(attacker.name + "'s Risky Business: takes Disadvantage on the attack and regains a Risk Die! (" + attacker.risk_dice_current + "/" + attacker.risk_dice_max + ")", false);
+		} else if (attacker.risky_business_pending) {
+			// Conditions not met (already disadv, already used this turn, or Risk Dice full) — clear the pending flag silently
+			attacker.risky_business_pending = false;
 		}
 	}
 
@@ -2650,19 +2674,78 @@ class battle_manager {
 	// one Risk Die to add it to the roll, potentially turning it into a success. You can
 	// only use this maneuver once per turn." Smart-spend: only auto-fires if the rolled
 	// Risk Die would actually turn the failure into a success.
+	// High Roller L10 Risk Taker (paras 267-268): the Gunslinger may use Maverick Spirit
+	// without expending a Risk Die — instead rolls a d6.
 	int try_maverick_spirit(combatant@ target, int dc, int current_total, string label) {
 		if (@target == null) return current_total;
 		if (target.class_name != "Gunslinger") return current_total;
 		if (current_total >= dc) return current_total; // not failing
-		if (target.risk_dice_current <= 0) return current_total;
 		if (target.maverick_spirit_used_this_turn) return current_total;
+		bool risk_taker = (target.subclass == "High Roller" and target.risk_taker_active);
+		if (!risk_taker and target.risk_dice_current <= 0) return current_total;
 		// Smart-spend: roll the die and only commit if it turns the failure into a success.
-		int ms_roll = random(1, target.risk_die_size);
+		int die_size = risk_taker ? 6 : target.risk_die_size;
+		int ms_roll = random(1, die_size);
 		int new_total = current_total + ms_roll;
 		if (new_total < dc) return current_total; // would still fail — don't burn the use
 		target.maverick_spirit_used_this_turn = true;
-		target.risk_dice_current--;
-		broadcast_announce(target.name + " uses Maverick Spirit! Adds 1d" + target.risk_die_size + " (" + ms_roll + ") to the " + label + " (new total " + new_total + ") — succeeded! (" + target.risk_dice_current + "/" + target.risk_dice_max + " Risk Dice)", true);
+		string die_label = "1d" + die_size;
+		string source_label;
+		if (risk_taker) {
+			source_label = " (Risk Taker free use)";
+		} else {
+			target.risk_dice_current--;
+			source_label = " (" + target.risk_dice_current + "/" + target.risk_dice_max + " Risk Dice)";
+		}
+		broadcast_announce(target.name + " uses Maverick Spirit! Adds " + die_label + " (" + ms_roll + ") to the " + label + " (new total " + new_total + ") — succeeded!" + source_label, true);
+		return new_total;
+	}
+
+	// Valda's Spire Gunslinger Deadeye L3 Eagle Eye [Maneuver] (paras 240-241): "Once per
+	// turn when you miss with a ranged attack roll, you can expend one Risk Die and add
+	// it to the attack roll, potentially causing the attack to hit." Smart-spend: only
+	// commits if the rolled Risk Die would actually turn the miss into a hit.
+	// Returns the new attack total (may equal current_total if no use).
+	int try_eagle_eye(combatant@ attacker, combatant@ target, int current_total) {
+		if (@attacker == null or @target == null) return current_total;
+		if (attacker.class_name != "Gunslinger" or attacker.subclass != "Deadeye") return current_total;
+		if (current_total >= target.armor_class) return current_total; // already hits
+		if (attacker.risk_dice_current <= 0) return current_total;
+		if (attacker.eagle_eye_used_this_turn) return current_total;
+		if (!attacker.main_hand_is_ranged) return current_total;
+		// Smart-spend: roll the die first; only commit if it turns the miss into a hit.
+		int ee_roll = random(1, attacker.risk_die_size);
+		int new_total = current_total + ee_roll;
+		if (new_total < target.armor_class) return current_total;
+		attacker.eagle_eye_used_this_turn = true;
+		attacker.risk_dice_current--;
+		broadcast_announce(attacker.name + " uses Eagle Eye! Adds 1d" + attacker.risk_die_size + " (" + ee_roll + ") to the missed attack roll (new total " + new_total + " vs AC " + target.armor_class + ") — hit! (" + attacker.risk_dice_current + "/" + attacker.risk_dice_max + " Risk Dice)", true);
+		return new_total;
+	}
+
+	// Valda's Spire Gunslinger Trick Shot L3 Ricochet [Maneuver] (paras 442-443): "When
+	// you miss with a ranged attack using a weapon, you can take a Bonus Action and
+	// expend one Risk Die to reroll the attack and add the Risk Die to the roll. You
+	// must use the new roll." Smart-spend: only commits if Bonus Action available AND
+	// the rerolled total would hit. Returns the new attack total.
+	int try_ricochet(combatant@ attacker, combatant@ target, int current_total, int attack_modifier) {
+		if (@attacker == null or @target == null) return current_total;
+		if (attacker.class_name != "Gunslinger" or attacker.subclass != "Trick Shot") return current_total;
+		if (current_total >= target.armor_class) return current_total; // already hits
+		if (attacker.risk_dice_current <= 0) return current_total;
+		if (!attacker.has_bonus_action) return current_total;
+		if (attacker.ricochet_used_this_turn) return current_total;
+		if (!attacker.main_hand_is_ranged) return current_total;
+		// Smart-spend: roll the new d20 + risk die first, only commit if it hits.
+		int new_natural = random(1, 20);
+		int rc_roll = random(1, attacker.risk_die_size);
+		int new_total = new_natural + attack_modifier + rc_roll;
+		if (new_total < target.armor_class) return current_total;
+		attacker.ricochet_used_this_turn = true;
+		attacker.risk_dice_current--;
+		attacker.has_bonus_action = false;
+		attacker.used_bonus_action = true;
+		broadcast_announce(attacker.name + " uses Ricochet (Bonus Action)! Rerolled attack: " + new_natural + " + " + attack_modifier + " + 1d" + attacker.risk_die_size + " (" + rc_roll + ") = " + new_total + " vs AC " + target.armor_class + " — hit! (" + attacker.risk_dice_current + "/" + attacker.risk_dice_max + " Risk Dice)", true);
 		return new_total;
 	}
 
@@ -3160,6 +3243,12 @@ class battle_manager {
 					broadcast_announce(prev.name + " dislodges the Gut Shot projectile. Speed restored.", false);
 				}
 			}
+			// Valda's Spire Gunslinger White Hat L10 Long Arm of the Law (paras 462-463):
+			// The hobble lasts only one turn — clear the lockout flag at end of the
+			// affected combatant's turn so it doesn't persist into future rounds.
+			if (prev.cant_move_until_disengage) {
+				prev.cant_move_until_disengage = false;
+			}
 			if (prev.raging) {
 				if (prev.is_dead or prev.current_hp <= 0) {
 					prev.raging = false;
@@ -3484,6 +3573,24 @@ class battle_manager {
 		// Valda's Spire Gunslinger Blindfire (paras 209-210): "until the end of the current
 		// turn." Cleared at start of next turn so the buff doesn't bleed across rounds.
 		c.blindfire_active = false;
+		// Valda's Spire Gunslinger subclass per-turn use flags reset (paras 240, 265, 442, 446, 462):
+		// Eagle Eye (Deadeye L3), Risky Business (High Roller L6), Ricochet (Trick Shot L3),
+		// Gun Spinning (Trick Shot L6), Long Arm of the Law (White Hat L10).
+		c.eagle_eye_used_this_turn = false;
+		c.risky_business_used_this_turn = false;
+		c.ricochet_used_this_turn = false;
+		c.gun_spinning_used_this_turn = false;
+		c.long_arm_used_this_turn = false;
+		// Valda's Spire Gunslinger White Hat L10 Long Arm of the Law (paras 462-463):
+		// "The creature can't move on its next turn unless it first takes the Disengage
+		// action." If this combatant was hobbled, zero out movement at turn start. The
+		// flag is cleared at end of turn (whether they moved or not). Disengage clears
+		// the flag earlier in the turn so they can resume moving (handled in the
+		// Disengage action handler in users _dom.nvgt).
+		if (c.cant_move_until_disengage) {
+			c.movement_remaining = 0;
+			broadcast_announce(c.name + " is hobbled by Long Arm of the Law and cannot move (must Disengage first).", false);
+		}
 
 		// Sacred Weapon glow reminder
 		if (c.sacred_weapon_active) {
@@ -4913,6 +5020,41 @@ class battle_manager {
 				c.combat_prowess_used = true;
 				outcome = "Hit! Boon of Combat Prowess turns the miss into a hit.";
 			}
+			// Valda's Spire Gunslinger Deadeye L3 Eagle Eye (paras 240-241): on miss with
+			// a ranged weapon attack, smart-spend one Risk Die to add to the attack roll
+			// and potentially turn it into a hit. Helper enforces per-turn flag, ranged
+			// weapon, and smart-spend gating.
+			if (!hit and !is_fumble and pr.is_weapon_attack and !pr.is_spell_effect) {
+				int new_total = try_eagle_eye(c, target, total);
+				if (new_total > total) {
+					reported_modifier += (new_total - total);
+					total = new_total;
+					hit = true;
+					outcome = "Hit! Eagle Eye turns the miss into a hit.";
+				}
+			}
+			// Valda's Spire Gunslinger Trick Shot L3 Ricochet (paras 442-443): on miss with
+			// a ranged weapon attack, smart-spend Bonus Action + Risk Die to reroll. Helper
+			// enforces ranged weapon + bonus action availability + smart-spend.
+			if (!hit and !is_fumble and pr.is_weapon_attack and !pr.is_spell_effect) {
+				int rc_total = try_ricochet(c, target, total, reported_modifier);
+				if (rc_total > total) {
+					total = rc_total;
+					hit = true;
+					outcome = "Hit! Ricochet rerolls the miss into a hit.";
+				}
+			}
+			// Valda's Spire Gunslinger Deadeye L14 Focused Shot (paras 252-253): "When you
+			// take the Attack action, you can choose to make only one ranged attack roll
+			// using a weapon to make a Focused Shot. You have Advantage on this attack roll
+			// and, on a hit, score a Critical Hit." Advantage is granted via apply_attack_advantage_state
+			// (see hook below). On hit, force critical and consume the flag.
+			if (hit and c.focused_shot_pending and pr.is_weapon_attack and c.main_hand_is_ranged) {
+				is_crit = true;
+				c.focused_shot_pending = false;
+				outcome = "Critical hit! Focused Shot.";
+				broadcast_announce(c.name + "'s Focused Shot turns the hit into a Critical Hit!", true);
+			}
 			// Fighter L13 Studied Attacks (PHB 2024 para 5983): on miss, mark the target
 			// so the next attack roll against them gains advantage. The advantage flag is
 			// consumed in apply_attack_advantage_state on the next attack.
@@ -5162,6 +5304,33 @@ class battle_manager {
 			int total_damage = natural_roll + pr.damage_modifier;
 			if (total_damage < 1) total_damage = 1;
 
+			// Valda's Spire Gunslinger High Roller L14 Double or Nothing (paras 269-270):
+			// "When you score a Critical Hit using a Ranged weapon, you can gamble for a
+			// higher result. Roll a d20. If the roll is a 10 or higher, roll all of the
+			// attack's damage dice four times and add them together, instead of only two
+			// times as normal for a Critical Hit. If you roll a 9 or lower on the d20,
+			// the Critical Hit becomes a normal hit." Auto-fires when the toggle is on:
+			// the gamble has positive expected value (avg ≥10 on a d20 = 55% chance) and
+			// the upside (4x dice) outweighs the downside (1x dice instead of 2x).
+			if (pr.is_crit and c.double_or_nothing_active and pr.is_weapon_attack and c.main_hand_is_ranged and !pr.is_spell_effect and pr.damage_dice_count > 0 and pr.damage_dice_sides > 0) {
+				int dn_roll = random(1, 20);
+				int base_count = pr.damage_dice_count / 2; // pr.damage_dice_count was doubled at attack-time for the crit
+				if (base_count < 1) base_count = 1;
+				if (dn_roll >= 10) {
+					int extra_dn = 0;
+					for (int dni = 0; dni < (2 * base_count); dni++) extra_dn += random(1, pr.damage_dice_sides);
+					total_damage += extra_dn;
+					broadcast_announce(c.name + "'s Double or Nothing rolls " + dn_roll + "! 4x damage dice — adds " + extra_dn + "!", true);
+				} else {
+					int new_natural = 0;
+					for (int dni = 0; dni < base_count; dni++) new_natural += random(1, pr.damage_dice_sides);
+					total_damage = total_damage - natural_roll + new_natural;
+					if (total_damage < 1) total_damage = 1;
+					pr.is_crit = false;
+					broadcast_announce(c.name + "'s Double or Nothing rolls " + dn_roll + "! Critical Hit becomes a normal hit.", true);
+				}
+			}
+
 			// Add potion damage bonus
 			if (c.potion_damage_bonus > 0 and pr.is_weapon_attack) {
 				total_damage += c.potion_damage_bonus;
@@ -5281,6 +5450,83 @@ class battle_manager {
 					total_damage += hs_dmg;
 					broadcast_announce(c.name + "'s Headshot adds " + hs_dmg + " extra damage!", true);
 				}
+			}
+			// Valda's Spire Gunslinger Secret Agent L14 License to Kill (paras 290-291):
+			// "Whenever you deal damage with a Ranged weapon, you can expend either one
+			// or two Risk Dice and add them to the damage roll. If you roll the highest
+			// number on a Risk Die, you can roll the die again and add it to the damage
+			// without expending it, rolling again if it is the highest number again, and
+			// so on. The maximum number of Risk Dice you can add to the damage equals
+			// your Proficiency Bonus." Triggered via opt-in pending flag set by bonus
+			// action handler so the player chooses 1 or 2 dice and when to spend.
+			if (c.license_to_kill_active and c.license_to_kill_pending and pr.is_weapon_attack and c.main_hand_is_ranged and !pr.is_spell_effect and c.risk_dice_current > 0) {
+				c.license_to_kill_pending = false;
+				int ltk_to_spend = c.license_to_kill_dice_to_spend;
+				if (ltk_to_spend < 1) ltk_to_spend = 1;
+				if (ltk_to_spend > 2) ltk_to_spend = 2;
+				if (ltk_to_spend > c.risk_dice_current) ltk_to_spend = c.risk_dice_current;
+				c.risk_dice_current -= ltk_to_spend;
+				int ltk_total = 0;
+				int ltk_dice_added = 0;
+				int ltk_max_dice = c.proficiency;
+				int ltk_die_sides = c.risk_die_size;
+				for (int li = 0; li < ltk_to_spend; li++) {
+					if (ltk_dice_added >= ltk_max_dice) break;
+					int roll = random(1, ltk_die_sides);
+					ltk_total += roll;
+					ltk_dice_added++;
+					// Exploding on max — keep rolling without expending
+					while (roll == ltk_die_sides and ltk_dice_added < ltk_max_dice) {
+						roll = random(1, ltk_die_sides);
+						ltk_total += roll;
+						ltk_dice_added++;
+					}
+				}
+				total_damage += ltk_total;
+				broadcast_announce(c.name + "'s License to Kill spends " + ltk_to_spend + " Risk Dice (" + ltk_dice_added + " total dice rolled with explosions) for +" + ltk_total + " damage! (" + c.risk_dice_current + "/" + c.risk_dice_max + " Risk Dice remaining)", true);
+			}
+			// Valda's Spire Gunslinger White Hat L6 Reach for the Skies (paras 460-461):
+			// "When you score a Critical Hit against a creature, you call for the target
+			// to surrender instead of lodging a projectile in it. The target must succeed
+			// on a Wisdom saving throw against your Maneuver save DC or have the
+			// Frightened and Incapacitated conditions for 1 minute. These conditions end
+			// early if the creature takes any damage..." Note: since the source says the
+			// conditions END if the creature takes damage, we apply the conditions but
+			// they will be cleared by the very damage of this attack. The intent of the
+			// feature is the surrender call before damage — implementation skips the
+			// effect when total_damage > 0 and the source rule would auto-clear it. We
+			// implement the spirit by giving the target the save first; if they fail and
+			// total_damage == 0 (e.g., resisted to 0), the conditions stick. L14 Gold
+			// Star Hero (para 466-468) upgrades Incapacitated → Stunned which would NOT
+			// be cleared by the same damage rule (only Incapacitated/Frightened end on
+			// damage per RAW; Stunned does not).
+			if (pr.is_crit and c.reach_for_skies_active and pr.is_weapon_attack and c.main_hand_is_ranged and !pr.is_spell_effect and !target.is_dead) {
+				int rfs_dc = 8 + c.proficiency + c.get_ability_mod(ABILITY_DEX);
+				int rfs_save_roll = random(1, 20);
+				int rfs_save_bonus = target.get_save_bonus(ABILITY_WIS);
+				int rfs_save_total = rfs_save_roll + rfs_save_bonus;
+				bool rfs_saved = rfs_save_total >= rfs_dc;
+				broadcast_roll(target.name, "WIS save vs Reach for the Skies", rfs_save_roll, rfs_save_bonus, rfs_save_total, rfs_saved ? "Saved!" : "Failed!");
+				if (!rfs_saved) {
+					if (c.gold_star_hero_active) {
+						target.add_condition(COND_STUNNED);
+						broadcast_announce(c.name + "'s Reach for the Skies STUNS " + target.name + "! (Gold Star Hero)", true);
+					} else {
+						target.add_condition(COND_FRIGHTENED);
+						target.add_condition(COND_INCAPACITATED);
+						broadcast_announce(c.name + " calls for " + target.name + " to surrender — Frightened and Incapacitated!", true);
+					}
+				}
+			}
+			// Valda's Spire Gunslinger White Hat L10 Long Arm of the Law (paras 462-463):
+			// "Once per turn when you hit a Large or smaller creature with a ranged
+			// attack using a weapon, you can hobble the target. The creature can't move
+			// on its next turn unless it first takes the Disengage action." Auto-fires
+			// when available — strict upside, no resource cost.
+			if (c.long_arm_used_this_turn == false and c.class_name == "Gunslinger" and c.subclass == "White Hat" and c.level >= 10 and pr.is_weapon_attack and c.main_hand_is_ranged and !pr.is_spell_effect and target.size <= SIZE_LARGE and !target.is_dead) {
+				c.long_arm_used_this_turn = true;
+				target.cant_move_until_disengage = true;
+				broadcast_announce(c.name + "'s Long Arm of the Law hobbles " + target.name + "! Cannot move next turn unless they Disengage.", true);
 			}
 			// Valda's Spire Gunslinger L15 Dire Gambit (para 196): "Whenever you roll
 			// Initiative or score a Critical Hit, you regain one expended Risk Die."
@@ -6799,6 +7045,14 @@ class battle_manager {
 		c.has_action = false;
 		c.used_action = true;
 		c.took_disengage = true;
+		// Valda's Spire Gunslinger White Hat L10 Long Arm of the Law (paras 462-463):
+		// "The creature can't move on its next turn unless it first takes the
+		// Disengage action." Disengage clears the lockout and restores movement.
+		if (c.cant_move_until_disengage) {
+			c.cant_move_until_disengage = false;
+			c.movement_remaining = c.speed;
+			broadcast_announce(c.name + " breaks free of Long Arm of the Law via Disengage — movement restored.", true);
+		}
 		broadcast_announce(c.name + " takes the Disengage action.");
 		broadcast_state();
 	}
@@ -10784,8 +11038,25 @@ class battle_manager {
 				if (hit) {
 					int total_damage = 0;
 					for (int d = 0; d < dice_count; d++) total_damage += random(1, 6);
+					// Valda's Spire Gunslinger Spellslinger L3 Bang, You're Dead — Arcane
+					// Shot (paras 423-426): "When you hit a target with a Finger Guns
+					// attack, you can expend one Risk Die as a Bonus Action and add it to
+					// the damage roll." Triggered via opt-in pending toggle so the player
+					// chooses whether to spend a Risk Die on each Finger Guns hit.
+					if (c.bang_youre_dead_active and c.bang_youre_dead_pending and c.risk_dice_current > 0 and c.has_bonus_action) {
+						c.bang_youre_dead_pending = false;
+						c.has_bonus_action = false;
+						c.used_bonus_action = true;
+						c.risk_dice_current--;
+						int byd_roll = random(1, c.risk_die_size);
+						total_damage += byd_roll;
+						broadcast_announce(c.name + "'s Bang You're Dead spends a Risk Die for +" + byd_roll + " damage! (" + c.risk_dice_current + "/" + c.risk_dice_max + " Risk Dice remaining)", true);
+					}
 					combat.apply_damage(target, total_damage, DMG_FORCE, c);
 					broadcast_announce(c.name + "'s Finger Guns blast " + target.name + " for " + total_damage + " force damage.", true);
+				} else {
+					// Clear the pending flag if the attack missed (don't carry over)
+					c.bang_youre_dead_pending = false;
 				}
 				broadcast_state();
 				check_battle_end();

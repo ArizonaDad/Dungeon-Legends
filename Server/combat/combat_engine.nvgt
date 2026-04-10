@@ -416,16 +416,51 @@ class combatant {
 	bool orders_demand_used = false; // Order Domain Cleric Channel Divinity
 	bool wizardly_quill_active = false; // Order of Scribes Wizard
 	int awakened_spellbook_changes = 0; // Order of Scribes - replace damage type
-	// Gunslinger subclasses
-	bool deadeye_stance_active = false; // Deadeye - sharpshooter stance
-	int high_roller_dice = 0; // High Roller - Liar's Dice pool
-	bool high_roller_gamble = false; // pending bet result
-	bool secret_agent_license = false; // Secret Agent - license to kill bonus damage on first hit
-	uint secret_agent_target = 0;
-	bool trick_shot_ricochet_pending = false; // Trick Shot - bouncing bullet
-	int trick_shot_uses = 0;
-	bool white_hat_protection_active = false; // White Hat - protect ally from harm
-	uint white_hat_ally = 0;
+	// Gunslinger subclasses (Valda's Spire of Secrets paras 229-490)
+	// Deadeye (paras 236-253)
+	bool sharpshooters_stance_active = false; // L3 Sharpshooter's Stance: Fire While Prone + Quick Stand
+	bool eagle_eye_used_this_turn = false;    // L3 Eagle Eye [Maneuver]: 1/turn add Risk Die to missed ranged attack roll
+	bool concealed_position_active = false;   // L6 Concealed Position: Camouflage + Sniper's Nest
+	bool focused_shot_pending = false;        // L14 Focused Shot: next ranged attack has Advantage + auto-crit on hit (single shot only)
+	// High Roller (paras 254-271)
+	bool liars_dice_pending = false;          // L3 Liar's Dice [Maneuver]: hidden damage roll declared total (BA)
+	int liars_dice_declared = 0;              // declared damage total
+	int liars_dice_actual = 0;                // actual rolled damage
+	bool risky_business_used_this_turn = false; // L6 Risky Business: 1/turn make attack with Disadvantage to regain Risk Die
+	bool risky_business_pending = false;      // L6 Risky Business: pending toggle — next attack forces Disadvantage and refunds 1 Risk Die
+	bool risk_taker_active = false;           // L10 Risk Taker: Maverick Spirit/Skin of Your Teeth without expending (roll d6 instead)
+	bool double_or_nothing_active = false;    // L14 Double or Nothing: gamble crits for 4x damage dice
+	// Secret Agent (paras 272-291)
+	bool secret_agent_active = false;         // L3 Operative Training flag
+	bool parting_shot_pending = false;        // L3 Parting Shot [Maneuver]: pending BA ranged attack after Dash/Disengage/Dodge
+	bool fieldcraft_active = false;           // L6 Fieldcraft: Slick Talker (clamp Cha Deception/Persuasion ≤9 → 10) + Quick Change
+	bool exit_strategy_used = false;          // L10 Exit Strategy: 1/SR Reaction Invisible + 10ft move
+	bool license_to_kill_active = false;      // L14 License to Kill: 1-2 Risk Dice exploding into damage
+	bool license_to_kill_pending = false;     // L14 License to Kill: pending toggle — next damage roll spends Risk Dice
+	int license_to_kill_dice_to_spend = 1;    // L14 License to Kill: 1 or 2 Risk Dice declared by player
+	// Spellslinger (paras 292-435)
+	bool spellslinger_active = false;         // L3 Spellcasting active
+	bool bang_youre_dead_active = false;      // L3 Arcane Shot: Risk Die add to Finger Guns damage on hit
+	bool bang_youre_dead_pending = false;     // L3 Arcane Shot: pending toggle — next Finger Guns hit adds Risk Die to damage
+	bool spellshot_active = false;            // L6 Spellshot: replace one attack with cantrip
+	bool counter_mage_active = false;         // L10 Counter-Mage: Abjuration-Breaker + Antimagic Shot + Inured to Magic
+	bool inured_to_magic_used = false;        // Per-rest tracking? actually Reaction-based, no rest cap — uses reaction
+	bool magic_bullet_active = false;         // L14 Magic Bullet [Maneuver]
+	// Trick Shot (paras 436-452)
+	bool creative_trajectory_active = false;  // L3 Creative Trajectory: ranged attacks ignore Half/Three-Quarters Cover
+	bool ricochet_used_this_turn = false;     // L3 Ricochet [Maneuver]: BA + Risk Die reroll missed ranged attack 1/turn
+	bool fancy_gunplay_active = false;        // L6 Fancy Gunplay: Gun Spinning (Cha Performance/Dex Sleight of Hand +Risk Die 1/turn) + Speed Loader
+	bool gun_spinning_used_this_turn = false; // 1/turn flag for Gun Spinning
+	bool deft_deflection_active = false;      // L10 Deft Deflection [Maneuver]: Reaction + Risk Die grant ally Skin of Your Teeth
+	bool pinball_shot_used = false;           // L14 Pinball Shot: 1/SR
+	// White Hat (paras 453-468)
+	bool lay_down_law_protection = false;     // L3 Lay Down the Law: ally tagged for retaliation Reaction
+	uint lay_down_law_target_id = 0;          // tagged ally id
+	bool steely_eyed_aura_active = false;     // L3 Steely-Eyed Aura: 10/30 ft frightened save advantage
+	bool reach_for_skies_active = false;      // L6 Reach for the Skies: on crit, target WIS save vs Frighten+Incap
+	bool long_arm_used_this_turn = false;     // L10 Long Arm of the Law: 1/turn ranged hit hobbles target
+	bool cant_move_until_disengage = false;   // Target side: White Hat L10 Long Arm of the Law lockout — clears on Disengage or after target's next turn
+	bool gold_star_hero_active = false;       // L14 Gold Star Hero: Improved Aura + Iron-Clad Law + Stunned Surrender
 	// Spell tracking (Batch 19)
 	bool spirit_guardians_active = false;
 	int spirit_guardians_slot_level = 0;

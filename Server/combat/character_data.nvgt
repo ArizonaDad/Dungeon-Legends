@@ -244,16 +244,51 @@ void apply_class_defaults(character_sheet@ cs) {
         cs.hit_die = 8; cs.save_profs = {0,1,0,0,0,1}; // DEX, CHA
         cs.armor_type = "leather"; // Light armor
         if (cs.level >= 5) cs.extra_attacks = 1;
-        // Risk Dice pool and maneuvers
-        // Level 2: 2 d8 Risk Dice
-        // Level 10: 3 d10 Risk Dice
-        // Level 18: 4 d12 Risk Dice
-        // Spellslinger subclass gets half-caster slots
+        // Risk Dice progression: Valda's Spire paras 174 / Gunslinger Features table.
+        //   L2-5: 4d8, L6-9: 5d8, L10-13: 5d10, L14-17: 6d10, L18-20: 6d12.
+        // Spellslinger subclass spellcasting (Valda's Spire paras 296-422):
+        // INT-based half-caster from Wizard list with a UNIQUE spell slot table that
+        // caps at L4 spells (not L5 like a standard half-caster). Source para 304:
+        // "Intelligence is your spellcasting ability for your Wizard spells."
         if (cs.subclass == "Spellslinger") {
-            cs.is_caster = true; cs.spellcasting_ability = ABILITY_CHA;
-            apply_half_caster_slots(cs);
+            cs.is_caster = true;
+            cs.spellcasting_ability = ABILITY_INT;
+            apply_spellslinger_slots(cs);
         }
     }
+}
+
+// Spellslinger Spellcasting table (Valda's Spire of Secrets paras 306-422).
+// Columns: L1 / L2 / L3 / L4 / L5 spell slots. Source-quoted from the printed
+// table — note this is NOT a standard half-caster table; it lags by 1 level
+// at most slot transitions and caps at L4 spells until L19.
+void apply_spellslinger_slots(character_sheet@ cs) {
+    int[][] table = {
+        {0,0,0,0,0,0,0,0,0,0}, // L1 (no slots)
+        {0,0,0,0,0,0,0,0,0,0}, // L2 (no slots)
+        {0,2,0,0,0,0,0,0,0,0}, // L3
+        {0,3,0,0,0,0,0,0,0,0}, // L4
+        {0,3,0,0,0,0,0,0,0,0}, // L5
+        {0,3,0,0,0,0,0,0,0,0}, // L6
+        {0,4,2,0,0,0,0,0,0,0}, // L7
+        {0,4,2,0,0,0,0,0,0,0}, // L8
+        {0,4,2,0,0,0,0,0,0,0}, // L9
+        {0,4,3,0,0,0,0,0,0,0}, // L10
+        {0,4,3,0,0,0,0,0,0,0}, // L11
+        {0,4,3,0,0,0,0,0,0,0}, // L12
+        {0,4,3,2,0,0,0,0,0,0}, // L13
+        {0,4,3,2,0,0,0,0,0,0}, // L14
+        {0,4,3,2,0,0,0,0,0,0}, // L15
+        {0,4,3,3,0,0,0,0,0,0}, // L16
+        {0,4,3,3,0,0,0,0,0,0}, // L17
+        {0,4,3,3,0,0,0,0,0,0}, // L18
+        {0,4,3,3,1,0,0,0,0,0}, // L19
+        {0,4,3,3,1,0,0,0,0,0}, // L20
+    };
+    int idx = cs.level - 1;
+    if (idx < 0) idx = 0;
+    if (idx > 19) idx = 19;
+    cs.spell_slots_max = table[idx];
 }
 
 void apply_full_caster_slots(character_sheet@ cs) {
@@ -2254,29 +2289,192 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         }
     }
 
-    // Gunslinger subclasses (Valda's Spire of Secrets)
-    // All subclasses unlock at level 3. These mostly use Risk Dice (class resource), not separate pools.
+    // Gunslinger subclasses (Valda's Spire of Secrets paras 220-490).
+    // All subclasses unlock at level 3 and gain features at L3/6/10/14.
+    // Most features use Risk Dice (class resource), not separate pools. Audit doctrine:
+    // every flag carries a source paragraph reference; flags initialize false to allow
+    // late level-up gains, then are unlocked by level checks below.
     if (cs.class_name == "Gunslinger" and cs.level >= 3) {
+        // === Deadeye (paras 236-253): Shoot with Bullseye Precision ===
         if (cs.subclass == "Deadeye") {
-            // L3: Eagle Eye (turn miss into hit using Risk Die) + Sharpshooter's Stance (prone benefits)
-            c.deadeye_stance_active = false;
+            // L3 Eagle Eye [Maneuver] (paras 240-241): "Once per turn when you miss with a
+            // ranged attack roll, you can expend one Risk Die and add it to the attack
+            // roll, potentially causing the attack to hit." Per-turn flag handled at use.
+            // L3 Sharpshooter's Stance (paras 242-245): Fire While Prone (no Disadvantage
+            // on ranged attack rolls from Prone) + Quick Stand (5 ft to stand from Prone).
+            // Flag is always-on at L3+; the disadvantage source for attacker-prone is not
+            // currently penalized in the codebase, so Fire While Prone is a no-op until
+            // attacker-prone disadvantage is implemented; Quick Stand depends on stand-up
+            // movement cost being implemented.
+            c.sharpshooters_stance_active = true;
+            // L6 Concealed Position (paras 246-249): Camouflage (Hide while Prone without
+            // obscurement/cover) + Sniper's Nest (failed hidden ranged attack doesn't
+            // reveal location). Always-on flag.
+            if (cs.level >= 6) c.concealed_position_active = true;
+            // L10 Reposition (paras 250-251): Reaction when missed by an attack — end
+            // Prone + move up to half Speed. Deferred — depends on opt-in defensive
+            // reaction prompt extension (same blocker as Skin of Your Teeth).
+            // L14 Focused Shot (paras 252-253): Replace Attack action with one ranged
+            // attack with Advantage and auto-Crit on hit. Bonus-action handler sets
+            // focused_shot_pending; consumed by next ranged weapon attack.
         }
+        // === High Roller (paras 254-271): Gamble with Life and Death ===
         if (cs.subclass == "High Roller") {
-            // L3: Poker Face + Liar's Dice (hidden damage roll, bluff mechanic)
-            c.high_roller_dice = 0; // Uses Risk Dice, not a separate pool
+            // L3 Poker Face (paras 258-259): grants proficiency with Gaming Sets and one
+            // of Deception/Insight/Perception. Tool prof is granted at character creation
+            // — currently auto-add Deception as a placeholder until level-up prompt exists.
+            bool has_gaming_set = false;
+            for (uint si = 0; si < c.tool_proficiencies.length(); si++) if (c.tool_proficiencies[si] == "Gaming Set") { has_gaming_set = true; break; }
+            if (!has_gaming_set) c.tool_proficiencies.insert_last("Gaming Set");
+            bool has_decep = false; bool has_ins = false; bool has_perc = false;
+            for (uint si = 0; si < c.skill_proficiencies.length(); si++) {
+                if (c.skill_proficiencies[si] == "Deception") has_decep = true;
+                else if (c.skill_proficiencies[si] == "Insight") has_ins = true;
+                else if (c.skill_proficiencies[si] == "Perception") has_perc = true;
+            }
+            if (!has_decep and !has_ins and !has_perc) c.skill_proficiencies.insert_last("Deception");
+            // L3 Liar's Dice [Maneuver] (paras 260-264): when you make a damage roll with
+            // a Ranged weapon, expend Risk Die as Bonus Action and declare a hidden roll.
+            // Bluff mechanic — fully prompted bluff vs GM is deferred. Stub flag tracks
+            // pending state for the bonus action handler.
+            // L6 Risky Business (paras 265-266): "Once per turn when you make an attack
+            // roll against an enemy and the roll doesn't have Disadvantage, you can
+            // choose to make the roll with Disadvantage. When you do, you regain one
+            // expended Risk Die." Per-turn flag handled at use site. Currently the system
+            // doesn't prompt before each attack to opt into Disadvantage — wired as a
+            // bonus-action toggle that affects the next attack.
+            // L10 Risk Taker (paras 267-268): "You can use your Maverick Spirit and Skin
+            // of Your Teeth maneuvers without expending a Risk Die. When you do so, roll
+            // a d6 instead of a Risk Die." Read by try_maverick_spirit helper.
+            if (cs.level >= 10) c.risk_taker_active = true;
+            // L14 Double or Nothing (paras 269-270): "When you score a Critical Hit using
+            // a Ranged weapon, you can gamble for a higher result. Roll a d20. If the roll
+            // is a 10 or higher, roll all of the attack's damage dice four times and add
+            // them together, instead of only two times as normal for a Critical Hit. If
+            // you roll a 9 or lower on the d20, the Critical Hit becomes a normal hit."
+            // Wired in finalize_roll_result crit damage path. Player toggles via BA.
+            if (cs.level >= 14) c.double_or_nothing_active = true;
         }
+        // === Secret Agent (paras 272-291): Engage in Espionage and Assassination ===
         if (cs.subclass == "Secret Agent") {
-            // L3: Operative Training + Parting Shot (bonus action ranged attack after Dash/Disengage/Dodge)
-            // License to Kill is L14, NOT L3
-            c.secret_agent_license = false;
+            // L3 Operative Training (paras 275-279): Concealed Shot cantrip (INT/WIS/CHA
+            // spellcasting), Disguise Kit + Thieves' Tools proficiencies, 2 of
+            // Deception/Investigation/Persuasion/Sleight of Hand/Stealth.
+            c.secret_agent_active = true;
+            bool has_concealed_shot = false;
+            for (uint si = 0; si < c.prepared_spells.length(); si++) if (c.prepared_spells[si] == "concealed_shot") { has_concealed_shot = true; break; }
+            if (!has_concealed_shot) c.prepared_spells.insert_last("concealed_shot");
+            bool has_disguise_kit = false; bool has_thieves_tools = false;
+            for (uint si = 0; si < c.tool_proficiencies.length(); si++) {
+                if (c.tool_proficiencies[si] == "Disguise Kit") has_disguise_kit = true;
+                else if (c.tool_proficiencies[si] == "Thieves' Tools") has_thieves_tools = true;
+            }
+            if (!has_disguise_kit) c.tool_proficiencies.insert_last("Disguise Kit");
+            if (!has_thieves_tools) c.tool_proficiencies.insert_last("Thieves' Tools");
+            // Auto-add Deception + Stealth as placeholder until level-up skill prompt exists.
+            bool has_dec_sa = false; bool has_stl_sa = false;
+            for (uint si = 0; si < c.skill_proficiencies.length(); si++) {
+                if (c.skill_proficiencies[si] == "Deception") has_dec_sa = true;
+                else if (c.skill_proficiencies[si] == "Stealth") has_stl_sa = true;
+            }
+            if (!has_dec_sa) c.skill_proficiencies.insert_last("Deception");
+            if (!has_stl_sa) c.skill_proficiencies.insert_last("Stealth");
+            // L3 Parting Shot [Maneuver] (paras 281-282): when you take Dash/Disengage/
+            // Dodge action, expend Risk Die as BA to make a ranged weapon attack. Add
+            // Risk Die to damage on hit. Wired via parting_shot_pending flag set on those
+            // actions, consumed by BA handler.
+            // L6 Fieldcraft (paras 283-286): Quick Change (BA Costume) + Slick Talker
+            // (treat Cha Deception/Persuasion ≤9 → 10). Wired in finalize_roll_result.
+            if (cs.level >= 6) c.fieldcraft_active = true;
+            // L10 Exit Strategy (paras 287-289): Reaction on damage taken — Invisible until
+            // start of next turn + 10 ft move. 1/SR or Risk Die. Deferred — needs opt-in
+            // defensive reaction prompt extension.
+            // L14 License to Kill (paras 290-291): On ranged damage, expend 1-2 Risk Dice
+            // exploding on max roll, capped at PB total dice. Wired in damage path via BA
+            // toggle (license_to_kill_active set when player commits to expending dice).
+            if (cs.level >= 14) c.license_to_kill_active = true;
         }
+        // === Spellslinger (paras 292-435): Complement Your Gunslinging with Arcana ===
+        if (cs.subclass == "Spellslinger") {
+            // L3 Spellcasting (paras 296-305): INT-based half-caster from Wizard list.
+            // Spell slot table is the Spellslinger-specific table (set in apply_gunslinger_spellslinger_slots
+            // below, called from the main Gunslinger init block). 2 cantrips known at L3,
+            // 3 at L10. Prepared L1+ spells start at 3, scale by table to 13 at L20. Caps at L4 spells.
+            c.spellslinger_active = true;
+            // L3 Bang, You're Dead! (paras 423-426): Finger Guns cantrip + Arcane Shot
+            // (when you hit with Finger Guns, expend Risk Die as BA, add to damage roll).
+            bool has_finger_guns = false;
+            for (uint si = 0; si < c.prepared_spells.length(); si++) if (c.prepared_spells[si] == "finger_guns") { has_finger_guns = true; break; }
+            if (!has_finger_guns) c.prepared_spells.insert_last("finger_guns");
+            c.bang_youre_dead_active = true;
+            // L6 Spellshot (para 427-428): "When you take the Attack action on your turn,
+            // you can replace one of the attacks with a casting of one of your Wizard
+            // cantrips that has a casting time of an action." Flag is set; the player
+            // resolves this by casting a cantrip during their Attack action turn.
+            if (cs.level >= 6) c.spellshot_active = true;
+            // L10 Counter-Mage (paras 429-433): Abjuration-Breaker (suppress target's
+            // protective magic during ranged attacks; no Shield reaction allowed) +
+            // Antimagic Shot (on Crit + Gut Shot, prevent target spellcasting + Magic
+            // action) + Inured to Magic (Reaction on failed save vs spell, +1d6).
+            if (cs.level >= 10) c.counter_mage_active = true;
+            // L14 Magic Bullet [Maneuver] (paras 434-435): when you make a spell attack
+            // roll, expend Risk Die as BA to substitute spell attack with ranged weapon
+            // attack. Add Risk Die to attack roll. On hit, deals weapon damage + spell
+            // attack effects. Deferred — depends on per-spell-attack BA prompt infra.
+            if (cs.level >= 14) c.magic_bullet_active = true;
+        }
+        // === Trick Shot (paras 436-452): Ricochet Bullets from Every Angle ===
         if (cs.subclass == "Trick Shot") {
-            // L3: Creative Trajectory (ignore cover) + Ricochet (reroll miss using Risk Die)
-            c.trick_shot_uses = 0; // uses Risk Dice, not a separate pool
+            // L3 Creative Trajectory (paras 440-441): "Your ranged attacks with weapons
+            // ignore Half Cover and Three-Quarters Cover." Always-on flag — cover system
+            // is not yet implemented in the codebase, so the flag is set for future use.
+            c.creative_trajectory_active = true;
+            // L3 Ricochet [Maneuver] (paras 442-443): "When you miss with a ranged attack
+            // using a weapon, you can take a Bonus Action and expend one Risk Die to
+            // reroll the attack and add the Risk Die to the roll. You must use the new
+            // roll." Per-turn implicit (Bonus Action restriction). Wired via try_ricochet
+            // helper after a missed ranged attack.
+            // L6 Fancy Gunplay (paras 444-447): Gun Spinning (Cha Performance / Dex
+            // Sleight of Hand checks with Ranged weapon, 1/turn add Risk Die roll without
+            // expending) + Speed Loader (reload Reload weapons without action/BA).
+            if (cs.level >= 6) c.fancy_gunplay_active = true;
+            // L10 Deft Deflection [Maneuver] (paras 448-449): "When an ally within 30
+            // feet of you is hit by an attack, you can take a Reaction and expend one
+            // Risk Die to grant that ally the benefit of the Skin of Your Teeth maneuver
+            // against that attack. You must be holding a Ranged weapon to use this
+            // maneuver." Deferred — depends on Skin of Your Teeth + opt-in reaction infra.
+            if (cs.level >= 10) c.deft_deflection_active = true;
+            // L14 Pinball Shot (paras 450-452): "Once on each of your turns when you hit
+            // a creature with a ranged attack using a weapon, you can deflect the
+            // projectile at additional targets." Up to 5 attacks total. 1/SR or 2 Risk
+            // Dice. Wired in damage path after a successful ranged hit via BA toggle.
+            if (cs.level >= 14) c.pinball_shot_used = false;
         }
+        // === White Hat (paras 453-468): Protect Your Allies and Uphold the Law ===
         if (cs.subclass == "White Hat") {
-            // L3: Lay Down the Law (temp HP + reaction attack) + Steely-Eyed Aura (frightened save advantage 10ft)
-            c.white_hat_protection_active = false;
+            // L3 Lay Down the Law [Maneuver] (paras 456-457): existing implementation
+            // (preserved from prior batch) — BA + Risk Die, ally within 60 ft gets temp
+            // HP + retaliation reaction tag.
+            // L3 Steely-Eyed Aura (paras 458-459): "An aura of stoic confidence radiates
+            // from you in a 10-foot Emanation. You and allies within the Emanation have
+            // Advantage on saving throws made to avoid or end the Frightened condition.
+            // The aura is inactive while you have the Incapacitated condition." Always-on
+            // flag, read at WIS-vs-Frightened save sites.
+            c.steely_eyed_aura_active = true;
+            // L6 Reach for the Skies (paras 460-461): "When you score a Critical Hit
+            // against a creature, you call for the target to surrender instead of lodging
+            // a projectile in it. The target must succeed on a Wisdom saving throw
+            // against your Maneuver save DC or have the Frightened and Incapacitated
+            // conditions for 1 minute." Wired in crit-resolve path.
+            if (cs.level >= 6) c.reach_for_skies_active = true;
+            // L10 Long Arm of the Law (paras 462-463): "Once per turn when you hit a
+            // Large or smaller creature with a ranged attack using a weapon, you can
+            // hobble the target. The creature can't move on its next turn unless it first
+            // takes the Disengage action." Per-turn flag handled at use.
+            // L14 Gold Star Hero (paras 464-468): Improved Aura (Steely-Eyed Aura range
+            // 10 → 30 ft) + Iron-Clad Law (Lay Down the Law adds B/P/S resistance) +
+            // Stunned Surrender (Reach for the Skies failure → Stunned not Incapacitated).
+            if (cs.level >= 14) c.gold_star_hero_active = true;
         }
     }
 

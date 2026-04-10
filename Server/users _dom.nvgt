@@ -4362,6 +4362,59 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.room.bm.broadcast_announce(c.name + " bites the bullet! Rolls 1d" + c.risk_die_size + " (" + btb_roll + ") + level " + c.level + " = " + btb_thp + " temporary hit points. (" + c.risk_dice_current + "/" + c.risk_dice_max + " Risk Dice)", false);
 		}
 
+		else if (feature == "focused_shot") {
+			// Valda's Spire Gunslinger Deadeye L14 Focused Shot (paras 252-253):
+			// "When you take the Attack action, you can choose to make only one ranged
+			//  attack roll using a weapon to make a Focused Shot. You have Advantage on
+			//  this attack roll and, on a hit, score a Critical Hit." Toggle the pending
+			//  flag — the next ranged attack will get Advantage and auto-crit on hit.
+			if (c.class_name != "Gunslinger" or c.subclass != "Deadeye" or c.level < 14) { u.send({{"type", message_types::announce}, {"text", "Only L14+ Deadeye Gunslingers can Focused Shot."}, {"interrupt", true}}); return; }
+			if (!c.main_hand_is_ranged) { u.send({{"type", message_types::announce}, {"text", "Focused Shot requires a ranged weapon."}, {"interrupt", true}}); return; }
+			c.focused_shot_pending = true;
+			u.room.bm.broadcast_announce(c.name + " takes aim for a Focused Shot — next ranged attack gains Advantage and is a Critical Hit on a hit!", true);
+		}
+
+		else if (feature == "risky_business") {
+			// Valda's Spire Gunslinger High Roller L6 Risky Business (paras 265-266):
+			// "Once per turn when you make an attack roll against an enemy and the roll
+			//  doesn't have Disadvantage, you can choose to make the roll with Disadvantage.
+			//  When you do, you regain one expended Risk Die." Toggle the pending flag —
+			//  the next attack will be made with Disadvantage and refund 1 Risk Die.
+			if (c.class_name != "Gunslinger" or c.subclass != "High Roller" or c.level < 6) { u.send({{"type", message_types::announce}, {"text", "Only L6+ High Roller Gunslingers can Risky Business."}, {"interrupt", true}}); return; }
+			if (c.risky_business_used_this_turn) { u.send({{"type", message_types::announce}, {"text", "Risky Business already used this turn."}, {"interrupt", true}}); return; }
+			if (c.risk_dice_current >= c.risk_dice_max) { u.send({{"type", message_types::announce}, {"text", "Risk Dice already at maximum — no refund possible."}, {"interrupt", true}}); return; }
+			c.risky_business_pending = true;
+			u.room.bm.broadcast_announce(c.name + " takes a Risky Business shot — next attack will have Disadvantage and refund a Risk Die!", false);
+		}
+
+		else if (feature == "license_to_kill_one" or feature == "license_to_kill_two") {
+			// Valda's Spire Gunslinger Secret Agent L14 License to Kill (paras 290-291):
+			// "Whenever you deal damage with a Ranged weapon, you can expend either one
+			//  or two Risk Dice and add them to the damage roll." Toggle the pending flag
+			//  with the chosen die count — the next ranged weapon damage roll will spend
+			//  Risk Dice with explosions on max.
+			if (c.class_name != "Gunslinger" or c.subclass != "Secret Agent" or c.level < 14) { u.send({{"type", message_types::announce}, {"text", "Only L14+ Secret Agent Gunslingers have a License to Kill."}, {"interrupt", true}}); return; }
+			if (c.risk_dice_current <= 0) { u.send({{"type", message_types::announce}, {"text", "No Risk Dice available."}, {"interrupt", true}}); return; }
+			int ltk_dice = (feature == "license_to_kill_two") ? 2 : 1;
+			if (ltk_dice > c.risk_dice_current) ltk_dice = c.risk_dice_current;
+			c.license_to_kill_pending = true;
+			c.license_to_kill_dice_to_spend = ltk_dice;
+			u.room.bm.broadcast_announce(c.name + " calls in their License to Kill — next ranged damage roll will spend " + ltk_dice + " Risk Die" + (ltk_dice == 1 ? "" : "s") + " (with explosions).", true);
+		}
+
+		else if (feature == "bang_youre_dead") {
+			// Valda's Spire Gunslinger Spellslinger L3 Bang, You're Dead — Arcane Shot
+			// (paras 423-426): "When you hit a target with a Finger Guns attack, you can
+			//  expend one Risk Die as a Bonus Action and add it to the damage roll."
+			//  Toggle the pending flag — the next Finger Guns hit will spend a Risk Die
+			//  and add it to damage. Bonus action is consumed at hit time, not now.
+			if (c.class_name != "Gunslinger" or c.subclass != "Spellslinger" or c.level < 3) { u.send({{"type", message_types::announce}, {"text", "Only Spellslinger Gunslingers can Bang You're Dead."}, {"interrupt", true}}); return; }
+			if (c.risk_dice_current <= 0) { u.send({{"type", message_types::announce}, {"text", "No Risk Dice available."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			c.bang_youre_dead_pending = true;
+			u.room.bm.broadcast_announce(c.name + " readies a Bang You're Dead arcane shot — next Finger Guns hit will spend a Risk Die for bonus damage!", false);
+		}
+
 		else if (feature == "open_hand_technique") {
 			// Warrior of the Open Hand: expend focus points on a Flurry hit to push/prone/no-reaction
 			if (c.class_name != "Monk" or c.subclass != "Warrior of the Open Hand") { u.send({{"type", message_types::announce}, {"text", "Only Open Hand monks can use this technique."}, {"interrupt", true}}); return; }
@@ -4558,8 +4611,8 @@ void handle_user_message(user@ u, json_object@ msg)
 			c.risk_dice_current--;
 			int temp = random(1, c.risk_die_size);
 			if (ally.temp_hp < temp) ally.temp_hp = temp;
-			c.white_hat_protection_active = true;
-			c.white_hat_ally = ally.id;
+			c.lay_down_law_protection = true;
+			c.lay_down_law_target_id = ally.id;
 			u.room.bm.broadcast_announce(c.name + " Lays Down the Law — " + ally.name + " gains " + temp + " temp HP; retaliation ready!", true);
 		}
 		else if (feature == "unsettling_words") {
