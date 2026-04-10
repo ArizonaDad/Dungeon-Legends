@@ -1985,6 +1985,19 @@ class battle_manager {
 				}
 			}
 		}
+		// Xanathar's Celestial Warlock L6 Radiant Soul (para 2742): "when you cast a
+		// spell that deals radiant or fire damage, you can add your Charisma modifier
+		// to one radiant or fire damage roll of that spell against one of its targets."
+		if (caster.subclass == "Celestial Patron" and caster.level >= 6 and !caster.radiant_soul_used_this_turn) {
+			if (pr.damage_type == DMG_FIRE or pr.damage_type == DMG_RADIANT) {
+				int rs_cha = caster.get_ability_mod(ABILITY_CHA);
+				if (rs_cha > 0) {
+					base_damage += rs_cha;
+					caster.radiant_soul_used_this_turn = true;
+					broadcast_announce(caster.name + "'s Radiant Soul adds +" + rs_cha + " to the spell damage.", false);
+				}
+			}
+		}
 		string dmg_type_name = "damage";
 		if (pr.damage_type >= 0 and pr.damage_type < int(DAMAGE_TYPE_NAMES.length())) {
 			dmg_type_name = DAMAGE_TYPE_NAMES[pr.damage_type] + " damage";
@@ -2306,6 +2319,10 @@ class battle_manager {
 			}
 		}
 		// Sacred Weapon: add CHA mod to attack rolls (handled via attack bonus modification)
+
+		// Xanathar's Scout L13 Ambush Master (para 2399): "attack rolls against that
+		// target have advantage until the start of your next turn."
+		if (target.ambush_master_marked_by != 0) adv = true;
 
 		// PHB 2024 Rogue L18 Elusive (para 6576-6577): "No attack roll can have
 		// Advantage against you unless you have the Incapacitated condition." Strip
@@ -3921,6 +3938,13 @@ class battle_manager {
 			c.assassinate_available = false;
 		}
 
+		// Xanathar's Scout L13 Ambush Master (para 2399): advantage vs marked target
+		// ends "at the start of your next turn" — clear marks set by this Scout.
+		if (c.class_name == "Rogue" and c.subclass == "Scout" and c.level >= 13) {
+			for (uint ami = 0; ami < combat.combatants.length(); ami++) {
+				if (combat.combatants[ami].ambush_master_marked_by == c.id) combat.combatants[ami].ambush_master_marked_by = 0;
+			}
+		}
 		// Reset first hit tracking for subclass on-hit effects
 		c.is_first_hit_this_turn = true;
 		// PHB 2024 Rogue L1 Sneak Attack (para 6537): "Once per turn" — reset.
@@ -5372,6 +5396,15 @@ class battle_manager {
 		// Samurai: Fighting Spirit (advantage handled in advantage check; temp HP gained on activation)
 		// Handled via bonus action
 
+		// Xanathar's Scout L13 Ambush Master (para 2399): "the first creature you hit
+		// during the first round of a combat becomes easier for you and others to strike;
+		// attack rolls against that target have advantage until the start of your next turn."
+		if (attacker.class_name == "Rogue" and attacker.subclass == "Scout" and attacker.level >= 13
+			and combat.round_number == 1 and target.ambush_master_marked_by == 0) {
+			target.ambush_master_marked_by = attacker.id;
+			broadcast_announce(attacker.name + "'s Ambush Master marks " + target.name + "! All attacks have advantage against them.", false);
+		}
+
 		// Mark first hit used
 		if (bonus > 0 or is_weapon_attack) {
 			attacker.is_first_hit_this_turn = false;
@@ -6074,6 +6107,19 @@ class battle_manager {
 
 			int total_damage = natural_roll + pr.damage_modifier;
 			if (total_damage < 1) total_damage = 1;
+
+			// Xanathar's Celestial Warlock L6 Radiant Soul (para 2742): +CHA to
+			// one fire/radiant spell damage roll per turn.
+			if (pr.is_spell_effect and c.subclass == "Celestial Patron" and c.level >= 6 and !c.radiant_soul_used_this_turn) {
+				if (pr.damage_type == DMG_FIRE or pr.damage_type == DMG_RADIANT) {
+					int rs_cha = c.get_ability_mod(ABILITY_CHA);
+					if (rs_cha > 0) {
+						total_damage += rs_cha;
+						c.radiant_soul_used_this_turn = true;
+						broadcast_announce(c.name + "'s Radiant Soul adds +" + rs_cha + " to the spell damage.", false);
+					}
+				}
+			}
 
 			// Valda's Spire Gunslinger High Roller L14 Double or Nothing (paras 269-270):
 			// "When you score a Critical Hit using a Ranged weapon, you can gamble for a
@@ -7946,6 +7992,14 @@ class battle_manager {
 			c.has_action = false;
 			c.used_action = true;
 			c.attacks_remaining_this_turn = c.extra_attacks; // e.g. Fighter lv5 = 1 extra
+			// Xanathar's Gloom Stalker L3 Dread Ambusher (para 2154): "If you take
+			// the Attack action on that turn, you can make one additional weapon attack
+			// as part of that action." First round only, once per combat.
+			if (c.class_name == "Ranger" and c.subclass == "Gloom Stalker" and c.level >= 3
+				and @combat != null and combat.round_number == 1 and !c.dread_ambusher_extra_attack_used) {
+				c.dread_ambusher_extra_attack_used = true;
+				c.attacks_remaining_this_turn++;
+			}
 		}
 
 		int atk_bonus = get_attack_bonus_for_roll(c, false);

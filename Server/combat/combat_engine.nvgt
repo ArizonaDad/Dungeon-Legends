@@ -936,8 +936,11 @@ class combatant {
 	int arcane_ward_max = 0;
 	bool cutting_words_available = true;
 	int healing_light_dice = 0;
+	bool radiant_soul_used_this_turn = false; // Xanathar's Celestial Warlock L6 (para 2742)
 	bool entropic_ward_active = false;
 	bool dread_ambusher_used = false;
+	bool dread_ambusher_extra_attack_used = false; // Xanathar's Gloom Stalker L3 (para 2154)
+	uint ambush_master_marked_by = 0; // Xanathar's Scout L13 (para 2399): all attacks have advantage vs this target
 	int elemental_attunement_points = 0;
 	bool restore_balance_available = true;
 	int dark_luck_used = 0;
@@ -1397,6 +1400,8 @@ class battle {
 		c.hunter_colossus_used = false;
 		c.is_first_hit_this_turn = true;
 		c.dread_ambusher_used = false;
+		c.dread_ambusher_extra_attack_used = false;
+		c.radiant_soul_used_this_turn = false;
 		c.crusher_used_this_turn = false;
 		c.slasher_used_this_turn = false;
 		c.piercer_reroll_used_this_turn = false;
