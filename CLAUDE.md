@@ -482,6 +482,11 @@ Per-class audit of all 13 base class features against `basic_rules_full.txt` (Ba
 - Monster Slayer Slayer's Prey (+1d6 first weapon hit per turn on marked target)
 - Oath of Redemption Rebuke the Violent (CD reaction: radiant damage equal to damage dealt on WIS fail), Protective Spirit (end-of-turn heal 1d6+half level if below half HP)
 - Oath of the Hearth Burning Weapon (+CHA fire damage while active)
+- Storm Herald Storm Soul (passive resistance: desert=fire, sea=lightning, tundra=cold)
+- Celestial Warlock Radiant Soul (radiant resistance at L6)
+- Scout Survivalist (Nature+Survival proficiency+expertise), Superior Mobility (+10ft speed at L9)
+- Swashbuckler Rakish Audacity (+CHA initiative, solo-engagement SA), Master Duelist (L17 miss reroll with advantage 1/SR)
+- Inquisitive Eye for Weakness (+3d6 SA at L17 vs studied target); Insightful Fighting integrated as SA qualification path (fixed double-dip bug)
 - Gunslinger White Hat Lay Down the Law (Risk Die temp HP + retaliation reaction)
 
 ### Feats with Combat Logic

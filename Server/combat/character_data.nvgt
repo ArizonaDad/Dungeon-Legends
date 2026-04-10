@@ -1565,11 +1565,37 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
     if (cs.class_name == "Barbarian" and cs.subclass == "Storm Herald" and cs.level >= 3) {
         c.storm_aura_active = false;
         c.storm_aura_damage_type = DMG_FIRE; // default desert (player can change via Shift+P)
+        // Xanathar's Storm Herald L6 Storm Soul (paras 423-427): passive resistance
+        // "desert: fire resistance, sea: lightning resistance + swim, tundra: cold resistance"
+        if (cs.level >= 6) {
+            if (c.storm_aura_damage_type == DMG_FIRE) c.fire_resistance = true;
+            else if (c.storm_aura_damage_type == DMG_LIGHTNING) c.lightning_resistance = true;
+            else if (c.storm_aura_damage_type == DMG_COLD) c.cold_resistance = true;
+        }
     }
 
     // Phantom Rogue: Wails from the Grave (once per short rest)
     if (cs.class_name == "Rogue" and cs.subclass == "Phantom" and cs.level >= 9) {
         c.wails_from_grave_uses = proficiency_bonus(cs.level) / 2;
+    }
+
+    // Xanathar's Scout Rogue (paras 2391-2401)
+    if (cs.class_name == "Rogue" and cs.subclass == "Scout") {
+        // L3 Survivalist (para 2394-2395): "proficiency and expertise in Nature and Survival"
+        if (cs.level >= 3) {
+            if (c.skill_proficiencies.find("Nature") < 0) c.skill_proficiencies.insert_last("Nature");
+            if (c.skill_proficiencies.find("Survival") < 0) c.skill_proficiencies.insert_last("Survival");
+            if (c.skill_expertise.find("Nature") < 0) c.skill_expertise.insert_last("Nature");
+            if (c.skill_expertise.find("Survival") < 0) c.skill_expertise.insert_last("Survival");
+        }
+        // L9 Superior Mobility (para 2396-2397): "+10 feet to your walking speed"
+        if (cs.level >= 9) c.speed += 10;
+    }
+
+    // Xanathar's Swashbuckler Rogue (paras 2418-2430)
+    if (cs.class_name == "Rogue" and cs.subclass == "Swashbuckler") {
+        // L17 Master Duelist (para 2429-2430): "reroll a missed attack with advantage, 1/SR"
+        if (cs.level >= 17) c.master_duelist_active = true;
     }
 
     // College of Creation Bard: Mote of Potential
@@ -2980,6 +3006,9 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
     if (cs.class_name == "Warlock") {
         if (cs.subclass == "Celestial Patron") {
             c.healing_light_dice = 1 + cs.level;
+            // Xanathar's Celestial L6 Radiant Soul (paras 2736-2739):
+            // "you gain resistance to radiant damage"
+            if (cs.level >= 6) c.radiant_resistance = true;
         }
         // PHB 2024 Warlock Eldritch Invocations: known count scales by level per the
         // Warlock Features table (paras 7607-7762). L1=1, L2-4=3, L5-6=5, L7-8=6,

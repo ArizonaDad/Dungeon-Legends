@@ -3393,6 +3393,11 @@ class battle_manager {
 		if (c.class_name == "Ranger" and c.subclass == "Gloom Stalker" and c.level >= 3) {
 			mod += c.get_ability_mod(ABILITY_WIS);
 		}
+		// Xanathar's Swashbuckler L3 Rakish Audacity (para 2421-2423):
+		// "you add your Charisma modifier to your initiative rolls"
+		if (c.class_name == "Rogue" and c.subclass == "Swashbuckler" and c.level >= 3) {
+			mod += c.get_ability_mod(ABILITY_CHA);
+		}
 		user@ u = find_user_for_combatant(c);
 
 		pending_roll pr;
@@ -5278,6 +5283,27 @@ class battle_manager {
 						break;
 					}
 				}
+				// Xanathar's Swashbuckler L3 Rakish Audacity (para 2421-2423):
+				// "you don't need advantage [...] if you are within 5 feet of it,
+				// no other creature is within 5 feet of you, and you don't have
+				// disadvantage on the attack roll."
+				if (!sa_qualifies and attacker.subclass == "Swashbuckler" and attacker.level >= 3) {
+					bool solo = true;
+					for (uint si = 0; si < combat.combatants.length(); si++) {
+						combatant@ nearby = combat.combatants[si];
+						if (@nearby == null or nearby.id == attacker.id or nearby.id == target.id or nearby.is_dead) continue;
+						if (feet_distance(nearby.x, nearby.y, attacker.x, attacker.y) <= 5) {
+							solo = false;
+							break;
+						}
+					}
+					if (solo and feet_distance(attacker.x, attacker.y, target.x, target.y) <= 5) sa_qualifies = true;
+				}
+				// Xanathar's Inquisitive L3 Insightful Fighting (para 2336-2339):
+				// SA without advantage vs studied target
+				if (!sa_qualifies and attacker.subclass == "Inquisitive" and attacker.inquisitive_target == target.id) {
+					sa_qualifies = true;
+				}
 			}
 			if (sa_qualifies) {
 				attacker.sneak_attack_used_this_turn = true;
@@ -5286,16 +5312,16 @@ class battle_manager {
 				for (int sd = 0; sd < sa_dice; sd++) sa_bonus += random(1, 6);
 				bonus += sa_bonus;
 				broadcast_announce(attacker.name + "'s Sneak Attack deals " + sa_bonus + " extra damage! (" + sa_dice + "d6)", true);
+				// Xanathar's Inquisitive L17 Eye for Weakness (para 2344-2345):
+				// "your Sneak Attack damage against the creature is increased by 3d6"
+				if (attacker.subclass == "Inquisitive" and attacker.level >= 17
+					and attacker.inquisitive_target == target.id) {
+					int efw_bonus = 0;
+					for (int ef = 0; ef < 3; ef++) efw_bonus += random(1, 6);
+					bonus += efw_bonus;
+					broadcast_announce(attacker.name + "'s Eye for Weakness deals " + efw_bonus + " extra damage! (3d6)", false);
+				}
 			}
-		}
-
-		// Inquisitive Rogue: Insightful Fighting — sneak attack without advantage vs studied target
-		if (attacker.class_name == "Rogue" and attacker.subclass == "Inquisitive" and attacker.inquisitive_target == target.id and attacker.is_first_hit_this_turn and is_weapon_attack) {
-			int dice = (attacker.level + 1) / 2;
-			int sneak_bonus = 0;
-			for (int sd = 0; sd < dice; sd++) sneak_bonus += random(1, 6);
-			bonus += sneak_bonus;
-			broadcast_announce(attacker.name + "'s Insightful Fighting adds " + sneak_bonus + " sneak attack damage!", false);
 		}
 
 		// Scout Rogue: Skirmisher (handled via movement system, just notes)
@@ -5690,6 +5716,30 @@ class battle_manager {
 					outcome = ua_outcome;
 					is_fumble = false;
 					pr.is_crit = (ua_roll == 20);
+				}
+			}
+
+			// Xanathar's Swashbuckler L17 Master Duelist (para 2429-2430): "If you miss
+			// with an attack roll, you can roll it again with advantage. Once you do so,
+			// you can't use this feature again until you finish a short or long rest."
+			if (!hit and !is_fumble and pr.is_weapon_attack and c.master_duelist_active and !c.master_duelist_used and !target.is_dead) {
+				c.master_duelist_used = true;
+				int md_roll1 = random(1, 20);
+				int md_roll2 = random(1, 20);
+				int md_roll = md_roll1 > md_roll2 ? md_roll1 : md_roll2; // advantage
+				int md_total = md_roll + pr.modifier;
+				bool md_hit = md_total >= target.armor_class and md_roll != 1;
+				if (md_roll == 20) md_hit = true;
+				string md_outcome = md_hit ? "hits!" : "misses.";
+				broadcast_roll(c.name, "Master Duelist reroll (advantage)", md_roll, pr.modifier, md_total, md_outcome);
+				if (md_hit) {
+					hit = true;
+					natural_roll = md_roll;
+					total = md_total;
+					reported_modifier = pr.modifier;
+					outcome = md_outcome;
+					is_fumble = false;
+					pr.is_crit = (md_roll == 20);
 				}
 			}
 

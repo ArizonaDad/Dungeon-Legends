@@ -285,6 +285,7 @@ class combatant {
 	bool slashing_resistance = false;
 	bool thunder_resistance = false;
 	bool poison_resistance = false;
+	bool radiant_resistance = false; // Xanathar's Celestial Warlock L6 Radiant Soul
 	bool lightning_immunity = false; // Xanathar's Storm Sorcery L18 Wind Soul
 	bool thunder_immunity = false;   // Xanathar's Storm Sorcery L18 Wind Soul
 	bool poison_immunity = false;
@@ -424,6 +425,8 @@ class combatant {
 	bool swashbuckler_attacked_this_turn = false; // Track for Fancy Footwork
 	uint inquisitive_target = 0; // Inquisitive Rogue
 	bool scout_skirmisher = false; // Scout Rogue
+	bool master_duelist_active = false; // Swashbuckler L17
+	bool master_duelist_used = false; // 1/SR reroll
 	bool starry_form_active = false; // Circle of Stars Druid
 	string starry_form_type = ""; // Archer/Chalice/Dragon
 	bool land_stride_active = false; // Circle of the Land
@@ -1572,6 +1575,7 @@ class battle {
 		bool skip_poison_immunity = source_poison_soul; // Poisoner does NOT bypass immunity
 		if (damage_type == DMG_POISON and target.poison_resistance and !target.poison_immunity and !skip_poison_resistance) amount = (amount + 1) / 2;
 		if (damage_type == DMG_POISON and target.poison_immunity and !skip_poison_immunity) amount = 0;
+		if (damage_type == DMG_RADIANT and target.radiant_resistance) amount = (amount + 1) / 2;
 
 		// PHB 2024 Monk L18 Superior Defense (para 5372-5373): "you have Resistance
 		// to all damage except Force damage." Halve damage of any non-Force type.

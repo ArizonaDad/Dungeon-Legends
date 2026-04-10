@@ -948,7 +948,7 @@ Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 | Feature | Level | Source para | Status |
 |---------|-------|-------------|--------|
 | **Storm Aura** (10ft aura on rage: desert=fire dmg, sea=lightning DEX save, tundra=temp HP) | 3 | 416-422 | ✓ Done — `apply_storm_aura_effect()` helper with 3-environment support. Auto-fires on rage entry + BA handler for per-turn reactivation. Flat dmg 2/3/4/5/6 scaling (desert/tundra), d6 dice 1/2/3/4 (sea). Environment stored in `storm_aura_damage_type` (DMG_FIRE/LIGHTNING/COLD). |
-| **Storm Soul** (passive resistance: desert=fire, sea=lightning+swim, tundra=cold) | 6 | 423-427 | PARTIAL — resistance fields exist on combatant (fire/lightning/cold_resistance), but not set by Storm Herald init. Needs environment-based auto-grant. |
+| **Storm Soul** (passive resistance: desert=fire, sea=lightning+swim, tundra=cold) | 6 | 423-427 | ✓ Done — resistance auto-granted at init based on `storm_aura_damage_type` (desert→fire, sea→lightning, tundra→cold). Swim speed deferred (no swim combat). |
 | **Shielding Storm** (aura grants Storm Soul resistance to allies) | 10 | 428-429 | DEFERRED — extending resistance to other combatants in AoE requires per-turn resistance tracking. |
 | **Raging Storm** (desert=reaction fire on melee hit, sea=reaction prone on hit, tundra=STR save speed 0) | 14 | 430-434 | DEFERRED — 3 reaction/trigger variants. Desert variant similar to Scornful Rebuke pattern. |
 
@@ -1003,19 +1003,19 @@ Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 
 | Feature | Level | Source para | Status |
 |---------|-------|-------------|--------|
-| **Ear for Deceit** (minimum roll on Insight to detect lies = 8 + WIS mod) | 3 | 2332-2333 | DEFERRED — non-combat social feature. Could wire via skill_check clamp like Silver Tongue. |
+| **Ear for Deceit** (minimum roll on Insight to detect lies = 8 + WIS mod) | 3 | 2332-2333 | DEFERRED — non-combat social feature. |
 | **Eye for Detail** (BA: Perception check to find hidden creature or Investigation check to find clues) | 3 | 2334-2335 | DEFERRED — BA skill check not wired. |
-| **Insightful Fighting** (BA: Insight vs target's Deception; success = SA without advantage for 1 min) | 3 | 2336-2339 | ✓ Done — `inquisitive_target` field. BA handler in `users _dom.nvgt` sets target. Sneak Attack bonus in `apply_subclass_on_hit_damage` applies SA dice to `inquisitive_target` without needing advantage. |
+| **Insightful Fighting** (BA: Insight vs target's Deception; success = SA without advantage for 1 min) | 3 | 2336-2339 | ✓ Done — `inquisitive_target` field. BA handler sets target. SA qualification integrated into standard SA condition block (no longer a separate double-dip block). |
 | **Steady Eye** (advantage on Perception and Investigation if move ≤ half speed) | 9 | 2340-2341 | DEFERRED — non-combat, requires movement tracking per turn for conditional advantage. |
 | **Unerring Eye** (action: sense illusion/shapechanger/deception within 30ft, WIS mod uses/LR) | 13 | 2342-2343 | DEFERRED — detection/utility feature, no direct combat effect. |
-| **Eye for Weakness** (+3d6 SA against Insightful Fighting target) | 17 | 2344-2345 | DEFERRED — additional SA dice on top of base SA. Needs to add 3d6 in `apply_subclass_on_hit_damage` when `inquisitive_target` matched and level >= 17. |
+| **Eye for Weakness** (+3d6 SA against Insightful Fighting target) | 17 | 2344-2345 | ✓ Done — +3d6 bonus fires inside SA block when `inquisitive_target` matches and level >= 17. |
 
 ### Mastermind Rogue Subclass Audit (2026-04-10) — Xanathar's paras 2361-2377
 
 | Feature | Level | Source para | Status |
 |---------|-------|-------------|--------|
 | **Master of Intrigue** (disguise kit, forgery kit, 2 languages, mimic speech/writing) | 3 | 2361-2365 | N/A — proficiency/roleplay feature, no combat effect. |
-| **Master of Tactics** (Help as BA at 30ft range instead of action at 5ft) | 3 | 2366-2369 | ✓ Done — `mastermind_help` flag. BA handler in `users _dom.nvgt` sets help target with 30ft range validation. |
+| **Master of Tactics** (Help as BA at 30ft range instead of action at 5ft) | 3 | 2366-2369 | ✓ Done — `mastermind_help` flag. BA handler sets help target with 30ft range validation. |
 | **Insightful Manipulator** (study creature for 1 min: learn 2 stats relative to self) | 9 | 2370-2372 | DEFERRED — non-combat information-gathering feature. |
 | **Misdirection** (reaction: redirect attack targeting you to another creature within 5ft providing cover) | 13 | 2373-2375 | DEFERRED — requires cover system + attack-redirect reaction. |
 | **Soul of Deceit** (immune to telepathy, always appear truthful to lies-detection magic, CHA vs WIS on zone of truth) | 17 | 2376-2377 | DEFERRED — non-combat / anti-magic detection feature. |
@@ -1025,8 +1025,8 @@ Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 | Feature | Level | Source para | Status |
 |---------|-------|-------------|--------|
 | **Skirmisher** (reaction: move half speed when enemy ends turn within 5ft, no OA) | 3 | 2391-2393 | PARTIAL — `scout_skirmisher` flag set on init. Manual BA activation exists but automatic end-of-enemy-turn trigger not implemented (needs per-movement event hooks). |
-| **Survivalist** (proficiency + expertise in Nature and Survival) | 3 | 2394-2395 | DEFERRED — skill proficiency/expertise auto-grant at init needed. |
-| **Superior Mobility** (+10ft speed to walk/climb/swim) | 9 | 2396-2397 | DEFERRED — simple `c.speed += 10` at init. |
+| **Survivalist** (proficiency + expertise in Nature and Survival) | 3 | 2394-2395 | ✓ Done — auto-grants Nature + Survival proficiency and expertise at init. |
+| **Superior Mobility** (+10ft speed to walk/climb/swim) | 9 | 2396-2397 | ✓ Done — `c.speed += 10` at init. Climb/swim deferred (no climbing/swimming combat). |
 | **Ambush Master** (advantage on initiative; first creature hit in first turn grants all allies advantage vs it until start of next turn) | 13 | 2398-2399 | DEFERRED — initiative advantage + team-wide advantage marker. |
 | **Sudden Strike** (if take Attack action, can make extra attack as BA against different creature with SA) | 17 | 2400-2401 | DEFERRED — extra attack via BA with SA on different target. |
 
@@ -1035,10 +1035,10 @@ Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 | Feature | Level | Source para | Status |
 |---------|-------|-------------|--------|
 | **Fancy Footwork** (after melee attack vs creature, it can't make OA against you for rest of turn) | 3 | 2418-2420 | ✓ Done — `swashbuckler_attacked_this_turn` flag. Set on attack in battle_manager. OA suppression logic checks flag. Reset in `advance_turn`. |
-| **Rakish Audacity** (+CHA to initiative; SA without advantage if no creature other than target within 5ft of you) | 3 | 2421-2423 | DEFERRED — initiative CHA bonus + solo-engagement SA condition. Two distinct mechanics need wiring. |
+| **Rakish Audacity** (+CHA to initiative; SA without advantage if no creature other than target within 5ft of you) | 3 | 2421-2423 | ✓ Done — +CHA initiative bonus in `request_next_initiative`. Solo-engagement SA condition integrated into standard SA qualification block in `apply_subclass_on_hit_damage`. |
 | **Panache** (action: Persuasion vs Insight; hostile = disadvantage on attacks vs others and no OA for 1 min; friendly = charmed for 1 min) | 9 | 2424-2426 | DEFERRED — non-combat social feature (hostile version has combat use but needs contested check system). |
 | **Elegant Maneuver** (BA: advantage on next Acrobatics or Athletics check this turn) | 13 | 2427-2428 | DEFERRED — BA skill check advantage grant. |
-| **Master Duelist** (1/SR: miss → reroll with advantage) | 17 | 2429-2430 | DEFERRED — attack-miss reroll, similar to Unerring Accuracy pattern. |
+| **Master Duelist** (1/SR: miss → reroll with advantage) | 17 | 2429-2430 | ✓ Done — `master_duelist_active` + `master_duelist_used` flags. Reroll with advantage in miss path after Unerring Accuracy. |
 
 ### Celestial Warlock Subclass Audit (2026-04-10) — Xanathar's paras 2720-2747
 
@@ -1046,8 +1046,8 @@ Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 |---------|-------|-------------|--------|
 | **Expanded Spell List** (Cure Wounds, Flaming Sphere, Lesser Restoration, Daylight, Revivify, Guardian of Faith, Wall of Fire, Flame Strike, Greater Restoration) | 1-9 | 2720-2726 | DEFERRED — auto-prepared spell system not yet wired for Warlock patron spells. |
 | **Bonus Cantrips** (Light, Sacred Flame) | 1 | 2727-2728 | DEFERRED — auto-grant cantrips at subclass selection. |
-| **Healing Light** (BA: pool of 1+level d6s, spend 1-CHA mod dice to heal creature within 60ft) | 1 | 2729-2735 | ✓ Done — `healing_light_dice` field initialized to `1 + cs.level`. BA handler in `users _dom.nvgt` with dice spending. Client menu entry wired. |
-| **Radiant Soul** (resistance to radiant damage; when casting fire/radiant spell, add CHA to one damage roll) | 6 | 2736-2739 | DEFERRED — radiant resistance auto-grant + spell damage CHA rider. |
+| **Healing Light** (BA: pool of 1+level d6s, spend 1-CHA mod dice to heal creature within 60ft) | 1 | 2729-2735 | ✓ Done — `healing_light_dice` field initialized to `1 + cs.level`. BA handler with dice spending. Client menu entry wired. |
+| **Radiant Soul** (resistance to radiant damage; when casting fire/radiant spell, add CHA to one damage roll) | 6 | 2736-2739 | PARTIAL — `radiant_resistance` auto-granted at init. CHA spell damage rider deferred (requires per-spell damage hook). |
 | **Celestial Resilience** (temp HP = Warlock level + CHA at end of SR/LR; 5 allies get half Warlock level + CHA) | 10 | 2740-2743 | DEFERRED — rest-triggered temp HP distribution. |
 | **Searing Vengeance** (at start of turn while dying: regain half max HP + stand + 2d8+CHA radiant to chosen creatures within 30ft, blinding on fail, 1/LR) | 14 | 2744-2747 | DEFERRED — death save replacement trigger + AoE radiant burst. |
 
