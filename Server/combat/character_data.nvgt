@@ -2280,27 +2280,40 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         }
     }
 
-    // Gunslinger: Risk Dice pool + Critical Shot uses
+    // Gunslinger base class (Valda's Spire of Secrets paras 159-203)
     if (cs.class_name == "Gunslinger") {
-        // Quick Draw: advantage on initiative (applied to bonus)
-        if (cs.level >= 1) c.initiative_bonus += 2; // Quick Draw approximation
-        // Risk Dice at level 2
-        if (cs.level >= 2) {
-            c.risk_dice_max = 2;
-            c.risk_die_size = 8;
-        }
-        if (cs.level >= 10) { c.risk_dice_max = 3; c.risk_die_size = 10; }
-        if (cs.level >= 18) { c.risk_dice_max = 4; c.risk_die_size = 12; }
+        // L1 Quick Draw: Advantage on Initiative + Double Draw (paras 162-165).
+        // The advantage is applied at initiative request time in battle_manager,
+        // not as a flat +2 bonus. Flag is set so that hook can detect it.
+        if (cs.level >= 1) c.quick_draw_active = true;
+        // L1 Fighting Style + Weapon Mastery — handled via existing fighting_style + weapon_mastery infra.
+        // L2 Risk Dice (para 174). Count and die size scale by level per Gunslinger Features table:
+        //   L2-5: 4d8, L6-9: 5d8, L10-13: 5d10, L14-17: 6d10, L18-20: 6d12.
+        if (cs.level >= 2) { c.risk_dice_max = 4; c.risk_die_size = 8; }
+        if (cs.level >= 6) { c.risk_dice_max = 5; c.risk_die_size = 8; }
+        if (cs.level >= 10) { c.risk_dice_max = 5; c.risk_die_size = 10; }
+        if (cs.level >= 14) { c.risk_dice_max = 6; c.risk_die_size = 10; }
+        if (cs.level >= 18) { c.risk_dice_max = 6; c.risk_die_size = 12; }
         c.risk_dice_current = c.risk_dice_max;
-        // Critical Shot (level 2): 2 per rest
-        if (cs.level >= 2) {
-            c.critical_shot_uses = 2;
-            c.critical_shot_die_size = 6;
-        }
-        if (cs.level >= 9) c.critical_shot_die_size = 8;
-        if (cs.level >= 17) c.critical_shot_die_size = 10;
-        // Cheat Death at level 13
-        if (cs.level >= 13) c.cheat_death_available = true;
+        // L2 Critical Shot (paras 170-171): passive crit-range expansion. 19 at L2, 18 at L9, 17 at L17.
+        if (cs.level >= 2) c.gunslinger_crit_threshold = 19;
+        if (cs.level >= 9) c.gunslinger_crit_threshold = 18;
+        if (cs.level >= 17) c.gunslinger_crit_threshold = 17;
+        // L5 Extra Attack (para 183) + L5 Gut Shot flag (paras 184-185).
+        if (cs.level >= 5) { c.extra_attacks = 1; c.gut_shot_active = true; }
+        // L7 Evasion (paras 187-188): reuses the shared evasion_active field with Monk/Rogue.
+        if (cs.level >= 7) c.evasion_active = true;
+        // L11 Overkill (paras 189-191).
+        if (cs.level >= 11) c.overkill_active = true;
+        // L13 Cheat Death (paras 193-194): drop to 1 HP instead of 0, regain Gunslinger level HP. 1/SR.
+        if (cs.level >= 13) c.cheat_death_used = false;
+        // L15 Dire Gambit (para 196): regain a Risk Die on initiative or crit.
+        if (cs.level >= 15) c.dire_gambit_active = true;
+        // L18 Deft Maneuver (paras 197-198): extra Bonus Action that can only be a maneuver.
+        if (cs.level >= 18) c.deft_maneuver_active = true;
+        // L20 Headshot (paras 201-203): on a crit with a Ranged weapon, kill if target HP < 100,
+        // else +10d10 weapon damage. 1/SR or 3 Risk Dice.
+        if (cs.level >= 20) { c.headshot_active = true; c.headshot_used = false; }
     }
 
     // Wizard subclasses

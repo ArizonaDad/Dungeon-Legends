@@ -582,17 +582,23 @@ class combatant {
 	bool college_choreography_active = false; // College of Choreography Bard
 	bool college_mercantile_active = false; // College of Mercantile Bard
 	bool blade_breaker_armor_crush = false; // armor reduction tracking
-	// Gunslinger class
+	// Gunslinger class (Valda's Spire of Secrets, paras 159-203)
 	int risk_dice_current = 0;
 	int risk_dice_max = 0;
 	int risk_die_size = 8;
-	int critical_shot_uses = 0;
-	int critical_shot_die_size = 6;
-	bool critical_shot_pending = false;
-	bool quick_draw_active = false; // Level 1: advantage on initiative
-	bool gut_shot_active = false; // Level 5
-	bool overkill_active = false; // Level 11
-	bool cheat_death_available = true; // Level 13: avoid a lethal blow once per short rest
+	// L2 Critical Shot: passive crit-range expansion. 19 at L2, 18 at L9, 17 at L17.
+	int gunslinger_crit_threshold = 20;
+	bool quick_draw_active = false; // L1: advantage on initiative + Double Draw
+	bool gut_shot_active = false; // L5: gates the on-crit debuff against Large or smaller targets
+	bool overkill_active = false; // L11: ranged weapon ability mod adder + 1d8 boost
+	// L7 Evasion uses the existing combatant.evasion_active field shared with Monk/Rogue.
+	bool dire_gambit_active = false; // L15: regain Risk Die on init or crit
+	bool deft_maneuver_active = false; // L18: extra bonus action for maneuvers
+	bool headshot_active = false; // L20
+	bool headshot_used = false; // L20: 1/SR (or 3 Risk Dice)
+	bool cheat_death_used = false; // L13: 1/SR drop-to-1
+	// L5 Gut Shot debuff tracking (set on victim of a Gunslinger crit)
+	int gut_shot_rounds_remaining = 0;
 	int rage_turns_remaining = 0;
 	int action_surge_uses_remaining = 0;
 	// PHB 2024 Fighter L1 Second Wind (para 5103-5106): Bonus Action, heal 1d10 +
@@ -1438,6 +1444,20 @@ class battle {
 					}
 				}
 			}
+			// Valda's Spire Gunslinger L13 Cheat Death (paras 193-194): "When you are
+			// reduced to 0 Hit Points and not killed outright, you can drop to 1 Hit
+			// Point instead, and you regain a number of Hit Points equal to your
+			// Gunslinger level. Once you use this feature, you can't use it again until
+			// you finish a Short or Long Rest."
+			if (target.class_name == "Gunslinger" and target.level >= 13 and !target.cheat_death_used and !target.is_dead) {
+				int cd_overflow = -target.current_hp;
+				if (cd_overflow < target.max_hp) { // Not killed outright
+					target.cheat_death_used = true;
+					target.current_hp = 1 + target.level;
+					if (target.current_hp > target.max_hp) target.current_hp = target.max_hp;
+					return;
+				}
+			}
 			// Instant death check: remaining damage >= max HP
 			int overflow = -target.current_hp;
 			if (overflow >= target.max_hp) {
@@ -1746,6 +1766,17 @@ class battle {
 				state["my_flash_of_genius_uses_max"] = c.flash_of_genius_uses_max;
 				state["my_magic_item_attunement_max"] = c.magic_item_attunement_max;
 				state["my_magical_guidance_active"] = c.magical_guidance_active;
+				// Valda's Spire of Secrets Gunslinger (paras 159-203)
+				state["my_risk_dice_current"] = c.risk_dice_current;
+				state["my_risk_dice_max"] = c.risk_dice_max;
+				state["my_risk_die_size"] = c.risk_die_size;
+				state["my_gunslinger_crit_threshold"] = c.gunslinger_crit_threshold;
+				state["my_overkill_active"] = c.overkill_active;
+				state["my_dire_gambit_active"] = c.dire_gambit_active;
+				state["my_deft_maneuver_active"] = c.deft_maneuver_active;
+				state["my_headshot_active"] = c.headshot_active;
+				state["my_headshot_used"] = c.headshot_used;
+				state["my_cheat_death_used"] = c.cheat_death_used;
 				// Potion buff rounds remaining
 				state["my_potion_damage_rounds"] = c.potion_damage_rounds;
 				state["my_potion_ac_rounds"] = c.potion_ac_rounds;

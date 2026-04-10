@@ -1412,6 +1412,14 @@ class battle_manager {
 		if (attacker.class_name == "Paladin" and attacker.subclass == "Oath of Zeal" and attacker.mark_of_heretic_active and @pr != null and attacker.mark_of_heretic_target == pr.target_id) {
 			return 19;
 		}
+		// Valda's Spire Gunslinger L2 Critical Shot (paras 170-171): "Your attack rolls
+		// with Ranged weapons can score a Critical Hit on a roll of 19 or 20 on the d20.
+		// At Gunslinger level 9, your attack rolls with Ranged weapons score a Critical
+		// Hit on a roll of 18-20. At Gunslinger level 17, they score a Critical Hit on
+		// a roll of 17-20." Restricted to Ranged weapon attacks only.
+		if (attacker.class_name == "Gunslinger" and weapon_attack and attacker.main_hand_is_ranged and attacker.gunslinger_crit_threshold < 20) {
+			return attacker.gunslinger_crit_threshold;
+		}
 		return 20;
 	}
 
@@ -1944,6 +1952,9 @@ class battle_manager {
 		if (target.has_condition(COND_PRONE) and (attack_is_ranged or dist > 5)) disadv = true;
 		if (target.has_condition(COND_PARALYZED) or target.has_condition(COND_STUNNED) or target.has_condition(COND_UNCONSCIOUS)) adv = true;
 		if (attacker.has_condition(COND_BLINDED) or attacker.has_condition(COND_POISONED) or attacker.has_condition(COND_FRIGHTENED) or attacker.has_condition(COND_RESTRAINED)) disadv = true;
+		// Valda's Spire Gunslinger L5 Gut Shot (paras 184-185): the gut-shot creature
+		// "has Disadvantage on attack rolls" until it dislodges or 1 minute passes.
+		if (attacker.gut_shot_rounds_remaining > 0) disadv = true;
 		if (target.is_dodging and !attacker.has_condition(COND_BLINDED)) disadv = true;
 		if (target.has_condition(COND_INVISIBLE) and !can_ignore_invisible) disadv = true;
 		if (target.has_condition(COND_RESTRAINED)) adv = true;
@@ -2962,6 +2973,9 @@ class battle_manager {
 		// PHB 2024 Barbarian Level 7: Feral Instinct (para 2334-2335):
 		// "Your instincts are so honed that you have Advantage on Initiative rolls."
 		if (c.class_name == "Barbarian" and c.level >= 7) pr.has_advantage = true;
+		// Valda's Spire Gunslinger L1 Quick Draw (paras 162-164): "You have Advantage
+		// on Initiative rolls."
+		if (c.class_name == "Gunslinger" and c.quick_draw_active) pr.has_advantage = true;
 		// PHB 2024 Bard Level 18: Superior Inspiration (para 2760-2761):
 		// "When you roll Initiative, you regain expended uses of Bardic Inspiration
 		// until you have two if you have fewer than that."
@@ -2969,6 +2983,12 @@ class battle_manager {
 			int restored = 2 - c.bardic_inspiration_uses;
 			c.bardic_inspiration_uses = 2;
 			broadcast_announce(c.name + "'s Superior Inspiration restores " + restored + " Bardic Inspiration use" + (restored == 1 ? "" : "s") + ".", false);
+		}
+		// Valda's Spire Gunslinger L15 Dire Gambit (para 196): "Whenever you roll
+		// Initiative or score a Critical Hit, you regain one expended Risk Die."
+		if (c.class_name == "Gunslinger" and c.dire_gambit_active and c.risk_dice_current < c.risk_dice_max) {
+			c.risk_dice_current++;
+			broadcast_announce(c.name + "'s Dire Gambit regains a Risk Die from rolling Initiative! (" + c.risk_dice_current + "/" + c.risk_dice_max + ")", false);
 		}
 		@current_roll = pr;
 
@@ -3080,6 +3100,17 @@ class battle_manager {
 				if (prev.innate_sorcery_rounds_remaining <= 0) {
 					prev.innate_sorcery_active = false;
 					broadcast_announce(prev.name + "'s Innate Sorcery fades.", false);
+				}
+			}
+			// Valda's Spire Gunslinger L5 Gut Shot debuff tickdown (paras 184-185):
+			// "For 1 minute or until the target replaces one of its attacks with
+			// dislodging the projectile, its Speed is halved..." 1 minute = 10 rounds.
+			// On expiry, restore the original speed (doubled because we halved it on apply).
+			if (prev.gut_shot_rounds_remaining > 0) {
+				prev.gut_shot_rounds_remaining--;
+				if (prev.gut_shot_rounds_remaining <= 0) {
+					prev.speed = prev.speed * 2;
+					broadcast_announce(prev.name + " dislodges the Gut Shot projectile. Speed restored.", false);
 				}
 			}
 			if (prev.raging) {
@@ -4288,20 +4319,19 @@ class battle_manager {
 			broadcast_announce(attacker.name + "'s Giant's Might adds " + giant_dmg + " damage!", false);
 		}
 
-		// Gunslinger: Critical Shot — extra damage on next hit
-		if (attacker.class_name == "Gunslinger" and attacker.critical_shot_pending and is_weapon_attack) {
-			int crit_dmg = random(1, attacker.critical_shot_die_size);
-			bonus += crit_dmg;
-			attacker.critical_shot_pending = false;
-			broadcast_announce(attacker.name + "'s Critical Shot adds " + crit_dmg + " damage!", false);
-		}
-
-		// Gunslinger: Gut Shot — Risk Die bonus damage
-		if (attacker.class_name == "Gunslinger" and attacker.gut_shot_active and is_weapon_attack) {
-			int gut_dmg = random(1, attacker.risk_die_size);
-			bonus += gut_dmg;
-			attacker.gut_shot_active = false;
-			broadcast_announce(attacker.name + "'s Gut Shot adds " + gut_dmg + " damage!", false);
+		// Valda's Spire Gunslinger L11 Overkill (paras 189-191): "When you deal damage
+		// with a Ranged weapon that doesn't add your ability modifier to the roll, you
+		// add your ability modifier nonetheless. If you already add your modifier to the
+		// damage roll, the target takes an extra 1d8 damage of the weapon's type."
+		// Firearms have the Firearm property and don't add ability mod to damage rolls;
+		// non-firearm ranged weapons do. We can't yet inspect the Firearm property
+		// reliably across the weapon registry, so we apply the +1d8 branch as the safe
+		// default for L11 Gunslingers using a ranged weapon (the modifier is already
+		// applied to weapon damage in get_damage_modifier_for_attack).
+		if (attacker.class_name == "Gunslinger" and attacker.overkill_active and is_weapon_attack and attacker.main_hand_is_ranged) {
+			int over_dmg = random(1, 8);
+			bonus += over_dmg;
+			broadcast_announce(attacker.name + "'s Overkill adds " + over_dmg + " extra damage!", false);
 		}
 
 		// Deadeye Sharpshooter's Stance is a prone-benefit feature, not a damage bonus (removed).
@@ -5147,6 +5177,40 @@ class battle_manager {
 				int boon_damage = random(1, 10) + random(1, 10);
 				total_damage += boon_damage;
 				broadcast_announce(c.name + "'s Boon of Irresistible Offense adds " + boon_damage + " extra damage!", false);
+			}
+			// Valda's Spire Gunslinger L5 Gut Shot (paras 184-185): "Whenever you score a
+			// Critical Hit against a Large or smaller creature with a ranged attack using
+			// a weapon, the projectile lodges itself in the target. For 1 minute or until
+			// the target replaces one of its attacks with dislodging the projectile, its
+			// Speed is halved and it has Disadvantage on attack rolls." 1 minute = 10 rounds.
+			if (pr.is_crit and c.class_name == "Gunslinger" and c.gut_shot_active and pr.is_weapon_attack and c.main_hand_is_ranged and target.size <= SIZE_LARGE and !target.is_dead) {
+				target.gut_shot_rounds_remaining = 10;
+				target.speed = target.speed / 2;
+				broadcast_announce(c.name + "'s Gut Shot lodges in " + target.name + "! Speed halved and Disadvantage on attacks for 1 minute.", true);
+			}
+			// Valda's Spire Gunslinger L20 Headshot (paras 201-203): "When you score a
+			// Critical Hit against a creature using a Ranged weapon, you can choose for it
+			// to be a Headshot. If the creature has less than 100 Hit Points, it dies.
+			// Otherwise, it takes an extra 10d10 damage of the weapon's type." 1/SR or
+			// expend 3 Risk Dice. Auto-fires when available — extra damage is always strict
+			// upside, and the use can be refunded with 3 Risk Dice if the player has them.
+			if (pr.is_crit and c.class_name == "Gunslinger" and c.headshot_active and !c.headshot_used and pr.is_weapon_attack and c.main_hand_is_ranged and !target.is_dead) {
+				c.headshot_used = true;
+				if (target.current_hp < 100) {
+					total_damage += target.current_hp; // ensure kill — apply_damage handles overflow
+					broadcast_announce(c.name + " lands a HEADSHOT on " + target.name + "! Killed instantly!", true);
+				} else {
+					int hs_dmg = 0;
+					for (int hi = 0; hi < 10; hi++) hs_dmg += random(1, 10);
+					total_damage += hs_dmg;
+					broadcast_announce(c.name + "'s Headshot adds " + hs_dmg + " extra damage!", true);
+				}
+			}
+			// Valda's Spire Gunslinger L15 Dire Gambit (para 196): "Whenever you roll
+			// Initiative or score a Critical Hit, you regain one expended Risk Die."
+			if (pr.is_crit and c.class_name == "Gunslinger" and c.dire_gambit_active and c.risk_dice_current < c.risk_dice_max) {
+				c.risk_dice_current++;
+				broadcast_announce(c.name + "'s Dire Gambit regains a Risk Die from the critical hit! (" + c.risk_dice_current + "/" + c.risk_dice_max + ")", false);
 			}
 			// Feat: Great Weapon Master — bonus action attack on crit with Heavy melee weapon
 			if (pr.is_crit and !pr.is_spell_effect and c.has_feat("great_weapon_master") and !c.main_hand_is_ranged and c.has_bonus_action and weapon_qualifies_great_weapon_fighting(c.main_hand)) {

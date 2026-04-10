@@ -4306,24 +4306,10 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.room.bm.broadcast_announce(c.name + " uses Chronal Shift to manipulate time!", true);
 		}
 
-		else if (feature == "critical_shot") {
-			// Gunslinger: Critical Shot — expend a use to add Risk Die damage to next hit
-			if (c.class_name != "Gunslinger") { u.send({{"type", message_types::announce}, {"text", "Only Gunslingers can use Critical Shot."}, {"interrupt", true}}); return; }
-			if (c.critical_shot_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Critical Shot uses remaining."}, {"interrupt", true}}); return; }
-			c.critical_shot_uses--;
-			c.critical_shot_pending = true;
-			u.room.bm.broadcast_announce(c.name + " readies a Critical Shot! Next hit deals bonus damage.", false);
-		}
-
-		else if (feature == "gut_shot") {
-			// Gunslinger: Gut Shot — spend a Risk Die to deal bonus damage
-			if (c.class_name != "Gunslinger") { u.send({{"type", message_types::announce}, {"text", "Only Gunslingers can use Gut Shot."}, {"interrupt", true}}); return; }
-			if (c.level < 5) { u.send({{"type", message_types::announce}, {"text", "Gut Shot unlocks at level 5."}, {"interrupt", true}}); return; }
-			if (c.risk_dice_current <= 0) { u.send({{"type", message_types::announce}, {"text", "No Risk Dice available."}, {"interrupt", true}}); return; }
-			c.risk_dice_current--;
-			c.gut_shot_active = true;
-			u.room.bm.broadcast_announce(c.name + " readies a Gut Shot! Next hit will deal a Risk Die of bonus damage.", false);
-		}
+		// Valda's Spire Gunslinger L2 Critical Shot (paras 170-171) is a passive crit-range
+		// expansion (19/18/17), not a use-based maneuver. Wired in get_critical_threshold.
+		// Valda's Spire Gunslinger L5 Gut Shot (paras 184-185) is an automatic on-crit
+		// effect against Large or smaller creatures. Wired in finalize_roll_result on crit.
 
 		else if (feature == "dodge_roll") {
 			// Gunslinger maneuver: Dodge Roll — spend Risk Die, bonus action move half speed + Dodge

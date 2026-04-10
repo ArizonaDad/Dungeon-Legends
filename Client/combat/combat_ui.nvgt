@@ -221,6 +221,17 @@ int my_flash_of_genius_uses_current = 0;
 int my_flash_of_genius_uses_max = 0;
 int my_magic_item_attunement_max = 3;
 bool my_magical_guidance_active = false;
+// Valda's Spire of Secrets Gunslinger (paras 159-203) — synced from server
+int my_risk_dice_current = 0;
+int my_risk_dice_max = 0;
+int my_risk_die_size = 8;
+int my_gunslinger_crit_threshold = 20;
+bool my_overkill_active = false;
+bool my_dire_gambit_active = false;
+bool my_deft_maneuver_active = false;
+bool my_headshot_active = false;
+bool my_headshot_used = false;
+bool my_cheat_death_used = false;
 int my_rage_uses_remaining = 0;
 int my_rage_damage_bonus = 0;
 bool my_is_raging = false;
@@ -981,8 +992,6 @@ void show_bonus_action_menu() {
 	int slayers_prey_opt = -1;
 	int swarmkeeper_opt = -1;
 	int chronal_shift_opt = -1;
-	int critical_shot_opt = -1;
-	int gut_shot_opt = -1;
 	int dodge_roll_opt = -1;
 	int blindfire_opt = -1;
 	int open_hand_opt = -1;
@@ -1482,14 +1491,9 @@ void show_bonus_action_menu() {
 	// Feat-based bonus actions (server validates feat ownership)
 	polearm_master_attack_opt = m.add_item("Polearm Master Attack. Bonus action. Strike with the polearm butt for 1d4. (Requires Polearm Master feat)");
 	// Shield Master Shove is automatic now (2024 rules: rider on melee hit with shield, not a bonus action)
-	// Gunslinger class features
+	// Valda's Spire Gunslinger maneuvers (Critical Shot is now passive crit-range,
+	// Gut Shot is now an automatic on-crit debuff — neither is a menu entry).
 	if (lc == "gunslinger") {
-		if (level >= 2) {
-			critical_shot_opt = m.add_item("Critical Shot. Add bonus damage dice to your next weapon attack.");
-		}
-		if (level >= 5) {
-			gut_shot_opt = m.add_item("Gut Shot. Spend a Risk Die for bonus damage on next attack.");
-		}
 		dodge_roll_opt = m.add_item("Dodge Roll. Bonus action. Spend a Risk Die to Dodge.");
 		blindfire_opt = m.add_item("Blindfire. Spend a Risk Die to ignore disadvantage on next ranged attack.");
 	}
@@ -2153,14 +2157,6 @@ void show_bonus_action_menu() {
 	else if (chronal_shift_opt >= 0 and res == chronal_shift_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "chronal_shift"}});
 		speak("Time shifted.", true);
-	}
-	else if (critical_shot_opt >= 0 and res == critical_shot_opt) {
-		send({{"type", message_types::bonus_action}, {"feature", "critical_shot"}});
-		speak("Critical Shot readied.", true);
-	}
-	else if (gut_shot_opt >= 0 and res == gut_shot_opt) {
-		send({{"type", message_types::bonus_action}, {"feature", "gut_shot"}});
-		speak("Gut Shot readied.", true);
 	}
 	else if (dodge_roll_opt >= 0 and res == dodge_roll_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "dodge_roll"}});
@@ -3272,6 +3268,17 @@ void parse_game_state(json_object@ msg) {
 	my_flash_of_genius_uses_max = msg.exists("my_flash_of_genius_uses_max") ? int(msg["my_flash_of_genius_uses_max"]) : 0;
 	my_magic_item_attunement_max = msg.exists("my_magic_item_attunement_max") ? int(msg["my_magic_item_attunement_max"]) : 3;
 	my_magical_guidance_active = msg.exists("my_magical_guidance_active") ? bool(msg["my_magical_guidance_active"]) : false;
+	// Valda's Spire of Secrets Gunslinger
+	my_risk_dice_current = msg.exists("my_risk_dice_current") ? int(msg["my_risk_dice_current"]) : 0;
+	my_risk_dice_max = msg.exists("my_risk_dice_max") ? int(msg["my_risk_dice_max"]) : 0;
+	my_risk_die_size = msg.exists("my_risk_die_size") ? int(msg["my_risk_die_size"]) : 8;
+	my_gunslinger_crit_threshold = msg.exists("my_gunslinger_crit_threshold") ? int(msg["my_gunslinger_crit_threshold"]) : 20;
+	my_overkill_active = msg.exists("my_overkill_active") ? bool(msg["my_overkill_active"]) : false;
+	my_dire_gambit_active = msg.exists("my_dire_gambit_active") ? bool(msg["my_dire_gambit_active"]) : false;
+	my_deft_maneuver_active = msg.exists("my_deft_maneuver_active") ? bool(msg["my_deft_maneuver_active"]) : false;
+	my_headshot_active = msg.exists("my_headshot_active") ? bool(msg["my_headshot_active"]) : false;
+	my_headshot_used = msg.exists("my_headshot_used") ? bool(msg["my_headshot_used"]) : false;
+	my_cheat_death_used = msg.exists("my_cheat_death_used") ? bool(msg["my_cheat_death_used"]) : false;
 	my_rage_uses_remaining = msg.exists("my_rage_uses_remaining") ? int(msg["my_rage_uses_remaining"]) : 0;
 	my_rage_damage_bonus = msg.exists("my_rage_damage_bonus") ? int(msg["my_rage_damage_bonus"]) : 0;
 	my_is_raging = msg.exists("my_is_raging") ? bool(msg["my_is_raging"]) : false;
@@ -3459,6 +3466,16 @@ void reset_combat_state() {
 	my_flash_of_genius_uses_max = 0;
 	my_magic_item_attunement_max = 3;
 	my_magical_guidance_active = false;
+	my_risk_dice_current = 0;
+	my_risk_dice_max = 0;
+	my_risk_die_size = 8;
+	my_gunslinger_crit_threshold = 20;
+	my_overkill_active = false;
+	my_dire_gambit_active = false;
+	my_deft_maneuver_active = false;
+	my_headshot_active = false;
+	my_headshot_used = false;
+	my_cheat_death_used = false;
 	my_rage_uses_remaining = 0;
 	my_rage_damage_bonus = 0;
 	my_is_raging = false;
