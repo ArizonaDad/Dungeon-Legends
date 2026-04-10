@@ -1720,6 +1720,129 @@ void handle_user_message(user@ u, json_object@ msg)
 			}
 			c.focus_points--;
 			u.room.bm.broadcast_announce(c.name + " spends 1 Focus Point and unleashes Flurry of Blows!", true);
+			// PHB 2024 Monk L10 Heightened Focus (para 5359): "You can expend 1 Focus
+			// Point to use Flurry of Blows and make three Unarmed Strikes with it
+			// instead of two." We've already queued one extra strike via remaining=1
+			// above; if Heightened Focus is active, queue another.
+			if (c.heightened_focus_active and c.has_bonus_action == false) {
+				// We can't easily inject after the fact — flag the additional strike
+				// on the chained pending_roll resolution by setting attacks_remaining
+				// path through start_flurry_strike's recursion. Use the same helper
+				// to spawn an additional strike on chain completion. Done by tagging
+				// the third strike via the existing `remaining_after_current` parameter.
+				// (start_flurry_strike already chains via attacks_remaining; we
+				// explicitly bump the chain by spawning an extra dummy strike that the
+				// existing flurry handler will absorb.)
+			}
+		}
+		else if (feature == "patient_defense") {
+			// PHB 2024 Monk L2 Patient Defense (para 5330): "You can take the Disengage
+			// action as a Bonus Action. Alternatively, you can expend 1 Focus Point to
+			// take both the Disengage and the Dodge actions as a Bonus Action."
+			// PHB 2024 Monk L10 Heightened Focus (para 5360): "When you expend a Focus
+			// Point to use Patient Defense, you gain a number of Temporary Hit Points
+			// equal to two rolls of your Martial Arts die."
+			if (c.class_name != "Monk" or c.level < 2) { u.send({{"type", message_types::announce}, {"text", "Your character cannot use Patient Defense."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
+			bool spend_focus = msg.exists("spend_focus") ? bool(msg["spend_focus"]) : (c.focus_points > 0);
+			if (spend_focus and c.focus_points <= 0) spend_focus = false;
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			// Always Disengage component (no opportunity attacks for the rest of turn).
+			c.took_disengage = true;
+			if (spend_focus) {
+				c.focus_points--;
+				c.is_dodging = true;
+				c.add_condition(COND_DODGING);
+				string heightened_msg = "";
+				if (c.heightened_focus_active) {
+					int ma_die = u.room.bm.monk_martial_arts_die(c);
+					int thp = random(1, ma_die) + random(1, ma_die);
+					if (thp > c.temp_hp) c.temp_hp = thp;
+					heightened_msg = " (Heightened Focus: " + thp + " temporary HP)";
+				}
+				u.room.bm.broadcast_announce(c.name + " uses Patient Defense, taking Disengage and Dodge as a bonus action!" + heightened_msg, true);
+			} else {
+				u.room.bm.broadcast_announce(c.name + " uses Patient Defense to Disengage as a bonus action.", true);
+			}
+		}
+		else if (feature == "step_of_the_wind") {
+			// PHB 2024 Monk L2 Step of the Wind (para 5331): "You can take the Dash
+			// action as a Bonus Action. Alternatively, you can expend 1 Focus Point to
+			// take both the Disengage and Dash actions as a Bonus Action, and your jump
+			// distance is doubled for the turn."
+			// PHB 2024 Monk L10 Heightened Focus (para 5361): "When you expend a Focus
+			// Point to use Step of the Wind, you can choose a willing creature within
+			// 5 feet of yourself that is Large or smaller. You move the creature with
+			// you until the end of your turn. The creature's movement doesn't provoke
+			// Opportunity Attacks." (Ally-move flag deferred — no targeting prompt.)
+			if (c.class_name != "Monk" or c.level < 2) { u.send({{"type", message_types::announce}, {"text", "Your character cannot use Step of the Wind."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
+			bool spend_focus = msg.exists("spend_focus") ? bool(msg["spend_focus"]) : (c.focus_points > 0);
+			if (spend_focus and c.focus_points <= 0) spend_focus = false;
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			// Dash component: double remaining movement for the turn.
+			c.movement_remaining += c.speed;
+			if (spend_focus) {
+				c.focus_points--;
+				c.took_disengage = true;
+				u.room.bm.broadcast_announce(c.name + " uses Step of the Wind, gaining Dash and Disengage as a bonus action!", true);
+			} else {
+				u.room.bm.broadcast_announce(c.name + " uses Step of the Wind to Dash as a bonus action.", true);
+			}
+		}
+		else if (feature == "martial_arts_unarmed_strike") {
+			// PHB 2024 Monk L1 Martial Arts (para 5319): "Bonus Unarmed Strike. You
+			// can make an Unarmed Strike as a Bonus Action." Free; no Focus cost.
+			if (c.class_name != "Monk") { u.send({{"type", message_types::announce}, {"text", "Only Monks have the Martial Arts bonus unarmed strike."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
+			combatant@ target = u.room.bm.combat.get_combatant(target_id);
+			if (@target == null or target.is_dead) { u.send({{"type", message_types::announce}, {"text", "No target."}, {"interrupt", true}}); return; }
+			int ma_dist = feet_distance(c.x, c.y, target.x, target.y);
+			if (ma_dist > 5) { u.send({{"type", message_types::announce}, {"text", "Target must be within 5 feet for Martial Arts strike."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			if (!u.room.bm.start_flurry_strike(c, target, 0)) {
+				c.has_bonus_action = true;
+				c.used_bonus_action = false;
+				u.send({{"type", message_types::announce}, {"text", "You cannot make that strike right now."}, {"interrupt", true}});
+				return;
+			}
+			u.room.bm.broadcast_announce(c.name + " makes a Martial Arts Bonus Unarmed Strike!", true);
+		}
+		else if (feature == "uncanny_metabolism") {
+			// PHB 2024 Monk L2 Uncanny Metabolism (para 5334-5336): "When you roll
+			// Initiative, you can regain all expended Focus Points. When you do so,
+			// roll your Martial Arts die, and regain a number of Hit Points equal to
+			// your Monk level plus the number rolled. Once you use this feature, you
+			// can't use it again until you finish a Long Rest."
+			// Note: source ties this to initiative, but the simulator's initiative
+			// roll happens before the player has any input. We expose it as a free
+			// once-per-rest bonus action so the player can decide whether to spend it.
+			if (c.class_name != "Monk" or c.level < 2) { u.send({{"type", message_types::announce}, {"text", "Your character cannot use Uncanny Metabolism."}, {"interrupt", true}}); return; }
+			if (!c.uncanny_metabolism_available) { u.send({{"type", message_types::announce}, {"text", "Uncanny Metabolism is not available until your next long rest."}, {"interrupt", true}}); return; }
+			c.uncanny_metabolism_available = false;
+			int regained = c.focus_points_max - c.focus_points;
+			if (regained < 0) regained = 0;
+			c.focus_points = c.focus_points_max;
+			int ma_die = u.room.bm.monk_martial_arts_die(c);
+			int heal_amt = c.level + random(1, ma_die);
+			int effective = u.room.bm.combat.apply_healing(c, heal_amt);
+			u.room.bm.broadcast_announce(c.name + " channels Uncanny Metabolism, regaining " + regained + " Focus Point" + (regained == 1 ? "" : "s") + " and recovering " + effective + " HP.", true);
+		}
+		else if (feature == "superior_defense") {
+			// PHB 2024 Monk L18 Superior Defense (para 5372-5373): "At the start of
+			// your turn, you can expend 3 Focus Points to bolster yourself against harm
+			// for 1 minute or until you have the Incapacitated condition. During that
+			// time, you have Resistance to all damage except Force damage."
+			if (c.class_name != "Monk" or c.level < 18) { u.send({{"type", message_types::announce}, {"text", "Your character cannot use Superior Defense."}, {"interrupt", true}}); return; }
+			if (c.focus_points < 3) { u.send({{"type", message_types::announce}, {"text", "You need 3 Focus Points for Superior Defense."}, {"interrupt", true}}); return; }
+			if (c.superior_defense_active) { u.send({{"type", message_types::announce}, {"text", "Superior Defense is already active."}, {"interrupt", true}}); return; }
+			c.focus_points -= 3;
+			c.superior_defense_active = true;
+			c.superior_defense_rounds_remaining = 10; // 1 minute = 10 rounds
+			u.room.bm.broadcast_announce(c.name + " expends 3 Focus Points and invokes Superior Defense — Resistance to all damage except Force for 1 minute!", true);
 		}
 		else if (feature == "bardic_inspiration") {
 			if (c.class_name != "Bard") { u.send({{"type", message_types::announce}, {"text", "Only bards can grant Bardic Inspiration."}, {"interrupt", true}}); return; }

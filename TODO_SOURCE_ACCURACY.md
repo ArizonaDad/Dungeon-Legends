@@ -255,7 +255,48 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 | Indomitable (three uses) | 17 | 5082 | ✓ Done. |
 | Epic Boon | 19 | 5132-5133 | ✓ Done — Epic Boon feat catalog ships boon_of_combat_prowess et al. |
 | **Three Extra Attacks** (4 attacks per Attack action) | 20 | 5134-5135 | ✓ FIXED 2026-04-09 — was triggering at L17 (wrong), now triggers at L20 per source. |
-- **Monk:** Martial Arts die scaling, Deflect Attacks (was Deflect Missiles), Stunning Strike, Empowered Strikes, Perfect Focus
+
+### Monk Audit (PHB 2024 Basic Rules paras 5156-5395) — completed 2026-04-09 (batch 1)
+
+| Feature | Lvl | Source para | Status |
+|---|---|---|---|
+| **Martial Arts: Bonus Unarmed Strike** (BA, free) | 1 | 5319 | ✓ Done 2026-04-09 — new `martial_arts_unarmed_strike` bonus action handler that calls `start_flurry_strike(c, target, 0)` to make a single bonus unarmed strike with no Focus cost. |
+| **Martial Arts Die scaling** (1d6→1d8→1d10→1d12) | 1/5/11/17 | 5320 | ✓ Done — `monk_martial_arts_die()` already correct in `battle_manager.nvgt`. |
+| **Dexterous Attacks** (DEX for unarmed/Monk weapon attack/dmg) | 1 | 5321 | ✓ Done — `get_weapon_attack_ability_mod` already returns DEX for unarmed Monks. |
+| **Unarmored Defense** (10 + DEX + WIS unarmored AC) | 1 | 5322-5323 | ✓ Done — `has_unarmored_defense` flag and AC calc in `character_data.nvgt`. |
+| **Monk's Focus** (Focus Points = Monk level, Flurry/Patient/Step) | 2 | 5324-5331 | ✓ Done 2026-04-09 — `focus_points` already initialized; new `focus_points_max` cap field. Patient Defense and Step of the Wind handlers added (were entirely missing). |
+| **Patient Defense** (BA Disengage; spend 1 FP for Disengage+Dodge) | 2 | 5330 | ✓ Done 2026-04-09 — new `patient_defense` bonus action handler. Free Disengage by default; `spend_focus` flag adds Dodge. Heightened Focus L10 grants `2 × MA die` temp HP automatically. |
+| **Step of the Wind** (BA Dash; spend 1 FP for Disengage+Dash, jump x2) | 2 | 5331 | ✓ Done 2026-04-09 — new `step_of_the_wind` bonus action handler. Free Dash by default; `spend_focus` flag adds Disengage. (Heightened Focus ally-move deferred — needs targeting prompt.) |
+| **Unarmored Movement** (+10/15/20/25/30 ft at L2/6/10/14/18) | 2/6/10/14/18 | 5332-5333 | ✓ Done 2026-04-09 — was entirely missing for Monk class. Added speed bonus block in `character_data.nvgt` Monk init that respects unarmored + no shield gating. |
+| **Uncanny Metabolism** (regain all FP + heal lvl + MA die at initiative) | 2 | 5334-5336 | ✓ Done 2026-04-09 — new `uncanny_metabolism_available` flag (1/long rest). Exposed as a free bonus action so the player chooses when to spend it during the first round (source ties to initiative roll which the simulator pre-rolls). New `uncanny_metabolism` bonus action menu entry. |
+| **Deflect Attacks** (reaction, reduce 1d10+DEX+lvl B/P/S; redirect at 0) | 3 | 5337-5339 | ✗ DEFERRED — needs reaction prompt UI (similar to Shield/Cutting Words). Adding to follow-up batch. |
+| **Monk Subclass** | 3 | 5340-5341 | ✓ Done — Warrior of the Open Hand and 10+ extra subclasses. |
+| **Slow Fall** (reaction reduces fall damage by 5x lvl) | 4 | 5344-5345 | DEFERRED — combat doesn't currently model falling damage. |
+| **Extra Attack** (2 attacks per Attack action) | 5 | 5346-5347 | ✓ Done — `cs.extra_attacks = 1` set at L5. |
+| **Stunning Strike** (1/turn, 1 FP, CON save or Stunned until start of monk's next turn; speed halved + adv on next attack on success) | 5 | 5348-5349 | ✓ FIXED 2026-04-09 — was using stale 2014 wording ("end of next turn" + repeating saves). Now: stuns until start of monk's next turn (cleared in `start_turn` block when source monk's turn comes around). Success rider added: `stunning_strike_speed_orig` halves the target's speed and `stunning_strike_advantage_pending` grants advantage on the next attack roll against them. |
+| **Empowered Strikes** (Force damage option on unarmed) | 6 | 5350-5351 | ✓ Done — `empowered_strikes_active` flag set at L6+. (Damage type currently auto-defaults to original; player choice prompt deferred.) |
+| **Evasion** (DEX save: 0 dmg on success, half on failure) | 7 | 5352-5354 | ✓ Done — `evasion_active` flag set at L7+ and applied in `apply_save_damage`. |
+| **Acrobatic Movement** (climb walls + run on liquids unarmored) | 9 | 5355-5356 | DEFERRED — combat doesn't currently model vertical surfaces or liquid terrain. |
+| **Heightened Focus** (Flurry +1 strike, Patient Def temp HP, Step ally) | 10 | 5357-5361 | PARTIAL 2026-04-09 — Patient Defense temp HP rider implemented. Flurry of Blows third strike and Step of the Wind ally-carry deferred (Flurry needs `start_flurry_strike` count parameter, ally-carry needs targeting prompt). |
+| **Self-Restoration** (auto remove Charmed/Frightened/Poisoned at end of turn) | 10 | 5362-5364 | ✓ Done 2026-04-09 — `self_restoration_active` flag and end-of-turn cleanup in `advance_turn` (highest-priority condition removed first). |
+| **Subclass feature** | 11 | 5256 | ✓ Done. |
+| **Deflect Energy** (Deflect Attacks works on any damage type) | 13 | 5365-5366 | ✗ DEFERRED — depends on Deflect Attacks reaction implementation. |
+| **Disciplined Survivor** (all save profs + reroll failed save with FP) | 14 | 5367-5369 | PARTIAL 2026-04-09 — all save proficiencies set in `character_data.nvgt` Monk L14+ block. Save reroll prompt deferred (needs failed-save prompt chain integration). |
+| **Perfect Focus** (regain to 4 FP on initiative if 3 or fewer) | 15 | 5370-5371 | DEFERRED — needs initiative-time hook similar to Uncanny Metabolism. |
+| **Subclass feature** | 17 | 5292 | ✓ Done. |
+| **Superior Defense** (3 FP, 1 minute Resistance to all but Force) | 18 | 5372-5373 | ✓ Done 2026-04-09 — new `superior_defense_active` + `superior_defense_rounds_remaining` fields, bonus action handler, damage halving in `apply_damage` for any non-Force damage type, round-tick in `start_turn`, ends if Incapacitated. |
+| **Epic Boon** | 19 | 5374-5375 | ✓ Done — Epic Boon feat catalog. |
+| **Body and Mind** (+4 DEX/WIS, max 25) | 20 | 5376-5377 | ✓ Done 2026-04-09 — `body_and_mind_applied` one-time guard in Monk init block. Boost capped at 25. |
+
+**Pending follow-up Monk batches:**
+- Deflect Attacks reaction prompt + redirect target picker
+- Disciplined Survivor failed-save reroll prompt chain
+- Perfect Focus initiative-time floor
+- Heightened Focus Flurry-of-Blows third strike (needs `start_flurry_strike` count parameter)
+- Heightened Focus Step of the Wind ally-carry (needs targeting prompt)
+- Empowered Strikes Force/normal damage type prompt
+
+- **Paladin:** Lay on Hands (pool size), Divine Smite (slot-based in 2024), Aura of Courage, Cleansing Touch
 - **Paladin:** Lay on Hands (pool size), Divine Smite (slot-based in 2024), Aura of Courage, Cleansing Touch
 - **Ranger:** Favored Enemy (2024 uses Hunter's Mark), Natural Explorer, Primeval Awareness
 - **Rogue:** Sneak Attack dice scaling, Cunning Strike (2024), Reliable Talent

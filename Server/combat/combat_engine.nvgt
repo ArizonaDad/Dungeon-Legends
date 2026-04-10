@@ -134,9 +134,20 @@ class combatant {
 	bool studied_attacks_active = false; // Fighter L13: passive flag - advantage on next attack after a miss
 	uint studied_attacks_target_id = 0;  // The creature you missed (gives advantage on next attack vs them)
 	// Monk PHB 2024 base class features
+	int focus_points_max = 0;              // L2+: cap on focus points (= Monk level)
 	bool stunning_strike_available = true; // Once per turn if at L5+ with focus points (reset at turn start)
+	uint stunning_strike_source_id = 0;    // L5: tracks which monk applied the strike (cleared at start of their next turn)
+	bool stunning_strike_advantage_pending = false; // L5 success rider: next attack vs target has advantage
+	int stunning_strike_speed_orig = 0;    // L5 success rider: orig speed to restore at start of monk's next turn
+	bool uncanny_metabolism_available = false; // L2: 1/long rest, regain all FP + heal at initiative
 	bool empowered_strikes_active = false; // L6+: unarmed strike can deal force damage instead
 	bool evasion_active = false;           // L7+: succeed on DEX save = 0 damage, fail = half (uncapped)
+	bool self_restoration_active = false;  // L10: end-of-turn remove Charmed/Frightened/Poisoned
+	bool heightened_focus_active = false;  // L10: Flurry 3 strikes, Patient Defense temp HP, Step of Wind ally move
+	bool disciplined_survivor_active = false; // L14: reroll failed save by spending 1 FP
+	bool body_and_mind_applied = false;    // L20: tracks the one-time +4 DEX/WIS boost
+	bool superior_defense_active = false;  // L18: damage resistance to all but Force for 1 minute
+	int superior_defense_rounds_remaining = 0; // L18: ticks down at start of turn, ends at 0 or Incapacitated
 	// Rogue PHB 2024 base class features
 	bool reliable_talent_active = false;   // L11: treat d20 <=9 as 10 on checks using proficient skills
 	// Wizard PHB 2024 base class features
@@ -1177,6 +1188,12 @@ class battle {
 		if (damage_type == DMG_POISON and target.poison_resistance and !target.poison_immunity and !skip_poison_resistance) amount = (amount + 1) / 2;
 		if (damage_type == DMG_POISON and target.poison_immunity and !skip_poison_immunity) amount = 0;
 
+		// PHB 2024 Monk L18 Superior Defense (para 5372-5373): "you have Resistance
+		// to all damage except Force damage." Halve damage of any non-Force type.
+		if (target.superior_defense_active and damage_type != DMG_FORCE) {
+			amount = (amount + 1) / 2;
+		}
+
 		// Death Ward (Basic Rules para 12784): "The first time the target would drop to
 		// 0 Hit Points before the spell ends, the target instead drops to 1 Hit Point,
 		// and the spell ends."
@@ -1480,6 +1497,10 @@ class battle {
 				combatant@ c = combatants[i];
 				if (!c.is_player or c.player_username != viewer_username) continue;
 				state["my_focus_points"] = c.focus_points;
+				state["my_focus_points_max"] = c.focus_points_max;
+				state["my_uncanny_metabolism_available"] = c.uncanny_metabolism_available;
+				state["my_superior_defense_active"] = c.superior_defense_active;
+				state["my_superior_defense_rounds_remaining"] = c.superior_defense_rounds_remaining;
 				state["my_lay_on_hands_pool"] = c.lay_on_hands_pool;
 				state["my_bardic_inspiration_uses"] = c.bardic_inspiration_uses;
 				state["my_bardic_inspiration_grant_die"] = c.bardic_inspiration_grant_die;

@@ -1885,10 +1885,64 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         }
     }
     if (cs.class_name == "Monk") {
+        // PHB 2024 Monk L2 Unarmored Movement (para 5332-5333): "Your speed
+        // increases by 10 feet while you aren't wearing armor or wielding a Shield.
+        // This bonus increases when you reach certain Monk levels..." Monk Features
+        // table: +10 ft L2, +15 ft L6, +20 ft L10, +25 ft L14, +30 ft L18.
+        if (cs.level >= 2 and cs.armor_type == "none" and !cs.has_shield) {
+            int um_bonus = 10;
+            if (cs.level >= 18) um_bonus = 30;
+            else if (cs.level >= 14) um_bonus = 25;
+            else if (cs.level >= 10) um_bonus = 20;
+            else if (cs.level >= 6) um_bonus = 15;
+            c.speed += um_bonus;
+        }
+        // PHB 2024 Monk L2 Monk's Focus (para 5325-5328): Focus Points = Monk level.
+        // Already initialized via cs.ki_points -> c.focus_points; set the cap so resting
+        // and Uncanny Metabolism can refill correctly.
+        if (cs.level >= 2) {
+            c.focus_points_max = cs.level;
+            if (c.focus_points > c.focus_points_max) c.focus_points = c.focus_points_max;
+        }
+        // PHB 2024 Monk L2 Uncanny Metabolism (para 5334-5336): "When you roll
+        // Initiative, you can regain all expended Focus Points. When you do so, roll
+        // your Martial Arts die, and regain a number of Hit Points equal to your Monk
+        // level plus the number rolled. Once you use this feature, you can't use it
+        // again until you finish a Long Rest."
+        if (cs.level >= 2) {
+            c.uncanny_metabolism_available = true;
+        }
         // PHB 2024 Monk L6 Empowered Strikes: unarmed strike can deal force damage
         if (cs.level >= 6) c.empowered_strikes_active = true;
         // PHB 2024 Monk L7 Evasion: DEX save = 0 damage on success, half on failure
         if (cs.level >= 7) c.evasion_active = true;
+        // PHB 2024 Monk L10 Self-Restoration (para 5362-5364): "Through sheer force
+        // of will, you can remove one of the following conditions from yourself at the
+        // end of each of your turns: Charmed, Frightened, or Poisoned."
+        if (cs.level >= 10) c.self_restoration_active = true;
+        // PHB 2024 Monk L10 Heightened Focus (para 5357-5361): Flurry → 3 strikes,
+        // Patient Defense temp HP, Step of the Wind ally movement.
+        if (cs.level >= 10) c.heightened_focus_active = true;
+        // PHB 2024 Monk L14 Disciplined Survivor (para 5367-5369): "Your physical and
+        // mental discipline grant you proficiency in all saving throws. Additionally,
+        // whenever you make a saving throw and fail, you can expend 1 Focus Point to
+        // reroll it, and you must use the new roll."
+        if (cs.level >= 14) {
+            for (uint sp_i = 0; sp_i < 6; sp_i++) c.save_proficiencies[sp_i] = 1;
+            c.disciplined_survivor_active = true;
+        }
+        // PHB 2024 Monk L20 Body and Mind (para 5376-5377): "Your Dexterity and Wisdom
+        // scores increase by 4, to a maximum of 25." Applied at sheet level so AC,
+        // initiative, save bonuses all see the boost.
+        if (cs.level >= 20 and !c.body_and_mind_applied) {
+            int new_dex = c.ability_scores[ABILITY_DEX] + 4;
+            int new_wis = c.ability_scores[ABILITY_WIS] + 4;
+            if (new_dex > 25) new_dex = 25;
+            if (new_wis > 25) new_wis = 25;
+            c.ability_scores[ABILITY_DEX] = new_dex;
+            c.ability_scores[ABILITY_WIS] = new_wis;
+            c.body_and_mind_applied = true;
+        }
         // Sword Coast: Way of the Long Death
         if (cs.subclass == "Way of the Long Death" and cs.level >= 3) {
             c.long_death_active = true;

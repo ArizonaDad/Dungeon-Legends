@@ -178,6 +178,10 @@ int combat_history_cursor = -1;
 
 // Personal combat resources
 int my_focus_points = 0;
+int my_focus_points_max = 0;
+bool my_uncanny_metabolism_available = false;
+bool my_superior_defense_active = false;
+int my_superior_defense_rounds_remaining = 0;
 int my_lay_on_hands_pool = 0;
 int my_bardic_inspiration_uses = 0;
 int my_bardic_inspiration_grant_die = 0;
@@ -969,6 +973,27 @@ void show_bonus_action_menu() {
 	if (lc == "rogue" and level >= 2) cunning_opt = m.add_item("Cunning Action. Bonus action. Dash, Disengage, or Hide.");
 	if (lc == "paladin" and my_lay_on_hands_pool > 0) lay_hands_opt = m.add_item("Lay on Hands. Bonus action. Pool: " + my_lay_on_hands_pool + ".");
 	if (lc == "monk" and level >= 2) flurry_opt = m.add_item("Flurry of Blows. 1 Focus Point. Focus Points: " + my_focus_points + ".");
+	int patient_defense_opt = -1;
+	int step_of_wind_opt = -1;
+	int martial_arts_strike_opt = -1;
+	int uncanny_metabolism_opt = -1;
+	int superior_defense_opt = -1;
+	if (lc == "monk") {
+		// PHB 2024 Monk L1 Martial Arts Bonus Unarmed Strike (para 5319)
+		martial_arts_strike_opt = m.add_item("Martial Arts: Bonus Unarmed Strike. Bonus action. Free.");
+		if (level >= 2) {
+			// PHB 2024 Monk L2 Patient Defense (para 5330)
+			patient_defense_opt = m.add_item("Patient Defense. Bonus action. Disengage. Spend 1 Focus Point to also Dodge. Focus Points: " + my_focus_points + ".");
+			// PHB 2024 Monk L2 Step of the Wind (para 5331)
+			step_of_wind_opt = m.add_item("Step of the Wind. Bonus action. Dash. Spend 1 Focus Point to also Disengage. Focus Points: " + my_focus_points + ".");
+			// PHB 2024 Monk L2 Uncanny Metabolism (para 5334-5336)
+			if (my_uncanny_metabolism_available) uncanny_metabolism_opt = m.add_item("Uncanny Metabolism. Once per long rest. Regain all Focus Points and heal monk level plus Martial Arts die.");
+		}
+		if (level >= 18 and !my_superior_defense_active and my_focus_points >= 3) {
+			// PHB 2024 Monk L18 Superior Defense (para 5372-5373)
+			superior_defense_opt = m.add_item("Superior Defense. Spend 3 Focus Points. Resistance to all damage except Force for 1 minute.");
+		}
+	}
 	if (lc == "bard" and my_bardic_inspiration_uses > 0) bardic_opt = m.add_item("Bardic Inspiration. Bonus action. Uses left: " + my_bardic_inspiration_uses + ".");
 	if (lc == "druid" and level >= 2 and (currently_wild_shaped or subclass == "Circle of the Moon")) {
 		if (currently_wild_shaped) wild_shape_opt = m.add_item("Wild Shape. Revert or choose a new beast form.");
@@ -1417,6 +1442,27 @@ void show_bonus_action_menu() {
 	}
 	else if (flurry_opt >= 0 and res == flurry_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "flurry_of_blows"}, {"target_id", current_target_id}});
+	}
+	else if (patient_defense_opt >= 0 and res == patient_defense_opt) {
+		// PHB 2024 Monk L2 Patient Defense — auto-spend Focus Point if available.
+		send({{"type", message_types::bonus_action}, {"feature", "patient_defense"}, {"spend_focus", my_focus_points > 0}});
+	}
+	else if (step_of_wind_opt >= 0 and res == step_of_wind_opt) {
+		// PHB 2024 Monk L2 Step of the Wind — auto-spend Focus Point if available.
+		send({{"type", message_types::bonus_action}, {"feature", "step_of_the_wind"}, {"spend_focus", my_focus_points > 0}});
+	}
+	else if (martial_arts_strike_opt >= 0 and res == martial_arts_strike_opt) {
+		if (current_target_id == 0) {
+			speak("No target selected. Scan with I J K L and press Enter to lock a target.", true);
+			return;
+		}
+		send({{"type", message_types::bonus_action}, {"feature", "martial_arts_unarmed_strike"}, {"target_id", current_target_id}});
+	}
+	else if (uncanny_metabolism_opt >= 0 and res == uncanny_metabolism_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "uncanny_metabolism"}});
+	}
+	else if (superior_defense_opt >= 0 and res == superior_defense_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "superior_defense"}});
 	}
 	else if (bardic_opt >= 0 and res == bardic_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "bardic_inspiration"}, {"target_id", current_target_id}});
@@ -2997,6 +3043,10 @@ void parse_game_state(json_object@ msg) {
 	if (msg.exists("mode")) battle_mode = string(msg["mode"]);
 	if (msg.exists("wave")) wave_number = int(msg["wave"]);
 	my_focus_points = msg.exists("my_focus_points") ? int(msg["my_focus_points"]) : 0;
+	my_focus_points_max = msg.exists("my_focus_points_max") ? int(msg["my_focus_points_max"]) : 0;
+	my_uncanny_metabolism_available = msg.exists("my_uncanny_metabolism_available") ? bool(msg["my_uncanny_metabolism_available"]) : false;
+	my_superior_defense_active = msg.exists("my_superior_defense_active") ? bool(msg["my_superior_defense_active"]) : false;
+	my_superior_defense_rounds_remaining = msg.exists("my_superior_defense_rounds_remaining") ? int(msg["my_superior_defense_rounds_remaining"]) : 0;
 	my_lay_on_hands_pool = msg.exists("my_lay_on_hands_pool") ? int(msg["my_lay_on_hands_pool"]) : 0;
 	my_bardic_inspiration_uses = msg.exists("my_bardic_inspiration_uses") ? int(msg["my_bardic_inspiration_uses"]) : 0;
 	my_bardic_inspiration_grant_die = msg.exists("my_bardic_inspiration_grant_die") ? int(msg["my_bardic_inspiration_grant_die"]) : 0;
@@ -3150,6 +3200,10 @@ void reset_combat_state() {
 	scan_cursor = 0;
 	wave_number = 0;
 	my_focus_points = 0;
+	my_focus_points_max = 0;
+	my_uncanny_metabolism_available = false;
+	my_superior_defense_active = false;
+	my_superior_defense_rounds_remaining = 0;
 	my_lay_on_hands_pool = 0;
 	my_bardic_inspiration_uses = 0;
 	my_bardic_inspiration_grant_die = 0;
