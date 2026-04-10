@@ -3203,10 +3203,15 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         if (cs.level >= 20) c.eldritch_master_active = true;
 		// Eldritch Invocations: default combat-relevant invocations by level + pact.
 		// TODO: Build invocation selection prompt so players can choose their own set.
+		// No-prerequisite invocations (available from L1)
+		c.armor_of_shadows = true;   // Free Mage Armor on self (para 7808-7809)
+		c.eldritch_mind = true;      // Advantage on concentration saves (para 7823-7824)
 		if (cs.level >= 2) {
 			c.agonizing_blast = true;  // +CHA to EB damage (para 7749-7752)
 			c.repelling_blast = true;  // Push 10ft on EB hit (para 7831-7834)
 			c.devils_sight = true;     // See in darkness 120ft (para 7758-7760)
+			c.eldritch_spear = true;   // +30*level range on EB (para 7830-7832)
+			c.fiendish_vigor = true;   // Auto False Life max die (para 7835-7837)
 		}
 		if (c.pact_of_the_blade) {
 			if (cs.level >= 5) {
@@ -3220,6 +3225,18 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
 				c.extra_attacks = 2;
 			}
 		}
+		// Pact of the Tome: Gift of the Protectors (para 7849-7852)
+		if (c.pact_of_the_tome and cs.level >= 9) c.gift_of_the_protectors = true;
+		// Armor of Shadows: apply Mage Armor AC (13 + DEX) if higher than current
+		if (c.armor_of_shadows) {
+			int ma_ac = 13 + c.get_ability_mod(ABILITY_DEX);
+			if (ma_ac > c.armor_class) {
+				c.mage_armor_bonus = ma_ac - c.armor_class;
+				c.armor_class = ma_ac;
+			}
+		}
+		// Fiendish Vigor: auto False Life with max die = 2d4+4 max = 12 temp HP
+		if (c.fiendish_vigor and c.temp_hp < 12) c.temp_hp = 12;
     }
 
     // Ranger subclasses

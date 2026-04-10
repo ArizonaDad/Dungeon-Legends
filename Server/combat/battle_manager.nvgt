@@ -4961,7 +4961,9 @@ class battle_manager {
 		bool war_caster_adv = target.has_feat("war_caster");
 		// PHB 2024 Sorcerer Metamagic Extended Spell (para 7029): "you have Advantage
 		// on any Constitution saving throw you make to maintain Concentration on it."
-		bool conc_adv = war_caster_adv or target.extended_spell_concentration;
+		// Basic Rules 2024 Eldritch Mind (para 7823-7824): "You have Advantage on
+		// Constitution saving throws that you make to maintain Concentration."
+		bool conc_adv = war_caster_adv or target.extended_spell_concentration or target.eldritch_mind;
 
 		user@ u = find_user_for_combatant(target);
 		if (target.is_player and @u != null and !u.is_bot) {
@@ -4978,6 +4980,7 @@ class battle_manager {
 			if (conc_adv) pr.has_advantage = true;
 			if (mage_slayer_disadv) broadcast_announce(attacker.name + "'s Mage Slayer imposes disadvantage on " + target.name + "'s concentration save!", false);
 			if (war_caster_adv) broadcast_announce(target.name + " has advantage on the concentration save from War Caster!", false);
+			else if (target.eldritch_mind) broadcast_announce(target.name + " has advantage on the concentration save from Eldritch Mind!", false);
 			else if (conc_adv) broadcast_announce(target.name + " has advantage on the concentration save from Extended Spell!", false);
 			@current_roll = pr;
 
@@ -4989,6 +4992,7 @@ class battle_manager {
 				int r2 = random(1, 20);
 				if (r2 > natural) natural = r2;
 				if (war_caster_adv) broadcast_announce(target.name + " has advantage on the concentration save from War Caster!", false);
+				else if (target.eldritch_mind) broadcast_announce(target.name + " has advantage on the concentration save from Eldritch Mind!", false);
 				else broadcast_announce(target.name + " has advantage on the concentration save from Extended Spell!", false);
 			}
 			if (mage_slayer_disadv and !conc_adv) {
@@ -10717,6 +10721,8 @@ class battle_manager {
 			int effective_range = spell.range;
 			// Metamagic: Distant Spell — double range (para 6983-6984)
 			if (c.metamagic_distant_active and spell.range >= 5) effective_range = spell.range * 2;
+			// Basic Rules 2024 Eldritch Spear (para 7830-7832): increase range by 30*level
+			if (c.eldritch_spear and spell.id == "eldritch_blast") effective_range += 30 * c.level;
 			int target_dist = feet_distance(c.x, c.y, target.x, target.y);
 			if (target_dist > effective_range) {
 				u.send({{"type", message_types::announce}, {"text", "That target is out of range for " + spell.name + "."}, {"interrupt", true}});

@@ -259,6 +259,12 @@ class combatant {
 	bool lifedrinker = false;              // L9+, Pact of Blade: +1d6 necrotic on pact weapon hit (para 7801-7803)
 	bool lifedrinker_used_this_turn = false;
 	bool devouring_blade = false;          // L12+, Thirsting Blade: 3 attacks instead of 2 (para 7761-7763)
+	bool armor_of_shadows = false;        // L1+: free Mage Armor on self (para 7808-7809)
+	bool eldritch_mind = false;           // L1+: advantage on concentration saves (para 7823-7824)
+	bool eldritch_spear = false;          // L2+: +30*level range on EB (para 7830-7832)
+	bool fiendish_vigor = false;          // L2+: auto False Life max die 12 temp HP (para 7835-7837)
+	bool gift_of_the_protectors = false;  // L9+, Pact of Tome: drop to 1 HP instead of 0 1/LR (para 7849-7852)
+	bool gift_of_the_protectors_used = false;
 	// PHB 2024 Fighter L9 Tactical Master (para 5125-5126): replace weapon mastery with Push/Sap/Slow
 	bool tactical_master_active = false;
 	int tactical_master_mastery = 0; // MASTERY_PUSH, MASTERY_SAP, or MASTERY_SLOW
@@ -1895,6 +1901,17 @@ class battle {
 					target.cheat_death_used = true;
 					target.current_hp = 1 + target.level;
 					if (target.current_hp > target.max_hp) target.current_hp = target.max_hp;
+					return;
+				}
+			}
+			// Basic Rules 2024 Gift of the Protectors (para 7849-7852): "When any creature
+			// whose name is on the page is reduced to 0 Hit Points but not killed outright,
+			// the creature magically drops to 1 Hit Point instead."
+			if (target.gift_of_the_protectors and !target.gift_of_the_protectors_used and !target.is_dead) {
+				int gp_overflow = -target.current_hp;
+				if (gp_overflow < target.max_hp) {
+					target.gift_of_the_protectors_used = true;
+					target.current_hp = 1;
 					return;
 				}
 			}
