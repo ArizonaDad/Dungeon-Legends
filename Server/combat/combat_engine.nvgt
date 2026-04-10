@@ -155,6 +155,30 @@ class combatant {
 	bool reliable_talent_active = false;   // L11: treat d20 <=9 as 10 on checks using proficient skills
 	// Wizard PHB 2024 base class features
 	int arcane_recovery_charges = 0;       // L1: recover slots on short rest
+	// PHB 2024 Wizard L1 Ritual Adept (para 8616-8617): "You can cast any spell as a
+	// Ritual if that spell has the Ritual tag and the spell is in your spellbook. You
+	// needn't have the spell prepared, but you must read from the book to cast a spell
+	// in this way." Combat sim flag — actual ritual casting handled in spell pipeline.
+	bool ritual_adept_active = false;
+	// PHB 2024 Wizard L18 Spell Mastery (paras 8629-8631): "Choose a level 1 and a level
+	// 2 spell in your spellbook that have a casting time of an action. You always have
+	// those spells prepared, and you can cast them at their lowest level without expending
+	// a spell slot." Designations must come from the player; cast pipeline checks the
+	// spell ID against these strings before bypassing the slot.
+	bool spell_mastery_active = false;
+	string spell_mastery_l1_spell_id = ""; // player-designated L1 spell
+	string spell_mastery_l2_spell_id = ""; // player-designated L2 spell
+	// PHB 2024 Wizard L20 Signature Spells (para 8634-8635): "Choose two level 3 spells
+	// in your spellbook as your signature spells. You always have these spells prepared,
+	// and you can cast each of them once at level 3 without expending a spell slot. When
+	// you do so, you can't cast them in this way again until you finish a Short or Long
+	// Rest." Two charges that refresh on short rest.
+	int signature_spells_charges_remaining = 0;
+	int signature_spells_charges_max = 0;
+	string signature_spell_a_id = ""; // first player-designated L3 spell
+	string signature_spell_b_id = ""; // second player-designated L3 spell
+	bool signature_spell_a_used_this_rest = false;
+	bool signature_spell_b_used_this_rest = false;
 	// Druid PHB 2024 base class features
 	bool wild_companion_active = false;    // L2: cast Find Familiar via Wild Shape
 	bool elemental_fury_active = false;    // L7: damage type swap on Wild Shape attacks
@@ -1677,6 +1701,14 @@ class battle {
 				state["my_mystic_arcanum_7_available"] = c.mystic_arcanum_7_available;
 				state["my_mystic_arcanum_8_available"] = c.mystic_arcanum_8_available;
 				state["my_mystic_arcanum_9_available"] = c.mystic_arcanum_9_available;
+				// PHB 2024 Wizard L18 Spell Mastery / L20 Signature Spells
+				state["my_spell_mastery_active"] = c.spell_mastery_active;
+				state["my_spell_mastery_l1_spell_id"] = c.spell_mastery_l1_spell_id;
+				state["my_spell_mastery_l2_spell_id"] = c.spell_mastery_l2_spell_id;
+				state["my_signature_spells_charges_remaining"] = c.signature_spells_charges_remaining;
+				state["my_signature_spells_charges_max"] = c.signature_spells_charges_max;
+				state["my_signature_spell_a_id"] = c.signature_spell_a_id;
+				state["my_signature_spell_b_id"] = c.signature_spell_b_id;
 				// Potion buff rounds remaining
 				state["my_potion_damage_rounds"] = c.potion_damage_rounds;
 				state["my_potion_ac_rounds"] = c.potion_ac_rounds;

@@ -7062,6 +7062,8 @@ class battle_manager {
 			// Material components." If the Cleric activated Divine Intervention this
 			// battle and the spell is a Cleric spell of level <=5, the flag bypasses
 			// slot consumption.
+			bool used_spell_mastery = false;
+			bool used_signature_spell = false;
 			if (c.divine_intervention_ready and c.class_name == "Cleric" and spell.level <= 5) {
 				c.divine_intervention_ready = false;
 				used_divine_intervention = true;
@@ -7069,6 +7071,28 @@ class battle_manager {
 			} else if (c.get_free_cast_uses_remaining(spell.id) > 0) {
 				used_free_cast = c.use_free_cast(spell.id);
 				cast_slot_level = spell.level;
+			} else if (c.class_name == "Wizard" and c.spell_mastery_active and spell.level == 1 and spell.id == c.spell_mastery_l1_spell_id) {
+				// PHB 2024 Wizard L18 Spell Mastery (paras 8629-8631): designated L1
+				// spell can be cast at base level without expending a slot.
+				used_spell_mastery = true;
+				cast_slot_level = 1;
+			} else if (c.class_name == "Wizard" and c.spell_mastery_active and spell.level == 2 and spell.id == c.spell_mastery_l2_spell_id) {
+				// Designated L2 Spell Mastery spell.
+				used_spell_mastery = true;
+				cast_slot_level = 2;
+			} else if (c.class_name == "Wizard" and spell.level == 3 and spell.id == c.signature_spell_a_id and !c.signature_spell_a_used_this_rest) {
+				// PHB 2024 Wizard L20 Signature Spells (para 8634-8635): first
+				// designated L3 spell, free at L3 once per Short Rest.
+				c.signature_spell_a_used_this_rest = true;
+				if (c.signature_spells_charges_remaining > 0) c.signature_spells_charges_remaining--;
+				used_signature_spell = true;
+				cast_slot_level = 3;
+			} else if (c.class_name == "Wizard" and spell.level == 3 and spell.id == c.signature_spell_b_id and !c.signature_spell_b_used_this_rest) {
+				// Second designated L3 Signature Spell.
+				c.signature_spell_b_used_this_rest = true;
+				if (c.signature_spells_charges_remaining > 0) c.signature_spells_charges_remaining--;
+				used_signature_spell = true;
+				cast_slot_level = 3;
 			} else {
 				int slot_used = -1;
 				for (int sl = spell.level; sl <= 9; sl++) {
@@ -7087,6 +7111,8 @@ class battle_manager {
 			reveal_hidden_combatant(c, "casting a spell");
 			if (used_divine_intervention) broadcast_announce(c.name + " casts " + spell.name + " through Divine Intervention — no spell slot consumed!", true);
 			else if (used_free_cast) broadcast_announce(c.name + " casts " + spell.name + " using a free casting.", false);
+			else if (used_spell_mastery) broadcast_announce(c.name + " casts " + spell.name + " through Spell Mastery — no spell slot consumed!", true);
+			else if (used_signature_spell) broadcast_announce(c.name + " unleashes " + spell.name + " as a Signature Spell — no spell slot consumed!", true);
 			else broadcast_announce(c.name + " casts " + spell.name + " using a level " + cast_slot_level + " spell slot.", false);
 
 			// Wild Magic Sorcerer: Wild Magic Surge (d20, on 1 trigger a random effect)

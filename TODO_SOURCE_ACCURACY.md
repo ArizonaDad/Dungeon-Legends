@@ -436,6 +436,28 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 - Magical Cunning duration — currently collapses the 1-minute rite to a single Magic action because 10 rounds of standing still is unusable in combat. Source-accurate behavior would require a "rite in progress" state that ticks down per round and breaks on offensive actions.
 - Pact Boon (Blade/Chain/Tome/Talisman) selection prompt at L3 — currently defaults to Pact of the Tome since the source mandates a player choice.
 
+### Wizard Audit (2026-04-09) — Basic Rules 2024 paras 8298-8635
+
+| Feature | Level | Source para | Status |
+|---------|-------|-------------|--------|
+| **Spellcasting** (INT, Arcane Focus or spellbook) | 1 | 8597-8610 | ✓ Done — `cs.is_caster=true`, `spellcasting_ability=ABILITY_INT`, full caster slot table. |
+| **Ritual Adept** (cast any Ritual-tagged spellbook spell as ritual without prep) | 1 | 8616-8617 | PARTIAL 2026-04-09 — `ritual_adept_active` flag set on Wizard init. Actual ritual casting hook (no-slot, no-prep, +10 minutes) not yet wired into spell pipeline. Would need Ritual tag on `spell_data` entries first. |
+| **Arcane Recovery** (recover slots half level round up, none L6+, 1/LR via short rest) | 1 | 8618-8620 | ✓ Done — `arcane_recovery_charges = 1`, bonus action handler in `users _dom.nvgt`, greedy slot recovery loop. |
+| **Scholar** (Expertise in chosen knowledge skill) | 2 | 8621-8622 | DEFERRED — needs player choice prompt at level-up to designate Arcana/History/Investigation/Medicine/Nature/Religion. Skill expertise system exists but no wizard-specific selector. |
+| **Wizard Subclass** | 3 | 8623-8624 | ✓ Done — Evoker, Diviner, Abjurer, Illusionist, War Magic, Bladesinging, Order of Scribes, Chronurgy Magic, Graviturgy Magic, Materializer, Wand Lore, Shadow Arcane Tradition, etc. |
+| **Ability Score Improvement** | 4/8/12/16 | 8625-8626 | ✓ Done — global feat-grant system. |
+| **Memorize Spell** (swap one prepared spell on short rest) | 5 | 8627-8628 | DEFERRED — needs short rest subsystem and prepared-spell-list mutator UI. |
+| **Spell Mastery** (chosen L1+L2 spells castable at base level without slot) | 18 | 8629-8631 | PARTIAL 2026-04-09 — `spell_mastery_active` flag set on init. Slot bypass wired into `cast_spell` pipeline in battle_manager.nvgt: if `spell.id == c.spell_mastery_l1_spell_id` (or l2), the cast skips slot consumption with announcement "casts X through Spell Mastery — no spell slot consumed!". `spell_mastery_l1_spell_id` and `spell_mastery_l2_spell_id` strings default to empty; the player must designate (level-up choice prompt deferred). |
+| **Epic Boon** | 19 | 8632-8633 | ✓ Done — Epic Boon feat catalog. |
+| **Signature Spells** (two L3 spells castable at L3 without slot, 1/short rest each) | 20 | 8634-8635 | PARTIAL 2026-04-09 — `signature_spells_charges_max = 2` and `signature_spells_charges_remaining = 2` set on L20 init. Slot bypass wired in cast pipeline for `signature_spell_a_id` and `signature_spell_b_id` (separate `_used_this_rest` flags per spell). The two designation strings default to empty; the player must designate. Short rest reset deferred (currently only long rest). |
+
+**Pending follow-up Wizard batches:**
+- Spell Mastery designation prompt at L18 — player picks 1 L1 + 1 L2 spell from spellbook (the spell IDs are fields in `combatant`, just need a level-up UI flow to set them).
+- Signature Spells designation prompt at L20 — same as above for two L3 spells.
+- Scholar L2 expertise prompt at L2 — knowledge skill picker.
+- Memorize Spell L5 — short rest subsystem dependency.
+- Ritual Adept L1 spell pipeline integration — needs `Ritual` tag on spell data entries and a separate ritual cast path that consumes 10 minutes (or 11 minutes per source) and skips slot/prep requirements for spellbook ritual spells.
+
 - **Paladin:** Lay on Hands (pool size), Divine Smite (slot-based in 2024), Aura of Courage, Cleansing Touch — all addressed in 2026-04-09 audit; remaining items in pending list above.
 - **Ranger:** Favored Enemy / Roving / Tireless / Relentless Hunter / Nature's Veil / Precise Hunter / Feral Senses / Foe Slayer all addressed 2026-04-09; deferred items in Ranger pending list above.
 - **Rogue:** Sneak Attack base case / Steady Aim / Uncanny Dodge / Reliable Talent L7 fix / Slippery Mind / Elusive / Stroke of Luck flag all addressed 2026-04-09; deferred Cunning Strike family in Rogue pending list above.

@@ -2122,6 +2122,19 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         // and none of the slots can be level 6 or higher."
         // Charge count = 1 per long rest (1/day per source).
         c.arcane_recovery_charges = 1;
+        // PHB 2024 Wizard L1 Ritual Adept (paras 8616-8617): "You can cast any spell
+        // as a Ritual if that spell has the Ritual tag and the spell is in your
+        // spellbook. You needn't have the spell prepared..."
+        c.ritual_adept_active = true;
+        // PHB 2024 Wizard L18 Spell Mastery (paras 8629-8631): chosen L1+L2 spells
+        // castable at will without expending slots.
+        if (cs.level >= 18) c.spell_mastery_active = true;
+        // PHB 2024 Wizard L20 Signature Spells (paras 8634-8635): two L3 spells
+        // castable once each per Short Rest without a slot.
+        if (cs.level >= 20) {
+            c.signature_spells_charges_max = 2;
+            c.signature_spells_charges_remaining = 2;
+        }
         if (cs.subclass == "Materializer" and cs.level >= 2) {
             c.materializer_object = true;
         }
