@@ -3466,6 +3466,12 @@ class battle_manager {
 			c.risk_dice_current++;
 			broadcast_announce(c.name + "'s Dire Gambit regains a Risk Die from rolling Initiative! (" + c.risk_dice_current + "/" + c.risk_dice_max + ")", false);
 		}
+		// PHB 2024 Druid L20 Archdruid: "If you have no uses of Wild Shape left,
+		// you regain one expended use of it."
+		if (c.class_name == "Druid" and c.level >= 20 and c.wild_shape_uses <= 0) {
+			c.wild_shape_uses = 1;
+			broadcast_announce(c.name + "'s Archdruid restores 1 Wild Shape use!", false);
+		}
 		@current_roll = pr;
 
 		if (@u != null and !u.is_bot and c.is_player) {
@@ -3749,6 +3755,8 @@ class battle_manager {
 					if (@caster == null or caster.is_dead) continue;
 					if (caster.concentration_spell == "Fear" and caster.is_concentrating) {
 						int save_roll = random(1, 20);
+						// Aberrant Mind L6 Psychic Defenses / Fey Ancestry: advantage on charm/frighten saves
+						if (prev.charm_frighten_save_advantage) { int r2 = random(1, 20); if (r2 > save_roll) save_roll = r2; }
 						int save_bonus = prev.get_save_bonus(ABILITY_WIS);
 						int save_dc_val = spell_save_dc(caster);
 						int save_total = save_roll + save_bonus;
@@ -9194,6 +9202,7 @@ class battle_manager {
 				for (uint ti = 0; ti < targets_hit.length(); ti++) {
 					combatant@ t = targets_hit[ti];
 					int save_roll = random(1, 20);
+					if (t.charm_frighten_save_advantage) { int r2 = random(1, 20); if (r2 > save_roll) save_roll = r2; }
 					int save_bonus = t.get_save_bonus(ABILITY_WIS);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -9223,6 +9232,7 @@ class battle_manager {
 				for (uint ti = 0; ti < targets_hit.length(); ti++) {
 					combatant@ t = targets_hit[ti];
 					int save_roll = random(1, 20);
+					if (t.charm_frighten_save_advantage) { int r2 = random(1, 20); if (r2 > save_roll) save_roll = r2; }
 					int save_bonus = t.get_save_bonus(ABILITY_WIS);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
@@ -9496,6 +9506,7 @@ class battle_manager {
 				// or become frightened of you until the spell ends. A construct or an
 				// undead is immune to this effect."
 				int save_roll = random(1, 20);
+				if (target.charm_frighten_save_advantage) { int r2 = random(1, 20); if (r2 > save_roll) save_roll = r2; }
 				int save_bonus = target.get_save_bonus(ABILITY_WIS);
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
@@ -10177,6 +10188,7 @@ class battle_manager {
 				int total_damage = 0;
 				for (int d = 0; d < dice_count; d++) total_damage += random(1, 10);
 				int save_roll = random(1, 20);
+				if (target.charm_frighten_save_advantage) { int r2 = random(1, 20); if (r2 > save_roll) save_roll = r2; }
 				int save_bonus = target.get_save_bonus(ABILITY_WIS);
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
@@ -10761,6 +10773,7 @@ class battle_manager {
 				// Panicked (Frightened), or Sickened (disadvantage on attacks + ability checks).
 				// Defaults to Panicked since Unconscious auto-kills monsters.
 				int save_roll = random(1, 20);
+				if (target.charm_frighten_save_advantage) { int r2 = random(1, 20); if (r2 > save_roll) save_roll = r2; }
 				int save_bonus = target.get_save_bonus(ABILITY_WIS);
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
@@ -11248,6 +11261,7 @@ class battle_manager {
 				// Basic Rules para 12980: "One Humanoid you can see within range must succeed
 				// on a Wisdom saving throw or have the Charmed condition for the duration."
 				int save_roll = random(1, 20);
+				if (target.charm_frighten_save_advantage) { int r2 = random(1, 20); if (r2 > save_roll) save_roll = r2; }
 				int save_bonus = target.get_save_bonus(ABILITY_WIS);
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
@@ -11278,6 +11292,7 @@ class battle_manager {
 			}
 			else if (spell.id == "charm_person" and @target != null) {
 				int save_roll = random(1, 20);
+				if (target.charm_frighten_save_advantage) { int r2 = random(1, 20); if (r2 > save_roll) save_roll = r2; }
 				int save_bonus = target.get_save_bonus(ABILITY_WIS);
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
@@ -11988,6 +12003,7 @@ class battle_manager {
 			}
 			else if (spell.id == "dominate_monster" and @target != null) {
 				int save_roll = random(1, 20);
+				if (target.charm_frighten_save_advantage) { int r2 = random(1, 20); if (r2 > save_roll) save_roll = r2; }
 				int save_bonus = target.get_save_bonus(ABILITY_WIS);
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
@@ -12417,6 +12433,7 @@ class battle_manager {
 			}
 			else if (spell.id == "charm_monster" and @target != null) {
 				int save_roll = random(1, 20);
+				if (target.charm_frighten_save_advantage) { int r2 = random(1, 20); if (r2 > save_roll) save_roll = r2; }
 				int save_bonus = target.get_save_bonus(ABILITY_WIS);
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
@@ -12441,6 +12458,7 @@ class battle_manager {
 			}
 			else if (spell.id == "dominate_beast" and @target != null) {
 				int save_roll = random(1, 20);
+				if (target.charm_frighten_save_advantage) { int r2 = random(1, 20); if (r2 > save_roll) save_roll = r2; }
 				int save_bonus = target.get_save_bonus(ABILITY_WIS);
 				int bless_bonus = roll_bless_bonus(target);
 				int save_total = save_roll + save_bonus + bless_bonus;
@@ -13375,6 +13393,7 @@ class battle_manager {
 					int dmg = 0;
 					for (int d = 0; d < dice_count; d++) dmg += random(1, 10);
 					int save_roll = random(1, 20);
+					if (t.charm_frighten_save_advantage) { int r2 = random(1, 20); if (r2 > save_roll) save_roll = r2; }
 					int save_bonus = t.get_save_bonus(ABILITY_WIS);
 					int bless_bonus = roll_bless_bonus(t);
 					int save_total = save_roll + save_bonus + bless_bonus;
