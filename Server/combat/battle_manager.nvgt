@@ -1558,6 +1558,12 @@ class battle_manager {
 			int dex_mod = c.get_ability_mod(ABILITY_DEX);
 			if (dex_mod > ability_mod) ability_mod = dex_mod;
 		}
+		// Xanathar's Hexblade L1 Hex Warrior (paras 2275-2277): CHA for melee
+		// weapon attacks with non-two-handed weapons.
+		if (c.class_name == "Warlock" and c.subclass == "Hexblade" and !c.main_hand_is_ranged and !weapon_qualifies_great_weapon_fighting(c.main_hand)) {
+			int cha_mod = c.get_ability_mod(ABILITY_CHA);
+			if (cha_mod > ability_mod) ability_mod = cha_mod;
+		}
 		return ability_mod;
 	}
 
@@ -1866,8 +1872,21 @@ class battle_manager {
 	int roll_attack_damage_natural(combatant@ attacker, pending_roll@ pr) {
 		if (@pr == null) return 0;
 		int total = 0;
+		int min_die = pr.damage_dice_sides + 1; // track lowest die for Piercer
 		for (int di = 0; di < pr.damage_dice_count; di++) {
-			total += roll_single_attack_damage_die(attacker, pr);
+			int r = roll_single_attack_damage_die(attacker, pr);
+			total += r;
+			if (r < min_die) min_die = r;
+		}
+		// PHB 2024 Piercer (para 7707): "Once per turn when you hit a creature with
+		// an attack that deals Piercing damage, you can reroll one of the attack's
+		// damage dice, and you must use the new roll."
+		if (@attacker != null and attacker.has_feat("piercer") and pr.damage_type == DMG_PIERCING and !attacker.piercer_reroll_used_this_turn and pr.damage_dice_count > 0) {
+			attacker.piercer_reroll_used_this_turn = true;
+			int new_roll = roll_single_attack_damage_die(attacker, pr);
+			int old_min = min_die;
+			total = total - old_min + new_roll;
+			broadcast_announce(attacker.name + "'s Piercer rerolls lowest damage die (" + old_min + " -> " + new_roll + ").", false);
 		}
 		if (@attacker != null and attacker.has_feat("savage_attacker") and !attacker.savage_attacker_used and pr.damage_dice_count > 0) {
 			int reroll_total = 0;
@@ -2410,6 +2429,15 @@ class battle_manager {
 					if (damage < 1) damage = 1;
 					broadcast_announce(t.name + "'s Evasion reduces the failed save to half damage.", false);
 				}
+			}
+			// PHB 2024 Shield Master Interpose (para 7797): "If you're subjected to
+			// an effect that allows you to make a DEX save to take only half damage,
+			// you can use your Reaction to take no damage if you succeed, interposing
+			// your shield." Functions like Evasion but consumes reaction.
+			else if (saved and t.has_feat("shield_master") and t.has_shield and pr.spell_save_type == ABILITY_DEX and !t.has_condition(COND_INCAPACITATED) and t.has_reaction) {
+				damage = 0;
+				t.has_reaction = false;
+				broadcast_announce(t.name + "'s Shield Master interposes their shield — no damage!", false);
 			}
 
 			bool aoe_target_was_full = (t.current_hp == t.max_hp);
@@ -4021,6 +4049,29 @@ class battle_manager {
 				broadcast_announce(leader.name + "'s Inspiring Leader grants " + leader.inspiring_leader_temp_hp_pool + " temporary hit points to " + granted + " ally" + (granted == 1 ? "" : "ies") + ".", false);
 			}
 		}
+		// PHB 2024 Musician Origin feat: grant Heroic Inspiration at battle start
+		for (uint mu = 0; mu < combat.combatants.length(); mu++) {
+			combatant@ musician = combat.combatants[mu];
+			if (@musician == null or musician.is_dead or !musician.is_player) continue;
+			if (!musician.has_feat("musician")) continue;
+			int cha_mod = musician.get_ability_mod(ABILITY_CHA);
+			int max_targets = musician.proficiency + cha_mod;
+			if (max_targets < 1) max_targets = 1;
+			int granted_hi = 0;
+			for (uint mg = 0; mg < combat.combatants.length() and granted_hi < max_targets; mg++) {
+				combatant@ ally = combat.combatants[mg];
+				if (@ally == null or ally.is_dead) continue;
+				if (ally.is_player != musician.is_player) continue;
+				if (feet_distance(musician.x, musician.y, ally.x, ally.y) > 30) continue;
+				if (!ally.has_heroic_inspiration) {
+					ally.has_heroic_inspiration = true;
+					granted_hi++;
+				}
+			}
+			if (granted_hi > 0) {
+				broadcast_announce(musician.name + "'s Musician performance grants Heroic Inspiration to " + granted_hi + " allies!", false);
+			}
+		}
 
 		// Delay initiative to let clients enter combat loop.
 		initiative_phase = true;
@@ -4738,7 +4789,7 @@ class battle_manager {
 				}
 			}
 		}
-		// PHB 2024 Crusher crit: clear advantage on targets this combatant crushed
+		// PHB 2024 Crusher crit / Slasher crit+hamstring: clear effects this combatant applied
 		for (uint cr = 0; cr < combat.combatants.length(); cr++) {
 			combatant@ cr_t = combat.combatants[cr];
 			if (@cr_t != null and cr_t.crusher_crit_advantage and cr_t.crusher_crit_source_id == c.id) {
@@ -4749,6 +4800,12 @@ class battle_manager {
 			if (@cr_t != null and cr_t.slasher_crit_disadvantage and cr_t.slasher_crit_source_id == c.id) {
 				cr_t.slasher_crit_disadvantage = false;
 				cr_t.slasher_crit_source_id = 0;
+			}
+			// PHB 2024 Slasher hamstring: restore speed on targets this combatant hamstrung
+			if (@cr_t != null and cr_t.slasher_hamstring_active and cr_t.slasher_hamstring_source_id == c.id) {
+				cr_t.speed += 10;
+				cr_t.slasher_hamstring_active = false;
+				cr_t.slasher_hamstring_source_id = 0;
 			}
 		}
 		c.mastery_sap_active = false;
@@ -5209,6 +5266,55 @@ class battle_manager {
 			}
 			if (granted > 0) {
 				broadcast_announce(leader.name + "'s Inspiring Leader grants " + leader.inspiring_leader_temp_hp_pool + " temporary HP to " + granted + " allies after rest.", false);
+			}
+		}
+		// PHB 2024 Musician Origin feat: "As you finish a Short or Long Rest, you
+		// can play a song... Choose a number of creatures equal to your Proficiency
+		// Bonus + your Charisma modifier (minimum of one creature). Those creatures
+		// each gain Heroic Inspiration."
+		for (uint mu = 0; mu < combat.combatants.length(); mu++) {
+			combatant@ musician = combat.combatants[mu];
+			if (@musician == null or musician.is_dead or !musician.is_player) continue;
+			if (!musician.has_feat("musician")) continue;
+			int cha_mod = musician.get_ability_mod(ABILITY_CHA);
+			int max_targets = musician.proficiency + cha_mod;
+			if (max_targets < 1) max_targets = 1;
+			int granted_hi = 0;
+			for (uint mg = 0; mg < combat.combatants.length() and granted_hi < max_targets; mg++) {
+				combatant@ ally = combat.combatants[mg];
+				if (@ally == null or ally.is_dead) continue;
+				if (ally.is_player != musician.is_player) continue;
+				if (feet_distance(musician.x, musician.y, ally.x, ally.y) > 30) continue;
+				if (!ally.has_heroic_inspiration) {
+					ally.has_heroic_inspiration = true;
+					granted_hi++;
+				}
+			}
+			if (granted_hi > 0) {
+				broadcast_announce(musician.name + "'s Musician performance grants Heroic Inspiration to " + granted_hi + " allies!", false);
+			}
+		}
+		// PHB 2024 Chef feat (para 7568): "As part of a Short Rest, you can cook
+		// special food... any creature who eats the food regains an extra 1d8 HP."
+		for (uint ch = 0; ch < combat.combatants.length(); ch++) {
+			combatant@ chef = combat.combatants[ch];
+			if (@chef == null or chef.is_dead or !chef.is_player) continue;
+			if (!chef.has_feat("chef")) continue;
+			int max_servings = 4 + chef.proficiency;
+			int fed = 0;
+			for (uint cg = 0; cg < combat.combatants.length() and fed < max_servings; cg++) {
+				combatant@ ally = combat.combatants[cg];
+				if (@ally == null or ally.is_dead) continue;
+				if (ally.is_player != chef.is_player) continue;
+				if (ally.current_hp < ally.max_hp) {
+					int chef_heal = random(1, 8);
+					ally.current_hp += chef_heal;
+					if (ally.current_hp > ally.max_hp) ally.current_hp = ally.max_hp;
+					fed++;
+				}
+			}
+			if (fed > 0) {
+				broadcast_announce(chef.name + "'s Chef cooking restores extra HP to " + fed + " allies!", false);
 			}
 		}
 		broadcast_state();
@@ -7938,7 +8044,8 @@ class battle_manager {
 				broadcast_announce(c.name + "'s Piercer adds " + extra + " extra piercing damage on the crit!", false);
 			}
 			// Feat: Crusher — push target 5ft on bludgeoning damage (once per turn)
-			if (c.has_feat("crusher") and pr.damage_type == DMG_BLUDGEONING and !c.crusher_used_this_turn) {
+			// PHB 2024 para 7579: "no more than one size larger than you"
+			if (c.has_feat("crusher") and pr.damage_type == DMG_BLUDGEONING and !c.crusher_used_this_turn and target.size <= c.size + 1) {
 				c.crusher_used_this_turn = true;
 				int push_dx = 0, push_dy = 0;
 				if (target.x > c.x) push_dx = 1;
@@ -7957,10 +8064,13 @@ class battle_manager {
 				broadcast_announce(c.name + "'s Crusher critical — all attacks have Advantage against " + target.name + "!", true);
 			}
 			// Feat: Slasher — reduce target speed by 10 on slashing damage (once per turn)
+			// PHB 2024 para 7597: "until the start of your next turn"
 			if (c.has_feat("slasher") and pr.damage_type == DMG_SLASHING and !c.slasher_used_this_turn) {
 				c.slasher_used_this_turn = true;
 				target.speed -= 10;
 				if (target.speed < 0) target.speed = 0;
+				target.slasher_hamstring_active = true;
+				target.slasher_hamstring_source_id = c.id;
 				broadcast_announce(c.name + "'s Slasher reduces " + target.name + "'s speed by 10 feet!", false);
 			}
 			// PHB 2024 Slasher (para 7597): "Once per turn, on crit with slashing,
@@ -9953,15 +10063,19 @@ class battle_manager {
 		// PHB 2024 Prone condition (para 16240): "The creature can crawl or spend
 		// half its movement to stand up and thereby end the condition." Standing
 		// costs half total speed; deducted before the move.
+		// PHB 2024 Athlete (para 7557): standing from prone costs 0 movement.
 		if (c.has_condition(COND_PRONE)) {
-			int stand_cost = c.speed / 2;
+			int stand_cost = c.has_feat("athlete") ? 0 : c.speed / 2;
 			if (c.movement_remaining < stand_cost + 5) {
 				u.send({{"type", message_types::error}, {"text", "You need " + (stand_cost + 5) + " feet of movement to stand up and move (" + stand_cost + " to stand, 5 to move). " + c.movement_remaining + " feet remaining."}});
 				return;
 			}
-			c.movement_remaining -= stand_cost;
+			if (stand_cost > 0) c.movement_remaining -= stand_cost;
 			c.remove_condition(COND_PRONE);
-			broadcast_announce(c.name + " stands up (" + stand_cost + " ft used).", false);
+			string stand_msg = c.name + " stands up";
+			if (stand_cost > 0) stand_msg += " (" + stand_cost + " ft used)";
+			else stand_msg += " instantly (Athlete)";
+			broadcast_announce(stand_msg + ".", false);
 		}
 
 		int move_cost = (dx != 0 and dy != 0) ? 5 : 5;  // Simplified: 5 ft per tile.

@@ -345,6 +345,8 @@ class combatant {
 	bool slasher_used_this_turn = false;
 	bool slasher_crit_disadvantage = false; // PHB 2024 Slasher: disadvantage on target's attacks
 	uint slasher_crit_source_id = 0; // Who applied the slasher crit (clears at their turn start)
+	bool slasher_hamstring_active = false; // PHB 2024 Slasher: -10ft speed until attacker's next turn
+	uint slasher_hamstring_source_id = 0; // Who applied the hamstring
 	bool piercer_reroll_used_this_turn = false;
 	int temp_ac_bonus_this_attack = 0; // Defensive Duelist reaction
 	// Subclass feature tracking (Xanathar's/Tasha's)
@@ -1187,6 +1189,10 @@ class combatant {
 		// Tasha's Rune Knight L3 Giant's Might (para 3125-3130): "You have Advantage
 		// on Strength checks and Strength saving throws." while active.
 		if (giants_might_active and ability_id == ABILITY_STR) mod += 5;
+		// PHB 2024 Shield Master (para 7796): "You add your Shield's AC Bonus to
+		// any Dexterity saving throw you make against a spell or other harmful
+		// effect that targets only you." Shield grants +2 AC.
+		if (has_feat("shield_master") and has_shield and ability_id == ABILITY_DEX) mod += 2;
 		return mod;
 	}
 
