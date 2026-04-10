@@ -964,6 +964,10 @@ class combatant {
 	bool hunter_colossus_used = false;
 	// PHB 2024 Charger feat (para 1394-1403): +10ft on Dash, +1d8 melee after moving 10+ ft
 	bool charger_dash_active = false;
+	// PHB 2024 Boon of Dimensional Travel (para 7876): Blink Steps —
+	// teleport 30 ft after Attack or Magic action. Free 1/turn.
+	bool blink_steps_available = false;
+	bool blink_steps_used_this_turn = false;
 	// PHB 2024 Mage Slayer Guarded Mind (para 7693): "If you fail an Intelligence,
 	// Wisdom, or Charisma saving throw, you can cause yourself to succeed instead.
 	// Once you use this benefit, you can't use it again until you finish a Short or
@@ -973,6 +977,10 @@ class combatant {
 	// a number of Hit Points equal to half your Hit Point Maximum (round down). Once
 	// you use this benefit, you can't use it again until you finish a Long Rest."
 	bool boon_of_recovery_used = false;
+	// PHB 2024 Boon of Fate (para 7877): "When you or another creature within
+	// 60 feet succeeds on or fails a D20 Test, roll 2d4 as bonus or penalty.
+	// 1/Short Rest or Initiative."
+	bool boon_of_fate_used = false;
 	// PHB 2024 Boon of Spell Recall (para 7882): "You can cast any spell you have
 	// prepared at its base level without expending a spell slot. Once you cast a spell
 	// in this way, you can't use this benefit again until you finish a Long Rest."
@@ -2166,6 +2174,8 @@ class battle {
 				state["my_divine_soul_affinity"] = c.divine_soul_affinity;
 				state["my_otherworldly_wings_active"] = c.otherworldly_wings_active;
 				state["my_unearthly_recovery_available"] = c.unearthly_recovery_available;
+				// PHB 2024 Boon of Dimensional Travel (para 7876)
+				state["my_blink_steps_available"] = c.blink_steps_available;
 				// PHB 2024 Elemental Adept type (para 7610)
 				string ea_str = "";
 				if (c.elemental_adept_acid) ea_str = "acid";
@@ -2176,6 +2186,7 @@ class battle {
 				state["my_elemental_adept_type"] = ea_str;
 				// PHB 2024 Epic Boon state
 				state["my_boon_of_recovery_used"] = c.boon_of_recovery_used;
+				state["my_boon_of_fate_used"] = c.boon_of_fate_used;
 				state["my_boon_of_spell_recall_used"] = c.boon_of_spell_recall_used;
 				// Xanathar's Shadow Magic (paras 2557-2607)
 				state["my_shadow_walk_available"] = c.shadow_walk_available;

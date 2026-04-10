@@ -1960,6 +1960,51 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.room.bm.combat.apply_healing(c, heal);
 			u.room.bm.broadcast_announce(c.name + " invokes Boon of Recovery and regains " + heal + " hit points!", true);
 		}
+		else if (feature == "blink_steps") {
+			// PHB 2024 Boon of Dimensional Travel (para 7876): "Immediately after you
+			// take the Attack action or the Magic action, you can teleport up to 30 feet
+			// to an unoccupied space you can see." Free action, 1/action.
+			if (!c.has_feat("boon_of_dimensional_travel")) {
+				u.send({{"type", message_types::announce}, {"text", "Your character does not have Boon of Dimensional Travel."}, {"interrupt", true}});
+				return;
+			}
+			if (!c.blink_steps_available) {
+				u.send({{"type", message_types::announce}, {"text", "Blink Steps requires taking the Attack or Magic action first."}, {"interrupt", true}});
+				return;
+			}
+			if (c.blink_steps_used_this_turn) {
+				u.send({{"type", message_types::announce}, {"text", "You already used Blink Steps this turn."}, {"interrupt", true}});
+				return;
+			}
+			c.blink_steps_used_this_turn = true;
+			c.blink_steps_available = false;
+			// Teleport adjacent to current target, or nearest enemy if no target
+			combatant@ target = u.room.bm.combat.get_combatant(target_id);
+			if (@target == null or target.is_dead) @target = u.room.bm.find_nearest_hostile_target(c);
+			if (@target != null and !target.is_dead) {
+				int dist = feet_distance(c.x, c.y, target.x, target.y);
+				if (dist <= 30) {
+					c.x = target.x;
+					c.y = target.y + 1;
+					u.room.bm.broadcast_announce(c.name + " Blink Steps to " + target.name + "!", true);
+				} else {
+					// Move 30 ft toward the target
+					int dx = target.x - c.x;
+					int dy = target.y - c.y;
+					int tiles = 6; // 30 ft / 5 ft per tile
+					if (dx != 0 or dy != 0) {
+						float fdist = sqrt(float(dx * dx + dy * dy));
+						int move_x = int(float(dx) / fdist * tiles);
+						int move_y = int(float(dy) / fdist * tiles);
+						c.x += move_x;
+						c.y += move_y;
+					}
+					u.room.bm.broadcast_announce(c.name + " Blink Steps 30 feet toward " + target.name + "!", true);
+				}
+			} else {
+				u.room.bm.broadcast_announce(c.name + " Blink Steps but no valid target to teleport toward.", false);
+			}
+		}
 		else if (feature == "hound_of_ill_omen") {
 			// Xanathar's Shadow Magic L6 Hound of Ill Omen (para 2596-2602): "As a bonus
 			// action, you can spend 3 sorcery points to magically summon a hound of ill
