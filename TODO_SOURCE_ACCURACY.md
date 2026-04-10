@@ -300,7 +300,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 |---------|-------|-------------|--------|
 | **Lay On Hands** (5×level pool, Bonus Action heal, 5 HP cure Poisoned) | 1 | 5637-5640 | ✓ Done — pool sized correctly in `character_data.nvgt`, bonus action handler in `users _dom.nvgt` accepts `cleanse_conditions` for Poisoned (always) plus L14 Restoring Touch list. |
 | **Spellcasting** (CHA, Holy Symbol focus) | 1 | 5641-5649 | ✓ Done — `cs.is_caster=true`, `spellcasting_ability=ABILITY_CHA`, half-caster slot table. |
-| **Weapon Mastery** (2 weapons) | 1 | 5650-5652 | DEFERRED — base weapon mastery system not yet wired to attack resolution. |
+| **Weapon Mastery** (2 weapons) | 1 | 5650-5652 | ✓ Done 2026-04-10 — mastery properties wired to attack resolution. |
 | **Fighting Style** (incl. Blessed Warrior cleric cantrips) | 2 | 5653-5655 | DEFERRED — Fighting Style feat selection at character creation not yet implemented for Paladin. Blessed Warrior cantrip choice deferred. |
 | **Paladin's Smite** (Divine Smite always prepared, 1 free cast/LR) | 2 | 5656-5657 | ✓ Done 2026-04-09 — new `paladins_smite_free_cast_used` flag, divine_smite bonus action handler tries the free cast first (L1 base = 2d8 radiant) before consuming a slot. |
 | **Channel Divinity** (2 uses, regain 1 SR, +1 at L11) + Divine Sense | 3 | 5658-5662 | ✓ Done — channel divinity uses present, Divine Sense flavor announce; subclass-specific CD effects (Sacred Weapon, Vow of Enmity, Inspiring Smite, Nature's Wrath) implemented. |
@@ -321,7 +321,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 - Aura range loop for ally coverage of Aura of Protection (saves), Aura of Courage (Frightened immunity), and L18 Aura Expansion (10ft → 30ft).
 - Faithful Steed L5 mount summon (full companion entity) — deferred along with the rest of the mount system.
 - Fighting Style at character creation flow + Blessed Warrior cleric cantrip selection prompt.
-- Weapon Mastery property application to attack resolution (shared with Fighter Tactical Master).
+- ~~Weapon Mastery property application~~ RESOLVED 2026-04-10 — 7 properties wired. Fighter Tactical Master swap still pending.
 
 ### Ranger Audit (2026-04-09) — Basic Rules 2024 paras 5906-6194
 
@@ -329,7 +329,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 |---------|-------|-------------|--------|
 | **Favored Enemy** (Hunter's Mark always prepared, free casts scale 2/3/4/5/6) | 1 | 6155-6157 | ✓ Done 2026-04-09 — `grant_free_cast()` helper sets explicit count; scaling 2 (L1-4), 3 (L5-8), 4 (L9-12), 5 (L13-16), 6 (L17+). |
 | **Spellcasting** (WIS, half-caster, Druidic Focus) | 1 | 6158-6164 | ✓ Done — `cs.is_caster=true`, `spellcasting_ability=ABILITY_WIS`, half-caster slot table. |
-| **Weapon Mastery** (2 weapons) | 1 | 6165-6166 | DEFERRED — base weapon mastery system not yet wired to attack resolution. |
+| **Weapon Mastery** (2 weapons) | 1 | 6165-6166 | ✓ Done 2026-04-10 — mastery properties wired to attack resolution. |
 | **Deft Explorer** (Expertise in 1 of your skills) | 2 | 6167-6168 | DEFERRED — needs player choice prompt at L2 (and again with the 2 added skills at L9 in same feature line). |
 | **Fighting Style** (incl. Druidic Warrior druid cantrips) | 2 | 6169-6170 | DEFERRED — Fighting Style feat selection at character creation not yet implemented for Ranger. Druidic Warrior cantrip choice deferred. |
 | **Ranger Subclass** | 3 | 6171-6172 | ✓ Done — 6+ subclasses (Hunter, Gloom Stalker, Beast Master, Fey Wanderer, Drakewarden, Horizon Walker). |
@@ -350,7 +350,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 - Expertise L9 (2 more skills player choice).
 - Fighting Style L2 (Archery / Defense / Druidic Warrior / Two-Weapon Fighting / Thrown Weapon Fighting / Blind Fighting). Druidic Warrior also requires a druid-cantrip selection prompt.
 - Tireless L10 exhaustion-halving on Short Rest (deferred until exhaustion subsystem exists).
-- Weapon Mastery property application to attack resolution (shared with Fighter Tactical Master and Paladin L1).
+- ~~Weapon Mastery property application~~ RESOLVED 2026-04-10.
 
 ### Rogue Audit (2026-04-09) — Basic Rules 2024 paras 6443-6605
 
@@ -359,17 +359,17 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 | **Expertise** (2 skill proficiencies → expertise) | 1 | 6529-6531 | ✓ Done — Rogue init grants expertise on 2 skills (default Stealth + Perception). Player choice at character creation deferred. |
 | **Sneak Attack** (1d6 → 10d6, once per turn, finesse/ranged + advantage OR ally within 5ft no disadvantage) | 1 | 6537-6540 | ✓ Done 2026-04-09 — `apply_subclass_on_hit_damage` now has the base case. Tracks `sneak_attack_used_this_turn` (reset in `advance_turn`). Scaling: `(level+1)/2` dice. Conditions: weapon attack + finesse/ranged + (advantage OR ally-within-5ft-of-target with no disadvantage on roll). |
 | **Thieves' Cant** (lore — speak/write Thieves' Cant) | 1 | 6541-6542 | DEFERRED — narrative-only, no combat impact. |
-| **Weapon Mastery** (2 weapons) | 1 | 6543-6544 | DEFERRED — base weapon mastery system not yet wired to attack resolution. |
+| **Weapon Mastery** (2 weapons) | 1 | 6543-6544 | ✓ Done 2026-04-10 — mastery properties wired to attack resolution. |
 | **Cunning Action** (Bonus Action: Dash, Disengage, Hide) | 2 | 6545-6546 | ✓ Done — bonus action handler routes Dash/Disengage/Hide. |
 | **Rogue Subclass** | 3 | 6547 | ✓ Done — 12 subclasses implemented. |
 | **Steady Aim** (Bonus Action: Advantage on next attack this turn, Speed = 0 until end of turn) | 3 | 6550-6551 | ✓ Done 2026-04-09 — bonus action handler in `users _dom.nvgt`, `steady_aim_pending` flag, advantage flag set in `apply_attack_advantage_state`, `movement_remaining = 0` enforces speed=0 clause. Requires unmoved Speed (`movement_remaining >= speed`) per source. Client menu entry gated. |
-| **Cunning Strike** (Poison/Trip/Withdraw effects, swap SA dice for riders) | 5 | 6552-6560 | DEFERRED — needs prompt infrastructure for SA-die-cost effect tradeoffs. |
+| **Cunning Strike** (Poison/Trip/Withdraw effects, swap SA dice for riders) | 5 | 6552-6560 | ✓ Done 2026-04-10 — Toggle via bonus action menu, dice cost subtracted from SA before rolling. |
 | **Ability Score Improvement** | 4/8/12/16/19 | 6549 | ✓ Done — global feat-grant system. |
 | **Uncanny Dodge** (Reaction halves attack damage round down) | 5 | 6561-6562 | ✓ Done 2026-04-09 — reaction option added to `reaction_options` array. `uncanny_dodge_pending` flag set in `handle_reaction_response`, consumed in `apply_damage` to halve final damage post-reductions. Gated on `!Incapacitated`. Client text label added. |
 | **Evasion** (DEX save vs half damage → no damage on success, half on fail) | 7 | 6563-6564 | ✓ Done — `evasion_active` flag was missing init at L7 (only Monk got it); fixed in batch 0 (commit 5e78f1c). |
 | **Reliable Talent** (treat d20 ≤9 as 10 on proficient checks) | 7 | 6565-6566 | ✓ Done 2026-04-09 — was incorrectly gated at L11; corrected to L7 in `character_data.nvgt` init. Comment in `finalize_roll_result` updated to L7 + para 6565-6566. |
-| **Improved Cunning Strike** (use 2 effects) | 11 | 6567-6568 | DEFERRED — depends on Cunning Strike prompt. |
-| **Devious Strikes** (Daze/Knock Out/Obscure effects added to Cunning Strike) | 14 | 6569-6573 | DEFERRED — depends on Cunning Strike prompt. |
+| **Improved Cunning Strike** (use 2 effects) | 11 | 6567-6568 | ✓ Done 2026-04-10 — Two effects allowed at L11+ via second picker. |
+| **Devious Strikes** (Daze/Knock Out/Obscure effects added to Cunning Strike) | 14 | 6569-6573 | ✓ Done 2026-04-10 — Daze (2d6), Knock Out (6d6), Obscure (3d6) added to CS menu. Daze enforced at turn start. |
 | **Slippery Mind** (proficiency in WIS and CHA saves) | 15 | 6574-6575 | ✓ Done 2026-04-09 — init grants both save proficiencies. |
 | **Elusive** (no attack roll has Advantage against you unless Incapacitated) | 18 | 6576-6577 | ✓ Done 2026-04-09 — `elusive_active` flag set at L18 init; override at end of `apply_attack_advantage_state` clears advantage when defender is L18+ Rogue and not Incapacitated. |
 | **Epic Boon** | 19 | 6578-6579 | ✓ Done — Epic Boon feat catalog. |
@@ -389,7 +389,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 | **Spellcasting** (CHA, Arcane Focus) | 1 | 6952-6962 | ✓ Done — `cs.is_caster=true`, `spellcasting_ability=ABILITY_CHA`. |
 | **Innate Sorcery** (Bonus Action: +1 spell save DC + Advantage on Sorcerer spell attacks for 1 minute, 2/LR) | 1 | 6963-6967 | ✓ Done 2026-04-09 — bonus action handler in `users _dom.nvgt`, `innate_sorcery_active` flag, +1 DC in `spell_save_dc()`, advantage in `apply_attack_advantage_state()` (new `is_spell_attack` parameter), 10-round tickdown in `advance_turn`, broadcast to client. |
 | **Font of Magic** (SP pool, convert slot↔SP) | 2 | 6968-6993 | ✓ Done 2026-04-09 — Sorcery Points = level. Bonus action handlers: `font_of_magic_to_slot` (cost table 1=2/2=3/3=5/4=6/5=7 SP with min-level gating) and `font_of_magic_to_sp` (free action, gain SP = slot level, capped at max). Client menu entries with sub-menu for slot level. |
-| **Metamagic** (2 options at L2, +2 at L10, +2 at L17) | 2 | 6994-6997 | PARTIAL — Quickened/Twinned/Subtle implemented as toggle flags (3 of 10 options). Stub flags for Careful/Distant/Empowered/Extended/Heightened/Seeking/Transmuted added but not yet wired into spell pipeline. |
+| **Metamagic** (2 options at L2, +2 at L10, +2 at L17) | 2 | 6994-6997 | ✓ Done 2026-04-10 — All 10 options wired as toggle bonus actions with SP costs. Careful/Distant/Empowered/Extended/Heightened/Quickened/Seeking/Subtle/Transmuted all functional. Twinned deferred (needs dual-target cast flow). Extended Spell grants advantage on concentration saves. |
 | **Sorcerer Subclass** | 3 | 6998-6999 | ✓ Done — Draconic, Wild Magic, Aberrant, Storm, Clockwork, Divine Soul, Frost, Desert Soul, Light Weaver, Shadow. |
 | **Ability Score Improvement** | 4/8/12/16 | 7000-7001 | ✓ Done — global feat-grant system. |
 | **Sorcerous Restoration** (regain SP up to half level on short rest, 1/LR) | 5 | 7002-7003 | PARTIAL 2026-04-09 — `sorcerous_restoration_available` flag set on init. Short rest plumbing not implemented yet, so the regain trigger is deferred. |
@@ -636,7 +636,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 - Headshot 3-Risk-Dice refresh — depends on the Risk-Dice spend infrastructure for non-action effects.
 - Deft Maneuver L18 — requires a separate maneuver-only bonus action token to differentiate from the regular bonus action.
 - Skin of Your Teeth maneuver — requires extending the reaction prompt infrastructure with a new opt-in reaction option visible only to L2+ Gunslingers with at least one Risk Die.
-- Weapon Mastery property application — shared backlog item for all martial classes.
+- ~~Weapon Mastery property application~~ RESOLVED 2026-04-10 — 7 properties wired to attack resolution.
 
 - **Paladin:** Lay on Hands (pool size), Divine Smite (slot-based in 2024), Aura of Courage, Cleansing Touch — all addressed in 2026-04-09 audit; remaining items in pending list above.
 - **Ranger:** Favored Enemy / Roving / Tireless / Relentless Hunter / Nature's Veil / Precise Hunter / Feral Senses / Foe Slayer all addressed 2026-04-09; deferred items in Ranger pending list above.
