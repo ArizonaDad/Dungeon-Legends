@@ -90,6 +90,16 @@ class character_sheet {
     string[] heroic_prophecies; // Up to 3 prophecies
     // Ebon Tides fey court affiliation
     string fey_court = ""; // "" = none; one of 14 courts
+    // PHB 2024 Cleric L1 Divine Order (para 3600-3603): "Protector" (martial weapons
+    // + heavy armor) or "Thaumaturge" (+1 cantrip + WIS mod bonus to Arcana/Religion).
+    string divine_order = "";
+    // PHB 2024 Cleric L7 Blessed Strikes (para 3617-3620): "Divine Strike" (once/turn
+    // +1d8 necrotic/radiant on weapon hit) or "Potent Spellcasting" (WIS mod to
+    // cantrip damage). Chosen once at L7. Scales at L14 via Improved Blessed Strikes.
+    string blessed_strikes_choice = "";
+    // Divine Strike damage type sub-choice: "necrotic" or "radiant" (picked when
+    // blessed_strikes_choice == "divine_strike").
+    string divine_strike_damage_type = "";
 }
 
 int bardic_inspiration_die_for_level(int level) {
@@ -1367,6 +1377,10 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
     // Cleric subclasses
     if (cs.class_name == "Cleric") {
         c.channel_divinity_uses = cs.channel_divinity_uses;
+        // PHB 2024 Cleric L1 Divine Order, L7 Blessed Strikes — copy choices
+        c.divine_order = cs.divine_order;
+        c.blessed_strikes_choice = cs.blessed_strikes_choice;
+        c.divine_strike_damage_type = cs.divine_strike_damage_type;
         if (cs.subclass == "Light Domain" and cs.level >= 2) {
             c.warding_flare_uses = ability_modifier(cs.wisdom);
             if (c.warding_flare_uses < 1) c.warding_flare_uses = 1;

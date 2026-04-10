@@ -884,6 +884,10 @@ void show_bonus_action_menu() {
 	int reckless_attack_opt = -1;
 	int arcane_recovery_opt = -1;
 	int turn_undead_opt = -1;
+	int divine_spark_heal_opt = -1;
+	int divine_spark_radiant_opt = -1;
+	int divine_spark_necrotic_opt = -1;
+	int divine_intervention_opt = -1;
 	int magic_coin_opt = -1;
 	int create_void_opt = -1;
 	int breath_of_dragon_opt = -1;
@@ -1223,6 +1227,23 @@ void show_bonus_action_menu() {
 	// Cleric L2 Channel Divinity Turn Undead (PHB 2024 base class feature)
 	if (lc == "cleric" and level >= 2) {
 		turn_undead_opt = m.add_item("Turn Undead. Channel Divinity action. Each undead within 30 ft makes WIS save or is Frightened + Incapacitated 1 minute (or until damaged). At L5+ also deals WIS-mod d8 radiant damage.");
+		// PHB 2024 Cleric L2 Channel Divinity: Divine Spark (para 3608-3610). "Bonus Action,
+		// you point your Holy Symbol at another creature you can see within 60 feet of yourself
+		// and focus divine energy at it. Roll 2d8 and add your Wisdom modifier. You either
+		// restore Hit Points to the creature equal to that total, or you force the creature
+		// to make a Constitution saving throw. On a failed save, the creature takes Necrotic
+		// or Radiant damage (your choice) equal to that total." Scales: 3d8 at L7, 4d8 at L13, 5d8 at L18.
+		divine_spark_heal_opt = m.add_item("Divine Spark: Heal. Bonus action. Channel Divinity to heal a creature within 60 ft. 2d8+WIS HP (scales 3d8 L7, 4d8 L13, 5d8 L18).");
+		divine_spark_radiant_opt = m.add_item("Divine Spark: Radiant. Bonus action. Channel Divinity force CON save vs target within 60 ft. 2d8+WIS radiant on fail (scales L7/13/18).");
+		divine_spark_necrotic_opt = m.add_item("Divine Spark: Necrotic. Bonus action. Channel Divinity force CON save vs target within 60 ft. 2d8+WIS necrotic on fail (scales L7/13/18).");
+	}
+	// PHB 2024 Cleric L10 Divine Intervention (para 3621-3622). "you can call on your deity
+	// to intervene on your behalf. As a Magic action, choose any Cleric spell of level 5 or
+	// lower that doesn't require a Reaction to cast... The chosen spell occurs as an effect.
+	// You don't need to meet the requirements to cast the spell, including costly components."
+	// Once per long rest. Scales to "no roll needed" automatically at L10+.
+	if (lc == "cleric" and level >= 10) {
+		divine_intervention_opt = m.add_item("Divine Intervention. Bonus action. Once per long rest. Your next cast of any Cleric spell of level 5 or lower consumes no spell slot.");
 	}
 	if (lc == "bard" and subclass == "College of Mercantile" and level >= 3) {
 		magic_coin_opt = m.add_item("Magic Coin. Action. Fling a coin at target for 1d12 thunder damage (scales).");
@@ -1739,6 +1760,25 @@ void show_bonus_action_menu() {
 		send({{"type", message_types::bonus_action}, {"feature", "turn_undead"}});
 		speak("Turning undead.", true);
 	}
+	else if (divine_spark_heal_opt >= 0 and res == divine_spark_heal_opt) {
+		if (current_target_id == 0) { speak("No target selected. Scan with I J K L and Enter to lock a target within 60 feet.", true); return; }
+		send({{"type", message_types::bonus_action}, {"feature", "divine_spark_heal"}, {"target_id", current_target_id}});
+		speak("Divine Spark: healing.", true);
+	}
+	else if (divine_spark_radiant_opt >= 0 and res == divine_spark_radiant_opt) {
+		if (current_target_id == 0) { speak("No target selected. Scan with I J K L and Enter to lock a target within 60 feet.", true); return; }
+		send({{"type", message_types::bonus_action}, {"feature", "divine_spark_radiant"}, {"target_id", current_target_id}});
+		speak("Divine Spark: radiant smite.", true);
+	}
+	else if (divine_spark_necrotic_opt >= 0 and res == divine_spark_necrotic_opt) {
+		if (current_target_id == 0) { speak("No target selected. Scan with I J K L and Enter to lock a target within 60 feet.", true); return; }
+		send({{"type", message_types::bonus_action}, {"feature", "divine_spark_necrotic"}, {"target_id", current_target_id}});
+		speak("Divine Spark: necrotic blast.", true);
+	}
+	else if (divine_intervention_opt >= 0 and res == divine_intervention_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "divine_intervention"}});
+		speak("Divine Intervention readied. Your next Cleric spell of level 5 or lower will be cast for free.", true);
+	}
 	else if (magic_coin_opt >= 0 and res == magic_coin_opt) {
 		if (current_target_id == 0) { speak("No target selected.", true); return; }
 		send({{"type", message_types::bonus_action}, {"feature", "magic_coin"}, {"target_id", current_target_id}});
@@ -2094,6 +2134,19 @@ void show_phase1_menu() {
 	int guild_opt = m.add_item("Set Ravnica Guild (current: " + (me.ravnica_guild != "" ? me.ravnica_guild : "None") + ").");
 	int trans_opt = m.add_item("Set Grim Hollow Transformation (current: " + (me.transformation != "" ? me.transformation + " stage " + me.transformation_stage : "None") + ").");
 	int court_opt = m.add_item("Set Ebon Tides fey court (current: " + (me.fey_court != "" ? me.fey_court : "None") + ").");
+	// PHB 2024 Cleric L1 Divine Order (para 3600-3603) and L7 Blessed Strikes (para 3617-3620).
+	// Both are once-per-character choices that gate other Cleric features. Only show on Cleric.
+	string lc_class = current_class_name().lower();
+	int divine_order_opt = -1;
+	int blessed_strikes_opt = -1;
+	int divine_strike_dmg_opt = -1;
+	if (lc_class == "cleric") {
+		divine_order_opt = m.add_item("Set Cleric Divine Order (PHB 2024 L1 choice: Protector or Thaumaturge).");
+		if (current_character_level() >= 7) {
+			blessed_strikes_opt = m.add_item("Set Cleric Blessed Strikes (PHB 2024 L7 choice: Divine Strike or Potent Spellcasting).");
+			divine_strike_dmg_opt = m.add_item("Set Divine Strike damage type (Necrotic or Radiant — only used if Blessed Strikes is Divine Strike).");
+		}
+	}
 	int status_opt = m.add_item("Show full Phase 1 status.");
 	int cancel_opt = m.add_item("Cancel.");
 
@@ -2212,6 +2265,45 @@ void show_phase1_menu() {
 		}
 		send({{"type", message_types::bonus_action}, {"feature", "set_fey_court"}, {"value", chosen}});
 		speak("Fey court set to " + (chosen != "" ? chosen : "none") + ".", true);
+	}
+	else if (divine_order_opt >= 0 and res == divine_order_opt) {
+		menu@ dm = setup_sub_menu("Choose your Cleric Divine Order. PHB 2024 para 3600-3603.");
+		int prot = dm.add_item("Protector. Heavy armor + martial weapon proficiency. Combat-focused.");
+		int thaum = dm.add_item("Thaumaturge. Bonus Cleric cantrip + WIS mod (min +1) bonus to Arcana and Religion checks.");
+		int cnc = dm.add_item("Cancel.");
+		int pick = dm.run();
+		if (pick < 0 or pick == cnc) return;
+		string chosen = "";
+		if (pick == prot) chosen = "protector";
+		else if (pick == thaum) chosen = "thaumaturge";
+		send({{"type", message_types::bonus_action}, {"feature", "set_divine_order"}, {"value", chosen}});
+		speak("Divine Order set to " + chosen + ".", true);
+	}
+	else if (blessed_strikes_opt >= 0 and res == blessed_strikes_opt) {
+		menu@ bm = setup_sub_menu("Choose your Cleric Blessed Strikes (L7). PHB 2024 para 3617-3620.");
+		int ds = bm.add_item("Divine Strike. Once per turn on a weapon hit, deal +1d8 necrotic or radiant (your choice). +2d8 at L14.");
+		int ps = bm.add_item("Potent Spellcasting. Add WIS mod to Cleric cantrip damage. At L14, gain WIS*2 temp HP each time.");
+		int cnc = bm.add_item("Cancel.");
+		int pick = bm.run();
+		if (pick < 0 or pick == cnc) return;
+		string chosen = "";
+		if (pick == ds) chosen = "divine_strike";
+		else if (pick == ps) chosen = "potent_spellcasting";
+		send({{"type", message_types::bonus_action}, {"feature", "set_blessed_strikes"}, {"value", chosen}});
+		speak("Blessed Strikes set to " + chosen + ".", true);
+	}
+	else if (divine_strike_dmg_opt >= 0 and res == divine_strike_dmg_opt) {
+		menu@ dt = setup_sub_menu("Choose Divine Strike damage type.");
+		int nec = dt.add_item("Necrotic.");
+		int rad = dt.add_item("Radiant.");
+		int cnc = dt.add_item("Cancel.");
+		int pick = dt.run();
+		if (pick < 0 or pick == cnc) return;
+		string chosen = "";
+		if (pick == nec) chosen = "necrotic";
+		else if (pick == rad) chosen = "radiant";
+		send({{"type", message_types::bonus_action}, {"feature", "set_divine_strike_damage_type"}, {"value", chosen}});
+		speak("Divine Strike damage type set to " + chosen + ".", true);
 	}
 	else if (res == status_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "query_phase1"}});

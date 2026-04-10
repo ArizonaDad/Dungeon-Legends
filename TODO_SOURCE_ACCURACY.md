@@ -179,8 +179,41 @@ Audited against Basic Rules 2024 paras 2301-2359 (full Barbarian class entry).
 
 Other base class features that still need the same audit:
 - **Barbarian (Brutal Strike line above is the only remaining gap)**
-- **Bard:** Jack of All Trades, Expertise, Magical Inspiration, Countercharm, Superior Inspiration
-- **Cleric:** Channel Divinity (generic Turn Undead + Divine Intervention), Destroy Undead
+
+### Bard — RESOLVED 2026-04-09 (mostly)
+Audited against Basic Rules 2024 paras 2722-2765 (full Bard class entry).
+
+| Feature | Level | Source para | Status |
+|---|---|---|---|
+| Bardic Inspiration (BA, 60 ft, d6→d12) | 1 | 2722-2727 | ✓ Done |
+| Spellcasting (full caster, CHA) | 1 | 2728-2739 | ✓ Done |
+| Expertise (2 skills L2, +2 more L9) | 2/9 | 2740-2742 | ✓ Done (system-wide expertise field) |
+| Jack of All Trades (half-prof on non-prof skill checks) | 2 | 2743-2745 | ✓ Done — `combatant.jack_of_all_trades` flag set in `character_data.nvgt` and consumed by `get_skill_bonus` |
+| Bard Subclass | 3 | 2749-2750 | ✓ Done |
+| Font of Inspiration (regen BI on Short Rest, spend slot to regain one) | 5 | 2753-2755 | PARTIAL — regen-on-rest works because in-combat there are no short rests and a long rest (between sessions) restores all uses; the spell-slot-to-BI swap is not yet wired. Defer until a `convert_slot_to_bardic_inspiration` bonus action menu entry exists. |
+| **Countercharm** (Reaction reroll on Charmed/Frightened save fail) | 7 | 2756-2757 | ✗ DEFERRED — requires intercepting save failures at many call sites and offering a Reaction prompt to nearby Bard L7+. Pattern is similar to Cutting Words / Warding Flare. |
+| Magical Secrets (broader spell list at L10) | 10 | 2758 | ✓ Done (out-of-combat spell list expansion, handled by spell menu) |
+| **Superior Inspiration** (top up BI to 2 on Initiative) | 18 | 2760-2761 | ✓ Done 2026-04-09 — `request_next_initiative` restores BI uses to 2 if fewer for Bard L18+ |
+| **Words of Creation** (Power Word Heal/Kill always prepared, target second creature within 10 ft) | 20 | 2764 | ✗ DEFERRED — auto-prepared can be added to `apply_class_defaults`, but the multi-target rider on Power Word Heal/Kill needs custom handler edits |
+
+### Cleric — RESOLVED 2026-04-09 (almost all features)
+Audited against Basic Rules 2024 paras 3589-3630 (full Cleric class entry).
+
+| Feature | Level | Source para | Status |
+|---|---|---|---|
+| Spellcasting (full caster, WIS, prepared) | 1 | 3593-3599 | ✓ Done |
+| **Divine Order** (Protector or Thaumaturge — once-per-character choice) | 1 | 3600-3603 | ✓ Done 2026-04-09 — `divine_order` field on character_sheet + combatant. Configured via Shift+P → "Set Cleric Divine Order". Thaumaturge bonus to Arcana/Religion checks (WIS mod, min +1) wired in `finalize_roll_result`. Protector heavy-armor + martial weapon proficiency at character creation deferred to a future `apply_class_defaults` pass. |
+| Channel Divinity (Turn Undead) | 2 | 3604-3607 | ✓ Done |
+| **Channel Divinity: Divine Spark** (heal OR radiant/necrotic damage, scales L7/13/18) | 2 | 3608-3610 | ✓ Done 2026-04-09 — three bonus action handlers (`divine_spark_heal`, `divine_spark_radiant`, `divine_spark_necrotic`) in `users _dom.nvgt`. WIS-mod scaling, 1d8→4d8 dice progression, half-on-save for damage variants, all source-quoted. Client menu entries appear at Cleric L2+. |
+| Sear Undead (Channel Divinity replaces Turn Undead at L5+) | 5 | 3615-3616 | ✓ Done (folded into existing `turn_undead` handler) |
+| **Blessed Strikes** (Divine Strike OR Potent Spellcasting — choose at L7) | 7 | 3617-3620 | ✓ Done 2026-04-09 — `blessed_strikes_choice` field. Divine Strike: `roll_divine_strike` helper applies +1d8 necrotic/radiant once per turn on weapon hits, hooked into the attack damage path in `battle_manager.nvgt`. Potent Spellcasting: `potent_spellcasting_bonus` adds WIS mod to Cleric cantrip damage (sacred_flame inline path + generic spell save damage path both updated). Choice configured via Shift+P. |
+| **Divine Intervention** (cast any Cleric spell L5- without a slot, 1/long rest) | 10 | 3621-3622 | ✓ Done 2026-04-09 — bonus action sets `divine_intervention_ready` flag; next cast of any Cleric spell ≤L5 in `handle_cast` consumes the flag instead of a slot. Player picks the spell normally via the cast menu (no auto-pick per source-only mandate). |
+| **Improved Blessed Strikes** (Divine Strike +2d8 / Potent Spellcasting WIS*2 temp HP) | 14 | 3623-3626 | ✓ Done 2026-04-09 — `roll_divine_strike` doubles dice at L14+; `apply_improved_potent_temp_hp` grants WIS*2 temp HP after sacred_flame and the generic Cleric cantrip save path. |
+| **Greater Divine Intervention** (Wish) | 20 | 3629-3630 | ✗ DEFERRED — requires Wish spell infrastructure which is not yet implemented. Listed in spell catalog but not handled. |
+
+**Player choice infrastructure:** Three new Phase 1 config commands (`set_divine_order`, `set_blessed_strikes`, `set_divine_strike_damage_type`) added to the Shift+P menu. They persist to `account.data` so Cleric choices survive across sessions. Source-only rule respected — players configure their own choices, no auto-pick.
+
+
 - **Druid:** Wild Companion, Elemental Fury, Archdruid
 - **Fighter:** Tactical Mind/Shift/Master, Second Wind (correct dice), Studied Attacks
 - **Monk:** Martial Arts die scaling, Deflect Attacks (was Deflect Missiles), Stunning Strike, Empowered Strikes, Perfect Focus

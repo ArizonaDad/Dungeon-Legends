@@ -629,6 +629,21 @@ class combatant {
 	bool is_first_hit_this_turn = true;
 	int channel_divinity_uses = 0;
 	int preserve_life_pool = 0;
+	// PHB 2024 Cleric L1 Divine Order (para 3600-3603) — "" / "protector" / "thaumaturge"
+	string divine_order = "";
+	// PHB 2024 Cleric L7 Blessed Strikes (para 3617-3620) — "" / "divine_strike" / "potent_spellcasting"
+	string blessed_strikes_choice = "";
+	// Divine Strike damage type sub-choice (when blessed_strikes_choice == "divine_strike")
+	string divine_strike_damage_type = "";
+	// Tracks "Once on each of your turns" rule for Divine Strike (para 3619)
+	bool divine_strike_used_this_turn = false;
+	// PHB 2024 Cleric L10 Divine Intervention (para 3621-3622): "you can call on
+	// your deity or pantheon to intervene on your behalf. As a Magic action, choose
+	// any Cleric spell of level 5 or lower... You can't use this feature again until
+	// you finish a Long Rest." Implemented as a flag set by the action; the next
+	// cast of a level <=5 cleric spell consumes the flag instead of a spell slot.
+	bool divine_intervention_ready = false;
+	bool divine_intervention_used_this_rest = false;
 
 	// Potion buff tracking
 	int potion_damage_bonus = 0;
@@ -767,6 +782,56 @@ class combatant {
 			int str_score = ability_scores[ABILITY_STR];
 			if (total < str_score) return str_score;
 		}
+		return total;
+	}
+
+	// PHB 2024 Cleric L7 Blessed Strikes — Potent Spellcasting (para 3620): "Add your
+	// Wisdom modifier to the damage you deal with any Cleric cantrip." Returns the WIS
+	// modifier when the cleric has explicitly chosen Potent Spellcasting; 0 otherwise.
+	int potent_spellcasting_bonus() {
+		if (class_name != "Cleric") return 0;
+		if (level < 7) return 0;
+		if (blessed_strikes_choice != "potent_spellcasting") return 0;
+		int wm = get_ability_mod(ABILITY_WIS);
+		if (wm < 0) return 0;
+		return wm;
+	}
+
+	// PHB 2024 Cleric L14 Improved Blessed Strikes — Potent Spellcasting (para 3626):
+	// "When you cast a Cleric cantrip and deal damage to a creature with it, you can
+	// give vitality to yourself or another creature within 60 feet of yourself, granting
+	// a number of Temporary Hit Points equal to twice your Wisdom modifier." Auto-applies
+	// to self (the always-available default). The "or another creature" choice is
+	// deferred until a target-prompt system exists. Returns granted temp HP.
+	int apply_improved_potent_temp_hp() {
+		if (class_name != "Cleric") return 0;
+		if (level < 14) return 0;
+		if (blessed_strikes_choice != "potent_spellcasting") return 0;
+		int wm = get_ability_mod(ABILITY_WIS);
+		if (wm < 1) return 0;
+		int grant = wm * 2;
+		if (grant > temp_hp) temp_hp = grant; // Temp HP doesn't stack — replace if higher
+		return grant;
+	}
+
+	// PHB 2024 Cleric L7 Blessed Strikes — Divine Strike (para 3619): "Once on each of
+	// your turns when you hit a creature with an attack roll using a weapon, you can
+	// cause the target to take an extra 1d8 Necrotic or Radiant damage (your choice)."
+	// L14 Improved Blessed Strikes (para 3625): "The extra damage of your Divine Strike
+	// increases to 2d8." Returns the rolled extra damage (1d8 or 2d8) and the chosen
+	// damage type via out parameters; returns 0 if not eligible. Marks once-per-turn flag.
+	int roll_divine_strike(int&out out_damage_type) {
+		out_damage_type = -1;
+		if (class_name != "Cleric") return 0;
+		if (level < 7) return 0;
+		if (blessed_strikes_choice != "divine_strike") return 0;
+		if (divine_strike_used_this_turn) return 0;
+		if (divine_strike_damage_type == "") return 0; // Player must pick damage type first
+		int dice = (level >= 14) ? 2 : 1;
+		int total = 0;
+		for (int i = 0; i < dice; i++) total += random(1, 8);
+		divine_strike_used_this_turn = true;
+		out_damage_type = (divine_strike_damage_type == "necrotic") ? DMG_NECROTIC : DMG_RADIANT;
 		return total;
 	}
 

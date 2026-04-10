@@ -1454,7 +1454,9 @@ void handle_user_message(user@ u, json_object@ msg)
 		// they don't require the player to be the current combatant.
 		bool is_phase1_config = feature == "set_piety_god" or feature == "set_group_patron"
 			or feature == "set_ravnica_guild" or feature == "set_transformation"
-			or feature == "set_fey_court" or feature == "query_phase1";
+			or feature == "set_fey_court" or feature == "query_phase1"
+			or feature == "set_divine_order" or feature == "set_blessed_strikes"
+			or feature == "set_divine_strike_damage_type";
 		combatant@ c = null;
 		if (is_phase1_config) {
 			@c = u.room.bm.find_player_combatant(u.username);
@@ -2863,6 +2865,141 @@ void handle_user_message(user@ u, json_object@ msg)
 				}
 			}
 			u.room.bm.broadcast_announce(c.name + " channels divine energy to Turn Undead — " + turned + " creature" + (turned == 1 ? "" : "s") + " turned.", true);
+		}
+		else if (feature == "divine_spark_heal" or feature == "divine_spark_radiant" or feature == "divine_spark_necrotic") {
+			// PHB 2024 Cleric L2 Channel Divinity: Divine Spark (para 3608-3609):
+			// "As a Magic action, you point your Holy Symbol at another creature you can
+			// see within 30 feet of yourself and focus divine energy at it. Roll 1d8 and
+			// add your Wisdom modifier. You either restore Hit Points to the creature
+			// equal to that total or force the creature to make a Constitution saving
+			// throw. On a failed save, the creature takes Necrotic or Radiant damage
+			// (your choice) equal to that total. On a successful save, the creature
+			// takes half as much damage (round down).
+			// You roll an additional d8 when you reach Cleric levels 7 (2d8), 13 (3d8),
+			// and 18 (4d8)."
+			if (c.class_name != "Cleric") { u.send({{"type", message_types::announce}, {"text", "Only Clerics can use Divine Spark."}, {"interrupt", true}}); return; }
+			if (c.level < 2) { u.send({{"type", message_types::announce}, {"text", "Divine Spark unlocks at Cleric L2."}, {"interrupt", true}}); return; }
+			if (!c.has_action) { u.send({{"type", message_types::announce}, {"text", "You've already used your action."}, {"interrupt", true}}); return; }
+			if (c.channel_divinity_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Channel Divinity remaining."}, {"interrupt", true}}); return; }
+			combatant@ ds_target = u.room.bm.combat.get_combatant(target_id);
+			if (@ds_target == null or ds_target.is_dead) { u.send({{"type", message_types::announce}, {"text", "Choose a target for Divine Spark."}, {"interrupt", true}}); return; }
+			if (ds_target.id == c.id) { u.send({{"type", message_types::announce}, {"text", "Divine Spark targets another creature."}, {"interrupt", true}}); return; }
+			if (feet_distance(c.x, c.y, ds_target.x, ds_target.y) > 30) { u.send({{"type", message_types::announce}, {"text", "Target out of range (30 ft)."}, {"interrupt", true}}); return; }
+			c.has_action = false;
+			c.used_action = true;
+			c.channel_divinity_uses--;
+			int ds_die_count = 1;
+			if (c.level >= 18) ds_die_count = 4;
+			else if (c.level >= 13) ds_die_count = 3;
+			else if (c.level >= 7) ds_die_count = 2;
+			int ds_total = c.get_ability_mod(ABILITY_WIS);
+			for (int dsi = 0; dsi < ds_die_count; dsi++) ds_total += random(1, 8);
+			if (ds_total < 1) ds_total = 1;
+			if (feature == "divine_spark_heal") {
+				int healed = u.room.bm.combat.apply_healing(ds_target, ds_total);
+				u.room.bm.broadcast_announce(c.name + " channels Divine Spark to restore " + healed + " HP to " + ds_target.name + " (" + ds_die_count + "d8 + WIS).", true);
+			} else {
+				int dmg_type = (feature == "divine_spark_radiant") ? DMG_RADIANT : DMG_NECROTIC;
+				string dmg_name = (feature == "divine_spark_radiant") ? "radiant" : "necrotic";
+				int spell_dc = 8 + c.proficiency + c.get_ability_mod(ABILITY_WIS);
+				int save_roll = random(1, 20) + ds_target.get_save_bonus(ABILITY_CON);
+				int dealt = ds_total;
+				if (save_roll >= spell_dc) dealt = ds_total / 2;
+				u.room.bm.combat.apply_damage(ds_target, dealt, dmg_type, c);
+				if (save_roll >= spell_dc) {
+					u.room.bm.broadcast_announce(c.name + " channels Divine Spark — " + ds_target.name + " saves (CON " + save_roll + " vs DC " + spell_dc + ") for " + dealt + " " + dmg_name + " damage (half of " + ds_die_count + "d8 + WIS).", true);
+				} else {
+					u.room.bm.broadcast_announce(c.name + " channels Divine Spark — " + ds_target.name + " fails CON save (" + save_roll + " vs DC " + spell_dc + ") for " + dealt + " " + dmg_name + " damage (" + ds_die_count + "d8 + WIS).", true);
+				}
+			}
+		}
+		else if (feature == "divine_intervention") {
+			// PHB 2024 Cleric L10 Divine Intervention (para 3621-3622): "You can call on
+			// your deity or pantheon to intervene on your behalf. As a Magic action,
+			// choose any Cleric spell of level 5 or lower that doesn't require a Reaction
+			// to cast. As part of the same action, you cast that spell without expending
+			// a spell slot or needing Material components. You can't use this feature
+			// again until you finish a Long Rest."
+			// Implemented as a flag the player toggles on; the next Cleric spell of
+			// level <=5 they cast within the same battle consumes the flag instead of a
+			// spell slot. Player chooses the spell normally via the cast menu — no
+			// auto-selection (per source-only mandate).
+			if (c.class_name != "Cleric") { u.send({{"type", message_types::announce}, {"text", "Only Clerics can use Divine Intervention."}, {"interrupt", true}}); return; }
+			if (c.level < 10) { u.send({{"type", message_types::announce}, {"text", "Divine Intervention unlocks at Cleric L10."}, {"interrupt", true}}); return; }
+			if (!c.has_action) { u.send({{"type", message_types::announce}, {"text", "You've already used your action."}, {"interrupt", true}}); return; }
+			if (c.divine_intervention_used_this_rest) { u.send({{"type", message_types::announce}, {"text", "Divine Intervention has already been used this rest."}, {"interrupt", true}}); return; }
+			c.has_action = false;
+			c.used_action = true;
+			c.divine_intervention_ready = true;
+			c.divine_intervention_used_this_rest = true;
+			u.room.bm.broadcast_announce(c.name + " calls on their deity for Divine Intervention. Their next Cleric spell of level 5 or lower is cast without consuming a slot.", true);
+		}
+		else if (feature == "set_divine_order") {
+			// PHB 2024 Cleric L1 Divine Order (para 3600-3603) — player chooses
+			// "protector" or "thaumaturge". Stored on character; cannot be changed
+			// after L1 per source ("you have dedicated yourself to one of the following").
+			string order_choice = msg.exists("value") ? string(msg["value"]) : "";
+			if (order_choice != "protector" and order_choice != "thaumaturge") {
+				u.send({{"type", message_types::announce}, {"text", "Divine Order must be 'protector' or 'thaumaturge'."}, {"interrupt", true}});
+				return;
+			}
+			if (c.class_name != "Cleric") { u.send({{"type", message_types::announce}, {"text", "Only Clerics have a Divine Order."}, {"interrupt", true}}); return; }
+			c.divine_order = order_choice;
+			if (@u.account != null) {
+				json_object@ data = u.account.data;
+				string ckey = get_character_storage_key(u.room.game_type);
+				if (data.exists(ckey)) {
+					json_object@ ch = data[ckey];
+					ch["divine_order"] = order_choice;
+					u.account.commit();
+				}
+			}
+			string label = (order_choice == "protector") ? "Protector (martial weapons + heavy armor training)" : "Thaumaturge (extra cantrip + WIS bonus to Arcana/Religion)";
+			u.send({{"type", message_types::announce}, {"text", "Divine Order set to " + label + "."}, {"interrupt", true}});
+		}
+		else if (feature == "set_blessed_strikes") {
+			// PHB 2024 Cleric L7 Blessed Strikes (para 3617-3620) — player chooses
+			// "divine_strike" or "potent_spellcasting" once at L7.
+			string bs_choice = msg.exists("value") ? string(msg["value"]) : "";
+			if (bs_choice != "divine_strike" and bs_choice != "potent_spellcasting") {
+				u.send({{"type", message_types::announce}, {"text", "Blessed Strikes must be 'divine_strike' or 'potent_spellcasting'."}, {"interrupt", true}});
+				return;
+			}
+			if (c.class_name != "Cleric") { u.send({{"type", message_types::announce}, {"text", "Only Clerics have Blessed Strikes."}, {"interrupt", true}}); return; }
+			if (c.level < 7) { u.send({{"type", message_types::announce}, {"text", "Blessed Strikes unlocks at Cleric L7."}, {"interrupt", true}}); return; }
+			c.blessed_strikes_choice = bs_choice;
+			if (@u.account != null) {
+				json_object@ data = u.account.data;
+				string ckey = get_character_storage_key(u.room.game_type);
+				if (data.exists(ckey)) {
+					json_object@ ch = data[ckey];
+					ch["blessed_strikes_choice"] = bs_choice;
+					u.account.commit();
+				}
+			}
+			string label2 = (bs_choice == "divine_strike") ? "Divine Strike (+1d8 necrotic/radiant on weapon hit, once per turn)" : "Potent Spellcasting (WIS modifier to Cleric cantrip damage)";
+			u.send({{"type", message_types::announce}, {"text", "Blessed Strikes set to " + label2 + "."}, {"interrupt", true}});
+		}
+		else if (feature == "set_divine_strike_damage_type") {
+			// Sub-choice for Divine Strike — player picks the damage type once.
+			string dt_choice = msg.exists("value") ? string(msg["value"]) : "";
+			if (dt_choice != "necrotic" and dt_choice != "radiant") {
+				u.send({{"type", message_types::announce}, {"text", "Divine Strike damage type must be 'necrotic' or 'radiant'."}, {"interrupt", true}});
+				return;
+			}
+			if (c.class_name != "Cleric") { u.send({{"type", message_types::announce}, {"text", "Only Clerics use Divine Strike."}, {"interrupt", true}}); return; }
+			if (c.blessed_strikes_choice != "divine_strike") { u.send({{"type", message_types::announce}, {"text", "Pick Blessed Strikes Divine Strike first."}, {"interrupt", true}}); return; }
+			c.divine_strike_damage_type = dt_choice;
+			if (@u.account != null) {
+				json_object@ data = u.account.data;
+				string ckey = get_character_storage_key(u.room.game_type);
+				if (data.exists(ckey)) {
+					json_object@ ch = data[ckey];
+					ch["divine_strike_damage_type"] = dt_choice;
+					u.account.commit();
+				}
+			}
+			u.send({{"type", message_types::announce}, {"text", "Divine Strike damage type set to " + dt_choice + "."}, {"interrupt", true}});
 		}
 		else if (feature == "arcane_recovery") {
 			// PHB 2024 Wizard L1 Arcane Recovery: "Once per day when you finish a Short
