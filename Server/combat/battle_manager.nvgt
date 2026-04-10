@@ -5040,13 +5040,16 @@ class battle_manager {
 			broadcast_announce(attacker.name + "'s Divine Fury deals " + zealot_dmg + " extra radiant damage!", false);
 		}
 
-		// Psi Warrior: +1d6+INT force damage (uses limited)
+		// Tasha's Psi Warrior L3 Psionic Strike (para 16-18): "expend one Psionic
+		// Energy die, rolling it and dealing force damage equal to the number rolled
+		// plus your Intelligence modifier." Once per turn, on weapon hit.
 		if (attacker.class_name == "Fighter" and attacker.subclass == "Psi Warrior" and attacker.psionic_strike_uses > 0 and is_weapon_attack) {
-			int psi_dmg = random(1, 6) + attacker.get_ability_mod(ABILITY_INT);
+			int die = attacker.psionic_die_size > 0 ? attacker.psionic_die_size : 6;
+			int psi_dmg = random(1, die) + attacker.get_ability_mod(ABILITY_INT);
 			if (psi_dmg < 1) psi_dmg = 1;
 			attacker.psionic_strike_uses--;
 			bonus += psi_dmg;
-			broadcast_announce(attacker.name + "'s Psionic Strike deals " + psi_dmg + " force damage!", false);
+			broadcast_announce(attacker.name + "'s Psionic Strike deals " + psi_dmg + " force damage! (" + attacker.psionic_strike_uses + " dice remain)", false);
 		}
 
 		// Battle Master: Trip Attack (if pending, apply extra d8 and knock prone)
@@ -5148,9 +5151,13 @@ class battle_manager {
 
 		// Cavalier Unwavering Mark: old +prof bonus removed — retaliation is now a BA attack per source (para 1671-1672)
 
-		// Rune Knight Fighter: Giant's Might — +1d6 damage while active
-		if (attacker.class_name == "Fighter" and attacker.subclass == "Rune Knight" and attacker.giants_might_active and is_weapon_attack) {
-			int giant_dmg = random(1, 6);
+		// Tasha's Rune Knight L3 Giant's Might (para varies): "one of your attacks
+		// can deal an extra 1d6 damage" — scales to 1d8 at L10, 1d10 at L18
+		if (attacker.class_name == "Fighter" and attacker.subclass == "Rune Knight" and attacker.giants_might_active and is_weapon_attack and attacker.is_first_hit_this_turn) {
+			int gm_die = 6;
+			if (attacker.level >= 18) gm_die = 10;
+			else if (attacker.level >= 10) gm_die = 8;
+			int giant_dmg = random(1, gm_die);
 			bonus += giant_dmg;
 			broadcast_announce(attacker.name + "'s Giant's Might adds " + giant_dmg + " damage!", false);
 		}
@@ -5533,6 +5540,36 @@ class battle_manager {
 					bonus += efw_bonus;
 					broadcast_announce(attacker.name + "'s Eye for Weakness deals " + efw_bonus + " extra damage! (3d6)", false);
 				}
+				// Tasha's Phantom L3 Wails from the Grave (para 3454-3457): "Immediately
+				// after you deal your Sneak Attack damage to a creature on your turn, you
+				// can target a second creature within 30 feet of the first creature. Roll
+				// half the number of Sneak Attack dice (round up)." Necrotic damage.
+				if (attacker.subclass == "Phantom" and attacker.wails_from_grave_uses > 0) {
+					int wail_dice = (sa_dice + 1) / 2;
+					// Auto-select nearest enemy within 30ft of target
+					combatant@ wail_target = null;
+					float wail_best = 999;
+					for (uint wi = 0; wi < combat.combatants.length(); wi++) {
+						combatant@ wt = combat.combatants[wi];
+						if (@wt == null or wt.is_dead or wt.id == target.id) continue;
+						if (wt.is_player == attacker.is_player) continue; // Must be enemy
+						float wd = feet_distance(target.x, target.y, wt.x, wt.y);
+						if (wd <= 30 and wd < wail_best) { wail_best = wd; @wail_target = wt; }
+					}
+					if (@wail_target != null) {
+						attacker.wails_from_grave_uses--;
+						int wail_dmg = 0;
+						for (int wd = 0; wd < wail_dice; wd++) wail_dmg += random(1, 6);
+						// L17 Death's Friend (para 3470-3474): necrotic also hits first target
+						if (attacker.level >= 17) {
+							combat.apply_damage(target, wail_dmg, DMG_NECROTIC, attacker);
+							broadcast_announce(attacker.name + "'s Wails from the Grave deal " + wail_dmg + " necrotic to " + target.name + " and " + wail_target.name + "! (" + attacker.wails_from_grave_uses + " uses remain)", true);
+						} else {
+							broadcast_announce(attacker.name + "'s Wails from the Grave deal " + wail_dmg + " necrotic to " + wail_target.name + "! (" + attacker.wails_from_grave_uses + " uses remain)", true);
+						}
+						combat.apply_damage(wail_target, wail_dmg, DMG_NECROTIC, attacker);
+					}
+				}
 			}
 		}
 
@@ -5583,6 +5620,19 @@ class battle_manager {
 		if (c.silver_tongue_active and pr.roll_type == ROLL_ABILITY_CHECK and natural_roll < 10) {
 			if (pr.resolution_tag == "skill_persuasion" or pr.resolution_tag == "skill_deception") {
 				broadcast_announce(c.name + "'s Silver Tongue treats the " + natural_roll + " as a 10.", false);
+				natural_roll = 10;
+				total = natural_roll + pr.modifier + bless_bonus + bardic_bonus;
+			}
+		}
+		// Tasha's Circle of Stars L2 Starry Form — Dragon (para 2161-2168): "When you
+		// make an Intelligence or a Wisdom check or a Constitution saving throw to
+		// maintain concentration on a spell, you can treat a roll of 9 or lower as a 10."
+		if (c.starry_form_active and c.starry_form_type == "Dragon" and natural_roll < 10) {
+			bool dragon_applies = false;
+			if (pr.roll_type == ROLL_ABILITY_CHECK and (pr.ability_id == ABILITY_INT or pr.ability_id == ABILITY_WIS)) dragon_applies = true;
+			if (pr.roll_type == ROLL_CONCENTRATION) dragon_applies = true;
+			if (dragon_applies) {
+				broadcast_announce(c.name + "'s Dragon constellation treats the " + natural_roll + " as a 10.", false);
 				natural_roll = 10;
 				total = natural_roll + pr.modifier + bless_bonus + bardic_bonus;
 			}

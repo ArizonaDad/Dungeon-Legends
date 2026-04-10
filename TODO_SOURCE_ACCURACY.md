@@ -1081,6 +1081,52 @@ Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 | **Universal Speech** (action: CHA mod creatures within 60ft understand you for 1 hour, 1/LR or spell slot) | 6 | 1712-1715 | DEFERRED — non-combat flavor/social feature. |
 | **Infectious Inspiration** (reaction: when creature succeeds with your Bardic die, grant a free die to another ally within 60ft, CHA mod uses/LR) | 14 | 1716-1719 | ✓ Done 2026-04-10 — `infectious_inspiration_uses` field (CHA mod, min 1). Auto-resolved: on successful bardic-aided roll, nearest eligible ally within 60ft without a die gets one free. Consumes source Bard's reaction. |
 
+### Psi Warrior Fighter Subclass Audit (2026-04-10) — Tasha's paras 6-50
+
+| Feature | Level | Source para | Status |
+|---------|-------|-------------|--------|
+| **Psionic Power** (Psionic Energy dice pool = 2×proficiency bonus, die scaling d6 L3 / d8 L5 / d10 L11 / d12 L17) | 3 | 6-13 | ✓ Fixed 2026-04-10 — was `prof` (half), corrected to `prof * 2`. Die size scaling via `psionic_die_size` field set on init. |
+| **Psionic Strike** (on hit: spend 1 die, deal die + INT mod force damage) | 3 | 14-17 | ✓ Fixed 2026-04-10 — now uses `psionic_die_size` instead of hardcoded d6. |
+| **Protective Field** (reaction: when you or ally within 30ft takes damage, reduce by die + INT mod) | 3 | 18-21 | DEFERRED — needs reaction prompt extension for damage-reduction reactions. |
+| **Telekinetic Movement** (action: move Large or smaller object/creature 30ft) | 3 | 22-25 | DEFERRED — non-combat utility; needs position-picker UI for combat use. |
+| **Telekinetic Thrust** (on Psionic Strike hit: STR save or pushed 10ft + prone) | 7 | 26-29 | DEFERRED — Psionic Strike is wired but Thrust rider not yet added. |
+| **Guarded Mind** (psychic resistance; spend die to end charmed/frightened) | 10 | 30-33 | PARTIAL — `psychic_resistance = true` set on init at L10. Condition-clearing spend not implemented. |
+| **Bulwark of Force** (BA: grant half cover to INT mod allies within 30ft, concentration 1 min) | 15 | 34-40 | DEFERRED — cover system not in combat grid. |
+| **Telekinetic Master** (cast Telekinesis free 1/LR or spend 7 Psionic Energy dice) | 18 | 41-50 | DEFERRED — Telekinesis spell not fully implemented. |
+
+### Phantom Rogue Subclass Audit (2026-04-10) — Tasha's paras 3438-3474
+
+| Feature | Level | Source para | Status |
+|---------|-------|-------------|--------|
+| **Whispers of the Dead** (after rest: gain proficiency in 1 skill or tool until next rest) | 3 | 3438-3442 | DEFERRED — needs rest subsystem + proficiency swap UI. |
+| **Wails from the Grave** (after Sneak Attack: half SA dice d6 necrotic to second creature within 30ft of target, Prof uses/LR) | 3 | 3443-3451 | ✓ Fixed 2026-04-10 — was gated at L9 with `prof/2` uses. Corrected to L3 with full `prof` uses. Auto-selects nearest enemy within 30ft of target. |
+| **Tokens of the Departed** (reaction on death within 30ft: create soul trinket, max Prof trinkets; while trinket held, death saves have advantage; destroy trinket for SA without normal requirements or Wails free use) | 9 | 3452-3462 | DEFERRED — needs trinket item infrastructure + death save advantage hook. |
+| **Ghost Walk** (BA: spectral form — fly 10ft hover, attacks against you have disadvantage unless attacker can see invisible, 10 min, Prof uses/LR) | 13 | 3463-3469 | DEFERRED — fly/hover movement not in combat grid. |
+| **Death's Friend** (Wails from the Grave necrotic also hits the Sneak Attack target; if no soul trinkets, one appears) | 17 | 3470-3474 | PARTIAL — L17 dual-target Wails damage done. Trinket auto-creation not implemented (blocked on Tokens of the Departed). |
+
+### Rune Knight Fighter Subclass Audit (2026-04-10) — Tasha's paras 3200-3280
+
+| Feature | Level | Source para | Status |
+|---------|-------|-------------|--------|
+| **Giant's Might** (BA: become Large for 1 min, +1d6 weapon damage once/turn, ADV on STR checks/saves, Prof uses/LR) | 3 | 3200-3210 | ✓ Fixed 2026-04-10 — damage die now scales (d6 L3 / d8 L10 / d10 L18). Added `is_first_hit_this_turn` gate for once-per-turn. STR check/save advantage not yet wired. |
+| **Rune Carver** (learn 2 runes at L3, +1 at L7/10/15; invoke each 1/LR) | 3 | 3211-3240 | DEFERRED — 6 runes (Cloud, Fire, Frost, Stone, Hill, Storm) each with passive + invoked effect. Needs rune selection UI + invocation handlers. |
+| **Runic Shield** (reaction: when ally within 60ft is hit, force attacker to reroll and use lower) | 7 | 3241-3245 | DEFERRED — needs reaction prompt extension. |
+| **Great Stature** (height +3d4 inches; Giant's Might extra damage die → d8) | 10 | 3246-3250 | ✓ Implicit — die scaling already in `gm_die` logic (`d8` at L10+). Height is flavor only. |
+| **Master of Runes** (invoke each rune twice instead of once per LR) | 15 | 3251-3255 | DEFERRED — blocked on Rune Carver implementation. |
+| **Runic Juggernaut** (Large → Huge on Giant's Might; Giant's Might die → d10; +5ft reach) | 18 | 3256-3260 | PARTIAL — die scales to d10. Size change to Huge and +5ft reach not implemented. |
+
+### Circle of Stars Druid Subclass Audit (2026-04-10) — Tasha's paras 2130-2181
+
+| Feature | Level | Source para | Status |
+|---------|-------|-------------|--------|
+| **Star Map** (learn Guidance cantrip + Guiding Bolt free; Guiding Bolt free casts = Prof/LR) | 2 | 2130-2140 | PARTIAL — auto-adds Guidance + Guiding Bolt to prepared spells. Free cast tracking not implemented (uses spell slots). |
+| **Starry Form: Archer** (BA ranged spell attack 60ft, 1d8+WIS radiant; scales to 2d8 at L10) | 2 | 2141-2150 | DEFERRED — needs a BA combat handler for the ranged spell attack each turn. |
+| **Starry Form: Chalice** (when you cast a heal spell with spell slot, bonus 1d8+WIS heal to another creature within 30ft; 2d8 at L10) | 2 | 2151-2155 | DEFERRED — needs hook into heal spell resolution path. |
+| **Starry Form: Dragon** (INT/WIS checks and concentration saves: treat d20 ≤9 as 10) | 2 | 2156-2160 | ✓ Done 2026-04-10 — clamp in `finalize_roll_result` for `ROLL_ABILITY_CHECK` (INT/WIS) and `ROLL_CONCENTRATION`. |
+| **Cosmic Omen** (after LR: roll die → Woe or Weal; reaction to subtract/add d6 from creature's attack/save/check within 30ft, Prof uses/LR) | 6 | 2161-2168 | DEFERRED — needs reaction prompt for triggered buff/debuff on ally/enemy rolls. |
+| **Twinkling Constellations** (change Starry Form at start of each turn; Archer/Chalice heal dice → 2d8) | 10 | 2169-2173 | DEFERRED — blocked on Archer/Chalice implementation + advance_turn hook. |
+| **Full of Stars** (while in Starry Form: resistance to B/P/S damage) | 14 | 2179-2181 | ✓ Done 2026-04-10 — `apply_damage` halves B/P/S when `starry_form_active and level >= 14`. |
+
 ---
 
 ## Working Rule Going Forward

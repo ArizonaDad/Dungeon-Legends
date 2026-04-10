@@ -927,7 +927,8 @@ class combatant {
 	bool zealous_presence_buff_active = false; // Buff from Zealous Presence (advantage attacks+saves)
 	uint zealous_presence_source_id = 0; // Who granted the buff
 	bool rage_beyond_death_active = false; // Xanathar's Zealot L14 (para 448-450)
-	int psionic_strike_uses = 0;
+	int psionic_strike_uses = 0; // Tasha's Psi Warrior (para 6-13): Psionic Energy dice pool (2×prof)
+	int psionic_die_size = 6;   // Tasha's Psi Warrior: d6(L3), d8(L5), d10(L11), d12(L17)
 	int superiority_dice = 0;
 	int superiority_dice_max = 0;
 	bool trip_attack_pending = false;
@@ -1621,6 +1622,12 @@ class battle {
 		if (damage_type == DMG_POISON and target.poison_immunity and !skip_poison_immunity) amount = 0;
 		if (damage_type == DMG_RADIANT and target.radiant_resistance) amount = (amount + 1) / 2;
 
+		// Tasha's Circle of Stars L14 Full of Stars (para 2179-2181): "While in your
+		// Starry Form, you become partially incorporeal, giving you resistance to
+		// bludgeoning, piercing, and slashing damage."
+		if (target.starry_form_active and target.level >= 14 and (damage_type == DMG_BLUDGEONING or damage_type == DMG_PIERCING or damage_type == DMG_SLASHING)) {
+			amount = (amount + 1) / 2;
+		}
 		// PHB 2024 Monk L18 Superior Defense (para 5372-5373): "you have Resistance
 		// to all damage except Force damage." Halve damage of any non-Force type.
 		if (target.superior_defense_active and damage_type != DMG_FORCE) {
