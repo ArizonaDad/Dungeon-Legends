@@ -269,7 +269,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 | **Step of the Wind** (BA Dash; spend 1 FP for Disengage+Dash, jump x2) | 2 | 5331 | ✓ Done 2026-04-09 — new `step_of_the_wind` bonus action handler. Free Dash by default; `spend_focus` flag adds Disengage. (Heightened Focus ally-move deferred — needs targeting prompt.) |
 | **Unarmored Movement** (+10/15/20/25/30 ft at L2/6/10/14/18) | 2/6/10/14/18 | 5332-5333 | ✓ Done 2026-04-09 — was entirely missing for Monk class. Added speed bonus block in `character_data.nvgt` Monk init that respects unarmored + no shield gating. |
 | **Uncanny Metabolism** (regain all FP + heal lvl + MA die at initiative) | 2 | 5334-5336 | ✓ Done 2026-04-09 — new `uncanny_metabolism_available` flag (1/long rest). Exposed as a free bonus action so the player chooses when to spend it during the first round (source ties to initiative roll which the simulator pre-rolls). New `uncanny_metabolism` bonus action menu entry. |
-| **Deflect Attacks** (reaction, reduce 1d10+DEX+lvl B/P/S; redirect at 0) | 3 | 5337-5339 | ✗ DEFERRED — needs reaction prompt UI (similar to Shield/Cutting Words). Adding to follow-up batch. |
+| **Deflect Attacks** (reaction, reduce 1d10+DEX+lvl B/P/S; redirect at 0) | 3 | 5337-5339 | PARTIAL 2026-04-09 — base reaction wired into existing reaction prompt system; reduces incoming damage in `apply_damage` via new `deflect_attacks_reduction` field; gated to B/P/S unless L13+. Redirect target picker (Focus Point spend on damage reduced to 0) deferred — needs new prompt path. |
 | **Monk Subclass** | 3 | 5340-5341 | ✓ Done — Warrior of the Open Hand and 10+ extra subclasses. |
 | **Slow Fall** (reaction reduces fall damage by 5x lvl) | 4 | 5344-5345 | DEFERRED — combat doesn't currently model falling damage. |
 | **Extra Attack** (2 attacks per Attack action) | 5 | 5346-5347 | ✓ Done — `cs.extra_attacks = 1` set at L5. |
@@ -280,7 +280,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 | **Heightened Focus** (Flurry +1 strike, Patient Def temp HP, Step ally) | 10 | 5357-5361 | PARTIAL 2026-04-09 — Patient Defense temp HP rider implemented. Flurry of Blows third strike and Step of the Wind ally-carry deferred (Flurry needs `start_flurry_strike` count parameter, ally-carry needs targeting prompt). |
 | **Self-Restoration** (auto remove Charmed/Frightened/Poisoned at end of turn) | 10 | 5362-5364 | ✓ Done 2026-04-09 — `self_restoration_active` flag and end-of-turn cleanup in `advance_turn` (highest-priority condition removed first). |
 | **Subclass feature** | 11 | 5256 | ✓ Done. |
-| **Deflect Energy** (Deflect Attacks works on any damage type) | 13 | 5365-5366 | ✗ DEFERRED — depends on Deflect Attacks reaction implementation. |
+| **Deflect Energy** (Deflect Attacks works on any damage type) | 13 | 5365-5366 | ✓ Done 2026-04-09 — Deflect Attacks reaction option is offered for any damage type when defender is L13+ (the L3 gating only enforces B/P/S below L13). |
 | **Disciplined Survivor** (all save profs + reroll failed save with FP) | 14 | 5367-5369 | PARTIAL 2026-04-09 — all save proficiencies set in `character_data.nvgt` Monk L14+ block. Save reroll prompt deferred (needs failed-save prompt chain integration). |
 | **Perfect Focus** (regain to 4 FP on initiative if 3 or fewer) | 15 | 5370-5371 | DEFERRED — needs initiative-time hook similar to Uncanny Metabolism. |
 | **Subclass feature** | 17 | 5292 | ✓ Done. |
@@ -289,7 +289,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 | **Body and Mind** (+4 DEX/WIS, max 25) | 20 | 5376-5377 | ✓ Done 2026-04-09 — `body_and_mind_applied` one-time guard in Monk init block. Boost capped at 25. |
 
 **Pending follow-up Monk batches:**
-- Deflect Attacks reaction prompt + redirect target picker
+- Deflect Attacks redirect target picker (Focus Point spend, 5ft melee / 60ft ranged, DEX save, 2× MA die + DEX mod same damage type)
 - Disciplined Survivor failed-save reroll prompt chain
 - Perfect Focus initiative-time floor
 - Heightened Focus Flurry-of-Blows third strike (needs `start_flurry_strike` count parameter)

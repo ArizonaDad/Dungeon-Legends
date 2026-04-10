@@ -3216,6 +3216,10 @@ class battle_manager {
 		c.righteous_strike_used_this_turn = false;
 		// Reset Stunning Strike (PHB 2024 Monk L5: "Once per turn")
 		c.stunning_strike_available = true;
+		// PHB 2024 Monk L3 Deflect Attacks: clear the redirect-available flag (defensive
+		// cleanup — gets set mid-attack when reduction zeros the incoming damage, should
+		// never persist past the Monk's own turn).
+		c.deflect_attacks_reduced_to_zero = false;
 		// PHB 2024 Monk L5 Stunning Strike (para 5349): The Stunned condition (and
 		// the success-rider speed-halving / advantage tag) lasts "until the start of
 		// your next turn". When this monk's turn starts, scan all combatants and clear
@@ -4673,6 +4677,17 @@ class battle_manager {
 				if (target.class_name == "Wizard" and target.subclass == "War Magic" and target.arcane_deflection_available) {
 					reaction_options.insert_last("arcane_deflection");
 				}
+				// PHB 2024 Monk L3 Deflect Attacks (para 5337-5339): reduce an attack's
+				// total damage by 1d10 + DEX mod + Monk level. Normally restricted to
+				// Bludgeoning/Piercing/Slashing damage. L13 Deflect Energy (para 5366)
+				// removes the damage-type restriction.
+				if (target.class_name == "Monk" and target.level >= 3) {
+					int incoming_dmg_type = pr.damage_dice_count > 0 ? pr.damage_type : get_attack_damage_type(c, false);
+					bool is_bps = (incoming_dmg_type == DMG_BLUDGEONING or incoming_dmg_type == DMG_PIERCING or incoming_dmg_type == DMG_SLASHING);
+					if (is_bps or target.level >= 13) {
+						reaction_options.insert_last("deflect_attacks");
+					}
+				}
 
 				if (reaction_options.length() > 0) {
 					user@ def_user = find_user_for_combatant(target);
@@ -4703,6 +4718,7 @@ class battle_manager {
 							else if (reaction_options[oi] == "spirit_shield") opts += "Spirit Shield (reduce damage by 2d6+)";
 							else if (reaction_options[oi] == "entropic_ward") opts += "Entropic Ward (force the hit to miss)";
 							else if (reaction_options[oi] == "arcane_deflection") opts += "Arcane Deflection (+4 AC)";
+							else if (reaction_options[oi] == "deflect_attacks") opts += "Deflect Attacks (reduce by 1d10+DEX+level)";
 						}
 						def_user.send({{"type", message_types::reaction_prompt}, {"attacker", c.name}, {"options", opts}, {"options_csv", opts_csv}});
 						return; // Pause — wait for reaction_response
@@ -5841,6 +5857,24 @@ class battle_manager {
 				defender.armor_class += 4;
 				defender.temp_ac_bonus_this_attack = 4;
 				broadcast_announce(defender.name + " invokes Arcane Deflection! +4 AC against this attack.", true);
+			}
+		}
+		else if (choice == "deflect_attacks" and defender.is_player) {
+			// PHB 2024 Monk L3 Deflect Attacks (para 5337-5339): "you can take a Reaction
+			// to reduce the attack's total damage against you. The reduction equals 1d10
+			// plus your Dexterity modifier and Monk level."
+			if (defender.class_name == "Monk" and defender.level >= 3) {
+				defender.has_reaction = false;
+				int reduction = random(1, 10) + defender.get_ability_mod(ABILITY_DEX) + defender.level;
+				if (reduction < 0) reduction = 0;
+				defender.deflect_attacks_reduction = reduction;
+				// Cache damage type so if the reduction zeroes out, a later redirect uses
+				// the correct type (same as source attack per para 5339).
+				int dtype = (@rp.attack_roll != null and rp.attack_roll.damage_dice_count > 0)
+					? rp.attack_roll.damage_type
+					: get_attack_damage_type(attacker, false);
+				defender.deflect_attacks_orig_damage_type = dtype;
+				broadcast_announce(defender.name + " uses Deflect Attacks! Incoming damage reduced by " + reduction + ".", true);
 			}
 		}
 

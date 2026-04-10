@@ -655,6 +655,7 @@ bool check_reaction_prompt_input() {
 			else if (choice_name == "spirit_shield") choice_name = "Spirit Shield";
 			else if (choice_name == "entropic_ward") choice_name = "Entropic Ward";
 			else if (choice_name == "arcane_deflection") choice_name = "Arcane Deflection";
+			else if (choice_name == "deflect_attacks") choice_name = "Deflect Attacks";
 			speak("Using " + choice_name + "!", true);
 			return true;
 		}

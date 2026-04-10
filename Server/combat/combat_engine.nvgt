@@ -148,6 +148,9 @@ class combatant {
 	bool body_and_mind_applied = false;    // L20: tracks the one-time +4 DEX/WIS boost
 	bool superior_defense_active = false;  // L18: damage resistance to all but Force for 1 minute
 	int superior_defense_rounds_remaining = 0; // L18: ticks down at start of turn, ends at 0 or Incapacitated
+	int deflect_attacks_reduction = 0;     // L3 Deflect Attacks: damage to subtract in apply_damage
+	bool deflect_attacks_reduced_to_zero = false; // L3 Deflect Attacks: set true when reduction zeroed this attack (redirect gate)
+	int deflect_attacks_orig_damage_type = 0; // L3 Deflect Attacks: damage type for redirect (matches incoming attack)
 	// Rogue PHB 2024 base class features
 	bool reliable_talent_active = false;   // L11: treat d20 <=9 as 10 on checks using proficient skills
 	// Wizard PHB 2024 base class features
@@ -1154,6 +1157,19 @@ class battle {
 			amount -= target.spirit_shield_reduction;
 			if (amount < 0) amount = 0;
 			target.spirit_shield_reduction = 0;
+		}
+
+		// PHB 2024 Monk L3 Deflect Attacks (para 5337-5339): reaction reduces attack's
+		// total damage by 1d10 + DEX mod + Monk level. If reduced to 0, caller can spend
+		// 1 Focus Point to redirect the force. The reduction value is set when the
+		// Monk chose to use the reaction in handle_reaction_response.
+		if (target.deflect_attacks_reduction > 0) {
+			amount -= target.deflect_attacks_reduction;
+			if (amount <= 0) {
+				amount = 0;
+				target.deflect_attacks_reduced_to_zero = true;
+			}
+			target.deflect_attacks_reduction = 0;
 		}
 
 		// Heavy Armor Master: reduce B/P/S damage by Proficiency Bonus when wearing heavy armor
