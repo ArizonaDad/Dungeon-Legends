@@ -248,7 +248,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 | Extra Attack | 5 | 5119-5120 | ✓ Done. |
 | **Tactical Shift** (Second Wind also grants half-Speed OA-free move) | 5 | 5121-5122 | ✓ Done 2026-04-09 — `tactical_shift_feet_remaining` field on combatant. When Second Wind is activated at L5+, that pool is set to half speed and `movement_remaining` is bumped. `check_opportunity_attacks` consumes pool greedily and suppresses OA while feet remain. Cleared at start of turn. |
 | **Indomitable** (failed save reroll, +Fighter level) | 9 | 5123-5125 | ✓ Done — 1/2/3 uses at L9/13/17, properly hooked in `handle_save_result`. |
-| **Tactical Master** (replace weapon mastery with Push/Sap/Slow) | 9 | 5126-5127 | PARTIAL 2026-04-10 — Weapon Mastery system now wired. Tactical Master swap itself needs a bonus action toggle to replace the weapon's property with Push/Sap/Slow for the next attack. |
+| **Tactical Master** (replace weapon mastery with Push/Sap/Slow) | 9 | 5126-5127 | ✓ Done 2026-04-10 — Bonus action toggle in users_dom.nvgt with Push/Sap/Slow sub-choice. Mastery override fires in weapon mastery block, clears after one attack. Client menu entry with sub-menu for L9+ Fighters. |
 | Two Extra Attacks | 11 | 5128-5129 | ✓ Done. |
 | **Studied Attacks** (advantage on next attack vs creature you missed) | 13 | 5130-5131 | ✓ Done — `studied_attacks_active` flag + `studied_attacks_target_id`. Set on miss, granted as advantage and consumed on next attack against the same target. |
 | Action Surge (two uses) | 17 | 5082 | ✓ Done — `action_surge_uses` upgrades at L17. |
@@ -308,20 +308,20 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 | **Ability Score Improvement** | 4/8/12/16 | 5669-5670 | ✓ Done — global feat-grant system. |
 | **Extra Attack** (2 attacks) | 5 | 5671-5672 | ✓ Done — `cs.extra_attacks=1` set in init. |
 | **Faithful Steed** (Find Steed always prepared, 1 free cast/LR) | 5 | 5673-5675 | PARTIAL 2026-04-09 — new `faithful_steed_free_cast_used` flag added; Find Steed companion summon (mount entity with stats) deferred per existing Beast Master/Steel Defender pattern. |
-| **Aura of Protection** (10ft Emanation, +CHA mod to saves) | 6 | 5676-5679 | ✓ Done 2026-04-09 — fixed wrong gating (was L7, source says L6). Self-coverage active in `get_save_bonus`; ally-aura coverage deferred (needs aura range loop). |
+| **Aura of Protection** (10ft Emanation, +CHA mod to saves) | 6 | 5676-5679 | ✓ Done 2026-04-10 — refresh_paladin_auras() scans all friendly Paladins by position. Ally coverage for Aura of Protection (CHA mod to saves within 10ft/30ft at L18) and Aura of Courage (Frightened immunity within range). Called at turn start and after movement. |
 | **Abjure Foes** (CD action, 60ft, CHA mod targets, WIS save Frightened) | 9 | 5680-5681 | DEFERRED — needs target-distribution prompt (CHA mod creatures in 60ft). |
-| **Aura of Courage** (Frightened immunity in aura) | 10 | 5682-5683 | ✓ Done 2026-04-09 — `add_condition` short-circuits when adding `COND_FRIGHTENED` to a Paladin L10+. Self-coverage only; ally aura coverage deferred. |
+| **Aura of Courage** (Frightened immunity in aura) | 10 | 5682-5683 | ✓ Done 2026-04-10 — Ally coverage wired via refresh_paladin_auras(). Frightened immunity applied to allies within 10ft (30ft at L18) of any L10+ Paladin. |
 | **Radiant Strikes** (+1d8 radiant on melee weapon/unarmed hit) | 11 | 5684-5685 | ✓ Done 2026-04-09 — block added in `battle_manager.nvgt` after Druid Primal Strike: every qualifying hit adds 1d8 radiant. Excludes ranged weapons per source ("Melee weapon or Unarmed Strike"). |
 | **Restoring Touch** (LoH heals + remove condition list, 5 HP each) | 14 | 5686-5687 | ✓ Done — `lay_on_hands` handler already accepts L14 conditions (Blinded/Charmed/Deafened/Frightened/Paralyzed/Stunned) at 5 HP each. |
-| **Aura Expansion** (10ft → 30ft) | 18 | 5688-5689 | DOC ONLY — comment in init notes the radius change. Aura range loop is deferred (currently self-only). |
+| **Aura Expansion** (10ft → 30ft) | 18 | 5688-5689 | ✓ Done 2026-04-10 — refresh_paladin_auras() uses 30ft range for L18+ Paladins. |
 | **Epic Boon** | 19 | 5690-5691 | ✓ Done — Epic Boon feat catalog. |
 
 **Pending follow-up Paladin batches:**
 - Abjure Foes L9 Channel Divinity action — needs CHA mod target distribution prompt within 60ft, WIS save vs spell save DC, 1-min Frightened (limited-action while Frightened condition).
-- Aura range loop for ally coverage of Aura of Protection (saves), Aura of Courage (Frightened immunity), and L18 Aura Expansion (10ft → 30ft).
+- ~~Aura range loop for ally coverage of Aura of Protection (saves), Aura of Courage (Frightened immunity), and L18 Aura Expansion (10ft → 30ft).~~ RESOLVED 2026-04-10 — refresh_paladin_auras() scans all friendly Paladins by position. Ally coverage for Aura of Protection + Aura of Courage within 10ft/30ft at L18. Called at turn start and after movement.
 - Faithful Steed L5 mount summon (full companion entity) — deferred along with the rest of the mount system.
 - Fighting Style at character creation flow + Blessed Warrior cleric cantrip selection prompt.
-- ~~Weapon Mastery property application~~ RESOLVED 2026-04-10 — 7 properties wired. Fighter Tactical Master swap still pending.
+- ~~Weapon Mastery property application~~ RESOLVED 2026-04-10 — 7 properties wired. ~~Fighter Tactical Master swap still pending.~~ RESOLVED 2026-04-10 — Tactical Master bonus action toggle with Push/Sap/Slow sub-choice wired.
 
 ### Ranger Audit (2026-04-09) — Basic Rules 2024 paras 5906-6194
 
@@ -392,7 +392,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 | **Metamagic** (2 options at L2, +2 at L10, +2 at L17) | 2 | 6994-6997 | ✓ Done 2026-04-10 — All 10 options wired as toggle bonus actions with SP costs. Careful/Distant/Empowered/Extended/Heightened/Quickened/Seeking/Subtle/Transmuted all functional. Twinned deferred (needs dual-target cast flow). Extended Spell grants advantage on concentration saves. |
 | **Sorcerer Subclass** | 3 | 6998-6999 | ✓ Done — Draconic, Wild Magic, Aberrant, Storm, Clockwork, Divine Soul, Frost, Desert Soul, Light Weaver, Shadow. |
 | **Ability Score Improvement** | 4/8/12/16 | 7000-7001 | ✓ Done — global feat-grant system. |
-| **Sorcerous Restoration** (regain SP up to half level on short rest, 1/LR) | 5 | 7002-7003 | PARTIAL 2026-04-09 — `sorcerous_restoration_available` flag set on init. Short rest plumbing not implemented yet, so the regain trigger is deferred. |
+| **Sorcerous Restoration** (regain SP up to half level on short rest, 1/LR) | 5 | 7002-7003 | ✓ Done 2026-04-10 — Wired into apply_short_rest: L5+ Sorcerers regain floor(level/2) SP on short rest, once per long rest via sorcerous_restoration_available flag. |
 | **Sorcery Incarnate** (spend 2 SP for Innate Sorcery use; 2 metamagic per spell while active) | 7 | 7004-7006 | PARTIAL 2026-04-09 — bonus action handler accepts the 2 SP fallback for Innate Sorcery activation. Multi-metamagic-per-spell while active deferred to metamagic pipeline rewrite. |
 | **Metamagic** (2 more options) | 10 | 7011 | DEFERRED — depends on the metamagic option choice prompt at level-up (we currently grant Quickened/Twinned/Subtle by default to all Sorcerers). |
 | **Metamagic** (2 more options) | 17 | 7011 | DEFERRED — same as L10. |
@@ -410,7 +410,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
   - **Seeking Spell** (1 SP, paras 7032-7035): reroll a missed spell attack. Stackable with other metamagic. Needs miss-resolution hook.
   - **Transmuted Spell** (1 SP, paras 7039-7041): change damage type among Acid/Cold/Fire/Lightning/Poison/Thunder. Needs damage type swap in cast pipeline.
 - Sorcery Incarnate L7 multi-metamagic-per-spell — needs metamagic pipeline rewrite to allow 2 simultaneous flags during a single cast.
-- Sorcerous Restoration L5 — needs short rest subsystem (currently we only have long rest reset).
+- ~~Sorcerous Restoration L5 — needs short rest subsystem (currently we only have long rest reset).~~ RESOLVED 2026-04-10 — Wired into apply_short_rest.
 - Arcane Apotheosis L20 — escalate to user; basic_rules_full.txt para 7009 has no body text.
 
 ### Storm Sorcery Subclass Audit (2026-04-09) — Xanathar's paras 2515-2577
@@ -459,7 +459,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 
 | Feature | Level | Source para | Status |
 |---------|-------|-------------|--------|
-| **Eldritch Invocations** (1 known at L1; scales to 10 at L18) | 1+ | 7607-7762 (Warlock Features table), 7764-7769 | PARTIAL — `eldritch_invocations_known` count corrected 2026-04-09 to match source table (was 0/2/3/4/5/6/7/8; now 1/3/3/3/5/5/6/6/7/7/7/8/8/8/8/9/9/10/10/10). Invocation selection / effects on individual invocations still subclass-specific. |
+| **Eldritch Invocations** (1 known at L1; scales to 10 at L18) | 1+ | 7607-7762 (Warlock Features table), 7764-7769 | PARTIAL 2026-04-10 — 7 combat-relevant invocations wired: Agonizing Blast (+CHA to EB damage), Repelling Blast (10ft push on EB hit), Thirsting Blade (Extra Attack at L5), Devouring Blade (3 attacks at L12), Eldritch Smite (expend slot for force+prone), Lifedrinker (+1d6 necrotic + HP recovery 1/turn), Devil's Sight (flag set, zone-based bypass deferred). Invocations defaulted by level+pact until selection prompt built. `eldritch_invocations_known` count corrected 2026-04-09 to match source table (1/3/3/3/5/5/6/6/7/7/7/8/8/8/8/9/9/10/10/10). |
 | **Pact Magic** (CHA, all slots same level, recover on Short Rest) | 1 | 7770-7781 | ✓ Done — `apply_warlock_slots()` matches source table (1 slot at L1, 2 at L2-10, 3 at L11-16, 4 at L17-20; slot levels 1/1/2/2/3/3/4/4/5/5...). Spellcasting=CHA. |
 | **Magical Cunning** (1-min rite to recover half max Pact slots round up, 1/LR) | 2 | 7782-7783 | ✓ Done 2026-04-09 — Magic action handler in `users _dom.nvgt`, `magical_cunning_available` flag, recovers `(max+1)/2` slots at the Pact slot level (or all at L20 via Eldritch Master). Init in `character_data.nvgt`. |
 | **Warlock Subclass** | 3 | 7784-7785 | ✓ Done — Fiend, Archfey, Great Old One, Hexblade, Celestial, Genie, Fathomless, Undead, Undying, Pact of the Astral Griffon, Pact of the Many, Mother of Sorrows, etc. |
@@ -473,7 +473,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 | **Eldritch Master** (Magical Cunning regains all slots) | 20 | 7798-7799 | ✓ Done 2026-04-09 — `eldritch_master_active` flag set on init at L20; Magical Cunning handler reads `c.level >= 20` and grants full pact slot recovery. |
 
 **Pending follow-up Warlock batches:**
-- Eldritch Invocation effects: many invocations need their own logic (Agonizing Blast cantrip CHA-mod damage rider, Devil's Sight darkvision, Pact of the Blade weapon conjure, Pact of the Chain familiar attack, Pact of the Tome cantrip/ritual prep, Repelling Blast push 10 ft, Thirsting Blade extra attack, Devouring Blade two extra attacks, Eldritch Smite force damage + prone, Lifedrinker bonus necrotic/psychic/radiant damage on pact weapon hit, Misty Visions/Mask of Many Faces/etc. as free at-will casts). Source: paras 7800-7927.
+- Eldritch Invocation effects: PARTIAL 2026-04-10 — 7 combat-relevant invocations wired (Agonizing Blast, Repelling Blast, Thirsting Blade, Devouring Blade, Eldritch Smite, Lifedrinker, Devil's Sight flag). Remaining invocations still need logic: Pact of the Blade weapon conjure, Pact of the Chain familiar attack, Pact of the Tome cantrip/ritual prep, Misty Visions/Mask of Many Faces/etc. as free at-will casts. Invocations defaulted by level+pact until selection prompt built. Source: paras 7800-7927.
 - Mystic Arcanum spell choice prompt at level-up — currently any chosen Warlock spell at the appropriate level can be cast. Source allows the player to designate one specific spell per arcanum level.
 - Magical Cunning duration — currently collapses the 1-minute rite to a single Magic action because 10 rounds of standing still is unusable in combat. Source-accurate behavior would require a "rite in progress" state that ticks down per round and breaks on offensive actions.
 - Pact Boon (Blade/Chain/Tome/Talisman) selection prompt at L3 — currently defaults to Pact of the Tome since the source mandates a player choice.
@@ -641,8 +641,8 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 - **Paladin:** Lay on Hands (pool size), Divine Smite (slot-based in 2024), Aura of Courage, Cleansing Touch — all addressed in 2026-04-09 audit; remaining items in pending list above.
 - **Ranger:** Favored Enemy / Roving / Tireless / Relentless Hunter / Nature's Veil / Precise Hunter / Feral Senses / Foe Slayer all addressed 2026-04-09; deferred items in Ranger pending list above.
 - **Rogue:** Sneak Attack base case / Steady Aim / Uncanny Dodge / Reliable Talent L7 fix / Slippery Mind / Elusive / Stroke of Luck flag all addressed 2026-04-09; deferred Cunning Strike family in Rogue pending list above.
-- **Sorcerer:** Innate Sorcery, Font of Magic, Sorcery Incarnate fallback, Eldritch Master prep all addressed 2026-04-09; metamagic pipeline + Sorcerous Restoration deferred.
-- **Warlock:** Magical Cunning, Contact Patron, Mystic Arcanum L11/13/15/17, Eldritch Master, invocation count fix all addressed 2026-04-09; individual invocation effects deferred.
+- **Sorcerer:** Innate Sorcery, Font of Magic, Sorcery Incarnate fallback, Eldritch Master prep all addressed 2026-04-09; metamagic pipeline wired 2026-04-10. Sorcerous Restoration wired into apply_short_rest 2026-04-10.
+- **Warlock:** Magical Cunning, Contact Patron, Mystic Arcanum L11/13/15/17, Eldritch Master, invocation count fix all addressed 2026-04-09; 7 combat-relevant invocation effects wired 2026-04-10 (Agonizing/Repelling Blast, Thirsting/Devouring Blade, Eldritch Smite, Lifedrinker, Devil's Sight). Remaining invocations deferred.
 - **Wizard:** Arcane Recovery, Spell Mastery, Signature Spells
 - **Artificer:** Tinker's Magic uses, Flash of Genius (20 sites + finalize_roll_result), Magic Item Adept/Savant/Master attunement caps, Magical Guidance flag
 - **Gunslinger:** Risk Dice progression fix (4/5/5/6/6 not 2/3/4), Critical Shot passive crit-range (19/18/17), Quick Draw initiative advantage, Extra Attack L5, Gut Shot crit debuff (speed half + disadv 10 rounds), Evasion L7, Overkill L11, Cheat Death L13 drop-to-1, Dire Gambit L15 Risk Die regen, Headshot L20 kill/+10d10
@@ -653,15 +653,18 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 
 **Current status (verified 2026-04-08):** 77 feats defined in `common/feat_data.nvgt`. Only 24 have `has_feat()` checks in combat code. **53 feats have no combat logic at all** — they're selectable at character creation but do nothing in combat.
 
-### Feats WITH combat logic (37 after batches 4A+4B; 16 still missing):
-alert, archery, athlete (BATCH 4A), blind_fighting (BATCH 4B), boon_of_combat_prowess, boon_of_irresistible_offense, boon_of_truesight, charger (BATCH 4B), crossbow_expert, crusher, defensive_duelist, dueling, fey_touched (BATCH 4B), grappler, great_weapon_fighting, great_weapon_master, healer, heavy_armor_master, inspiring_leader (BATCH 4A), mage_slayer, observant (BATCH 4A), piercer, poisoner (BATCH 4A), polearm_master, resilient (BATCH 4A), savage_attacker, sentinel, shadow_touched (BATCH 4B), sharpshooter (BATCH 4A), shield_master, skill_expert (BATCH 4A), skulker (BATCH 4A), slasher, spell_sniper (BATCH 4A), tavern_brawler, telekinetic (BATCH 4A), thrown_weapon_fighting, unarmed_fighting (BATCH 4B), war_caster
+### Feats WITH combat logic (38 after batches 4A+4B+2026-04-10; 15 still missing):
+alert, archery, athlete (BATCH 4A), blind_fighting (BATCH 4B), boon_of_combat_prowess, boon_of_irresistible_offense, boon_of_truesight, charger (BATCH 4B), crossbow_expert, crusher, defensive_duelist, dueling, fey_touched (BATCH 4B), grappler, great_weapon_fighting, great_weapon_master, healer, heavy_armor_master, inspiring_leader (BATCH 4A), mage_slayer, mobile (2026-04-10), observant (BATCH 4A), piercer, poisoner (BATCH 4A), polearm_master, resilient (BATCH 4A), savage_attacker, sentinel, shadow_touched (BATCH 4B), sharpshooter (BATCH 4A), shield_master, skill_expert (BATCH 4A), skulker (BATCH 4A), slasher, spell_sniper (BATCH 4A), tavern_brawler, telekinetic (BATCH 4A), thrown_weapon_fighting, unarmed_fighting (BATCH 4B), war_caster
 
 **Batch 4B wired (5 new feats):**
 - **Blind Fighting** (PHB para 7846) - sets `combatant.blindsight_range = 10` (used by future LoS / hidden checks)
 - **Unarmed Fighting** (PHB para 7880) - 1d6 (with shield) or 1d8 (no shield) bludgeoning unarmed strike, picks the higher of weapon die / monk MA die / Tavern Brawler die
-- **Charger** (PHB para 7557) - Improved Dash adds +10 ft to Dash speed. The d8 Charge Attack rider after a 10-ft straight-line move is deferred (needs movement-direction tracking).
-- **Fey Touched** (PHB para 7614) - auto-prepares Misty Step + Bless (default L1 Enchantment) at character init. Free-cast tracking deferred.
-- **Shadow Touched** (PHB para 7753) - auto-prepares Invisibility + Blindness/Deafness (default L2 Necromancy) at character init. Free-cast tracking deferred.
+- **Charger** (PHB para 7557) - Improved Dash adds +10 ft to Dash speed. Charger +1d8 charge damage wired (2026-04-10). Straight-line movement detection is approximated.
+- **Fey Touched** (PHB para 7614) - auto-prepares Misty Step + Bless (default L1 Enchantment) at character init. Free-cast tracking wired via grant_free_cast pipeline (2026-04-10).
+- **Shadow Touched** (PHB para 7753) - auto-prepares Invisibility + Blindness/Deafness (default L2 Necromancy) at character init. Free-cast tracking wired via grant_free_cast pipeline (2026-04-10).
+
+**2026-04-10 additions:**
+- **Mobile** (PHB para 7697) - ✓ Done 2026-04-10 — Blanket OA immunity approximation in check_opportunity_attacks. Strict RAW is only vs creatures attacked this turn.
 
 **Batch 4A wired (10 new feats):**
 - **Athlete** (PHB para 7549) - climb_speed = base speed
@@ -686,6 +689,7 @@ alert, archery, athlete (BATCH 4A), blind_fighting (BATCH 4B), boon_of_combat_pr
 
 **Fighting Style feats (5 missing):**
 - blind_fighting, interception, protection, two_weapon_fighting, unarmed_fighting
+- **Interception / Protection** — DEFERRED — requires extending reaction prompt system to support ally-protection reactions (currently only target is prompted).
 
 **Epic Boon feats (8 missing):**
 - boon_of_dimensional_travel, boon_of_energy_resistance, boon_of_fate, boon_of_fortitude (already wired as +40 HP), boon_of_recovery, boon_of_skill, boon_of_speed (already wired as +30 speed), boon_of_spell_recall, boon_of_the_night_spirit (already wired as 300 ft darkvision)
@@ -695,11 +699,11 @@ alert, archery, athlete (BATCH 4A), blind_fighting (BATCH 4B), boon_of_combat_pr
 - **Shield Master Interpose Shield** — reaction to take 0 damage instead of half on a successful DEX save against a half-damage effect.
 - **Shield Master push option** — player choice of Push 5ft OR Prone (currently always Prone).
 - **Mage Slayer Guarded Mind** — 1/rest reaction auto-succeed on failed INT/WIS/CHA save.
-- **Charger** — When you Dash, bonus action melee attack or shove with +1d8 damage.
+- ~~**Charger** — When you Dash, bonus action melee attack or shove with +1d8 damage.~~ RESOLVED 2026-04-10 — Charger +1d8 charge damage wired.
 - **Inspiring Leader** — After short/long rest, grant 6 creatures temp HP = level + CHA mod.
 - **Elemental Adept** — ignore resistance to chosen damage type, treat 1s as 2s on damage dice.
-- **Fey Touched** — free Misty Step + one 1st-level Div/Enchant spell once per long rest each.
-- **Shadow Touched** — free Invisibility + one 1st-level Illusion/Necromancy spell once per long rest each.
+- ~~**Fey Touched** — free Misty Step + one 1st-level Div/Enchant spell once per long rest each.~~ RESOLVED 2026-04-10 — Free-cast tracking wired via grant_free_cast pipeline.
+- ~~**Shadow Touched** — free Invisibility + one 1st-level Illusion/Necromancy spell once per long rest each.~~ RESOLVED 2026-04-10 — Free-cast tracking wired via grant_free_cast pipeline.
 - **Telekinetic** — bonus action Mage Hand / push-pull 5ft.
 - **Telepathic** — telepathic communication + Detect Thoughts spell.
 - **Sharpshooter** — ignore cover, no long range penalty, -5/+10 trade.

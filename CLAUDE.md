@@ -443,7 +443,14 @@ Per-class audit of all 13 base class features against `basic_rules_full.txt` (Ba
 - **Staggering Blow + Daze Wiring** (`ae7e13c`): Barbarian L13 Staggering Blow disadvantage wired into 6 save sites (central spell save + 5 EOT condition saves). Rogue L14 Daze enforced at turn start (lose movement + bonus action).
 - **Exhaustion Death** (`7665fb3`): PHB 2024 para 16254 — death at exhaustion level 6 enforced.
 - **Concentration Cleanup** (`ddc77f1`): Fixed critical bug where 11 concentration spell flags (Spirit Guardians, Divine Favor, Holy Weapon, Fire Shield, Stoneskin, Fly, Ensnaring Strike, Sanctuary, Venomous Mark, Fog Cloud, Darkness) were NOT cleared when concentration broke. All now reset in `clear_concentration_effects()`.
-- **Short Rest System** (`6d36682`): `apply_short_rest()` fires between waves in endless and wave modes. 25% max HP heal + restore Fighter Action Surge/Second Wind, Warlock Pact Magic, Wizard Arcane Recovery/Signature Spells, Druid Wild Shape, Battle Master/Arcane Archer dice, Monk Focus Points, Bard Bardic Inspiration, Cleric/Paladin Channel Divinity.
+- **Short Rest System** (`6d36682`): `apply_short_rest()` fires between waves in endless and wave modes. 25% max HP heal + restore Fighter Action Surge/Second Wind, Warlock Pact Magic, Wizard Arcane Recovery/Signature Spells, Druid Wild Shape, Battle Master/Arcane Archer dice, Monk Focus Points, Bard Bardic Inspiration, Cleric/Paladin Channel Divinity, Sorcerer Sorcerous Restoration.
+- **Mobile feat** (`81b63fb`): PHB 2024 para 7635 — blanket OA immunity approximation in check_opportunity_attacks. Strict RAW is per-creature-attacked-this-turn.
+- **Sorcerous Restoration** (`81b63fb`): PHB 2024 para 7002-7003 — L5+ Sorcerers regain floor(level/2) SP on short rest via apply_short_rest, once per long rest.
+- **Eldritch Invocations** (`86bd95d`): PHB 2024 paras 7749-7837 — 7 combat invocations wired: Agonizing Blast (+CHA to EB damage per beam), Repelling Blast (push 10ft on EB hit), Thirsting Blade (Extra Attack at L5 via extra_attacks), Devouring Blade (3 attacks at L12), Eldritch Smite (expend Pact slot for 1d8+1d8/level force + Prone), Lifedrinker (+1d6 necrotic on pact hit + Hit Die heal 1/turn), Devil's Sight (flag set). Invocations defaulted by level+pact in character_data.nvgt.
+- **Fighter Tactical Master** (`b962cb0`): PHB 2024 para 5125-5126 — L9+ Fighter bonus action to replace weapon mastery with Push/Sap/Slow for next attack. Override in weapon mastery block clears after one attack. Client sub-menu. main_hand_mastery broadcast to client.
+- **Paladin Aura ally coverage** (`09a4b32`): PHB 2024 paras 5665-5669, 5682-5683 — refresh_paladin_auras() at turn start and after movement. Aura of Protection CHA mod to ALL ally saves within 10ft (30ft at L18). Aura of Courage Frightened immunity for allies in range.
+- **Charger feat charge damage** (`2e4be7f`): PHB 2024 para 1394-1403 — +1d8 on first melee hit after Dash. charger_dash_active flag set on Dash, consumed on hit.
+- **Fey Touched / Shadow Touched free casts** (`2e4be7f`): PHB 2024 paras 1793-1800, 3563-3570 — grant_free_cast for Misty Step/Bless and Invisibility/Blindness-Deafness (1/LR each).
 
 **Pending classes (in priority order):** *(all base class audits complete — focus shifts to subclass batches and shared backlog)*
 
@@ -582,6 +589,7 @@ Epic Boon feats: combat_prowess, dimensional_travel, energy_resistance, fate, fo
 - Bard: Bardic Inspiration resets
 - Cleric/Paladin: Channel Divinity resets
 - Arcane Archer: Arcane Shot resets
+- Sorcerer: Sorcerous Restoration (floor(level/2) SP, 1/LR)
 - Clear conditions and end concentration
 
 ### Targeting & Scanning
