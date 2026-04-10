@@ -4447,6 +4447,8 @@ class battle_manager {
 		c.is_first_hit_this_turn = true;
 		// PHB 2024 Rogue L1 Sneak Attack (para 6537): "Once per turn" — reset.
 		c.sneak_attack_used_this_turn = false;
+		// Counterspell readied action expires at start of your next turn
+		c.counterspell_pending = false;
 		// PHB 2024 Boon of Dimensional Travel Blink Steps (para 7876)
 		c.blink_steps_available = false;
 		c.blink_steps_used_this_turn = false;
@@ -10049,6 +10051,45 @@ class battle_manager {
 		if (c.metamagic_transmuted_active) { c.metamagic_transmuted_active = false; }
 		if (c.metamagic_twinned_active) { c.metamagic_twinned_active = false; }
 		// Empowered and Seeking persist until consumed in damage/attack resolution
+
+		// Basic Rules 2024 Counterspell (para 12677): "You attempt to interrupt a
+		// creature in the process of casting a spell. The creature makes a Constitution
+		// saving throw. On a failed save, the spell dissipates with no effect, and the
+		// action, Bonus Action, or Reaction used to cast it is wasted."
+		// Check if any hostile with counterspell_pending and reaction is within 60 ft.
+		// Auto-resolve the CON save server-side. Cantrips cannot be countered.
+		if (spell.level >= 1) {
+			for (uint csi = 0; csi < combat.combatants.length(); csi++) {
+				combatant@ cs_caster = combat.combatants[csi];
+				if (@cs_caster == null or cs_caster.is_dead) continue;
+				if (!cs_caster.counterspell_pending) continue;
+				if (!cs_caster.has_reaction) continue;
+				if (!combat.are_hostile(cs_caster, c)) continue;
+				if (feet_distance(cs_caster.x, cs_caster.y, c.x, c.y) > 60) continue;
+				// Fire counterspell
+				cs_caster.counterspell_pending = false;
+				cs_caster.has_reaction = false;
+				int cs_dc = spell_save_dc(cs_caster);
+				int save_roll = random(1, 20);
+				int save_bonus = c.get_save_bonus(ABILITY_CON);
+				int save_total = save_roll + save_bonus;
+				bool cs_saved = save_total >= cs_dc;
+				broadcast_announce(cs_caster.name + " unleashes Counterspell on " + c.name + "'s " + spell.name + "!", true);
+				broadcast_roll(c.name, "CON save vs Counterspell", save_roll, save_bonus, save_total, cs_saved ? "Spell goes through!" : "Spell countered!");
+				if (!cs_saved) {
+					// Spell is countered — action and slot already consumed, just return
+					broadcast_announce(c.name + "'s " + spell.name + " fizzles!", true);
+					// War Magic Power Surge on successful counterspell
+					if (cs_caster.class_name == "Wizard" and cs_caster.subclass == "War Magic" and cs_caster.level >= 6 and cs_caster.power_surge_charges < cs_caster.power_surge_max) {
+						cs_caster.power_surge_charges++;
+						broadcast_announce(cs_caster.name + " stores a Power Surge! (" + cs_caster.power_surge_charges + "/" + cs_caster.power_surge_max + ")", false);
+					}
+					broadcast_state();
+					return;
+				}
+				break; // Only one counterspell per cast
+			}
+		}
 
 		// Xanathar's Storm Sorcery L6 Heart of the Storm (para 2629-2630): "whenever you
 		// start casting a spell of 1st level or higher that deals lightning or thunder damage,
