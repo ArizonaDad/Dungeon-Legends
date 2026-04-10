@@ -341,7 +341,7 @@ Adding a new prompted spell or feature: in `handle_cast` (or the relevant action
 
 - **Cleric**: Channel Divinity (Preserve Life, War Priest Attack)
 
-- **Monk**: Flurry of Blows + Shadow Step, Hands of Healing, Elemental Burst
+- **Monk**: Flurry of Blows + Shadow Step, Hands of Healing, Elemental Burst, Kensei's Shot (+1d4 ranged), Sharpen the Blade (+1/2/3 attack/damage)
 
 - **Bard**: Bardic Inspiration + Mantle of Inspiration (Glamour)
 
@@ -475,6 +475,9 @@ Per-class audit of all 13 base class features against `basic_rules_full.txt` (Ba
 - Path of the Glacier Frostbite (1d6/2d6/3d6 cold + 10ft slow) and Path of the Infernal Hellfire Claw (d6/d8/d10/d12 scaling)
 - Warrior of Celestial Soul Strike (L17 only, 1d4 radiant)
 - Way of the Aether Spirit Strike (force damage, MA die scaling)
+- Drunken Master Drunken Technique (Flurry grants Disengage + 10ft speed)
+- Kensei Deft Strike (1 ki on weapon hit for +MA die damage), Kensei's Shot (BA +1d4 ranged), Sharpen the Blade (BA 1-3 ki for +1/+2/+3 attack and damage, 1 min, no magic weapon stack), Unerring Accuracy (reroll weapon miss 1/turn)
+- Sun Soul Sun Shield (5+WIS radiant to melee attacker, consumes reaction)
 - Oath of the Hearth Burning Weapon (+CHA fire damage while active)
 - Gunslinger White Hat Lay Down the Law (Risk Die temp HP + retaliation reaction)
 

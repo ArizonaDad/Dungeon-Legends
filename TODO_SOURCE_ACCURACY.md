@@ -878,6 +878,38 @@ Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 | **Stalker's Flurry** (on miss with weapon attack, make another weapon attack, 1/turn) | 11 | 2160-2161 | ✓ Done — `stalkers_flurry_active` flag, `stalkers_flurry_used_this_turn` per-turn tracking. Full attack + damage roll chain in ROLL_ATTACK miss path. |
 | **Shadowy Dodge** (reaction: impose disadvantage if attacker has no advantage) | 15 | 2162-2163 | ✓ Done — `shadowy_dodge_active` flag. Reaction option gated on `!has_effective_advantage`. Handler rolls second d20, takes lower, recalculates attack total. |
 
+### Way of the Drunken Master Monk Subclass Audit (2026-04-10) — Xanathar's paras 1780-1805
+
+| Feature | Level | Source para | Status |
+|---------|-------|-------------|--------|
+| **Bonus Proficiencies** (Performance, brewer's supplies) | 3 | 1785-1786 | DEFERRED — tool/skill proficiency system exists but not wired for subclass auto-grants at init. |
+| **Drunken Technique** (on Flurry of Blows: free Disengage + 10ft speed) | 3 | 1787-1790 | ✓ Done — `drunken_technique_active` flag. Wired in Flurry handler: `took_disengage = true` + `movement_remaining += 10`. |
+| **Tipsy Sway: Leap to Your Feet** (stand from prone for 5ft instead of half speed) | 6 | 1791-1793 | DEFERRED — prone stand cost not tracked granularly. |
+| **Tipsy Sway: Redirect Attack** (reaction when missed: redirect attack to another creature within 5ft) | 6 | 1794-1797 | PARTIAL — `drunken_master_redirect` reaction handler exists (consumes 1 ki + reaction), but full redirect-to-new-target resolution is stub. |
+| **Drunkard's Luck** (when making STR/DEX/CON save with disadvantage, spend 1 ki to cancel disadvantage) | 11 | 1798-1800 | DEFERRED — save disadvantage cancellation requires hooking into save resolution pipeline. |
+| **Intoxicated Frenzy** (on Flurry of Blows: make up to 3 additional unarmed strikes, each against different target) | 17 | 1801-1805 | DEFERRED — multi-target Flurry expansion requires target selection prompt. |
+
+### Way of the Kensei Monk Subclass Audit (2026-04-10) — Xanathar's paras 1806-1835
+
+| Feature | Level | Source para | Status |
+|---------|-------|-------------|--------|
+| **Path of the Kensei: Kensei Weapons** (choose 2 weapon types as kensei weapons) | 3 | 1808-1813 | PARTIAL — `kensei_weapon_active` flag exists. Weapon selection prompt deferred. |
+| **Path of the Kensei: Agile Parry** (+2 AC when making unarmed strike while holding melee kensei weapon) | 3 | 1814-1817 | PARTIAL — `agile_parry_bonus` field declared + per-turn reset, but trigger condition (unarmed strike detection) not yet wired. |
+| **Path of the Kensei: Kensei's Shot** (BA: ranged kensei attacks deal +1d4 this turn) | 3 | 1814-1817 | ✓ Done — `kenseis_shot_active` flag set by BA handler. +1d4 applied in `apply_subclass_on_hit_damage` for ranged weapon attacks. Client menu entry wired. |
+| **One with the Blade: Deft Strike** (on kensei weapon hit, spend 1 ki for +MA die damage, 1/turn) | 6 | 1828-1831 | ✓ Done — `deft_strike_active` + `deft_strike_used_this_turn` flags. Wired in `apply_subclass_on_hit_damage`. |
+| **One with the Blade: Magic Kensei Weapons** (kensei weapons count as magical) | 6 | 1826-1827 | N/A — damage type bypass not tracked; all weapon attacks resolve normally. |
+| **Sharpen the Blade** (BA: spend 1-3 ki for +1/+2/+3 attack and damage, 1 minute, no magic weapon stack) | 11 | 1832-1835 | ✓ Done — `sharpen_the_blade_bonus`/`_rounds` fields. BA handler with ki_amount picker (1-3). Attack bonus in `get_attack_bonus_for_roll`, damage bonus in `get_damage_modifier_for_attack`, both gated on `magic_weapon_bonus == 0`. Duration tickdown in `advance_turn`. Client menu entries for 3 tiers. |
+| **Unerring Accuracy** (reroll one weapon miss per turn) | 17 | 1836-1838 | ✓ Done — `unerring_accuracy_active` + `unerring_accuracy_used_this_turn` flags. Wired in ROLL_ATTACK miss path after Stalker's Flurry. |
+
+### Way of the Sun Soul Monk Subclass Audit (2026-04-10) — Xanathar's paras 1836-1865
+
+| Feature | Level | Source para | Status |
+|---------|-------|-------------|--------|
+| **Radiant Sun Bolt** (ranged spell attack 30ft, 1d4+DEX radiant, replaces unarmed strike) | 3 | 1840-1845 | PARTIAL — `sun_bolt_ready` flag. Bonus action handler fires radiant bolt. Full unarmed-strike replacement in Attack action deferred. |
+| **Searing Arc Strike** (after Attack action: spend 2+ ki to cast Burning Hands as BA, scaling damage) | 6 | 1846-1850 | DEFERRED — requires post-Attack-action trigger + ki-gated spell cast. |
+| **Searing Sunburst** (action: 20ft-radius 150ft, 2d6 radiant CON save, +2d6 per ki up to 3) | 11 | 1851-1858 | DEFERRED — AoE ki-scaled spell not yet implemented. |
+| **Sun Shield** (bright light 30ft, when hit by melee: 5+WIS radiant, reaction) | 17 | 1859-1865 | ✓ Done — `sun_shield_active` flag. Wired in ROLL_DAMAGE path after apply_damage: `5 + target.get_ability_mod(ABILITY_WIS)` radiant to melee attacker, consumes reaction. |
+
 ---
 
 ## Working Rule Going Forward
