@@ -179,11 +179,15 @@ void apply_class_defaults(character_sheet@ cs) {
     } else if (c == "Fighter") {
         cs.hit_die = 10; cs.save_profs = {1,0,1,0,0,0}; // STR, CON
         cs.armor_type = "chain_mail"; cs.has_shield = true; // Heavy armor + shield
+        // PHB 2024 Fighter L2 Action Surge (para 5110-5112): 1 use L2-16, 2 uses L17+.
         cs.action_surge_uses = 1;
         if (cs.level >= 17) cs.action_surge_uses = 2;
+        // PHB 2024 Fighter L5 Extra Attack (para 5119-5120): attack twice.
+        // L11 Two Extra Attacks (para 5128-5129): attack three times.
+        // L20 Three Extra Attacks (para 5134-5135): attack four times.
         if (cs.level >= 5) cs.extra_attacks = 1;
         if (cs.level >= 11) cs.extra_attacks = 2;
-        if (cs.level >= 17) cs.extra_attacks = 3;
+        if (cs.level >= 20) cs.extra_attacks = 3;
         if (cs.subclass == "Eldritch Knight") {
             cs.is_caster = true; cs.spellcasting_ability = ABILITY_INT;
             apply_third_caster_slots(cs);
@@ -1081,7 +1085,21 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
     c.rage_uses_remaining = cs.rage_count;
     c.rage_damage_bonus = cs.rage_damage;
     c.action_surge_uses_remaining = cs.action_surge_uses;
-    c.second_wind_available = cs.class_name == "Fighter";
+    // PHB 2024 Fighter L1 Second Wind (para 5103-5106): uses scale with level —
+    // 2 at L1-3, 3 at L4-9, 4 at L10+. Fuels Tactical Mind (L2), Tactical Shift
+    // (L5) as well as the base HP recovery ability.
+    if (cs.class_name == "Fighter") {
+        int sw_max = 2;
+        if (cs.level >= 10) sw_max = 4;
+        else if (cs.level >= 4) sw_max = 3;
+        c.second_wind_uses_max = sw_max;
+        c.second_wind_uses_remaining = sw_max;
+        c.second_wind_available = true;
+    } else {
+        c.second_wind_uses_max = 0;
+        c.second_wind_uses_remaining = 0;
+        c.second_wind_available = false;
+    }
 
     // Lucky feat: grant luck points equal to proficiency bonus
     if (character_sheet_has_feat(cs, "lucky")) {

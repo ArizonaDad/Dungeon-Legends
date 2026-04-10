@@ -487,7 +487,16 @@ class combatant {
 	bool cheat_death_available = true; // Level 13: avoid a lethal blow once per short rest
 	int rage_turns_remaining = 0;
 	int action_surge_uses_remaining = 0;
-	bool second_wind_available = false;
+	// PHB 2024 Fighter L1 Second Wind (para 5103-5106): Bonus Action, heal 1d10 +
+	// Fighter level. 2 uses at L1, 3 at L4, 4 at L10. Regain 1 on Short Rest, all on
+	// Long Rest. Also fuels Tactical Mind (L2) and Tactical Shift (L5).
+	int second_wind_uses_remaining = 0;
+	int second_wind_uses_max = 0;
+	bool second_wind_available = false; // Kept for legacy client sync; mirrors (uses_remaining > 0).
+	// PHB 2024 Fighter L5 Tactical Shift (para 5121-5122): when Second Wind is
+	// activated as a Bonus Action, grant half-Speed of movement that ignores
+	// Opportunity Attacks. Decremented by movement and cleared at end of turn.
+	int tactical_shift_feet_remaining = 0;
 	uint help_target_id = 0;
 	int hide_dc = 0;
 	bool hasted = false;
@@ -1480,6 +1489,8 @@ class battle {
 				state["my_is_raging"] = c.raging;
 				state["my_action_surge_uses_remaining"] = c.action_surge_uses_remaining;
 				state["my_second_wind_available"] = c.second_wind_available;
+				state["my_second_wind_uses_remaining"] = c.second_wind_uses_remaining;
+				state["my_second_wind_uses_max"] = c.second_wind_uses_max;
 				state["my_is_hidden"] = c.is_hidden;
 				state["my_weapon_range"] = c.main_hand_range;
 				state["my_movement_remaining"] = c.movement_remaining;

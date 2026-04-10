@@ -234,7 +234,27 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 **Player choice infrastructure:** Three new Phase 1 config commands (`set_primal_order`, `set_elemental_fury`, `set_primal_strike_damage_type`) added to the Shift+P menu. They persist to `account.data` so Druid choices survive across sessions.
 
 
-- **Fighter:** Tactical Mind/Shift/Master, Second Wind (correct dice), Studied Attacks
+### Fighter Audit (PHB 2024 Basic Rules paras 4967-5135) — completed 2026-04-09
+
+| Feature | Lvl | Source para | Status |
+|---|---|---|---|
+| Fighting Style (feat selection from list) | 1 | 5100-5102 | ✓ Done — chooses a Fighting Style feat at creation; feat data has the styles. |
+| **Second Wind** (BA, heal 1d10+lvl, scaling uses) | 1 | 5103-5106 | ✓ Done 2026-04-09 — was a single bool; now `second_wind_uses_remaining` / `second_wind_uses_max` int pair. 2 uses L1-3, 3 uses L4-9, 4 uses L10+. Bonus action handler decrements properly and announces remaining. |
+| **Weapon Mastery** (3/4/5/6 weapons by level) | 1 | 5107-5109 | PARTIAL — character creation tracks the choice; the property effects themselves (Push/Sap/Slow/Vex/etc.) are NOT yet wired into attack resolution. The local `mastery` variable in `apply_weapon` is set then discarded — needs a follow-up to plumb mastery IDs through to the combatant and the attack pipeline. |
+| **Action Surge** (1 use L2, 2 uses L17) | 2 | 5110-5112 | ✓ Done — properly tracked and handled. |
+| **Tactical Mind** (spend Second Wind on failed ability check, refund on still-fail) | 2 | 5113-5114 | ✓ Done 2026-04-09 — new prompt chain entry after Lucky/Heroic. `pending_tactical_mind_prompt` struct + `maybe_prompt_tactical_mind` + `handle_tactical_mind_response` server-side. New `tactical_mind_prompt`/`tactical_mind_response` message types. Client `prompt_tactical_mind_choice` + `check_tactical_mind_prompt_input` (T to use, Escape to skip). Use is refunded if the +1d10 still fails to clear the DC, per source. Bots auto-use when `failure_margin <= 5` (1d10 average). |
+| Fighter Subclass | 3 | 5115-5116 | ✓ Done — Champion + many extra subclasses. |
+| Ability Score Improvement | 4/6/8/12/14/16 | 5117-5118 | ✓ Done. |
+| Extra Attack | 5 | 5119-5120 | ✓ Done. |
+| **Tactical Shift** (Second Wind also grants half-Speed OA-free move) | 5 | 5121-5122 | ✓ Done 2026-04-09 — `tactical_shift_feet_remaining` field on combatant. When Second Wind is activated at L5+, that pool is set to half speed and `movement_remaining` is bumped. `check_opportunity_attacks` consumes pool greedily and suppresses OA while feet remain. Cleared at start of turn. |
+| **Indomitable** (failed save reroll, +Fighter level) | 9 | 5123-5125 | ✓ Done — 1/2/3 uses at L9/13/17, properly hooked in `handle_save_result`. |
+| **Tactical Master** (replace weapon mastery with Push/Sap/Slow) | 9 | 5126-5127 | ✗ DEFERRED — depends on Weapon Mastery property application system being wired first. Stubbed in audit notes. |
+| Two Extra Attacks | 11 | 5128-5129 | ✓ Done. |
+| **Studied Attacks** (advantage on next attack vs creature you missed) | 13 | 5130-5131 | ✓ Done — `studied_attacks_active` flag + `studied_attacks_target_id`. Set on miss, granted as advantage and consumed on next attack against the same target. |
+| Action Surge (two uses) | 17 | 5082 | ✓ Done — `action_surge_uses` upgrades at L17. |
+| Indomitable (three uses) | 17 | 5082 | ✓ Done. |
+| Epic Boon | 19 | 5132-5133 | ✓ Done — Epic Boon feat catalog ships boon_of_combat_prowess et al. |
+| **Three Extra Attacks** (4 attacks per Attack action) | 20 | 5134-5135 | ✓ FIXED 2026-04-09 — was triggering at L17 (wrong), now triggers at L20 per source. |
 - **Monk:** Martial Arts die scaling, Deflect Attacks (was Deflect Missiles), Stunning Strike, Empowered Strikes, Perfect Focus
 - **Paladin:** Lay on Hands (pool size), Divine Smite (slot-based in 2024), Aura of Courage, Cleansing Touch
 - **Ranger:** Favored Enemy (2024 uses Hunter's Mark), Natural Explorer, Primeval Awareness

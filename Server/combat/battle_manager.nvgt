@@ -85,6 +85,19 @@ class pending_heroic_prompt {
 	int bardic_bonus = 0;
 }
 
+// PHB 2024 Fighter L2 Tactical Mind (para 5113-5114): "When you fail an ability
+// check, you can expend a use of your Second Wind to push yourself toward
+// success. Rather than regaining Hit Points, you roll 1d10 and add the number
+// rolled to the ability check, potentially turning it into a success. If the
+// check still fails, this use of Second Wind isn't expended."
+class pending_tactical_mind_prompt {
+	string player_username;
+	pending_roll@ roll;
+	int natural_roll = 0;
+	int bless_bonus = 0;
+	int bardic_bonus = 0;
+}
+
 class pending_smite_prompt {
 	string player_username;
 	pending_roll@ damage_roll;       // The damage roll to resume after smite choice
@@ -143,6 +156,7 @@ class battle_manager {
 	pending_bardic_prompt@ current_bardic_prompt;
 	pending_lucky_prompt@ current_lucky_prompt;
 	pending_heroic_prompt@ current_heroic_prompt;
+	pending_tactical_mind_prompt@ current_tactical_mind_prompt;
 	pending_smite_prompt@ current_smite_prompt;
 	pending_reaction_prompt@ current_reaction_prompt;
 	pending_spell_choice@ current_spell_choice;
@@ -3172,6 +3186,9 @@ class battle_manager {
 		c.primal_strike_used_this_turn = false;
 		// PHB 2024 Druid L5 Wild Resurgence (para 4428): "Once on each of your turns" — reset.
 		c.wild_resurgence_slot_to_use_used_this_turn = false;
+		// PHB 2024 Fighter L5 Tactical Shift (para 5121-5122): the OA-free movement
+		// pool only persists for the turn it was activated. Clear at start of turn.
+		c.tactical_shift_feet_remaining = 0;
 		// Reset Way of the Prophet Righteous Strike (1/turn)
 		c.righteous_strike_used_this_turn = false;
 		// Reset Stunning Strike (PHB 2024 Monk L5: "Once per turn")
@@ -3510,6 +3527,17 @@ class battle_manager {
 		if (@mover == null or @combat == null) return;
 		// Disengage prevents opportunity attacks.
 		if (mover.took_disengage) return;
+		// PHB 2024 Fighter L5 Tactical Shift (para 5121-5122): "Whenever you
+		// activate your Second Wind with a Bonus Action, you can move up to half
+		// your Speed without provoking Opportunity Attacks." Greedy: consume the
+		// shift pool first; once it's empty, normal OA rules apply again.
+		if (mover.tactical_shift_feet_remaining > 0) {
+			int step_feet = feet_distance(old_x, old_y, new_x, new_y);
+			if (mover.tactical_shift_feet_remaining >= step_feet) {
+				mover.tactical_shift_feet_remaining -= step_feet;
+				return;
+			}
+		}
 
 		for (uint i = 0; i < combat.combatants.length(); i++) {
 			combatant@ enemy = combat.combatants[i];
@@ -5335,16 +5363,20 @@ class battle_manager {
 		else if (pr.roll_type == ROLL_ABILITY_CHECK and pr.resolution_tag == "hide") {
 			return total < pr.dc;
 		}
+		else if (pr.roll_type == ROLL_ABILITY_CHECK and pr.dc > 0) {
+			return total < pr.dc;
+		}
 		return false;
 	}
 
-	// Try Lucky then Heroic prompts. Returns true if a prompt was sent (caller should wait).
+	// Try Lucky then Heroic then Tactical Mind. Returns true if a prompt was sent.
 	bool try_reroll_prompts(pending_roll@ pr, combatant@ c, int natural_roll, int bless_bonus, int bardic_bonus) {
 		if (@pr == null or @c == null) return false;
 		int total = natural_roll + pr.modifier + bless_bonus + bardic_bonus;
 		if (!roll_would_fail(pr, c, natural_roll, total)) return false;
 		if (maybe_prompt_lucky(pr, c, natural_roll, bless_bonus, bardic_bonus)) return true;
 		if (maybe_prompt_heroic(pr, c, natural_roll, bless_bonus, bardic_bonus)) return true;
+		if (maybe_prompt_tactical_mind(pr, c, natural_roll, bless_bonus, bardic_bonus)) return true;
 		return false;
 	}
 
@@ -5471,9 +5503,11 @@ class battle_manager {
 				finalize_roll_result(pr, new_natural, prompt.bless_bonus, prompt.bardic_bonus);
 			}
 		} else {
-			// Declined Lucky - try Heroic next
+			// Declined Lucky - try Heroic, then Tactical Mind, then finalize.
 			if (!maybe_prompt_heroic(pr, c, prompt.natural_roll, prompt.bless_bonus, prompt.bardic_bonus)) {
-				finalize_roll_result(pr, prompt.natural_roll, prompt.bless_bonus, prompt.bardic_bonus);
+				if (!maybe_prompt_tactical_mind(pr, c, prompt.natural_roll, prompt.bless_bonus, prompt.bardic_bonus)) {
+					finalize_roll_result(pr, prompt.natural_roll, prompt.bless_bonus, prompt.bardic_bonus);
+				}
 			}
 		}
 	}
@@ -5494,7 +5528,100 @@ class battle_manager {
 			c.has_heroic_inspiration = false;
 			int new_natural = random(1, 20);
 			broadcast_announce(c.name + " uses Heroic Inspiration to reroll! New roll: " + new_natural + ".", false);
-			finalize_roll_result(pr, new_natural, prompt.bless_bonus, prompt.bardic_bonus);
+			// After the reroll, the new natural roll might still fail — try Tactical Mind chain.
+			if (!try_reroll_prompts(pr, c, new_natural, prompt.bless_bonus, prompt.bardic_bonus)) {
+				finalize_roll_result(pr, new_natural, prompt.bless_bonus, prompt.bardic_bonus);
+			}
+		} else {
+			// Declined Heroic — try Tactical Mind next.
+			if (!maybe_prompt_tactical_mind(pr, c, prompt.natural_roll, prompt.bless_bonus, prompt.bardic_bonus)) {
+				finalize_roll_result(pr, prompt.natural_roll, prompt.bless_bonus, prompt.bardic_bonus);
+			}
+		}
+	}
+
+	// PHB 2024 Fighter L2 Tactical Mind (para 5113-5114): "When you fail an ability
+	// check, you can expend a use of your Second Wind to push yourself toward
+	// success. Rather than regaining Hit Points, you roll 1d10 and add the number
+	// rolled to the ability check, potentially turning it into a success. If the
+	// check still fails, this use of Second Wind isn't expended."
+	bool maybe_prompt_tactical_mind(pending_roll@ pr, combatant@ c, int natural_roll, int bless_bonus, int bardic_bonus) {
+		if (@pr == null or @c == null) return false;
+		if (c.class_name != "Fighter") return false;
+		if (c.level < 2) return false;
+		if (c.second_wind_uses_remaining <= 0) return false;
+		if (pr.roll_type != ROLL_ABILITY_CHECK) return false;
+		if (pr.dc <= 0) return false;
+		if (!c.is_player) return false;
+
+		int total = natural_roll + pr.modifier + bless_bonus + bardic_bonus;
+		if (total >= pr.dc) return false;
+		int failure_margin = pr.dc - total;
+
+		user@ roller_user = find_user_for_combatant(c);
+		if (@roller_user == null or roller_user.is_bot) {
+			// Bot heuristic: only use if 1d10 average (5.5) is enough to flip success.
+			if (failure_margin > 5) return false;
+			int tm_roll = random(1, 10);
+			int new_total = total + tm_roll;
+			bool succeeded = new_total >= pr.dc;
+			if (succeeded) {
+				c.second_wind_uses_remaining--;
+				c.second_wind_available = (c.second_wind_uses_remaining > 0);
+				broadcast_announce(c.name + "'s Tactical Mind rolls a " + tm_roll + " and turns the check into a success! " + c.second_wind_uses_remaining + " Second Wind use" + (c.second_wind_uses_remaining == 1 ? "" : "s") + " remain.", false);
+				// Bypass dc-fail finalize: nudge total via bardic_bonus channel so it actually succeeds.
+				finalize_roll_result(pr, natural_roll, bless_bonus, bardic_bonus + tm_roll);
+			} else {
+				// Use is NOT expended on a fail.
+				broadcast_announce(c.name + "'s Tactical Mind rolls a " + tm_roll + " but the check still fails. The Second Wind use is not expended.", false);
+				finalize_roll_result(pr, natural_roll, bless_bonus, bardic_bonus);
+			}
+			return true;
+		}
+
+		pending_tactical_mind_prompt prompt;
+		prompt.player_username = c.player_username;
+		@prompt.roll = pr;
+		prompt.natural_roll = natural_roll;
+		prompt.bless_bonus = bless_bonus;
+		prompt.bardic_bonus = bardic_bonus;
+		@current_tactical_mind_prompt = prompt;
+
+		string label = pr.reason != "" ? pr.reason : "ability check";
+		roller_user.send({
+			{"type", message_types::tactical_mind_prompt},
+			{"text", "Your " + label + " failed by " + failure_margin + ". Spend a Second Wind use on Tactical Mind to roll 1d10 and add it? Press T to use, Escape to skip. " + c.second_wind_uses_remaining + " Second Wind use" + (c.second_wind_uses_remaining == 1 ? "" : "s") + " remain."},
+			{"uses", c.second_wind_uses_remaining}
+		});
+		return true;
+	}
+
+	void handle_tactical_mind_response(user@ u, json_object@ msg) {
+		if (@current_tactical_mind_prompt == null or @u == null) return;
+		if (current_tactical_mind_prompt.player_username != u.username) return;
+
+		pending_tactical_mind_prompt@ prompt = current_tactical_mind_prompt;
+		@current_tactical_mind_prompt = null;
+
+		pending_roll@ pr = prompt.roll;
+		combatant@ c = @pr != null ? combat.get_combatant(pr.combatant_id) : null;
+		if (@pr == null or @c == null) return;
+
+		bool use_it = msg.exists("use") ? bool(msg["use"]) : false;
+		if (use_it and c.second_wind_uses_remaining > 0) {
+			int tm_roll = random(1, 10);
+			int total = prompt.natural_roll + pr.modifier + prompt.bless_bonus + prompt.bardic_bonus + tm_roll;
+			bool succeeded = total >= pr.dc;
+			if (succeeded) {
+				c.second_wind_uses_remaining--;
+				c.second_wind_available = (c.second_wind_uses_remaining > 0);
+				broadcast_announce(c.name + "'s Tactical Mind rolls a " + tm_roll + " and turns the check into a success! " + c.second_wind_uses_remaining + " Second Wind use" + (c.second_wind_uses_remaining == 1 ? "" : "s") + " remain.", false);
+				finalize_roll_result(pr, prompt.natural_roll, prompt.bless_bonus, prompt.bardic_bonus + tm_roll);
+			} else {
+				// Use is NOT expended on a fail per source.
+				broadcast_announce(c.name + "'s Tactical Mind rolls a " + tm_roll + " but the check still fails. The Second Wind use is not expended.", false);
+				finalize_roll_result(pr, prompt.natural_roll, prompt.bless_bonus, prompt.bardic_bonus);
+			}
 		} else {
 			finalize_roll_result(pr, prompt.natural_roll, prompt.bless_bonus, prompt.bardic_bonus);
 		}

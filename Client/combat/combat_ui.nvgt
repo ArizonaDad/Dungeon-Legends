@@ -139,6 +139,12 @@ uint64 next_lucky_prompt_reminder = 0;
 bool waiting_for_heroic_prompt = false;
 string heroic_prompt_text = "";
 uint64 next_heroic_prompt_reminder = 0;
+// PHB 2024 Fighter L2 Tactical Mind (Basic Rules para 5113-5114): spend a Second
+// Wind use after a failed ability check to roll 1d10 and add it to the check.
+// Press T to use, Escape to skip. Use is refunded if the check still fails.
+bool waiting_for_tactical_mind_prompt = false;
+string tactical_mind_prompt_text = "";
+uint64 next_tactical_mind_prompt_reminder = 0;
 bool waiting_for_smite_prompt = false;
 string smite_prompt_text = "";
 string smite_slots_info = "";
@@ -181,6 +187,8 @@ int my_rage_damage_bonus = 0;
 bool my_is_raging = false;
 int my_action_surge_uses_remaining = 0;
 bool my_second_wind_available = false;
+int my_second_wind_uses_remaining = 0;
+int my_second_wind_uses_max = 0;
 bool my_is_hidden = false;
 int my_weapon_range = 5;
 int my_movement_remaining = 0;
@@ -351,6 +359,13 @@ void prompt_heroic_choice(string text) {
 	speak(text, true);
 }
 
+void prompt_tactical_mind_choice(string text) {
+	waiting_for_tactical_mind_prompt = true;
+	tactical_mind_prompt_text = text;
+	next_tactical_mind_prompt_reminder = ticks() + 3500;
+	speak(text, true);
+}
+
 void prompt_smite_choice(string text, string slots) {
 	waiting_for_smite_prompt = true;
 	smite_prompt_text = text;
@@ -465,6 +480,25 @@ bool check_heroic_prompt_input() {
 		next_heroic_prompt_reminder = 0;
 		send({{"type", message_types::heroic_response}, {"use", false}});
 		speak("Saving Heroic Inspiration.", true);
+		return true;
+	}
+	return false;
+}
+
+bool check_tactical_mind_prompt_input() {
+	if (!waiting_for_tactical_mind_prompt) return false;
+	if (key_pressed(KEY_T)) {
+		waiting_for_tactical_mind_prompt = false;
+		next_tactical_mind_prompt_reminder = 0;
+		send({{"type", message_types::tactical_mind_response}, {"use", true}});
+		speak("Using Tactical Mind.", true);
+		return true;
+	}
+	if (key_pressed(KEY_ESCAPE)) {
+		waiting_for_tactical_mind_prompt = false;
+		next_tactical_mind_prompt_reminder = 0;
+		send({{"type", message_types::tactical_mind_response}, {"use", false}});
+		speak("Skipping Tactical Mind.", true);
 		return true;
 	}
 	return false;
@@ -931,7 +965,7 @@ void show_bonus_action_menu() {
 	int spirit_totem_unicorn_opt = -1;
 
 	if (lc == "barbarian" and !my_is_raging and my_rage_uses_remaining > 0) rage_opt = m.add_item("Rage. Bonus action. Uses left: " + my_rage_uses_remaining + ". Damage bonus: " + my_rage_damage_bonus + ".");
-	if (lc == "fighter" and my_second_wind_available) second_wind_opt = m.add_item("Second Wind. Bonus action. Heal 1d10 plus fighter level.");
+	if (lc == "fighter" and my_second_wind_uses_remaining > 0) second_wind_opt = m.add_item("Second Wind. Bonus action. Heal 1d10 plus fighter level. Uses left: " + my_second_wind_uses_remaining + " of " + my_second_wind_uses_max + ".");
 	if (lc == "rogue" and level >= 2) cunning_opt = m.add_item("Cunning Action. Bonus action. Dash, Disengage, or Hide.");
 	if (lc == "paladin" and my_lay_on_hands_pool > 0) lay_hands_opt = m.add_item("Lay on Hands. Bonus action. Pool: " + my_lay_on_hands_pool + ".");
 	if (lc == "monk" and level >= 2) flurry_opt = m.add_item("Flurry of Blows. 1 Focus Point. Focus Points: " + my_focus_points + ".");
@@ -2459,7 +2493,7 @@ void speak_my_status() {
 	if (my_is_raging) text += "Rage is active. ";
 	else if (my_rage_uses_remaining > 0) text += "Rages remaining: " + my_rage_uses_remaining + ". ";
 	if (my_action_surge_uses_remaining > 0) text += "Action Surge uses remaining: " + my_action_surge_uses_remaining + ". ";
-	if (my_second_wind_available) text += "Second Wind available. ";
+	if (my_second_wind_uses_remaining > 0) text += "Second Wind uses remaining: " + my_second_wind_uses_remaining + " of " + my_second_wind_uses_max + ". ";
 	if (my_spiritual_weapon_active) text += "Spiritual Weapon is active. ";
 	if (my_has_action) text += "Action available. ";
 	else if (my_attacks_remaining > 0) text += my_attacks_remaining + " extra attack" + (my_attacks_remaining == 1 ? "" : "s") + " remaining. ";
@@ -2972,6 +3006,8 @@ void parse_game_state(json_object@ msg) {
 	my_is_raging = msg.exists("my_is_raging") ? bool(msg["my_is_raging"]) : false;
 	my_action_surge_uses_remaining = msg.exists("my_action_surge_uses_remaining") ? int(msg["my_action_surge_uses_remaining"]) : 0;
 	my_second_wind_available = msg.exists("my_second_wind_available") ? bool(msg["my_second_wind_available"]) : false;
+	my_second_wind_uses_remaining = msg.exists("my_second_wind_uses_remaining") ? int(msg["my_second_wind_uses_remaining"]) : 0;
+	my_second_wind_uses_max = msg.exists("my_second_wind_uses_max") ? int(msg["my_second_wind_uses_max"]) : 0;
 	my_is_hidden = msg.exists("my_is_hidden") ? bool(msg["my_is_hidden"]) : false;
 	my_weapon_range = msg.exists("my_weapon_range") ? int(msg["my_weapon_range"]) : 5;
 	my_movement_remaining = msg.exists("my_movement_remaining") ? int(msg["my_movement_remaining"]) : 0;
@@ -3098,12 +3134,14 @@ void reset_combat_state() {
 	waiting_for_bardic_prompt = false;
 	waiting_for_lucky_prompt = false;
 	waiting_for_heroic_prompt = false;
+	waiting_for_tactical_mind_prompt = false;
 	waiting_for_smite_prompt = false;
 	waiting_for_reaction_prompt = false;
 	next_roll_prompt_reminder = 0;
 	next_bardic_prompt_reminder = 0;
 	next_lucky_prompt_reminder = 0;
 	next_heroic_prompt_reminder = 0;
+	next_tactical_mind_prompt_reminder = 0;
 	next_smite_prompt_reminder = 0;
 	next_reaction_prompt_reminder = 0;
 	roll_type = -1;
@@ -3121,6 +3159,8 @@ void reset_combat_state() {
 	my_is_raging = false;
 	my_action_surge_uses_remaining = 0;
 	my_second_wind_available = false;
+	my_second_wind_uses_remaining = 0;
+	my_second_wind_uses_max = 0;
 	my_is_hidden = false;
 	my_weapon_range = 5;
 	my_movement_remaining = 0;
@@ -3305,6 +3345,14 @@ void combat_game_loop() {
 				next_heroic_prompt_reminder = ticks() + 3500;
 			}
 			check_heroic_prompt_input();
+			continue;
+		}
+		if (waiting_for_tactical_mind_prompt) {
+			if (next_tactical_mind_prompt_reminder > 0 and ticks() >= next_tactical_mind_prompt_reminder) {
+				speak("Still waiting. " + tactical_mind_prompt_text, true);
+				next_tactical_mind_prompt_reminder = ticks() + 3500;
+			}
+			check_tactical_mind_prompt_input();
 			continue;
 		}
 		if (waiting_for_smite_prompt) {

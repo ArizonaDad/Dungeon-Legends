@@ -1545,17 +1545,32 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.room.bm.broadcast_announce(c.name + " uses Action Surge! Extra action this turn. " + c.action_surge_uses_remaining + " use" + (c.action_surge_uses_remaining == 1 ? "" : "s") + " remain.", true);
 		}
 		else if (feature == "second_wind") {
+			// PHB 2024 Fighter L1 Second Wind (para 5103-5106): "As a Bonus Action,
+			// you can use it to regain Hit Points equal to 1d10 plus your Fighter
+			// level. You can use this feature twice... regain one expended use when
+			// you finish a Short Rest, and all when you finish a Long Rest." 3 uses
+			// at L4, 4 uses at L10 per the Fighter Features table (para 5016-5048).
 			if (c.class_name != "Fighter") { u.send({{"type", message_types::announce}, {"text", "Only fighters can use Second Wind."}, {"interrupt", true}}); return; }
-			if (!c.second_wind_available) { u.send({{"type", message_types::announce}, {"text", "You have already used Second Wind this battle."}, {"interrupt", true}}); return; }
+			if (c.second_wind_uses_remaining <= 0) { u.send({{"type", message_types::announce}, {"text", "You have no Second Wind uses remaining."}, {"interrupt", true}}); return; }
 			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
 			c.has_bonus_action = false;
 			c.used_bonus_action = true;
-			c.second_wind_available = false;
+			c.second_wind_uses_remaining--;
+			c.second_wind_available = (c.second_wind_uses_remaining > 0);
 			int heal = random(1, 10) + c.level;
 			int effective_heal = u.room.bm.combat.apply_healing(c, heal);
 			u.room.bm.record_effective_healing(c.player_username, effective_heal);
 			u.room.bm.broadcast_roll(c.name, "Second Wind healing", heal, c.level, heal, "");
-			u.room.bm.broadcast_announce(c.name + " uses Second Wind! Healed " + effective_heal + " HP. Now at " + c.current_hp + ".", false);
+			u.room.bm.broadcast_announce(c.name + " uses Second Wind! Healed " + effective_heal + " HP. Now at " + c.current_hp + ". " + c.second_wind_uses_remaining + " use" + (c.second_wind_uses_remaining == 1 ? "" : "s") + " remain.", false);
+			// PHB 2024 Fighter L5 Tactical Shift (para 5121-5122): "Whenever you
+			// activate your Second Wind with a Bonus Action, you can move up to
+			// half your Speed without provoking Opportunity Attacks."
+			if (c.level >= 5) {
+				int shift_feet = c.speed / 2;
+				c.movement_remaining += shift_feet;
+				c.tactical_shift_feet_remaining = shift_feet;
+				u.room.bm.broadcast_announce(c.name + "'s Tactical Shift grants " + shift_feet + " feet of movement that ignores Opportunity Attacks.", false);
+			}
 			// Sword Coast: Purple Dragon Knight Rallying Cry — heal up to 3 allies within 60ft
 			if (c.purple_dragon_knight_active) {
 				int allies_healed = 0;
@@ -4271,6 +4286,9 @@ void handle_user_message(user@ u, json_object@ msg)
 	}
 	else if (msg_type == message_types::heroic_response) {
 		if (@u.room != null and @u.room.bm != null) u.room.bm.handle_heroic_response(u, msg);
+	}
+	else if (msg_type == message_types::tactical_mind_response) {
+		if (@u.room != null and @u.room.bm != null) u.room.bm.handle_tactical_mind_response(u, msg);
 	}
 	else if (msg_type == message_types::smite_response) {
 		if (@u.room != null and @u.room.bm != null) u.room.bm.handle_smite_response(u, msg);

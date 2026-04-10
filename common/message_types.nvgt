@@ -57,6 +57,8 @@ namespace message_types
 	const string lucky_response = "lucky_response";           // Client chooses whether to spend a Luck Point.
 	const string heroic_prompt = "heroic_prompt";             // Server offers Heroic Inspiration reroll after a failed d20 roll.
 	const string heroic_response = "heroic_response";         // Client chooses whether to spend Heroic Inspiration.
+	const string tactical_mind_prompt = "tactical_mind_prompt";   // Server offers Fighter L2 Tactical Mind: spend a Second Wind use to add 1d10 to a failed ability check.
+	const string tactical_mind_response = "tactical_mind_response"; // Client chooses whether to spend a Second Wind use on Tactical Mind.
 
 	// Actions
 	const string action_move = "action_move";                 // Client moves their character.
