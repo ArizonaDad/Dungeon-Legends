@@ -483,10 +483,13 @@ Per-class audit of all 13 base class features against `basic_rules_full.txt` (Ba
 - Oath of Redemption Rebuke the Violent (CD reaction: radiant damage equal to damage dealt on WIS fail), Protective Spirit (end-of-turn heal 1d6+half level if below half HP)
 - Oath of the Hearth Burning Weapon (+CHA fire damage while active)
 - Storm Herald Storm Soul (passive resistance: desert=fire, sea=lightning, tundra=cold)
-- Celestial Warlock Radiant Soul (radiant resistance at L6)
-- Scout Survivalist (Nature+Survival proficiency+expertise), Superior Mobility (+10ft speed at L9)
+- Celestial Warlock Radiant Soul (radiant resistance at L6, +CHA to one fire/radiant spell damage roll per turn)
+- Scout Survivalist (Nature+Survival proficiency+expertise), Superior Mobility (+10ft speed at L9), Ambush Master (L13: first hit in round 1 marks target for team-wide advantage)
 - Swashbuckler Rakish Audacity (+CHA initiative, solo-engagement SA), Master Duelist (L17 miss reroll with advantage 1/SR)
 - Inquisitive Eye for Weakness (+3d6 SA at L17 vs studied target); Insightful Fighting integrated as SA qualification path (fixed double-dip bug)
+- Gloom Stalker Dread Ambusher (L3: +WIS initiative, +10ft round 1, extra attack with +1d8 on first turn)
+- Aberrant Mind Psychic Defenses (advantage on charm/frighten saves at 12 spell save sites)
+- Druid L20 Archdruid Evergreen Wild Shape (regain 1 Wild Shape use on initiative if at 0)
 - Gunslinger White Hat Lay Down the Law (Risk Die temp HP + retaliation reaction)
 
 ### Feats with Combat Logic
