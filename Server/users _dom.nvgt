@@ -3043,15 +3043,20 @@ void handle_user_message(user@ u, json_object@ msg)
 		}
 
 		else if (feature == "blade_flourish") {
-			// College of Swords Bard: next melee attack has a flourish effect
+			// Xanathar's College of Swords L3 Blade Flourish (para 586-591)
 			if (c.class_name != "Bard" or c.subclass != "College of Swords") { u.send({{"type", message_types::announce}, {"text", "Only College of Swords bards can use Blade Flourish."}, {"interrupt", true}}); return; }
-			if (c.bardic_inspiration_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Bardic Inspiration uses remaining."}, {"interrupt", true}}); return; }
+			// Xanathar's L14 Master's Flourish (para 594-595): "you can roll a d6
+			// and use it instead of expending a Bardic Inspiration die."
+			bool masters = (c.level >= 14);
+			if (!masters and c.bardic_inspiration_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Bardic Inspiration uses remaining."}, {"interrupt", true}}); return; }
 			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
 			c.has_bonus_action = false;
 			c.used_bonus_action = true;
-			c.bardic_inspiration_uses--;
+			if (!masters) c.bardic_inspiration_uses--;
 			c.blade_flourish_active = true;
-			u.room.bm.broadcast_announce(c.name + " prepares a Blade Flourish! Next weapon attack gets bonus damage.", true);
+			c.masters_flourish_free = masters;
+			string fl_msg = masters ? " prepares a Master's Flourish! (free d6, no BI spent)" : " prepares a Blade Flourish! Next weapon attack gets bonus damage.";
+			u.room.bm.broadcast_announce(c.name + fl_msg, true);
 		}
 
 		else if (feature == "psychic_blades") {
@@ -3196,10 +3201,53 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.room.bm.broadcast_announce(c.name + " invokes Guided Strike! Next attack gets +10 bonus.", true);
 		}
 
+		else if (feature == "conquering_presence") {
+			// Xanathar's Oath of Conquest L3 Conquering Presence (para 1988-1991):
+			// "each creature of your choice that you can see within 30 feet of you
+			// must make a Wisdom saving throw. On a failed save, a creature becomes
+			// frightened of you for 1 minute."
+			if (c.class_name != "Paladin" or c.subclass != "Oath of Conquest") { u.send({{"type", message_types::announce}, {"text", "Only Oath of Conquest paladins can use Conquering Presence."}, {"interrupt", true}}); return; }
+			if (c.channel_divinity_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Channel Divinity uses remaining."}, {"interrupt", true}}); return; }
+			if (!c.has_action) { u.send({{"type", message_types::announce}, {"text", "No action remaining."}, {"interrupt", true}}); return; }
+			c.has_action = false;
+			c.channel_divinity_uses--;
+			int cp_dc = spell_save_dc(c);
+			int cp_hit = 0;
+			for (uint cpi = 0; cpi < u.room.bm.combat.combatants.length(); cpi++) {
+				combatant@ t = u.room.bm.combat.combatants[cpi];
+				if (@t == null or t.is_dead or t.id == c.id) continue;
+				if (t.is_player == c.is_player) continue;
+				if (feet_distance(c.x, c.y, t.x, t.y) > 30) continue;
+				int sr = random(1, 20);
+				int sb = t.get_save_bonus(ABILITY_WIS);
+				int st = sr + sb;
+				bool saved = st >= cp_dc;
+				u.room.bm.broadcast_roll(t.name, "WIS save vs Conquering Presence", sr, sb, st, saved ? "Resists!" : "Frightened!");
+				if (!saved) { t.add_condition(COND_FRIGHTENED); cp_hit++; }
+			}
+			u.room.bm.broadcast_announce(c.name + "'s Conquering Presence frightens " + cp_hit + " creature(s)!", true);
+		}
+
 		else if (feature == "wrath_of_storms") {
 			// Storm Sorcerer: Wrath of the Storms - reaction - deal lightning/thunder damage when hit
 			// Implemented as on-hit passive (see damage application)
 			u.send({{"type", message_types::announce}, {"text", "Wrath of the Storms triggers automatically when hit by melee attack."}, {"interrupt", true}});
+		}
+
+		else if (feature == "invincible_conqueror") {
+			// Xanathar's Oath of Conquest L20 Invincible Conqueror (para 1998-2003):
+			// "you gain resistance to all damage. When you take the Attack action,
+			// you can make one additional weapon attack. Your melee weapon attacks
+			// score a critical hit on a roll of 19 or 20." 1 min, 1/LR.
+			if (c.class_name != "Paladin" or c.subclass != "Oath of Conquest" or c.level < 20) { u.send({{"type", message_types::announce}, {"text", "Requires Oath of Conquest Paladin level 20."}, {"interrupt", true}}); return; }
+			if (c.invincible_conqueror_used) { u.send({{"type", message_types::announce}, {"text", "Invincible Conqueror already used this long rest."}, {"interrupt", true}}); return; }
+			if (!c.has_action) { u.send({{"type", message_types::announce}, {"text", "No action remaining."}, {"interrupt", true}}); return; }
+			c.has_action = false;
+			c.invincible_conqueror_used = true;
+			c.invincible_conqueror_active = true;
+			c.invincible_conqueror_rounds = 10;
+			c.extra_attacks++;
+			u.room.bm.broadcast_announce(c.name + " becomes an Invincible Conqueror! Resistance to all damage, extra attack, crit on 19-20 for 1 minute.", true);
 		}
 
 		else if (feature == "empowered_healing") {

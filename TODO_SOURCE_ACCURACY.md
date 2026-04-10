@@ -861,11 +861,11 @@ Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 | Feature | Level | Source para | Status |
 |---------|-------|-------------|--------|
 | **Oath Spells** (armor_of_agathys, command, hold_person, spiritual_weapon, bestow_curse, fear, dominate_beast, stoneskin, cloudkill, dominate_person) | 3-17 | 1973-1987 | ✓ Done — all 10 auto-prepared in `character_data.nvgt` init block. |
-| **Conquering Presence** (Channel Divinity: frighten each creature of choice within 30ft, WIS save) | 3 | 1988-1991 | DEFERRED — Channel Divinity system exists but needs dedicated AoE frighten action. |
+| **Conquering Presence** (Channel Divinity: frighten each creature of choice within 30ft, WIS save) | 3 | 1988-1991 | Done 2026-04-10 -- Action + CD use. Loops enemies within 30ft, WIS save vs spell DC or Frightened. Client menu entry wired. |
 | **Guided Strike** (Channel Divinity: +10 to attack roll) | 3 | 1988-1991 | Done -- field + activation handler + consumption all wired (BA + CD use + +10 attack bonus). Was incorrectly marked PARTIAL. |
 | **Aura of Conquest** (frightened creatures in 10ft/30ft aura: speed 0, half-paladin-level psychic damage at turn start) | 7/18 | 1992-1995 | ✓ Done — `aura_of_conquest_active` + `aura_of_conquest_range` (10→30 at L18). Wired in `advance_turn`: scans for frightened enemies within range, sets speed 0, applies psychic damage. |
 | **Scornful Rebuke** (when hit, attacker takes CHA mod psychic damage, min 1) | 15 | 1996-1997 | ✓ Done — `scornful_rebuke_active` flag. Wired in ROLL_DAMAGE path after Fire Shield / Refraction Shield. |
-| **Invincible Conqueror** (Action: 1 min resistance to all damage + extra attack + crit 19-20, 1/LR) | 20 | 1998-2003 | DEFERRED — fields added (`invincible_conqueror_active/_used`), activation handler needs action + 10-round timer. |
+| **Invincible Conqueror** (Action: 1 min resistance to all damage + extra attack + crit 19-20, 1/LR) | 20 | 1998-2003 | Done 2026-04-10 -- Action, 1/LR, 10-round timer. Resistance to all damage in apply_damage. +1 extra_attack. Crit 19-20 on melee in get_critical_threshold. Tickdown in advance_turn. Client menu entry at L20+. |
 
 ### Gloom Stalker Ranger Subclass Audit (2026-04-10) — Xanathar's paras 2130-2163
 
@@ -969,7 +969,7 @@ Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 | **Fighting Style** (Dueling or Two-Weapon Fighting) | 3 | 582-585 | PARTIAL — Dueling/TWF feat system exists; not auto-prompted at subclass selection for Swords Bard. |
 | **Blade Flourish** (on Attack action +10ft speed; on weapon hit spend 1 BI for extra damage + variant) | 3 | 586-591 | PARTIAL — `blade_flourish_active` BA handler spends BI for bonus BI-die damage. +10ft speed on Attack action wired 2026-04-10 via `blade_flourish_speed_applied`. Missing: 3 Flourish variants (Defensive=+AC, Slashing=AoE, Mobile=push+move) — needs player choice prompt. |
 | **Extra Attack** (attack twice per Attack action) | 6 | 592-593 | ✓ Done — `c.extra_attacks = 1` at L6 in character_data.nvgt. |
-| **Master's Flourish** (Blade Flourish can roll d6 instead of spending BI) | 14 | 594-595 | DEFERRED — requires free-Flourish path that doesn't consume BI. |
+| **Master's Flourish** (Blade Flourish can roll d6 instead of spending BI) | 14 | 594-595 | Done 2026-04-10 -- At L14+, Blade Flourish rolls d6 instead of expending BI die. Handler bypasses BI spend; damage rider uses d6 at L14+. |
 
 ### College of Whispers Bard Subclass Audit (2026-04-10) — Xanathar's paras 610-631
 

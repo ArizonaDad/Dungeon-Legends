@@ -2486,8 +2486,8 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
             if (cs.level >= 18) c.aura_of_conquest_range = 30;
             // L15 Scornful Rebuke (para 1996-1997): attacker takes CHA mod psychic on hit
             if (cs.level >= 15) c.scornful_rebuke_active = true;
-            // L20 Invincible Conqueror (para 1998-2003): deferred (needs action + 1min timer)
-            // if (cs.level >= 20) c.invincible_conqueror_used = false;
+            // L20 Invincible Conqueror (para 1998-2003): 1/LR action, 1 min
+            if (cs.level >= 20) c.invincible_conqueror_used = false;
         }
     }
     if (cs.class_name == "Ranger") {

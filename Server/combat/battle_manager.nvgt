@@ -1488,6 +1488,11 @@ class battle_manager {
 		if (attacker.class_name == "Gunslinger" and weapon_attack and attacker.main_hand_is_ranged and attacker.gunslinger_crit_threshold < 20) {
 			return attacker.gunslinger_crit_threshold;
 		}
+		// Xanathar's Oath of Conquest L20 Invincible Conqueror (para 2001):
+		// "your melee weapon attacks score a critical hit on a roll of 19 or 20"
+		if (attacker.invincible_conqueror_active and weapon_attack and !attacker.main_hand_is_ranged) {
+			return 19;
+		}
 		return 20;
 	}
 
@@ -3640,6 +3645,16 @@ class battle_manager {
 					broadcast_announce(prev.name + "'s Sharpen the Blade fades.", false);
 				}
 			}
+			// Xanathar's Oath of Conquest L20 Invincible Conqueror (para 1998-2003):
+			// "for 1 minute" — tick down 10-round duration
+			if (prev.invincible_conqueror_active and prev.invincible_conqueror_rounds > 0) {
+				prev.invincible_conqueror_rounds--;
+				if (prev.invincible_conqueror_rounds <= 0) {
+					prev.invincible_conqueror_active = false;
+					prev.extra_attacks--;
+					broadcast_announce(prev.name + "'s Invincible Conqueror fades.", false);
+				}
+			}
 			// Xanathar's Oath of Redemption L15 Protective Spirit (para 2050-2051):
 			// "You regain hit points equal to 1d6 + half your paladin level if you end
 			// your turn in combat with fewer than half of your hit points remaining."
@@ -5005,12 +5020,17 @@ class battle_manager {
 			broadcast_announce(attacker.name + "'s Symbiotic Entity adds " + spore_dmg + " necrotic damage!", false);
 		}
 
-		// College of Swords Bard: Blade Flourish — bonus damage when active
+		// Xanathar's College of Swords L3 Blade Flourish (para 586-591) + L14 Master's
+		// Flourish (para 594-595): "you can roll a d6 and use it instead of expending
+		// a Bardic Inspiration die."
 		if (attacker.class_name == "Bard" and attacker.subclass == "College of Swords" and attacker.blade_flourish_active and is_weapon_attack) {
-			int flourish_dmg = random(1, attacker.bardic_inspiration_grant_die);
+			int fl_die = attacker.masters_flourish_free ? 6 : attacker.bardic_inspiration_grant_die;
+			int flourish_dmg = random(1, fl_die);
 			bonus += flourish_dmg;
 			attacker.blade_flourish_active = false;
-			broadcast_announce(attacker.name + "'s Blade Flourish adds " + flourish_dmg + " damage!", false);
+			attacker.masters_flourish_free = false;
+			string fl_label = fl_die == 6 ? "Master's Flourish" : "Blade Flourish";
+			broadcast_announce(attacker.name + "'s " + fl_label + " adds " + flourish_dmg + " damage!", false);
 		}
 
 		// Xanathar's College of Whispers L3 Psychic Blades (para 610-613): "extra

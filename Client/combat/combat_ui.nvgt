@@ -1391,8 +1391,12 @@ void show_bonus_action_menu() {
 			hidden_paths_opt = m.add_item("Hidden Paths. Bonus action. Teleport up to 60 feet.");
 		}
 	}
+	int conquering_presence_opt = -1;
+	int invincible_conqueror_opt = -1;
 	if (lc == "paladin" and subclass == "Oath of Conquest") {
 		guided_strike_opt = m.add_item("Guided Strike. Channel Divinity. Add +10 to next attack roll.");
+		conquering_presence_opt = m.add_item("Conquering Presence. Channel Divinity action. Frighten enemies within 30 feet.");
+		if (level >= 20) invincible_conqueror_opt = m.add_item("Invincible Conqueror. Action. Resistance to all damage, extra attack, crit 19 to 20. 1 minute.");
 	}
 	if (lc == "fighter" and subclass == "Rune Knight") {
 		giants_might_opt = m.add_item("Giant's Might. Bonus action. Become Large with +1d6 damage.");
@@ -2127,6 +2131,14 @@ void show_bonus_action_menu() {
 	else if (guided_strike_opt >= 0 and res == guided_strike_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "guided_strike"}});
 		speak("Guided Strike. Next attack gets +10.", true);
+	}
+	else if (conquering_presence_opt >= 0 and res == conquering_presence_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "conquering_presence"}});
+		speak("Conquering Presence. Frightening nearby enemies!", true);
+	}
+	else if (invincible_conqueror_opt >= 0 and res == invincible_conqueror_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "invincible_conqueror"}});
+		speak("Invincible Conqueror! Resistance, extra attack, improved crits for 1 minute!", true);
 	}
 	else if (giants_might_opt >= 0 and res == giants_might_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "giants_might"}});

@@ -338,6 +338,7 @@ class combatant {
 	int aura_of_conquest_range = 0; // 10 at L7, 30 at L18
 	bool invincible_conqueror_active = false; // L20: all resist + extra attack + crit 19-20
 	bool invincible_conqueror_used = false; // 1/LR tracking
+	int invincible_conqueror_rounds = 0; // 10 round duration
 	// Gloom Stalker Ranger (Xanathar's paras 2130-2163)
 	bool stalkers_flurry_active = false; // L11: on miss, make another weapon attack
 	bool stalkers_flurry_used_this_turn = false; // once per turn
@@ -350,6 +351,7 @@ class combatant {
 	bool symbiotic_entity_active = false; // Circle of Spores Druid
 	int symbiotic_entity_uses = 0;
 	bool blade_flourish_active = false; // College of Swords Bard
+	bool masters_flourish_free = false; // Xanathar's Swords Bard L14 (para 594-595)
 	bool blade_flourish_speed_applied = false; // Xanathar's Swords Bard L3 (para 1497): +10ft on Attack action
 	bool psychic_blades_pending = false; // College of Whispers Bard
 	bool strength_of_the_grave_used = false; // Shadow Magic Sorcerer
@@ -1545,6 +1547,12 @@ class battle {
 		// Xanathar's Shadow Magic L18 Umbral Form (para 2605-2607): resistance to all
 		// damage except force and radiant while in shadowy form.
 		if (target.shadow_umbral_active and damage_type != DMG_FORCE and damage_type != DMG_RADIANT) {
+			amount = (amount + 1) / 2;
+		}
+
+		// Xanathar's Oath of Conquest L20 Invincible Conqueror (para 1999):
+		// "you gain resistance to all damage"
+		if (target.invincible_conqueror_active) {
 			amount = (amount + 1) / 2;
 		}
 
