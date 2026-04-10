@@ -2405,6 +2405,10 @@ class battle_manager {
 		if (attacker.gut_shot_rounds_remaining > 0) disadv = true;
 		if (target.is_dodging and !attacker.has_condition(COND_BLINDED)) disadv = true;
 		if (target.has_condition(COND_INVISIBLE) and !can_ignore_invisible) disadv = true;
+		// PHB 2024 Invisible condition (para 16219): "Attack rolls against the creature
+		// have Disadvantage, and the creature's attack rolls have Advantage." The defender
+		// Disadvantage is above; the attacker Advantage is here.
+		if (attacker.has_condition(COND_INVISIBLE)) adv = true;
 		if (target.has_condition(COND_RESTRAINED)) adv = true;
 		if (attacker.is_hidden and combat.are_hostile(attacker, target)) adv = true;
 		// Crossbow Expert: no disadvantage on ranged attacks within 5ft
@@ -2823,6 +2827,16 @@ class battle_manager {
 			broadcast_announce(bot.name + " has no targets and ends their turn.", false);
 			advance_turn();
 			return;
+		}
+
+		// PHB 2024 Prone: bot must spend half speed to stand before moving
+		if (bot.has_condition(COND_PRONE)) {
+			int stand_cost = bot.speed / 2;
+			if (bot.movement_remaining >= stand_cost) {
+				bot.movement_remaining -= stand_cost;
+				bot.remove_condition(COND_PRONE);
+				broadcast_announce(bot.name + " stands up (" + stand_cost + " ft used).", false);
+			}
 		}
 
 		while (bot.movement_remaining >= FEET_PER_TILE and nearest_dist > bot.main_hand_range) {
@@ -5167,6 +5181,16 @@ class battle_manager {
 			broadcast_announce(monster.name + " has no targets and ends its turn.");
 			advance_turn();
 			return;
+		}
+
+		// PHB 2024 Prone: monster must spend half speed to stand up before moving
+		if (monster.has_condition(COND_PRONE)) {
+			int stand_cost = monster.speed / 2;
+			if (monster.movement_remaining >= stand_cost) {
+				monster.movement_remaining -= stand_cost;
+				monster.remove_condition(COND_PRONE);
+				broadcast_announce(monster.name + " stands up (" + stand_cost + " ft used).", false);
+			}
 		}
 
 		// Step 1: Move toward the nearest player until one of the monster's attacks is in range.
@@ -9085,9 +9109,31 @@ class battle_manager {
 		combatant@ c = combat.current_combatant();
 		if (@c == null or !c.is_player or c.player_username != u.username) return;
 
+		// PHB 2024 Grappled (para 16216): "A Grappled creature's Speed is 0"
+		// PHB 2024 Restrained (para 16241): "A Restrained creature's Speed is 0"
+		if (c.has_condition(COND_GRAPPLED) or c.has_condition(COND_RESTRAINED)) {
+			string reason = c.has_condition(COND_GRAPPLED) ? "Grappled" : "Restrained";
+			u.send({{"type", message_types::error}, {"text", "You are " + reason + " and cannot move!"}});
+			return;
+		}
+
 		int dx = 0, dy = 0;
 		if (msg.exists("dx")) dx = int(msg["dx"]);
 		if (msg.exists("dy")) dy = int(msg["dy"]);
+
+		// PHB 2024 Prone condition (para 16240): "The creature can crawl or spend
+		// half its movement to stand up and thereby end the condition." Standing
+		// costs half total speed; deducted before the move.
+		if (c.has_condition(COND_PRONE)) {
+			int stand_cost = c.speed / 2;
+			if (c.movement_remaining < stand_cost + 5) {
+				u.send({{"type", message_types::error}, {"text", "You need " + (stand_cost + 5) + " feet of movement to stand up and move (" + stand_cost + " to stand, 5 to move). " + c.movement_remaining + " feet remaining."}});
+				return;
+			}
+			c.movement_remaining -= stand_cost;
+			c.remove_condition(COND_PRONE);
+			broadcast_announce(c.name + " stands up (" + stand_cost + " ft used).", false);
+		}
 
 		int move_cost = (dx != 0 and dy != 0) ? 5 : 5;  // Simplified: 5 ft per tile.
 		if (c.movement_remaining < move_cost) {
