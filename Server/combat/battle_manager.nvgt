@@ -1765,6 +1765,22 @@ class battle_manager {
 		if (@attacker != null and attacker.has_feat("great_weapon_fighting") and weapon_qualifies_great_weapon_fighting(pr.attack_name) and roll < 3) {
 			roll = 3;
 		}
+		// PHB 2024 Elemental Adept (para 7610): "when you roll damage for a spell
+		// you cast that deals damage of that type, you can treat any 1 on a damage
+		// die as a 2."
+		if (pr.is_spell_effect and roll == 1) {
+			combatant@ caster = @attacker != null ? attacker : combat.get_combatant(pr.combatant_id);
+			if (@caster != null) {
+				int dt = pr.metamagic_transmuted ? pr.metamagic_transmuted_type : pr.damage_type;
+				if ((dt == DMG_ACID and caster.elemental_adept_acid) or
+					(dt == DMG_COLD and caster.elemental_adept_cold) or
+					(dt == DMG_FIRE and caster.elemental_adept_fire) or
+					(dt == DMG_LIGHTNING and caster.elemental_adept_lightning) or
+					(dt == DMG_THUNDER and caster.elemental_adept_thunder)) {
+					roll = 2;
+				}
+			}
+		}
 		return roll;
 	}
 
@@ -3525,6 +3541,8 @@ class battle_manager {
 					if (ch.exists("primal_strike_damage_type")) cs.primal_strike_damage_type = string(ch["primal_strike_damage_type"]);
 					// PHB 2024 Sorcerer Draconic Sorcery L6 Elemental Affinity choice (para 7559-7560)
 					if (ch.exists("elemental_affinity_type")) cs.elemental_affinity_type = string(ch["elemental_affinity_type"]);
+					// PHB 2024 Elemental Adept (para 7610): persisted damage type choice
+					if (ch.exists("elemental_adept_type")) cs.elemental_adept_type = string(ch["elemental_adept_type"]);
 					// Xanathar's Divine Soul L1 Divine Magic affinity (para 2532-2546)
 					if (ch.exists("divine_soul_affinity")) cs.divine_soul_affinity = string(ch["divine_soul_affinity"]);
 					has_char = true;

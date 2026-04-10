@@ -1460,7 +1460,8 @@ void handle_user_message(user@ u, json_object@ msg)
 			or feature == "set_primal_order" or feature == "set_elemental_fury"
 			or feature == "set_primal_strike_damage_type"
 			or feature == "set_elemental_affinity"
-			or feature == "set_divine_soul_affinity";
+			or feature == "set_divine_soul_affinity"
+			or feature == "set_elemental_adept";
 		combatant@ c = null;
 		if (is_phase1_config) {
 			@c = u.room.bm.find_player_combatant(u.username);
@@ -4269,6 +4270,40 @@ void handle_user_message(user@ u, json_object@ msg)
 				}
 			}
 			u.send({{"type", message_types::announce}, {"text", "Divine Soul affinity set to " + dsa + ". Affinity spell: " + affinity_spell + "."}, {"interrupt", true}});
+		}
+		else if (feature == "set_elemental_adept") {
+			// PHB 2024 Elemental Adept (para 7610): player chooses one damage type
+			// (Acid, Cold, Fire, Lightning, or Thunder). Persists to account.
+			string ea_type = msg.exists("value") ? string(msg["value"]) : "";
+			if (ea_type != "acid" and ea_type != "cold" and ea_type != "fire" and ea_type != "lightning" and ea_type != "thunder") {
+				u.send({{"type", message_types::announce}, {"text", "Elemental Adept type must be acid, cold, fire, lightning, or thunder."}, {"interrupt", true}});
+				return;
+			}
+			if (!c.has_feat("elemental_adept")) {
+				u.send({{"type", message_types::announce}, {"text", "Your character does not have the Elemental Adept feat."}, {"interrupt", true}});
+				return;
+			}
+			// Clear previous selection
+			c.elemental_adept_acid = false;
+			c.elemental_adept_cold = false;
+			c.elemental_adept_fire = false;
+			c.elemental_adept_lightning = false;
+			c.elemental_adept_thunder = false;
+			if (ea_type == "acid") c.elemental_adept_acid = true;
+			else if (ea_type == "cold") c.elemental_adept_cold = true;
+			else if (ea_type == "fire") c.elemental_adept_fire = true;
+			else if (ea_type == "lightning") c.elemental_adept_lightning = true;
+			else if (ea_type == "thunder") c.elemental_adept_thunder = true;
+			if (@u.account != null) {
+				json_object@ data = u.account.data;
+				string ckey = get_character_storage_key(u.room.game_type);
+				if (data.exists(ckey)) {
+					json_object@ ch = data[ckey];
+					ch["elemental_adept_type"] = ea_type;
+					u.account.commit();
+				}
+			}
+			u.send({{"type", message_types::announce}, {"text", "Elemental Adept damage type set to " + ea_type + ". Your spells ignore " + ea_type + " resistance and treat 1s on damage dice as 2s."}, {"interrupt", true}});
 		}
 		else if (feature == "wild_companion") {
 			// PHB 2024 Druid L2 Wild Companion (para 4420-4422): "As a Magic action, you

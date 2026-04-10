@@ -193,6 +193,7 @@ int my_sorcery_points = 0;
 int my_sorcery_points_max = 0;
 // PHB 2024 Sorcerer Draconic Sorcery L6/L14/L18 + Wizard Evoker L3/L10/L14 — synced from server
 string my_elemental_affinity_type = "";
+string my_elemental_adept_type = "";
 bool my_dragon_wings_active = false;
 bool my_dragon_wings_used_this_rest = false;
 bool my_dragon_companion_used_this_rest = false;
@@ -2991,6 +2992,11 @@ void show_phase1_menu() {
 	if (lc_class == "sorcerer" and current_subclass_name() == "Divine Soul") {
 		divine_soul_affinity_opt = m.add_item("Set Divine Soul affinity (Good, Evil, Law, Chaos, or Neutrality). Grants an additional spell.");
 	}
+	// PHB 2024 Elemental Adept (para 7610): choose damage type.
+	int elemental_adept_opt = -1;
+	if (feat_selected("elemental_adept")) {
+		elemental_adept_opt = m.add_item("Set Elemental Adept damage type (current: " + (my_elemental_adept_type != "" ? my_elemental_adept_type : "Not set") + ").");
+	}
 	int status_opt = m.add_item("Show full Phase 1 status.");
 	int cancel_opt = m.add_item("Cancel.");
 
@@ -3231,6 +3237,26 @@ void show_phase1_menu() {
 		else if (pick == ne) chosen = "neutrality";
 		send({{"type", message_types::bonus_action}, {"feature", "set_divine_soul_affinity"}, {"value", chosen}});
 		speak("Divine Soul affinity set to " + chosen + ".", true);
+	}
+	else if (elemental_adept_opt >= 0 and res == elemental_adept_opt) {
+		// PHB 2024 Elemental Adept (para 7610): choose damage type
+		menu@ eam = setup_sub_menu("Choose Elemental Adept damage type. Your spells will ignore resistance to this type and treat 1s on damage dice as 2s.");
+		int ea_acid = eam.add_item("Acid.");
+		int ea_cold = eam.add_item("Cold.");
+		int ea_fire = eam.add_item("Fire.");
+		int ea_lightning = eam.add_item("Lightning.");
+		int ea_thunder = eam.add_item("Thunder.");
+		int cnc = eam.add_item("Cancel.");
+		int pick = eam.run();
+		if (pick < 0 or pick == cnc) return;
+		string chosen = "";
+		if (pick == ea_acid) chosen = "acid";
+		else if (pick == ea_cold) chosen = "cold";
+		else if (pick == ea_fire) chosen = "fire";
+		else if (pick == ea_lightning) chosen = "lightning";
+		else if (pick == ea_thunder) chosen = "thunder";
+		send({{"type", message_types::bonus_action}, {"feature", "set_elemental_adept"}, {"value", chosen}});
+		speak("Elemental Adept type set to " + chosen + ".", true);
 	}
 	else if (res == status_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "query_phase1"}});
@@ -3823,6 +3849,7 @@ void parse_game_state(json_object@ msg) {
 	my_sorcery_points_max = msg.exists("my_sorcery_points_max") ? int(msg["my_sorcery_points_max"]) : 0;
 	// PHB 2024 Sorcerer Draconic Sorcery L6/L14/L18 + Wizard Evoker L3/L10/L14
 	my_elemental_affinity_type = msg.exists("my_elemental_affinity_type") ? string(msg["my_elemental_affinity_type"]) : "";
+	my_elemental_adept_type = msg.exists("my_elemental_adept_type") ? string(msg["my_elemental_adept_type"]) : "";
 	my_dragon_wings_active = msg.exists("my_dragon_wings_active") ? bool(msg["my_dragon_wings_active"]) : false;
 	my_dragon_wings_used_this_rest = msg.exists("my_dragon_wings_used_this_rest") ? bool(msg["my_dragon_wings_used_this_rest"]) : false;
 	my_dragon_companion_used_this_rest = msg.exists("my_dragon_companion_used_this_rest") ? bool(msg["my_dragon_companion_used_this_rest"]) : false;
@@ -4099,6 +4126,7 @@ void reset_combat_state() {
 	my_sorcery_points = 0;
 	my_sorcery_points_max = 0;
 	my_elemental_affinity_type = "";
+	my_elemental_adept_type = "";
 	my_dragon_wings_active = false;
 	my_dragon_wings_used_this_rest = false;
 	my_dragon_companion_used_this_rest = false;

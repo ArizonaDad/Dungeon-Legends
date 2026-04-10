@@ -113,6 +113,7 @@ class character_sheet {
     // PHB 2024 Sorcerer Draconic Sorcery L6 Elemental Affinity (para 7559-7560):
     // "acid" / "cold" / "fire" / "lightning" / "poison". Set via set_elemental_affinity.
     string elemental_affinity_type = "";
+    string elemental_adept_type = ""; // PHB 2024 Elemental Adept (para 7610)
     // Xanathar's Divine Soul L1 affinity: "good"/"evil"/"law"/"chaos"/"neutrality". Set via set_divine_soul_affinity.
     string divine_soul_affinity = "";
 }
@@ -1228,9 +1229,13 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
     // treat any 1 on a damage die as a 2." Flag only - active mechanic
     // is deferred until per-spell damage type is tracked through casts.
     if (character_sheet_has_feat(cs, "elemental_adept")) {
-        // Flag preserved on combatant.feats; spell damage code can
-        // check has_feat("elemental_adept") later when source-mandated
-        // damage-type-aware logic is added.
+        // Type choice loaded from account data (set via Shift+P menu in combat).
+        // If no type stored yet, defaults remain false until player configures.
+        if (cs.elemental_adept_type == "acid") c.elemental_adept_acid = true;
+        else if (cs.elemental_adept_type == "cold") c.elemental_adept_cold = true;
+        else if (cs.elemental_adept_type == "fire") c.elemental_adept_fire = true;
+        else if (cs.elemental_adept_type == "lightning") c.elemental_adept_lightning = true;
+        else if (cs.elemental_adept_type == "thunder") c.elemental_adept_thunder = true;
     }
 
     // General: Grappler (PHB 2024 para 7635) - "You have Advantage on

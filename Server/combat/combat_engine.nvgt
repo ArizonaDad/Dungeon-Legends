@@ -315,6 +315,12 @@ class combatant {
 	bool thunder_immunity = false;   // Xanathar's Storm Sorcery L18 Wind Soul
 	bool poison_immunity = false;
 	bool magic_resistance = false;
+	// PHB 2024 Elemental Adept (para 7610): chosen damage type(s) for Energy Mastery
+	bool elemental_adept_acid = false;
+	bool elemental_adept_cold = false;
+	bool elemental_adept_fire = false;
+	bool elemental_adept_lightning = false;
+	bool elemental_adept_thunder = false;
 	// Armor (used for Heavy Armor Master check)
 	string armor_type = "none";
 	bool has_shield = false;
@@ -1634,21 +1640,33 @@ class battle {
 			amount = (amount + 1) / 2;
 		}
 
+		// PHB 2024 Elemental Adept (para 7610): "Spells you cast ignore Resistance
+		// to damage of the chosen type." Bypass resistance for the 5 eligible types.
+		bool ea_bypass = false;
+		if (@source != null) {
+			if ((damage_type == DMG_ACID and source.elemental_adept_acid) or
+				(damage_type == DMG_COLD and source.elemental_adept_cold) or
+				(damage_type == DMG_FIRE and source.elemental_adept_fire) or
+				(damage_type == DMG_LIGHTNING and source.elemental_adept_lightning) or
+				(damage_type == DMG_THUNDER and source.elemental_adept_thunder)) {
+				ea_bypass = true;
+			}
+		}
 		// Species/feat resistances and immunities
-		if (damage_type == DMG_COLD and target.cold_resistance) amount = (amount + 1) / 2;
+		if (damage_type == DMG_COLD and target.cold_resistance and !ea_bypass) amount = (amount + 1) / 2;
 		if (damage_type == DMG_NECROTIC and target.necrotic_resistance) amount = (amount + 1) / 2;
 		if (damage_type == DMG_PSYCHIC and target.psychic_resistance) amount = (amount + 1) / 2;
 		// Tasha's Aberrant Mind L6 Psychic Defenses (para 3939-3941): psychic resistance
 		// is now granted via psychic_resistance flag on init, not double-halving here.
-		if (damage_type == DMG_ACID and target.acid_resistance) amount = (amount + 1) / 2;
+		if (damage_type == DMG_ACID and target.acid_resistance and !ea_bypass) amount = (amount + 1) / 2;
 		if (damage_type == DMG_LIGHTNING and target.lightning_immunity) amount = 0;
 		if (damage_type == DMG_THUNDER and target.thunder_immunity) amount = 0;
-		if (damage_type == DMG_LIGHTNING and target.lightning_resistance and !target.lightning_immunity) amount = (amount + 1) / 2;
-		if (damage_type == DMG_THUNDER and target.thunder_resistance and !target.thunder_immunity) amount = (amount + 1) / 2;
+		if (damage_type == DMG_LIGHTNING and target.lightning_resistance and !target.lightning_immunity and !ea_bypass) amount = (amount + 1) / 2;
+		if (damage_type == DMG_THUNDER and target.thunder_resistance and !target.thunder_immunity and !ea_bypass) amount = (amount + 1) / 2;
 		if (damage_type == DMG_PIERCING and target.piercing_resistance) amount = (amount + 1) / 2;
 		if (damage_type == DMG_BLUDGEONING and target.bludgeoning_resistance) amount = (amount + 1) / 2;
 		if (damage_type == DMG_SLASHING and target.slashing_resistance) amount = (amount + 1) / 2;
-		if (damage_type == DMG_FIRE and target.fire_resistance) amount = (amount + 1) / 2;
+		if (damage_type == DMG_FIRE and target.fire_resistance and !ea_bypass) amount = (amount + 1) / 2;
 		// PHB 2024 Sorcerer Draconic Sorcery L6 Elemental Affinity (para 7559-7560):
 		// "You have Resistance to that damage type" (the type chosen for Elemental
 		// Affinity). Resistance halves damage of the chosen type.
@@ -2148,6 +2166,14 @@ class battle {
 				state["my_divine_soul_affinity"] = c.divine_soul_affinity;
 				state["my_otherworldly_wings_active"] = c.otherworldly_wings_active;
 				state["my_unearthly_recovery_available"] = c.unearthly_recovery_available;
+				// PHB 2024 Elemental Adept type (para 7610)
+				string ea_str = "";
+				if (c.elemental_adept_acid) ea_str = "acid";
+				else if (c.elemental_adept_cold) ea_str = "cold";
+				else if (c.elemental_adept_fire) ea_str = "fire";
+				else if (c.elemental_adept_lightning) ea_str = "lightning";
+				else if (c.elemental_adept_thunder) ea_str = "thunder";
+				state["my_elemental_adept_type"] = ea_str;
 				// PHB 2024 Epic Boon state
 				state["my_boon_of_recovery_used"] = c.boon_of_recovery_used;
 				state["my_boon_of_spell_recall_used"] = c.boon_of_spell_recall_used;
