@@ -1879,10 +1879,12 @@ class battle {
 			return;
 		}
 
-		// Damage while at 0 HP = auto death save failure
+		// PHB 2024 (para 16157): "If you have 0 Hit Points and take damage, you
+		// suffer a death saving throw failure. If the damage is from a Critical Hit,
+		// you suffer two failures instead."
 		if (target.current_hp == 0 and !target.is_dead and target.has_condition(COND_UNCONSCIOUS)) {
-			target.death_save_failures++;
-			// Crit = 2 failures (handled in attack resolution)
+			if (was_crit) target.death_save_failures += 2;
+			else target.death_save_failures++;
 			if (target.death_save_failures >= DEATH_SAVE_FAILURES_NEEDED) {
 				target.is_dead = true;
 			}

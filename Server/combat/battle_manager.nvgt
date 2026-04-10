@@ -9449,6 +9449,12 @@ class battle_manager {
 		if (@combat == null or @u == null) return;
 		combatant@ c = combat.current_combatant();
 		if (@c == null or !c.is_player or c.player_username != u.username) return;
+		// PHB 2024 Incapacitated (para 16225): "An Incapacitated creature can't take
+		// any action, Bonus Action, or Reaction."
+		if (c.is_incapacitated_check()) {
+			u.send({{"type", message_types::announce}, {"text", "You are incapacitated and cannot take actions."}, {"interrupt", true}});
+			return;
+		}
 		// Allow attack if: has action (fresh), OR has remaining attacks from Extra Attack.
 		if (!c.has_action and c.attacks_remaining_this_turn <= 0) {
 			u.send({{"type", message_types::error}, {"text", "You've already used your action this turn. Press F and choose End Turn, or press B for a bonus action."}});
@@ -10094,6 +10100,10 @@ class battle_manager {
 		if (@combat == null or @u == null) return;
 		combatant@ c = combat.current_combatant();
 		if (@c == null or !c.is_player or c.player_username != u.username) return;
+		if (c.is_incapacitated_check()) {
+			u.send({{"type", message_types::announce}, {"text", "You are incapacitated and cannot take actions."}, {"interrupt", true}});
+			return;
+		}
 		if (c.wild_shape_active) {
 			u.send({{"type", message_types::announce}, {"text", "You cannot cast spells while in Wild Shape."}, {"interrupt", true}});
 			return;
