@@ -155,7 +155,7 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 - Separate roll to hit (d20 + ability mod + proficiency vs AC), then roll for damage
 
 - Advantage/disadvantage from conditions (prone, paralyzed, dodging, etc.)
-- **Condition Mechanics**: Paralyzed/Unconscious → auto-crit on melee hit within 5ft. Incapacitated blocks actions/bonus actions/reactions (gated in handle_attack, handle_cast, bonus action handler). Stunned/Paralyzed/Unconscious auto-skip turns. Stunned/Paralyzed auto-fail STR/DEX saves (-100 in get_save_bonus). Frightened/Poisoned impose disadvantage on ability checks (request_skill_check). Restrained imposes disadvantage on DEX saves (-5 approx in get_save_bonus). Blinded target grants advantage to attackers (apply_attack_advantage_state). Petrified grants resistance to all damage + poison immunity (apply_damage + add_condition guard).
+- **Condition Mechanics**: Paralyzed/Unconscious → auto-crit on melee hit within 5ft. Incapacitated blocks actions/bonus actions/reactions (gated in handle_attack, handle_cast, bonus action handler). Stunned/Paralyzed/Unconscious auto-skip turns. Stunned/Paralyzed auto-fail STR/DEX saves (-100 in get_save_bonus). Frightened/Poisoned impose disadvantage on ability checks (request_skill_check). Frightened blocks movement toward fear source (`frightened_source_id` tracked at all 8 application sites, enforced in `handle_move` and monster AI). Restrained imposes disadvantage on DEX saves (-5 approx in get_save_bonus). Blinded target grants advantage to attackers (apply_attack_advantage_state). Petrified grants resistance to all damage + poison immunity (apply_damage + add_condition guard). Dodge grants advantage on DEX saves (+5 approx in get_save_bonus, gated on not Incapacitated). Grapple Escape action: Athletics/Acrobatics check vs DC 8+STR+Prof of grappler.
 - **Crit at 0 HP**: Critical hits on unconscious creatures count as 2 death save failures (was_crit parameter in apply_damage).
 - **Sanctuary Enforcement** (Basic Rules 2024 para 14826): WIS save enforced on all 3 attack paths (handle_attack, start_monster_attack_sequence, start_player_bot_attack_sequence). Self-break when warded creature attacks or casts a spell affecting an enemy.
 - **Bonus Action Spell Rule** (PHB 2024 para 7986-7989): If a bonus action spell is cast, only cantrips may be cast as the action. Tracked via `cast_ba_spell_this_turn` / `cast_leveled_spell_this_turn` flags. Quickened Spell counts as BA spell.
@@ -213,6 +213,12 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 - Spirit Guardians: 15ft aura, 3d8+ radiant damage on enemies starting turn within range OR entering the aura on movement (once per turn via `spirit_guardians_damaged_this_turn` flag). Halved movement while in aura. Movement entry trigger wired into both `handle_move` (player) and monster AI loop.
 
 - **Polymorph HP restoration** (Basic Rules 2024 para 14624-14626): On concentration break, original HP/AC restored via `polymorph_caster_id` tracking in `clear_concentration_effects`. On 0 HP in beast form, excess damage carries over to original form (in `apply_damage`, mirroring Wild Shape pattern).
+
+- **Heat Metal BA re-damage** (Basic Rules 2024 para 13734-13735): Concentration spell. Initial cast deals 2d8+upcast fire damage to metal-armored target. On subsequent turns, caster can use bonus action to re-deal the same damage. Tracked via `heat_metal_active`, `heat_metal_target_id`, `heat_metal_dice_count` on combatant. Cleared in `clear_concentration_effects`. Client menu entry in bonus action menu.
+
+- **Hunter's Mark target transfer** (PHB 2024 para 13825-13826): When marked target dies, Hunter's Mark auto-transfers to nearest hostile within 90ft (following Hexblade Curse pattern in `maybe_apply_on_kill_features`).
+
+- **Stabilize action** (PHB 2024 para 4525): DC 10 Wisdom (Medicine) check to stabilize a dying creature at 0 HP within 5ft. Respects proficiency, expertise, Jack of All Trades. Consumes action. Client action menu entry.
 
 - Spell slot consumption (lowest available >= spell level)
 
