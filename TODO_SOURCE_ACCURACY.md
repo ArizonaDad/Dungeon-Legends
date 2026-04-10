@@ -373,7 +373,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 | **Slippery Mind** (proficiency in WIS and CHA saves) | 15 | 6574-6575 | ✓ Done 2026-04-09 — init grants both save proficiencies. |
 | **Elusive** (no attack roll has Advantage against you unless Incapacitated) | 18 | 6576-6577 | ✓ Done 2026-04-09 — `elusive_active` flag set at L18 init; override at end of `apply_attack_advantage_state` clears advantage when defender is L18+ Rogue and not Incapacitated. |
 | **Epic Boon** | 19 | 6578-6579 | ✓ Done — Epic Boon feat catalog. |
-| **Stroke of Luck** (1/short rest: turn a failed D20 Test into a 20) | 20 | 6580-6582 | PARTIAL 2026-04-09 — `stroke_of_luck_available` flag set at L20 init. Auto-fire-on-fail prompt deferred (cleanest implementation needs reroll-prompt chain integration). |
+| **Stroke of Luck** (1/short rest: turn a failed D20 Test into a 20) | 20 | 6580-6582 | ✓ Done — Turns miss into nat 20 crit, consumes flag (1/LR). |
 
 **Pending follow-up Rogue batches:**
 - Cunning Strike L5 (Poison / Trip / Withdraw): per-effect prompt that subtracts SA dice cost before rolling SA damage. Effects: Poison (1d6 cost, CON save vs Poisoned 1 min), Trip (1d6, DEX save vs Prone), Withdraw (1d6, half-speed move with no OAs).
@@ -894,7 +894,7 @@ Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 | Feature | Level | Source para | Status |
 |---------|-------|-------------|--------|
 | **Path of the Kensei: Kensei Weapons** (choose 2 weapon types as kensei weapons) | 3 | 1808-1813 | PARTIAL — `kensei_weapon_active` flag exists. Weapon selection prompt deferred. |
-| **Path of the Kensei: Agile Parry** (+2 AC when making unarmed strike while holding melee kensei weapon) | 3 | 1814-1817 | PARTIAL — `agile_parry_bonus` field declared + per-turn reset, but trigger condition (unarmed strike detection) not yet wired. |
+| **Path of the Kensei: Agile Parry** (+2 AC when making unarmed strike while holding melee kensei weapon) | 3 | 1814-1817 | ✓ Done — +2 AC on unarmed strike while holding kensei weapon, AC restored at turn start. |
 | **Path of the Kensei: Kensei's Shot** (BA: ranged kensei attacks deal +1d4 this turn) | 3 | 1814-1817 | ✓ Done — `kenseis_shot_active` flag set by BA handler. +1d4 applied in `apply_subclass_on_hit_damage` for ranged weapon attacks. Client menu entry wired. |
 | **One with the Blade: Deft Strike** (on kensei weapon hit, spend 1 ki for +MA die damage, 1/turn) | 6 | 1828-1831 | ✓ Done — `deft_strike_active` + `deft_strike_used_this_turn` flags. Wired in `apply_subclass_on_hit_damage`. |
 | **One with the Blade: Magic Kensei Weapons** (kensei weapons count as magical) | 6 | 1826-1827 | N/A — damage type bypass not tracked; all weapon attacks resolve normally. |

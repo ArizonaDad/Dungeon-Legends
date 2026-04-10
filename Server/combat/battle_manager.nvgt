@@ -5720,6 +5720,16 @@ class battle_manager {
 			string attack_reason = pr.attack_name != "" ? pr.attack_name + " attack against " + target.name : "to attack " + target.name;
 			broadcast_roll(c.name, attack_reason, natural_roll, reported_modifier, total, outcome);
 
+			// Xanathar's Kensei L3 Agile Parry (para 1825): "If you make an unarmed
+			// strike as part of the Attack action on your turn and are holding a kensei
+			// weapon, you can use it to defend yourself. You gain a +2 bonus to AC
+			// until the start of your next turn."
+			if (attack_name_is_unarmed(pr.attack_name) and c.class_name == "Monk" and c.subclass == "Kensei" and c.level >= 3 and c.kensei_weapon_active and !c.agile_parry_bonus) {
+				c.agile_parry_bonus = true;
+				c.armor_class += 2;
+				broadcast_announce(c.name + "'s Agile Parry grants +2 AC until the start of their next turn.", false);
+			}
+
 			// Valda's Spire Gunslinger maneuver Grazing Shot (paras 213-214): on miss with a
 			// ranged weapon attack, expend one Risk Die for risk_die + DEX mod weapon-type damage.
 			// "no action required" + "once per turn" — helper handles per-turn flag and Risk Die.
@@ -5844,6 +5854,19 @@ class battle_manager {
 					is_fumble = false;
 					pr.is_crit = (md_roll == 20);
 				}
+			}
+
+			// PHB 2024 Rogue L20 Stroke of Luck (para 6579-6581): "If you fail a
+			// D20 Test, you can turn the roll into a 20." 1/SR. Auto-fires on attack
+			// miss as a last resort after all other miss-recovery features.
+			if (!hit and !is_fumble and c.class_name == "Rogue" and c.stroke_of_luck_available and !target.is_dead) {
+				c.stroke_of_luck_available = false;
+				natural_roll = 20;
+				total = 20 + pr.modifier;
+				hit = true;
+				pr.is_crit = true;
+				outcome = "Critical hit! (Stroke of Luck)";
+				broadcast_roll(c.name, "Stroke of Luck turns the miss into a natural 20!", 20, pr.modifier, total, outcome);
 			}
 
 			// Xanathar's Cavalier L7 Warding Maneuver (para 1674-1676): "If you or a

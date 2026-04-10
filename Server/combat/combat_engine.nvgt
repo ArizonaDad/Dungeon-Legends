@@ -1416,6 +1416,9 @@ class battle {
 		c.trip_attack_pending = false;
 		c.precision_attack_pending = false;
 		c.stalkers_flurry_used_this_turn = false;
+		if (c.agile_parry_bonus) {
+			c.armor_class -= 2;
+		}
 		c.agile_parry_bonus = false;
 		c.blade_flourish_speed_applied = false;
 		c.kenseis_shot_active = false;
