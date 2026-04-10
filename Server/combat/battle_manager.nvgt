@@ -6719,7 +6719,7 @@ class battle_manager {
 
 			// Reaction prompt: offer defender reactions BEFORE resolving hit
 			// Only if: target is a player, has reaction, attack would hit, not a fumble
-			if (!is_fumble and target.is_player and target.has_reaction and total >= target.armor_class) {
+			if (!is_fumble and target.is_player and target.has_reaction and !target.is_incapacitated_check() and total >= target.armor_class) {
 				string[] reaction_options;
 				// Shield: caster with Shield in prepared_spells and a spell slot available
 				bool has_shield_spell = false;
