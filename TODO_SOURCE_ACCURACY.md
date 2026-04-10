@@ -500,6 +500,21 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 - Memorize Spell L5 — short rest subsystem dependency.
 - Ritual Adept L1 spell pipeline integration — needs `Ritual` tag on spell data entries and a separate ritual cast path that consumes 10 minutes (or 11 minutes per source) and skips slot/prep requirements for spellbook ritual spells.
 
+### War Magic Wizard Subclass Audit (2026-04-10) — Xanathar's paras 2915-2944
+
+| Feature | Level | Source para | Status |
+|---------|-------|-------------|--------|
+| **Arcane Deflection** (reaction: +2 AC vs attack OR +4 to failed save; can't cast non-cantrip until end of next turn) | 2 | 2932-2934 | ✓ Done — reaction handler in `battle_manager.nvgt`. Fixed from wrong +4 AC to correct +2 AC per source. +4 save variant not yet wired (saves use a different prompt path). Non-cantrip restriction deferred (needs cast-gating flag). |
+| **Tactical Wit** (+INT mod to initiative rolls) | 2 | 2935-2936 | ✓ Done — `tactical_wit_active` flag set on init; `request_next_initiative` adds `c.get_ability_mod(ABILITY_INT)` to initiative modifier. |
+| **Power Surge** (store surges max=INT mod, gain from dispel_magic/counterspell success, spend 1/turn for half-level force damage on wizard spell hit) | 6 | 2937-2940 | PARTIAL — Charges init'd at INT mod, auto-spend on spell attack hit for `level/2` force damage (1/turn), gain from `dispel_magic` success. Deferred: gain from `counterspell` (interception not fully resolved), Power Surge on save-based spell damage (too scattered across 80+ handlers), short-rest "if 0 surges, gain 1" recovery. |
+| **Durable Magic** (+2 AC and +2 all saving throws while concentrating) | 10 | 2941-2942 | ✓ Done — `durable_magic_active` flag; AC dynamically added/removed at concentration start/`clear_concentration_effects`; +2 saves in `get_save_bonus` when `durable_magic_active and is_concentrating`. |
+| **Deflecting Shroud** (when Arcane Deflection used, up to 3 enemies within 60ft take half-wizard-level force damage) | 14 | 2943-2944 | ✓ Done — `deflecting_shroud_active` flag; damage loop in Arcane Deflection reaction handler, iterates combatants, skips allies/dead, distance check ≤60ft, caps at 3 targets. |
+
+**Pending War Magic follow-ups:**
+- Arcane Deflection +4 save variant — need to wire into failed-save resolution path (currently only the AC reaction exists)
+- Arcane Deflection non-cantrip casting restriction — need a flag that blocks non-cantrip spell casts until end of next turn after using the reaction
+- Power Surge: counterspell gain (depends on counterspell interception being fully resolved), save-based spell damage rider, short-rest 0→1 recovery
+
 ### Artificer Audit (2026-04-09) — Forgotten Realms PHB Forge of the Artificer paras 455-675
 
 | Feature | Level | Source para | Status |
