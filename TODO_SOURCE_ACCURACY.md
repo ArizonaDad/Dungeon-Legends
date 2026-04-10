@@ -515,6 +515,40 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 - Arcane Deflection non-cantrip casting restriction — need a flag that blocks non-cantrip spell casts until end of next turn after using the reaction
 - Power Surge: counterspell gain (depends on counterspell interception being fully resolved), save-based spell damage rider, short-rest 0→1 recovery
 
+### Grave Domain Cleric Subclass Audit (2026-04-10) — Xanathar's paras 794-832
+
+| Feature | Level | Source para | Status |
+|---------|-------|-------------|--------|
+| **Circle of Mortality** (max healing dice when healing a 0hp creature) | 1 | 795 | ✓ Done — `circle_of_mortality_active` flag set on init. |
+| **Eyes of the Grave** (detect undead within 60ft) | 1 | 796 | DEFERRED — no undead-detection system exists. |
+| **Path to the Grave** (Channel Divinity: next attack against cursed creature deals double damage via vulnerability) | 2 | 794-796 | ✓ Done — FIXED from wrong 1d8 bonus to correct vulnerability doubling on TARGET. Flag `path_to_grave_vulnerable` set on target; consumed before `apply_damage` to double `total_damage` for ANY attacker. |
+| **Sentinel at Death's Door** (reaction: negate crit within 30ft) | 6 | 808-812 | ✓ Done — auto-resolved: scans for Grave Cleric within 30ft with reaction + WIS mod uses. |
+| **Blessed Strikes** (Potent Spellcasting — +WIS mod to cantrip damage) | 8 | — | ✓ Done — `blessed_strikes_choice = "potent_spellcasting"` set on init. |
+| **Domain Spells** (bane, false_life, ray_of_enfeeblement, vampiric_touch, blight, antilife_shell) | 1-9 | 794 | ✓ Done — auto-prepared via init. |
+| **Keeper of Souls** (on enemy death within 60ft, heal most-injured ally for target-level HP, 1/turn) | 17 | 826-832 | ✓ Done — wired into `maybe_apply_on_kill_features`. |
+
+### Hexblade Warlock Subclass Audit (2026-04-10) — Xanathar's paras 2271-2306
+
+| Feature | Level | Source para | Status |
+|---------|-------|-------------|--------|
+| **Hexblade's Curse** (bonus action: +prof damage, crit 19-20, heal on kill = warlock level + CHA mod, 1/SR) | 1 | 2278-2288 | ✓ Done — `hexblade_curse_used` flag, `hexblade_curse_target` tracking. Crit threshold wired in `get_critical_threshold`. Heal + damage in `maybe_apply_on_kill_features` + `apply_subclass_on_hit_damage`. |
+| **Hex Warrior** (CHA for melee weapon attacks) | 1 | 2275-2277 | DEFERRED — needs weapon-stat override system. |
+| **Expanded Spell List** (shield, wrathful_smite, blur, branding_smite, blink, elemental_weapon, phantasmal_killer, staggering_smite, banishing_smite, cone_of_cold) | 1-9 | 2271-2274 | ✓ Done — auto-prepared via init. |
+| **Accursed Specter** (raise spectre from humanoid killed with curse) | 6 | 2289-2291 | DEFERRED — needs summon/companion system extension. |
+| **Armor of Hexes** (reaction: d6, 4+ forces cursed attacker to miss) | 10 | 2295-2298 | ✓ Done — reaction prompt option when cursed target attacks warlock. Resolution: `random(1,6) >= 4` → `rp.attack_total = 0`. |
+| **Master of Hexes** (auto-transfer curse to nearest enemy within 30ft on cursed target death) | 14 | 2302-2306 | ✓ Done — wired into `maybe_apply_on_kill_features`. Scans for nearest living enemy within 30ft and transfers `hexblade_curse_target`. |
+
+### Cavalier Fighter Subclass Audit (2026-04-10) — Xanathar's paras 1649-1682
+
+| Feature | Level | Source para | Status |
+|---------|-------|-------------|--------|
+| **Born to the Saddle** (advantage on saves vs falling off mount, quick mount/dismount) | 3 | 1666-1668 | DEFERRED — no mount system exists. |
+| **Unwavering Mark** (auto-mark on melee hit; marked creature has disadvantage on attacks not targeting you within 5ft; if marked creature damages ally, BA retaliation attack with advantage + half level damage; STR mod uses/LR) | 3 | 1669-1673 | ✓ Done — MAJOR REWORK from wrong +prof bonus damage. Now: auto-mark on melee hit, disadvantage in `apply_attack_advantage_state`, BA retaliation in `users _dom.nvgt`, mark expiry in `advance_turn`. |
+| **Warding Maneuver** (reaction: +1d8 AC to self or ally within 5ft; if still hit, resistance to damage; CON mod uses/LR) | 7 | 1674-1676 | ✓ Done — self-defense as reaction prompt option, ally defense auto-resolved. `warding_maneuver_resistance` consumed in `apply_damage` to halve damage. |
+| **Hold the Line** (OA triggers on 5ft movement within reach; hit reduces speed to 0) | 10 | 1677-1678 | DEFERRED — `hold_the_line_active` flag set. Needs OA trigger on per-tile movement (current OA system only fires on leaving 5ft reach entirely). |
+| **Ferocious Charger** (10ft+ straight-line move before attack → STR save or prone; 1/turn) | 15 | 1679-1680 | DEFERRED — `ferocious_charger_active` flag set. Needs straight-line movement path tracking before attack resolution. |
+| **Vigilant Defender** (special reaction on every other creature's turn for OA only) | 18 | 1681-1682 | DEFERRED — `vigilant_defender_active` flag set. Needs multi-reaction-per-round system (current system has single `has_reaction` bool reset once per turn). |
+
 ### Artificer Audit (2026-04-09) — Forgotten Realms PHB Forge of the Artificer paras 455-675
 
 | Feature | Level | Source para | Status |
