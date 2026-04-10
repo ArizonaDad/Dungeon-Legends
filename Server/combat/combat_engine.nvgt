@@ -1104,6 +1104,11 @@ class combatant {
 	}
 
 	int get_save_bonus(int ability_id) {
+		// PHB 2024 Stunned (para 16247) / Paralyzed (para 16231): "The creature
+		// automatically fails Strength and Dexterity saving throws."
+		if ((has_condition(COND_STUNNED) or has_condition(COND_PARALYZED)) and (ability_id == ABILITY_STR or ability_id == ABILITY_DEX)) {
+			return -100; // Guarantee auto-failure at all 120+ save sites
+		}
 		int mod = get_ability_mod(ability_id);
 		if (save_proficiencies[ability_id] == 1) mod += proficiency;
 		// 2024 exhaustion: subtract 2 * level from d20 rolls
@@ -1116,6 +1121,12 @@ class combatant {
 		// to the save bonus since the existing save flow doesn't currently roll twice.
 		if (danger_sense_active and ability_id == ABILITY_DEX and !has_condition(COND_INCAPACITATED)) {
 			mod += 5;
+		}
+		// PHB 2024 Restrained (para 16240): "The creature has Disadvantage on
+		// Dexterity saving throws." Approximated as -5 (matching Danger Sense +5
+		// pattern) so all 120+ save sites are covered uniformly.
+		if (has_condition(COND_RESTRAINED) and ability_id == ABILITY_DEX) {
+			mod -= 5;
 		}
 		// PHB 2024 Paladin L6 Aura of Protection (para 5665-5669): "You and your allies
 		// have a bonus to saving throws equal to your Charisma modifier (min +1) while
@@ -1143,6 +1154,9 @@ class combatant {
 		// paladin_aura_courage_immune is refreshed by battle_manager.refresh_paladin_auras()
 		// to cover both self and allies within the aura range.
 		if (cond_id == COND_FRIGHTENED and paladin_aura_courage_immune) return;
+		// PHB 2024 Petrified (para 16234): "The creature is immune to the Poisoned
+		// condition." Also immune to disease but no disease system exists yet.
+		if (cond_id == COND_POISONED and has_condition(COND_PETRIFIED)) return;
 		if (!has_condition(cond_id)) conditions.insert_last(cond_id);
 	}
 
@@ -1705,6 +1719,15 @@ class battle {
 		if (damage_type == DMG_POISON and target.poison_resistance and !target.poison_immunity and !skip_poison_resistance) amount = (amount + 1) / 2;
 		if (damage_type == DMG_POISON and target.poison_immunity and !skip_poison_immunity) amount = 0;
 		if (damage_type == DMG_RADIANT and target.radiant_resistance) amount = (amount + 1) / 2;
+
+		// PHB 2024 Petrified (para 16234-16236): "The creature has Resistance to all
+		// damage" and "The creature is immune to the Poisoned condition." Poison
+		// immunity is handled by zeroing poison damage here; condition immunity is
+		// enforced in add_condition.
+		if (target.has_condition(COND_PETRIFIED)) {
+			if (damage_type == DMG_POISON) amount = 0;
+			else amount = (amount + 1) / 2;
+		}
 
 		// Tasha's Circle of Stars L14 Full of Stars (para 2179-2181): "While in your
 		// Starry Form, you become partially incorporeal, giving you resistance to

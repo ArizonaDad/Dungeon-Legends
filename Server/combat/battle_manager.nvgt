@@ -1242,6 +1242,9 @@ class battle_manager {
 		int mod = c.get_skill_bonus(skill_name, ability_id);
 		bool adv = extra_advantage or c.has_skill_check_advantage(skill_name);
 		bool disadv = extra_disadvantage or c.has_skill_check_disadvantage(skill_name);
+		// PHB 2024 Frightened (para 16222): "The creature has Disadvantage on ability
+		// checks and attack rolls." PHB 2024 Poisoned (para 16237): same wording.
+		if (c.has_condition(COND_FRIGHTENED) or c.has_condition(COND_POISONED)) disadv = true;
 		// Pass Without Trace stacks +10 onto Stealth checks (also Dexterity (Stealth)).
 		if (skill_name == "Stealth") mod += c.pass_without_trace_bonus;
 		string tag = custom_tag != "" ? custom_tag : skill_resolution_tag(skill_name);
