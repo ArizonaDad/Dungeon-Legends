@@ -2329,7 +2329,17 @@ class battle_manager {
 		// roll on your turn, you can decide to attack recklessly. Doing so gives you Advantage
 		// on attack rolls using Strength until the start of your next turn, and attack rolls
 		// against you have Advantage during that time."
-		if (attacker.reckless_attack_active and !attack_is_ranged) adv = true;
+		if (attacker.reckless_attack_active and !attack_is_ranged) {
+			// PHB 2024 Barbarian L9 Brutal Strike (para 2338-2341): forgo Reckless advantage
+			// on one STR-based attack to gain +1d10 damage and a rider effect on hit.
+			if (attacker.brutal_strike_active and !attacker.brutal_strike_used_this_turn
+				and !attack_is_ranged) {
+				// Forgo the advantage — do NOT set adv = true for this attack
+				// (brutal_strike hit bonus + effects applied in finalize_roll_result)
+			} else {
+				adv = true;
+			}
+		}
 		if (target.reckless_attack_active) adv = true; // Target attacked self recklessly: incoming gets advantage
 		// Fighter L13 Studied Attacks (PHB 2024 para 5983): "If you make an attack roll
 		// against a creature and miss, you have Advantage on your next attack roll against
@@ -4210,6 +4220,16 @@ class battle_manager {
 		}
 		// Reckless Attack ends at the start of the barbarian's next turn (PHB 2024 para 2785).
 		c.reckless_attack_active = false;
+		// PHB 2024 Barbarian Brutal Strike per-turn flags reset.
+		c.brutal_strike_used_this_turn = false;
+		c.brutal_strike_active = false;
+		c.brutal_strike_effect = "";
+		c.brutal_strike_effect2 = "";
+		// Clear Staggering Blow and Hamstring effects that last "until start of your next turn"
+		// These were applied TO the target by a Barbarian, so we need to clear them when
+		// the Barbarian's turn starts. For simplicity, clear any staggering blow on the
+		// target at the start of ANY new turn (conservative).
+		c.staggering_blow_active = false;
 
 		// Valda's Spire Gunslinger maneuvers (paras 213-216): per-turn use flags reset.
 		c.grazing_shot_used_this_turn = false;
@@ -5696,10 +5716,111 @@ class battle_manager {
 			if (sa_qualifies) {
 				attacker.sneak_attack_used_this_turn = true;
 				int sa_dice = (attacker.level + 1) / 2;
+				// PHB 2024 Rogue L5 Cunning Strike (para 6553-6560): forgo SA dice for rider effects.
+				// DC = 8 + DEX mod + Proficiency Bonus.
+				int cs_dice_cost = 0;
+				string cs_eff1 = attacker.cunning_strike_effect;
+				string cs_eff2 = attacker.cunning_strike_effect2;
+				if (attacker.level >= 5 and cs_eff1 != "") {
+					// Calculate dice cost for chosen effects
+					if (cs_eff1 == "poison" or cs_eff1 == "trip" or cs_eff1 == "withdraw") cs_dice_cost += 1;
+					else if (cs_eff1 == "daze") cs_dice_cost += 2;
+					else if (cs_eff1 == "obscure") cs_dice_cost += 3;
+					else if (cs_eff1 == "knockout") cs_dice_cost += 6;
+					// L11 Improved Cunning Strike: second effect
+					if (attacker.level >= 11 and cs_eff2 != "") {
+						if (cs_eff2 == "poison" or cs_eff2 == "trip" or cs_eff2 == "withdraw") cs_dice_cost += 1;
+						else if (cs_eff2 == "daze") cs_dice_cost += 2;
+						else if (cs_eff2 == "obscure") cs_dice_cost += 3;
+						else if (cs_eff2 == "knockout") cs_dice_cost += 6;
+					}
+					// Must have enough dice remaining (at least 1 after cost)
+					if (cs_dice_cost >= sa_dice) {
+						broadcast_announce(attacker.name + " doesn't have enough Sneak Attack dice for Cunning Strike (" + cs_dice_cost + "d6 cost, only " + sa_dice + "d6 available).", false);
+						cs_eff1 = ""; cs_eff2 = "";
+						cs_dice_cost = 0;
+					} else {
+						sa_dice -= cs_dice_cost;
+					}
+				} else {
+					cs_eff1 = ""; cs_eff2 = "";
+				}
+				// Clear toggle after use
+				attacker.cunning_strike_effect = "";
+				attacker.cunning_strike_effect2 = "";
 				int sa_bonus = 0;
 				for (int sd = 0; sd < sa_dice; sd++) sa_bonus += random(1, 6);
 				bonus += sa_bonus;
-				broadcast_announce(attacker.name + "'s Sneak Attack deals " + sa_bonus + " extra damage! (" + sa_dice + "d6)", true);
+				if (cs_dice_cost > 0) {
+					broadcast_announce(attacker.name + "'s Sneak Attack deals " + sa_bonus + " extra damage! (" + sa_dice + "d6, " + cs_dice_cost + "d6 forfeited for Cunning Strike)", true);
+				} else {
+					broadcast_announce(attacker.name + "'s Sneak Attack deals " + sa_bonus + " extra damage! (" + sa_dice + "d6)", true);
+				}
+				// Apply Cunning Strike effects after damage (para 6553: "occurs immediately after the attack's damage is dealt")
+				if (cs_eff1 != "" or cs_eff2 != "") {
+					int cs_dc = 8 + attacker.get_ability_mod(ABILITY_DEX) + attacker.proficiency;
+					// Apply each effect
+					for (int csi = 0; csi < 2; csi++) {
+						string eff = (csi == 0) ? cs_eff1 : cs_eff2;
+						if (eff == "") continue;
+						if (eff == "poison") {
+							// Para 6555: CON save or Poisoned for 1 minute, repeating save at end of turn
+							int save_roll = random(1, 20) + target.get_ability_mod(ABILITY_CON);
+							if (save_roll < cs_dc) {
+								target.add_condition(COND_POISONED);
+								broadcast_announce(attacker.name + "'s Cunning Strike poisons " + target.name + "! (DC " + cs_dc + ", rolled " + save_roll + ")", true);
+							} else {
+								broadcast_announce(target.name + " resists the Cunning Strike poison! (DC " + cs_dc + ", rolled " + save_roll + ")", false);
+							}
+						} else if (eff == "trip") {
+							// Para 6557: DEX save or Prone (Large or smaller)
+							if (target.size <= SIZE_LARGE) {
+								int save_roll = random(1, 20) + target.get_ability_mod(ABILITY_DEX);
+								if (save_roll < cs_dc) {
+									target.add_condition(COND_PRONE);
+									broadcast_announce(attacker.name + "'s Cunning Strike trips " + target.name + "! (DC " + cs_dc + ", rolled " + save_roll + ")", true);
+								} else {
+									broadcast_announce(target.name + " resists the Cunning Strike trip! (DC " + cs_dc + ", rolled " + save_roll + ")", false);
+								}
+							} else {
+								broadcast_announce(target.name + " is too large to trip!", false);
+							}
+						} else if (eff == "withdraw") {
+							// Para 6558: move up to half speed without provoking OAs
+							int half_speed = attacker.speed / 2;
+							attacker.movement_remaining += half_speed;
+							broadcast_announce(attacker.name + " withdraws " + half_speed + " ft after the strike!", false);
+						} else if (eff == "daze") {
+							// Para 6564 (L14 Devious Strikes): CON save or can only move/action/BA on next turn
+							int save_roll = random(1, 20) + target.get_ability_mod(ABILITY_CON);
+							if (save_roll < cs_dc) {
+								target.cunning_strike_dazed = true;
+								target.cunning_strike_dazed_rounds = 1;
+								broadcast_announce(attacker.name + "'s Cunning Strike dazes " + target.name + "! (can only move OR act next turn, DC " + cs_dc + ", rolled " + save_roll + ")", true);
+							} else {
+								broadcast_announce(target.name + " resists the Cunning Strike daze! (DC " + cs_dc + ", rolled " + save_roll + ")", false);
+							}
+						} else if (eff == "knockout") {
+							// Para 6566: CON save or Unconscious for 1 minute (repeating save at end of turn)
+							int save_roll = random(1, 20) + target.get_ability_mod(ABILITY_CON);
+							if (save_roll < cs_dc) {
+								target.add_condition(COND_UNCONSCIOUS);
+								broadcast_announce(attacker.name + "'s Cunning Strike knocks out " + target.name + "! (DC " + cs_dc + ", rolled " + save_roll + ")", true);
+							} else {
+								broadcast_announce(target.name + " resists the Cunning Strike knockout! (DC " + cs_dc + ", rolled " + save_roll + ")", false);
+							}
+						} else if (eff == "obscure") {
+							// Para 6568: DEX save or Blinded until end of target's next turn
+							int save_roll = random(1, 20) + target.get_ability_mod(ABILITY_DEX);
+							if (save_roll < cs_dc) {
+								target.add_condition(COND_BLINDED);
+								broadcast_announce(attacker.name + "'s Cunning Strike blinds " + target.name + "! (DC " + cs_dc + ", rolled " + save_roll + ")", true);
+							} else {
+								broadcast_announce(target.name + " resists the Cunning Strike blinding! (DC " + cs_dc + ", rolled " + save_roll + ")", false);
+							}
+						}
+					}
+				}
 				// Xanathar's Inquisitive L17 Eye for Weakness (para 2344-2345):
 				// "your Sneak Attack damage against the creature is increased by 3d6"
 				if (attacker.subclass == "Inquisitive" and attacker.level >= 17
@@ -5954,6 +6075,15 @@ class battle_manager {
 				reported_modifier += 10;
 				c.guided_strike_pending = false;
 				broadcast_announce(c.name + "'s Guided Strike adds +10 to the attack roll!", false);
+			}
+			// PHB 2024 Barbarian L13 Sundering Blow (para 2347): next attack by ANOTHER creature
+			// against the target gains +5. Consume on use.
+			if (target.sundering_blow_target_active and target.sundering_blow_target_id != c.id) {
+				total += 5;
+				reported_modifier += 5;
+				target.sundering_blow_target_active = false;
+				target.sundering_blow_target_id = 0;
+				broadcast_announce(c.name + " exploits the Sundering Blow for +5 to hit " + target.name + "!", false);
 			}
 
 			if (is_crit) {
@@ -6780,6 +6910,51 @@ class battle_manager {
 				broadcast_announce(c.name + "'s Slasher reduces " + target.name + "'s speed by 10 feet!", false);
 			}
 
+			// PHB 2024 Barbarian L9 Brutal Strike (para 2338-2341): on hit after forgoing
+			// Reckless Attack advantage, +1d10 damage (2d10 at L17) + chosen effect(s).
+			if (c.brutal_strike_active and !c.brutal_strike_used_this_turn and pr.is_weapon_attack
+				and !pr.is_spell_effect and c.reckless_attack_active and !c.main_hand_is_ranged) {
+				c.brutal_strike_used_this_turn = true;
+				c.brutal_strike_active = false;
+				int bs_die_count = (c.level >= 17) ? 2 : 1;
+				int bs_dmg = 0;
+				for (int bsi = 0; bsi < bs_die_count; bsi++) bs_dmg += random(1, 10);
+				total_damage += bs_dmg;
+				broadcast_announce(c.name + "'s Brutal Strike deals " + bs_dmg + " extra damage! (" + bs_die_count + "d10)", true);
+				// Apply effect(s). At L17 can use two different effects.
+				int effects_to_apply = (c.level >= 17 and c.brutal_strike_effect2 != "") ? 2 : 1;
+				for (int bse = 0; bse < effects_to_apply; bse++) {
+					string bs_eff = (bse == 0) ? c.brutal_strike_effect : c.brutal_strike_effect2;
+					if (bs_eff == "") continue;
+					if (bs_eff == "forceful") {
+						// Para 2339: push 15 ft straight away, then move half speed toward target
+						int push_dx = 0, push_dy = 0;
+						if (target.x > c.x) push_dx = 3; else if (target.x < c.x) push_dx = -3;
+						if (target.y > c.y) push_dy = 3; else if (target.y < c.y) push_dy = -3;
+						target.x += push_dx;
+						target.y += push_dy;
+						int half_speed = c.speed / 2;
+						c.movement_remaining += half_speed;
+						broadcast_announce(c.name + "'s Forceful Blow pushes " + target.name + " 15 ft away! " + c.name + " can move " + half_speed + " ft toward them.", true);
+					} else if (bs_eff == "hamstring") {
+						// Para 2340: reduce target speed by 15 until start of attacker's next turn
+						target.speed -= 15;
+						if (target.speed < 0) target.speed = 0;
+						broadcast_announce(c.name + "'s Hamstring Blow reduces " + target.name + "'s speed by 15 ft!", true);
+					} else if (bs_eff == "staggering") {
+						// Para 2346: disadvantage on next save + no OA until start of attacker's next turn
+						target.staggering_blow_active = true;
+						broadcast_announce(c.name + "'s Staggering Blow gives " + target.name + " disadvantage on their next save and prevents Opportunity Attacks!", true);
+					} else if (bs_eff == "sundering") {
+						// Para 2347: next attack by another creature gains +5 to hit
+						target.sundering_blow_target_active = true;
+						target.sundering_blow_target_id = c.id;
+						broadcast_announce(c.name + "'s Sundering Blow weakens " + target.name + "'s defenses! Next attack by an ally gains +5 to hit.", true);
+					}
+				}
+				c.brutal_strike_effect = "";
+				c.brutal_strike_effect2 = "";
+			}
 			int hunter_damage = 0;
 			if (pr.is_weapon_attack and c.class_name == "Ranger" and c.subclass == "Hunter" and !c.hunter_colossus_used and target.current_hp < target.max_hp and target.current_hp > 0) {
 				hunter_damage = random(1, 8);

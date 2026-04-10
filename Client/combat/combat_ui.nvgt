@@ -1056,6 +1056,8 @@ void show_bonus_action_menu() {
 	int storm_aura_opt = -1;
 	int zealous_presence_opt = -1;
 	int reckless_attack_opt = -1;
+	int brutal_strike_opt = -1;
+	int cunning_strike_opt = -1;
 	int arcane_recovery_opt = -1;
 	int turn_undead_opt = -1;
 	int divine_spark_heal_opt = -1;
@@ -1617,6 +1619,14 @@ void show_bonus_action_menu() {
 	// Barbarian L2 Reckless Attack (PHB 2024 base class feature)
 	if (lc == "barbarian" and level >= 2) {
 		reckless_attack_opt = m.add_item("Reckless Attack. Declare on your first attack. Advantage on STR attacks until next turn, but enemies have advantage on attacks against you.");
+	}
+	// Barbarian L9 Brutal Strike (PHB 2024 para 2338)
+	if (lc == "barbarian" and level >= 9) {
+		brutal_strike_opt = m.add_item("Brutal Strike. Forgo Reckless advantage on next STR attack for +1d10 damage and a rider effect. Requires Reckless Attack active.");
+	}
+	// Rogue L5 Cunning Strike (PHB 2024 para 6553)
+	if (lc == "rogue" and level >= 5) {
+		cunning_strike_opt = m.add_item("Cunning Strike. Forgo SA dice on next Sneak Attack for a rider effect (Poison, Trip, Withdraw" + (level >= 14 ? ", Daze, Knock Out, Obscure" : "") + ").");
 	}
 	// Wizard L1 Arcane Recovery (PHB 2024 base class feature)
 	if (lc == "wizard") {
@@ -2423,6 +2433,92 @@ void show_bonus_action_menu() {
 	else if (reckless_attack_opt >= 0 and res == reckless_attack_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "reckless_attack"}});
 		speak("Reckless attack.", true);
+	}
+	else if (brutal_strike_opt >= 0 and res == brutal_strike_opt) {
+		// Sub-menu for Brutal Strike effect choice
+		menu@ bsm = setup_sub_menu("Choose a Brutal Strike effect.");
+		bsm.add_item("Forceful Blow. Push target 15 ft, then move half speed toward them.");
+		bsm.add_item("Hamstring Blow. Reduce target speed by 15 ft until your next turn.");
+		if (level >= 13) {
+			bsm.add_item("Staggering Blow. Disadvantage on next save, no Opportunity Attacks.");
+			bsm.add_item("Sundering Blow. Next ally attack gains +5 to hit.");
+		}
+		int bs_res = bsm.run();
+		if (bs_res < 0) { speak("Cancelled.", true); }
+		else {
+			string[] bs_effects = {"forceful", "hamstring", "staggering", "sundering"};
+			string eff1 = bs_effects[bs_res];
+			string eff2 = "";
+			// L17: pick a second different effect
+			if (level >= 17) {
+				menu@ bsm2 = setup_sub_menu("Choose a second Brutal Strike effect (or press Escape for none).");
+				for (uint bi = 0; bi < bs_effects.length(); bi++) {
+					if (bs_effects[bi] != eff1 and (bi < 2 or level >= 13)) {
+						bsm2.add_item(bs_effects[bi]);
+					}
+				}
+				int bs_res2 = bsm2.run();
+				if (bs_res2 >= 0) {
+					// Map back to effect name (skipping eff1)
+					int idx = 0;
+					for (uint bi = 0; bi < bs_effects.length(); bi++) {
+						if (bs_effects[bi] != eff1 and (bi < 2 or level >= 13)) {
+							if (idx == bs_res2) { eff2 = bs_effects[bi]; break; }
+							idx++;
+						}
+					}
+				}
+			}
+			send({{"type", message_types::bonus_action}, {"feature", "brutal_strike"}, {"effect", eff1}, {"effect2", eff2}});
+			speak("Brutal Strike: " + eff1 + (eff2 != "" ? " and " + eff2 : "") + ".", true);
+		}
+	}
+	else if (cunning_strike_opt >= 0 and res == cunning_strike_opt) {
+		// Sub-menu for Cunning Strike effect choice
+		menu@ csm = setup_sub_menu("Choose a Cunning Strike effect. Your SA dice will be reduced.");
+		csm.add_item("Poison. Cost 1d6. CON save or Poisoned for 1 minute.");
+		csm.add_item("Trip. Cost 1d6. DEX save or Prone (Large or smaller).");
+		csm.add_item("Withdraw. Cost 1d6. Move half speed without provoking OAs.");
+		if (level >= 14) {
+			csm.add_item("Daze. Cost 2d6. CON save or can only move OR act next turn.");
+			csm.add_item("Knock Out. Cost 6d6. CON save or Unconscious for 1 minute.");
+			csm.add_item("Obscure. Cost 3d6. DEX save or Blinded until end of target's next turn.");
+		}
+		int cs_res = csm.run();
+		if (cs_res < 0) {
+			// Clear any existing toggle
+			send({{"type", message_types::bonus_action}, {"feature", "cunning_strike"}, {"effect", ""}});
+			speak("Cunning Strike cleared.", true);
+		} else {
+			string[] cs_effects = {"poison", "trip", "withdraw", "daze", "knockout", "obscure"};
+			string cseff1 = cs_effects[cs_res];
+			string cseff2 = "";
+			// L11 Improved: pick a second effect
+			if (level >= 11) {
+				menu@ csm2 = setup_sub_menu("Choose a second Cunning Strike effect (or press Escape for one effect only).");
+				for (uint ci = 0; ci < cs_effects.length(); ci++) {
+					if (cs_effects[ci] != cseff1 and (ci < 3 or level >= 14)) {
+						string cost_str = "1d6";
+						if (cs_effects[ci] == "daze") cost_str = "2d6";
+						else if (cs_effects[ci] == "knockout") cost_str = "6d6";
+						else if (cs_effects[ci] == "obscure") cost_str = "3d6";
+						csm2.add_item(cs_effects[ci] + " (cost " + cost_str + ")");
+					}
+				}
+				int cs_res2 = csm2.run();
+				if (cs_res2 >= 0) {
+					int cidx = 0;
+					for (uint ci = 0; ci < cs_effects.length(); ci++) {
+						if (cs_effects[ci] != cseff1 and (ci < 3 or level >= 14)) {
+							if (cidx == cs_res2) { cseff2 = cs_effects[ci]; break; }
+							cidx++;
+						}
+					}
+				}
+			}
+			send({{"type", message_types::bonus_action}, {"feature", "cunning_strike"}, {"effect", cseff1}, {"effect2", cseff2}});
+			speak("Cunning Strike: " + cseff1 + (cseff2 != "" ? " and " + cseff2 : "") + ".", true);
+		}
 	}
 	else if (arcane_recovery_opt >= 0 and res == arcane_recovery_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "arcane_recovery"}});

@@ -4331,6 +4331,67 @@ void handle_user_message(user@ u, json_object@ msg)
 			c.reckless_attack_active = true;
 			u.room.bm.broadcast_announce(c.name + " attacks recklessly! Advantage on Strength attacks until next turn, but attacks against them also have advantage.", true);
 		}
+		// PHB 2024 Barbarian L9 Brutal Strike (para 2338-2341): toggle effect choice.
+		// No action cost — declared before attacking, consumed on first qualifying hit.
+		else if (feature == "brutal_strike") {
+			if (c.class_name != "Barbarian") { u.send({{"type", message_types::announce}, {"text", "Only Barbarians can use Brutal Strike."}, {"interrupt", true}}); return; }
+			if (c.level < 9) { u.send({{"type", message_types::announce}, {"text", "Brutal Strike unlocks at level 9."}, {"interrupt", true}}); return; }
+			string effect = "";
+			if (msg.exists("effect")) effect = string(msg["effect"]);
+			string effect2 = "";
+			if (msg.exists("effect2")) effect2 = string(msg["effect2"]);
+			if (effect == "") { u.send({{"type", message_types::announce}, {"text", "No Brutal Strike effect chosen."}, {"interrupt", true}}); return; }
+			// Validate effects are available at this level
+			bool valid1 = (effect == "forceful" or effect == "hamstring");
+			if (c.level >= 13) valid1 = valid1 or (effect == "staggering" or effect == "sundering");
+			if (!valid1) { u.send({{"type", message_types::announce}, {"text", "Invalid Brutal Strike effect."}, {"interrupt", true}}); return; }
+			// L17: two different effects
+			if (effect2 != "" and c.level < 17) effect2 = "";
+			if (effect2 == effect) effect2 = ""; // Must be different
+			c.brutal_strike_active = true;
+			c.brutal_strike_effect = effect;
+			c.brutal_strike_effect2 = effect2;
+			string desc = effect;
+			if (effect2 != "") desc += " + " + effect2;
+			u.room.bm.broadcast_announce(c.name + " prepares Brutal Strike: " + desc + "! (Forgoing Reckless advantage on next STR attack for +1d10 damage + effect)", false);
+		}
+		// PHB 2024 Rogue L5 Cunning Strike (para 6553-6560): toggle effect choice.
+		// No action cost — declared before attacking, consumed when SA triggers.
+		else if (feature == "cunning_strike") {
+			if (c.class_name != "Rogue") { u.send({{"type", message_types::announce}, {"text", "Only Rogues can use Cunning Strike."}, {"interrupt", true}}); return; }
+			if (c.level < 5) { u.send({{"type", message_types::announce}, {"text", "Cunning Strike unlocks at level 5."}, {"interrupt", true}}); return; }
+			string effect = "";
+			if (msg.exists("effect")) effect = string(msg["effect"]);
+			string effect2 = "";
+			if (msg.exists("effect2")) effect2 = string(msg["effect2"]);
+			if (effect == "") {
+				// Clear the toggle
+				c.cunning_strike_effect = "";
+				c.cunning_strike_effect2 = "";
+				u.send({{"type", message_types::announce}, {"text", "Cunning Strike cleared."}, {"interrupt", true}});
+				return;
+			}
+			// Validate effects at level
+			bool valid1 = (effect == "poison" or effect == "trip" or effect == "withdraw");
+			if (c.level >= 14) valid1 = valid1 or (effect == "daze" or effect == "knockout" or effect == "obscure");
+			if (!valid1) { u.send({{"type", message_types::announce}, {"text", "Invalid Cunning Strike effect."}, {"interrupt", true}}); return; }
+			// L11 Improved: two effects allowed
+			if (effect2 != "" and c.level < 11) effect2 = "";
+			c.cunning_strike_effect = effect;
+			c.cunning_strike_effect2 = effect2;
+			string desc = effect;
+			if (effect2 != "") desc += " + " + effect2;
+			int cost = 0;
+			if (effect == "poison" or effect == "trip" or effect == "withdraw") cost += 1;
+			else if (effect == "daze") cost += 2;
+			else if (effect == "obscure") cost += 3;
+			else if (effect == "knockout") cost += 6;
+			if (effect2 == "poison" or effect2 == "trip" or effect2 == "withdraw") cost += 1;
+			else if (effect2 == "daze") cost += 2;
+			else if (effect2 == "obscure") cost += 3;
+			else if (effect2 == "knockout") cost += 6;
+			u.room.bm.broadcast_announce(c.name + " prepares Cunning Strike: " + desc + "! (Forfeiting " + cost + "d6 SA dice for rider effect on next Sneak Attack)", false);
+		}
 		else if (feature == "summon_primal_companion") {
 			// Tasha's Beast Master Ranger L3 Primal Companion: bonus action summon a Land/
 			// Sea/Sky beast companion. Source stat block: HP = 5 + 5*ranger level, AC =

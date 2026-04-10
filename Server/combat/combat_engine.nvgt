@@ -129,6 +129,15 @@ class combatant {
 	bool danger_sense_active = false;    // Always-on if Barbarian level 2+ (advantage on DEX saves)
 	int relentless_rage_dc = 10;         // Resets to 10 on rest, +5 each successful use
 	bool persistent_rage_active = false; // Barbarian L15: rage doesn't auto-end after 1 round
+	// PHB 2024 Barbarian L9 Brutal Strike (para 2338-2341): forgo Reckless Attack advantage
+	// on one STR-based attack; on hit, +1d10 damage (2d10 at L17) + chosen effect.
+	bool brutal_strike_active = false;       // Toggled on, consumed after first qualifying attack
+	string brutal_strike_effect = "";        // "forceful"/"hamstring" (L9), "staggering"/"sundering" (L13)
+	string brutal_strike_effect2 = "";       // L17: second effect choice
+	bool brutal_strike_used_this_turn = false; // One Brutal Strike per turn
+	bool sundering_blow_target_active = false; // Sundering Blow: next other creature's attack gets +5
+	uint sundering_blow_target_id = 0;         // Target marked by Sundering Blow
+	bool staggering_blow_active = false;       // Staggering Blow: disadvantage on next save + no OAs
 	// Fighter PHB 2024 base class features
 	int indomitable_uses = 0;            // Fighter L9: 1 use/LR, 2 at L13, 3 at L17 (failed save reroll)
 	bool studied_attacks_active = false; // Fighter L13: passive flag - advantage on next attack after a miss
@@ -813,6 +822,12 @@ class combatant {
 	// attack's damage against you (round down)." Set in handle_reaction_response,
 	// consumed in apply_damage.
 	bool uncanny_dodge_pending = false;
+	// PHB 2024 Rogue L5 Cunning Strike (para 6553-6560): when dealing SA damage, forgo
+	// dice to add rider effects. DC = 8 + DEX mod + Prof.
+	string cunning_strike_effect = "";   // "poison"/"trip"/"withdraw" (L5), "daze"/"knockout"/"obscure" (L14)
+	string cunning_strike_effect2 = "";  // L11 Improved Cunning Strike: second effect
+	bool cunning_strike_dazed = false;   // Target is dazed (can only move OR action OR BA next turn)
+	int cunning_strike_dazed_rounds = 0; // Daze lasts until start of target's next turn
 	uint hex_target_id = 0;
 	bool spiritual_weapon_active = false;
 	int spiritual_weapon_slot_level = 0;
