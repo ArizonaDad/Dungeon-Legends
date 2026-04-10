@@ -2551,9 +2551,16 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         }
     }
     if (cs.class_name == "Warlock") {
-        // Sword Coast: The Undying
+        // Sword Coast: The Undying (Expanded Spell List, SCAG)
         if (cs.subclass == "The Undying" and cs.level >= 1) {
             c.undying_active = true;
+            // Sword Coast Adventurer's Guide: Undying Expanded Spell List
+            if (!c.knows_spell("false_life")) c.prepared_spells.insert_last("false_life");
+            if (!c.knows_spell("ray_of_sickness")) c.prepared_spells.insert_last("ray_of_sickness");
+            if (cs.level >= 3) { if (!c.knows_spell("blindness_deafness")) c.prepared_spells.insert_last("blindness_deafness"); if (!c.knows_spell("silence")) c.prepared_spells.insert_last("silence"); }
+            if (cs.level >= 5) { if (!c.knows_spell("speak_with_dead")) c.prepared_spells.insert_last("speak_with_dead"); }
+            if (cs.level >= 7) { if (!c.knows_spell("aura_of_life")) c.prepared_spells.insert_last("aura_of_life"); if (!c.knows_spell("death_ward")) c.prepared_spells.insert_last("death_ward"); }
+            if (cs.level >= 9) { if (!c.knows_spell("contagion")) c.prepared_spells.insert_last("contagion"); }
         }
         // Book of Ebon Tides: Mother of Sorrows
         // L1 Poison Soul (para 1135): "your affinity for poison becomes supernatural.
@@ -3082,6 +3089,15 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
             // "When you have to make a death saving throw at the start of your turn,
             // you can instead spring back to your feet with a burst of radiant energy."
             if (cs.level >= 14) c.searing_vengeance_available = true;
+        }
+        // Basic Rules 2024 Fiend Patron (para 8252): Expanded Spell List
+        if (cs.subclass == "Fiend Patron") {
+            if (!c.knows_spell("burning_hands")) c.prepared_spells.insert_last("burning_hands");
+            if (!c.knows_spell("command")) c.prepared_spells.insert_last("command");
+            if (cs.level >= 3) { if (!c.knows_spell("scorching_ray")) c.prepared_spells.insert_last("scorching_ray"); if (!c.knows_spell("suggestion")) c.prepared_spells.insert_last("suggestion"); }
+            if (cs.level >= 5) { if (!c.knows_spell("fireball")) c.prepared_spells.insert_last("fireball"); if (!c.knows_spell("stinking_cloud")) c.prepared_spells.insert_last("stinking_cloud"); }
+            if (cs.level >= 7) { if (!c.knows_spell("fire_shield")) c.prepared_spells.insert_last("fire_shield"); if (!c.knows_spell("wall_of_fire")) c.prepared_spells.insert_last("wall_of_fire"); }
+            if (cs.level >= 9) { if (!c.knows_spell("insect_plague")) c.prepared_spells.insert_last("insect_plague"); }
         }
         // PHB 2024 Warlock Eldritch Invocations: known count scales by level per the
         // Warlock Features table (paras 7607-7762). L1=1, L2-4=3, L5-6=5, L7-8=6,

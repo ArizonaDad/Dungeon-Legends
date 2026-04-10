@@ -1236,6 +1236,13 @@ class combatant {
 			bonus += proficiency / 2;
 		}
 		bonus -= exhaustion_level * 2;
+		// Xanathar's Samurai L7 Elegant Courtier (para 1705-1707): "+WIS mod to
+		// Persuasion checks" (also applies to all CHA checks per some readings,
+		// but strict RAW is Persuasion only)
+		if (skill_name == "Persuasion" and class_name == "Fighter" and subclass == "Samurai" and level >= 7) {
+			int wis_mod = get_ability_mod(ABILITY_WIS);
+			if (wis_mod > 0) bonus += wis_mod;
+		}
 		return bonus;
 	}
 
@@ -1556,6 +1563,15 @@ class battle {
 			amount = (amount + 1) / 2;
 		}
 
+		// Xanathar's Oath of Redemption L20 Emissary of Redemption (para 2052-2056):
+		// "you have resistance to all damage dealt by other creatures (their attacks,
+		// spells, and other effects). Also, whenever a creature damages you, it takes
+		// radiant damage equal to half the amount it dealt to you."
+		// Note: source excludes creatures you've attacked — deferred (needs per-creature tracking)
+		if (target.emissary_of_redemption_active and @source != null and source.id != target.id) {
+			amount = (amount + 1) / 2;
+		}
+
 		// Species/feat resistances and immunities
 		if (damage_type == DMG_COLD and target.cold_resistance) amount = (amount + 1) / 2;
 		if (damage_type == DMG_NECROTIC and target.necrotic_resistance) amount = (amount + 1) / 2;
@@ -1635,6 +1651,17 @@ class battle {
 		}
 
 		target.current_hp -= amount;
+
+		// Xanathar's Oath of Redemption L20 Emissary of Redemption retaliation (para 2054):
+		// "whenever a creature damages you, it takes radiant damage equal to half the
+		// amount it dealt to you." Guard against recursion via emissary check on source.
+		if (target.emissary_of_redemption_active and @source != null and source.id != target.id and amount > 0 and !source.emissary_of_redemption_active) {
+			int retribution = (amount + 1) / 2;
+			if (retribution > 0) {
+				source.current_hp -= retribution;
+			}
+		}
+
 		if (target.wild_shape_active and target.current_hp <= 0) {
 			int overflow = -target.current_hp;
 			restore_wild_shape(target, overflow);

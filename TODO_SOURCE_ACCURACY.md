@@ -544,7 +544,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 |---------|-------|-------------|--------|
 | **Bonus Proficiency** (History/Insight/Performance/Persuasion or language) | 3 | 1700-1701 | Done 2026-04-10 -- auto-grants first unproficient of History/Insight/Performance/Persuasion at init. |
 | **Fighting Spirit** (BA: advantage on weapon attacks this turn + 5/10/15 temp HP; 3 uses/LR) | 3 | 1702-1704 | ✓ Done — FIXED uses from proficiency_bonus to correct 3/LR. Temp HP scaling 5/10/15 at L3/10/15 already correct. |
-| **Elegant Courtier** (+WIS mod to Persuasion checks; WIS save proficiency) | 7 | 1705-1707 | PARTIAL — WIS save proficiency added at init. Persuasion +WIS mod requires extending the skill check modifier system (deferred). |
+| **Elegant Courtier** (+WIS mod to Persuasion checks; WIS save proficiency) | 7 | 1705-1707 | Done 2026-04-10 -- WIS save proficiency at init + WIS mod added to Persuasion in get_skill_bonus. |
 | **Tireless Spirit** (regain 1 Fighting Spirit on initiative if at 0 uses) | 10 | 1708-1709 | ✓ Done — wired in `request_next_initiative`. |
 | **Rapid Strike** (forgo advantage on one attack to gain an extra attack; 1/turn) | 15 | 1710-1711 | DEFERRED — needs an attack-time prompt to choose between advantage and extra attack. Complex interaction with Extra Attack system. |
 | **Strength before Death** (reaction on dropping to 0 HP: take extra turn immediately; 1/LR) | 18 | 1712-1714 | DEFERRED — needs turn interruption / insertion system. Very complex interaction with initiative order. |
@@ -941,7 +941,7 @@ Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 | **CD: Rebuke the Violent** (reaction when attacker damages ally within 30ft: WIS save, radiant damage = damage dealt, half on save) | 3 | 2046 | ✓ Done — `rebuke_violent_ready` flag. CD handler in `users _dom.nvgt`. Trigger auto-resolves in ROLL_DAMAGE path: scans for Redemption Paladin within 30ft, WIS save vs DC. |
 | **Aura of the Guardian** (reaction: take ally's damage within 10/30ft, unreducible) | 7 | 2047-2048 | PARTIAL — `aura_of_guardian_active` + `aura_of_guardian_range` set on init (10 at L7, 30 at L18). Damage-transfer reaction logic deferred. |
 | **Protective Spirit** (end of turn: regain 1d6+half level HP if below half HP and not incapacitated) | 15 | 2050-2051 | ✓ Done — `protective_spirit_active` flag. Passive heal wired in `advance_turn` after Sharpen the Blade tickdown. |
-| **Emissary of Redemption** (resistance to all creature damage + radiant retaliation = half damage taken; lost vs creatures you attack) | 20 | 2052-2056 | PARTIAL — `emissary_of_redemption_active` flag set on init at L20. Combat logic (resistance + retaliation + exclusion tracking) deferred. |
+| **Emissary of Redemption** (resistance to all creature damage + radiant retaliation = half damage taken; lost vs creatures you attack) | 20 | 2052-2056 | PARTIAL 2026-04-10 -- resistance to all damage from other creatures + radiant retaliation (half damage dealt) wired in apply_damage. Per-creature exclusion tracking deferred. |
 
 ### Path of the Storm Herald Barbarian Subclass Audit (2026-04-10) — Xanathar's paras 416-434
 
