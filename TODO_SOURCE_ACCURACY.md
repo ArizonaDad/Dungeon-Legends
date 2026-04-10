@@ -376,10 +376,10 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 | **Stroke of Luck** (1/short rest: turn a failed D20 Test into a 20) | 20 | 6580-6582 | ✓ Done — Turns miss into nat 20 crit, consumes flag (1/LR). |
 
 **Pending follow-up Rogue batches:**
-- Cunning Strike L5 (Poison / Trip / Withdraw): per-effect prompt that subtracts SA dice cost before rolling SA damage. Effects: Poison (1d6 cost, CON save vs Poisoned 1 min), Trip (1d6, DEX save vs Prone), Withdraw (1d6, half-speed move with no OAs).
-- Improved Cunning Strike L11: allow stacking up to 2 effects on the same SA hit.
-- Devious Strikes L14: Daze (2d6), Knock Out (6d6), Obscure (3d6) added to Cunning Strike menu.
-- Stroke of Luck L20 auto-prompt: when a player fails a D20 test (attack/save/check) and `stroke_of_luck_available`, prompt them to convert the roll into a 20 (slot it into existing reroll prompt chain after Heroic Inspiration).
+- ~~Cunning Strike L5~~ RESOLVED 2026-04-10 — Toggle via bonus action menu, dice cost subtracted from SA before rolling.
+- ~~Improved Cunning Strike L11~~ RESOLVED 2026-04-10 — Two effects allowed at L11+.
+- ~~Devious Strikes L14~~ RESOLVED 2026-04-10 — Daze (2d6), Knock Out (6d6), Obscure (3d6) wired.
+- ~~Stroke of Luck L20 auto-prompt~~ RESOLVED 2026-04-10 — `try_stroke_of_luck_save` wired into 40+ save failure sites.
 - Sneak Attack interactions: verify it triggers correctly for Soulknife Psychic Blades and Inquisitive Insightful Fighting (existing subclass riders).
 
 ### Sorcerer Audit (2026-04-09) — Basic Rules 2024 paras 6632-7044
@@ -401,14 +401,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 
 **Pending follow-up Sorcerer batches:**
 - Metamagic option selection at L2/L10/L17 (player choice prompt). Currently we grant Quickened/Twinned/Subtle by default to all Sorcerers. Source allows the player to pick from 10.
-- Metamagic options not yet wired to spell pipeline:
-  - **Careful Spell** (1 SP, paras 7012-7014): cast-time prompt to designate up to CHA mod allies who auto-succeed save and take 0 damage from a save-based spell.
-  - **Distant Spell** (1 SP, paras 7015-7017): doubles spell range (or makes Touch range 30 ft). Needs spell range modifier in cast pipeline.
-  - **Empowered Spell** (1 SP, paras 7018-7021): reroll up to CHA mod damage dice. Stackable with other metamagic. Needs damage roll hook.
-  - **Extended Spell** (1 SP, paras 7022-7025): doubles concentration spell duration up to 24 h, advantage on concentration saves while active. Needs duration tracker on concentration effects.
-  - **Heightened Spell** (2 SP, paras 7026-7028): one target has Disadvantage on its save vs the spell. Needs save-call pipeline modifier.
-  - **Seeking Spell** (1 SP, paras 7032-7035): reroll a missed spell attack. Stackable with other metamagic. Needs miss-resolution hook.
-  - **Transmuted Spell** (1 SP, paras 7039-7041): change damage type among Acid/Cold/Fire/Lightning/Poison/Thunder. Needs damage type swap in cast pipeline.
+- ~~Metamagic options not yet wired to spell pipeline~~ RESOLVED 2026-04-10 — All 7 non-trivial metamagic effects are wired: Careful (allies auto-succeed AoE save), Distant (double range), Empowered (reroll CHA mod damage dice), Extended (concentration advantage), Heightened (target save disadvantage), Seeking (reroll missed spell attack), Transmuted (swap damage type). Flags snapshot onto pending_roll at cast time.
 - Sorcery Incarnate L7 multi-metamagic-per-spell — needs metamagic pipeline rewrite to allow 2 simultaneous flags during a single cast.
 - ~~Sorcerous Restoration L5 — needs short rest subsystem (currently we only have long rest reset).~~ RESOLVED 2026-04-10 — Wired into apply_short_rest.
 - Arcane Apotheosis L20 — escalate to user; basic_rules_full.txt para 7009 has no body text.
@@ -506,7 +499,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 |---------|-------|-------------|--------|
 | **Arcane Deflection** (reaction: +2 AC vs attack OR +4 to failed save; can't cast non-cantrip until end of next turn) | 2 | 2932-2934 | ✓ Done — AC reaction in prompt system (+2 AC). Save variant `try_arcane_deflection_save` (+4 save) wired into 28+ save failure sites (smart-spend). Non-cantrip restriction enforced via `arcane_deflection_no_spell_turns = 2` checked in `handle_cast`. L14 Deflecting Shroud fires on both AC and save uses. |
 | **Tactical Wit** (+INT mod to initiative rolls) | 2 | 2935-2936 | ✓ Done — `tactical_wit_active` flag set on init; `request_next_initiative` adds `c.get_ability_mod(ABILITY_INT)` to initiative modifier. |
-| **Power Surge** (store surges max=INT mod, gain from dispel_magic/counterspell success, spend 1/turn for half-level force damage on wizard spell hit) | 6 | 2937-2940 | PARTIAL — Charges init'd at INT mod, auto-spend on spell attack hit for `level/2` force damage (1/turn), gain from `dispel_magic` success. Deferred: gain from `counterspell` (interception not fully resolved), Power Surge on save-based spell damage (too scattered across 80+ handlers), short-rest "if 0 surges, gain 1" recovery. |
+| **Power Surge** (store surges max=INT mod, gain from dispel_magic/counterspell success, spend 1/turn for half-level force damage on wizard spell hit) | 6 | 2937-2940 | PARTIAL — Charges init'd at INT mod, auto-spend on spell attack hit for `level/2` force damage (1/turn), gain from `dispel_magic` success. Save-based spell damage rider wired to central AoE path 2026-04-10. Deferred: gain from `counterspell` (interception not fully resolved), short-rest "if 0 surges, gain 1" recovery. |
 | **Durable Magic** (+2 AC and +2 all saving throws while concentrating) | 10 | 2941-2942 | ✓ Done — `durable_magic_active` flag; AC dynamically added/removed at concentration start/`clear_concentration_effects`; +2 saves in `get_save_bonus` when `durable_magic_active and is_concentrating`. |
 | **Deflecting Shroud** (when Arcane Deflection used, up to 3 enemies within 60ft take half-wizard-level force damage) | 14 | 2943-2944 | ✓ Done — `deflecting_shroud_active` flag; damage loop in Arcane Deflection reaction handler, iterates combatants, skips allies/dead, distance check ≤60ft, caps at 3 targets. |
 
@@ -606,7 +599,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 - Spell-Storing Item L11 — store an Artificer L1-3 spell in an object during Long Rest, anyone holding can use Magic action to cast (`2*INT mod` uses).
 - Refreshed Genius L14 + Magical Guidance L20 — Short Rest subsystem dependency.
 - Cheat Death L20 — depends on Replicate Magic Item infrastructure.
-- Flash of Genius coverage extension — MOSTLY RESOLVED 2026-04-10: `try_flash_of_genius` now wired into central AoE save path + 28 individual spell handler save sites (all high-impact spells covered). Remaining low-frequency spell saves (wall spells, utility saves) have diminishing returns.
+- ~~Flash of Genius coverage extension~~ RESOLVED 2026-04-10: `try_flash_of_genius` now wired into central AoE save path + 46+ individual spell handler save sites (all spell save sites covered, including cantrips and damage-only saves).
 - Tinker's Magic L1 Magic action — needs a hazards system for ball bearings/caltrops in adjacent tiles.
 
 ### Gunslinger Audit (2026-04-09) — Valda's Spire of Secrets paras 159-203
@@ -653,7 +646,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 
 **Current status (verified 2026-04-08):** 77 feats defined in `common/feat_data.nvgt`. Only 24 have `has_feat()` checks in combat code. **53 feats have no combat logic at all** — they're selectable at character creation but do nothing in combat.
 
-### Feats WITH combat logic (38 after batches 4A+4B+2026-04-10; 15 still missing):
+### Feats WITH combat logic (50+ after all batches through 2026-04-10):
 alert, archery, athlete (BATCH 4A), blind_fighting (BATCH 4B), boon_of_combat_prowess, boon_of_irresistible_offense, boon_of_truesight, charger (BATCH 4B), crossbow_expert, crusher, defensive_duelist, dueling, fey_touched (BATCH 4B), grappler, great_weapon_fighting, great_weapon_master, healer, heavy_armor_master, inspiring_leader (BATCH 4A), mage_slayer, mobile (2026-04-10), observant (BATCH 4A), piercer, poisoner (BATCH 4A), polearm_master, resilient (BATCH 4A), savage_attacker, sentinel, shadow_touched (BATCH 4B), sharpshooter (BATCH 4A), shield_master, skill_expert (BATCH 4A), skulker (BATCH 4A), slasher, spell_sniper (BATCH 4A), tavern_brawler, telekinetic (BATCH 4A), thrown_weapon_fighting, unarmed_fighting (BATCH 4B), war_caster
 
 **Batch 4B wired (5 new feats):**
@@ -687,32 +680,30 @@ alert, archery, athlete (BATCH 4A), blind_fighting (BATCH 4B), boon_of_combat_pr
 **General feats (still missing — level 4+, the biggest group):**
 - ability_score_improvement (data only — not really a "feat" in the combat sense), actor, charger, chef, defense (already wired as +1 AC), dual_wielder (already wired as +1 AC), durable, elemental_adept, fey_touched, heavily_armored, keen_mind, lightly_armored, martial_weapon_training, medium_armor_master, moderately_armored, mounted_combatant, ritual_caster, shadow_touched, speedy (already wired as +10 speed), telepathic, weapon_master
 
-**Fighting Style feats (5 missing):**
-- blind_fighting, interception, protection, two_weapon_fighting, unarmed_fighting
-- **Interception / Protection** — DEFERRED — requires extending reaction prompt system to support ally-protection reactions (currently only target is prompted).
+**Fighting Style feats (ALL RESOLVED):**
+- ~~blind_fighting~~ Done (blindsight 10ft). ~~interception~~ Done (auto-resolved -1d10-prof reaction). ~~protection~~ Done (auto-resolved disadvantage reaction). ~~two_weapon_fighting~~ Done (TWF system). ~~unarmed_fighting~~ Done (d6/d8 die).
 
-**Epic Boon feats (8 missing):**
-- boon_of_dimensional_travel, boon_of_energy_resistance, boon_of_fate, boon_of_fortitude (already wired as +40 HP), boon_of_recovery, boon_of_skill, boon_of_speed (already wired as +30 speed), boon_of_spell_recall, boon_of_the_night_spirit (already wired as 300 ft darkvision)
+**Epic Boon feats (ALL RESOLVED):**
+- ~~boon_of_dimensional_travel~~ Done (Blink Steps teleport). ~~boon_of_energy_resistance~~ Removed (not in source). ~~boon_of_fate~~ Done (2d4 ally save bonus). ~~boon_of_fortitude~~ Done (+40 HP). ~~boon_of_recovery~~ Done (BA heal half max HP). ~~boon_of_skill~~ Done (+1d10 ability check). ~~boon_of_speed~~ Done (+30 speed). ~~boon_of_spell_recall~~ Done (free spell cast). ~~boon_of_the_night_spirit~~ Done (300ft darkvision).
 
-### Key complex feat effects still needing work:
-- **Polearm Master Reactive Strike** — opportunity attack when a creature enters reach (not just when leaving). Current game only supports leave-reach OAs.
-- **Shield Master Interpose Shield** — reaction to take 0 damage instead of half on a successful DEX save against a half-damage effect.
+### Key complex feat effects — status:
+- ~~**Polearm Master Reactive Strike**~~ RESOLVED (commit 2813154) — entering-reach OA trigger wired.
+- ~~**Shield Master Interpose Shield**~~ RESOLVED 2026-04-10 — Reaction on successful DEX save → 0 damage.
 - **Shield Master push option** — player choice of Push 5ft OR Prone (currently always Prone).
-- **Mage Slayer Guarded Mind** — 1/rest reaction auto-succeed on failed INT/WIS/CHA save.
-- ~~**Charger** — When you Dash, bonus action melee attack or shove with +1d8 damage.~~ RESOLVED 2026-04-10 — Charger +1d8 charge damage wired.
-- **Inspiring Leader** — After short/long rest, grant 6 creatures temp HP = level + CHA mod.
-- **Elemental Adept** — ignore resistance to chosen damage type, treat 1s as 2s on damage dice.
-- ~~**Fey Touched** — free Misty Step + one 1st-level Div/Enchant spell once per long rest each.~~ RESOLVED 2026-04-10 — Free-cast tracking wired via grant_free_cast pipeline.
-- ~~**Shadow Touched** — free Invisibility + one 1st-level Illusion/Necromancy spell once per long rest each.~~ RESOLVED 2026-04-10 — Free-cast tracking wired via grant_free_cast pipeline.
-- **Telekinetic** — bonus action Mage Hand / push-pull 5ft.
-- **Telepathic** — telepathic communication + Detect Thoughts spell.
-- **Sharpshooter** — ignore cover, no long range penalty, -5/+10 trade.
-- **Spell Sniper** — double spell attack range, ignore cover, learn an attack cantrip.
-- **Poisoner** — apply poison for +2d8 poison damage + poisoned condition.
-- **Resilient** — gain proficiency in one saving throw.
-- **Ability Score Improvement** — +2 or +1/+1 (data only, no combat effect beyond stats).
+- ~~**Mage Slayer Guarded Mind**~~ RESOLVED (commit 7a47504) — 1/SR auto-succeed on failed INT/WIS/CHA save, wired into 40+ save sites.
+- ~~**Charger**~~ RESOLVED 2026-04-10 — +1d8 charge damage wired.
+- ~~**Inspiring Leader**~~ RESOLVED 2026-04-10 — temp HP at battle start + short rest.
+- ~~**Elemental Adept**~~ RESOLVED — resistance bypass + dice floor of 2 wired.
+- ~~**Fey Touched / Shadow Touched**~~ RESOLVED 2026-04-10 — Free-cast tracking wired.
+- ~~**Telekinetic**~~ RESOLVED 2026-04-10 — bonus action shove wired.
+- **Telepathic** — telepathic communication (non-combat) + Detect Thoughts spell (free cast deferred).
+- ~~**Sharpshooter**~~ RESOLVED — skips ranged-in-melee disadvantage. -5/+10 trade deferred (needs attack-time toggle).
+- ~~**Spell Sniper**~~ RESOLVED — skips ranged-spell-in-melee disadvantage.
+- ~~**Poisoner**~~ RESOLVED — poison damage bypasses Resistance.
+- ~~**Resilient**~~ RESOLVED — saving throw proficiency wired.
+- **Ability Score Improvement** — data only, no combat logic needed.
 
-**Total new feat implementations needed: ~40** (53 feats missing, but ability_score_improvement is purely stat-based and doesn't need combat code; several are simply +skill/+tool proficiency and will partly land in the skill check system).
+**Remaining feats without combat logic:** ~15-20, mostly non-combat (actor, crafter, keen_mind, skilled, magic_initiate variants, armor/weapon proficiency feats). The only combat-relevant gaps are: Sharpshooter -5/+10 toggle, Shield Master Push/Prone choice, Telepathic free Detect Thoughts, and medium_armor_master (+3 DEX cap).
 
 ---
 
