@@ -2172,6 +2172,14 @@ class battle_manager {
 				if (save_roll2 < save_roll) save_roll = save_roll2;
 				broadcast_announce(t.name + " has disadvantage on the save — " + caster.name + "'s Heightened Spell!", false);
 			}
+			// PHB 2024 Barbarian L13 Staggering Blow (para 2346): "The target has
+			// Disadvantage on the next saving throw it makes." Consumed on use.
+			if (t.staggering_blow_active) {
+				int stag_roll2 = random(1, 20);
+				if (stag_roll2 < save_roll) save_roll = stag_roll2;
+				t.staggering_blow_active = false;
+				broadcast_announce(t.name + " has disadvantage on the save from Staggering Blow!", false);
+			}
 			int save_bonus = t.get_save_bonus(pr.spell_save_type);
 			int bless_bonus = roll_bless_bonus(t);
 			int unsettling_penalty = 0;
@@ -3939,6 +3947,7 @@ class battle_manager {
 					if (@caster == null or caster.is_dead) continue;
 					if (caster.concentration_spell == "Hold Person" and caster.is_concentrating) {
 						int save_roll = random(1, 20);
+						if (prev.staggering_blow_active) { int sb2 = random(1, 20); if (sb2 < save_roll) save_roll = sb2; prev.staggering_blow_active = false; broadcast_announce(prev.name + " has disadvantage from Staggering Blow!", false); }
 						int save_bonus = prev.get_save_bonus(ABILITY_WIS);
 						int save_dc_val = spell_save_dc(caster);
 						int save_total = save_roll + save_bonus;
@@ -3962,6 +3971,7 @@ class battle_manager {
 					if (@caster == null or caster.is_dead) continue;
 					if (caster.concentration_spell == "Web" and caster.is_concentrating) {
 						int save_roll = random(1, 20);
+						if (prev.staggering_blow_active) { int sb2 = random(1, 20); if (sb2 < save_roll) save_roll = sb2; prev.staggering_blow_active = false; broadcast_announce(prev.name + " has disadvantage from Staggering Blow!", false); }
 						int save_bonus = prev.get_save_bonus(ABILITY_DEX);
 						int save_dc_val = spell_save_dc(caster);
 						int save_total = save_roll + save_bonus;
@@ -3984,6 +3994,7 @@ class battle_manager {
 					if (@caster == null or caster.is_dead) continue;
 					if (caster.concentration_spell == "Blindness/Deafness" and caster.is_concentrating) {
 						int save_roll = random(1, 20);
+						if (prev.staggering_blow_active) { int sb2 = random(1, 20); if (sb2 < save_roll) save_roll = sb2; prev.staggering_blow_active = false; broadcast_announce(prev.name + " has disadvantage from Staggering Blow!", false); }
 						int save_bonus = prev.get_save_bonus(ABILITY_CON);
 						int save_dc_val = spell_save_dc(caster);
 						int save_total = save_roll + save_bonus;
@@ -4006,6 +4017,7 @@ class battle_manager {
 					if (@caster == null or caster.is_dead) continue;
 					if (caster.concentration_spell == "Fear" and caster.is_concentrating) {
 						int save_roll = random(1, 20);
+						if (prev.staggering_blow_active) { int sb2 = random(1, 20); if (sb2 < save_roll) save_roll = sb2; prev.staggering_blow_active = false; broadcast_announce(prev.name + " has disadvantage from Staggering Blow!", false); }
 						// Aberrant Mind L6 Psychic Defenses / Fey Ancestry: advantage on charm/frighten saves
 						if (prev.charm_frighten_save_advantage) { int r2 = random(1, 20); if (r2 > save_roll) save_roll = r2; }
 						int save_bonus = prev.get_save_bonus(ABILITY_WIS);
@@ -4031,6 +4043,7 @@ class battle_manager {
 					if (@caster == null or caster.is_dead) continue;
 					if (caster.concentration_spell == "Tasha's Hideous Laughter" and caster.is_concentrating) {
 						int save_roll = random(1, 20);
+						if (prev.staggering_blow_active) { int sb2 = random(1, 20); if (sb2 < save_roll) save_roll = sb2; prev.staggering_blow_active = false; broadcast_announce(prev.name + " has disadvantage from Staggering Blow!", false); }
 						int save_bonus = prev.get_save_bonus(ABILITY_WIS);
 						int save_dc_val = spell_save_dc(caster);
 						int save_total = save_roll + save_bonus;
@@ -4098,6 +4111,24 @@ class battle_manager {
 			c.movement_remaining = 0;
 			c.haste_loses_next_turn = false;
 			broadcast_announce(c.name + " is lethargic as Haste ends and cannot move or act this turn.", true);
+		}
+		// PHB 2024 Rogue L14 Cunning Strike — Daze (para 6564): "on its next turn,
+		// it can do only one of the following: move or take an action or a Bonus Action."
+		// AI picks action (most impactful); players lose movement + bonus action.
+		if (c.cunning_strike_dazed) {
+			c.cunning_strike_dazed = false;
+			c.cunning_strike_dazed_rounds = 0;
+			if (c.is_player) {
+				// Player: keep action, lose movement + bonus action
+				c.has_bonus_action = false;
+				c.movement_remaining = 0;
+				broadcast_announce(c.name + " is dazed! Can only take an action this turn (no movement or bonus action).", true);
+			} else {
+				// Monster AI: keep action, lose movement + bonus action
+				c.has_bonus_action = false;
+				c.movement_remaining = 0;
+				broadcast_announce(c.name + " is dazed! Can only take an action this turn.", true);
+			}
 		}
 		if (c.heroism_source_id != 0 and c.is_alive() and c.heroism_temp_hp_amount > 0) {
 			if (c.temp_hp < c.heroism_temp_hp_amount) c.temp_hp = c.heroism_temp_hp_amount;
