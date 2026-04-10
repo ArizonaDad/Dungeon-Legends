@@ -4312,24 +4312,54 @@ void handle_user_message(user@ u, json_object@ msg)
 		// effect against Large or smaller creatures. Wired in finalize_roll_result on crit.
 
 		else if (feature == "dodge_roll") {
-			// Gunslinger maneuver: Dodge Roll — spend Risk Die, bonus action move half speed + Dodge
+			// Valda's Spire Gunslinger maneuver Dodge Roll (paras 211-212):
+			// "You can expend one Risk Die as a Bonus Action to move up to 15 feet and reload any
+			//  Ranged weapon you are holding. This movement doesn't provoke Opportunity Attacks
+			//  and is unaffected by Difficult Terrain."
+			// Implementation: consumes a Risk Die + bonus action and grants +15 ft of movement.
+			// OA-immunity and difficult-terrain-immunity for that movement segment are deferred
+			// until per-segment movement tracking exists; the Risk Die is otherwise unrolled
+			// since the maneuver itself doesn't add it to anything.
 			if (c.class_name != "Gunslinger") { u.send({{"type", message_types::announce}, {"text", "Only Gunslingers can Dodge Roll."}, {"interrupt", true}}); return; }
 			if (c.risk_dice_current <= 0) { u.send({{"type", message_types::announce}, {"text", "No Risk Dice available."}, {"interrupt", true}}); return; }
 			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
 			c.has_bonus_action = false;
 			c.used_bonus_action = true;
 			c.risk_dice_current--;
-			c.is_dodging = true;
-			c.add_condition(COND_DODGING);
-			u.room.bm.broadcast_announce(c.name + " uses Dodge Roll! Takes Dodge action.", false);
+			c.movement_remaining += 15;
+			u.room.bm.broadcast_announce(c.name + " uses Dodge Roll and gains 15 feet of extra movement! (" + c.risk_dice_current + "/" + c.risk_dice_max + " Risk Dice)", false);
 		}
 
 		else if (feature == "blindfire") {
-			// Gunslinger maneuver: Blindfire — ignore disadvantage on next ranged attack
+			// Valda's Spire Gunslinger maneuver Blindfire (paras 209-210):
+			// "You can take a Bonus Action and expend one Risk Die to gain Blindsight with a
+			//  range of 30 feet until the end of the current turn."
+			// Implementation: consumes a bonus action + Risk Die, sets blindfire_active flag
+			// granting Blindsight 30 ft until end of turn (cleared in advance_turn).
 			if (c.class_name != "Gunslinger") { u.send({{"type", message_types::announce}, {"text", "Only Gunslingers can Blindfire."}, {"interrupt", true}}); return; }
 			if (c.risk_dice_current <= 0) { u.send({{"type", message_types::announce}, {"text", "No Risk Dice available."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
 			c.risk_dice_current--;
-			u.room.bm.broadcast_announce(c.name + " uses Blindfire! Next ranged attack ignores disadvantage.", false);
+			c.blindfire_active = true;
+			u.room.bm.broadcast_announce(c.name + " uses Blindfire and gains Blindsight 30 ft until end of turn! (" + c.risk_dice_current + "/" + c.risk_dice_max + " Risk Dice)", false);
+		}
+
+		else if (feature == "bite_the_bullet") {
+			// Valda's Spire Gunslinger maneuver Bite the Bullet (paras 207-208):
+			// "You can expend one Risk Die as a Bonus Action to gain temporary hit points equal
+			//  to the number rolled plus your Gunslinger level."
+			if (c.class_name != "Gunslinger") { u.send({{"type", message_types::announce}, {"text", "Only Gunslingers can Bite the Bullet."}, {"interrupt", true}}); return; }
+			if (c.risk_dice_current <= 0) { u.send({{"type", message_types::announce}, {"text", "No Risk Dice available."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.risk_dice_current--;
+			int btb_roll = random(1, c.risk_die_size);
+			int btb_thp = btb_roll + c.level;
+			if (btb_thp > c.temp_hp) c.temp_hp = btb_thp;
+			u.room.bm.broadcast_announce(c.name + " bites the bullet! Rolls 1d" + c.risk_die_size + " (" + btb_roll + ") + level " + c.level + " = " + btb_thp + " temporary hit points. (" + c.risk_dice_current + "/" + c.risk_dice_max + " Risk Dice)", false);
 		}
 
 		else if (feature == "open_hand_technique") {

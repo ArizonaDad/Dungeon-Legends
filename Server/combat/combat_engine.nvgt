@@ -599,6 +599,10 @@ class combatant {
 	bool cheat_death_used = false; // L13: 1/SR drop-to-1
 	// L5 Gut Shot debuff tracking (set on victim of a Gunslinger crit)
 	int gut_shot_rounds_remaining = 0;
+	// L2 Risk Dice maneuvers (paras 207-218): per-turn use flags reset in advance_turn.
+	bool grazing_shot_used_this_turn = false; // 1/turn cap
+	bool maverick_spirit_used_this_turn = false; // 1/turn cap
+	bool blindfire_active = false; // L2 Blindfire: Blindsight 30 ft until end of current turn
 	int rage_turns_remaining = 0;
 	int action_surge_uses_remaining = 0;
 	// PHB 2024 Fighter L1 Second Wind (para 5103-5106): Bonus Action, heal 1d10 +

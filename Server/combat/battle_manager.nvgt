@@ -2619,6 +2619,53 @@ class battle_manager {
 		return current_total;
 	}
 
+	// Valda's Spire Gunslinger maneuver Grazing Shot (paras 213-214): "When you miss with
+	// a ranged attack roll using a weapon, you can expend one Risk Die (no action required)
+	// to deal damage to that creature equal to a roll of the die plus your Dexterity
+	// modifier (minimum of 1). This damage is the same type dealt by the weapon, and the
+	// damage can be increased only by increasing the ability modifier. You can only use
+	// this maneuver once per turn."
+	// Returns true if Grazing Shot was used (and applied damage server-side).
+	bool try_grazing_shot(combatant@ attacker, combatant@ target, int weapon_dmg_type) {
+		if (@attacker == null or @target == null) return false;
+		if (attacker.class_name != "Gunslinger") return false;
+		if (attacker.risk_dice_current <= 0) return false;
+		if (attacker.grazing_shot_used_this_turn) return false;
+		if (!attacker.main_hand_is_ranged) return false;
+		if (target.is_dead) return false;
+		attacker.grazing_shot_used_this_turn = true;
+		attacker.risk_dice_current--;
+		int gs_roll = random(1, attacker.risk_die_size);
+		int dex_mod = attacker.get_ability_mod(ABILITY_DEX);
+		if (dex_mod < 1) dex_mod = 1;
+		int gs_damage = gs_roll + dex_mod;
+		string dmg_name = (weapon_dmg_type >= 0 and weapon_dmg_type < int(DAMAGE_TYPE_NAMES.length())) ? DAMAGE_TYPE_NAMES[weapon_dmg_type] : "weapon";
+		broadcast_announce(attacker.name + " uses Grazing Shot! Risk Die 1d" + attacker.risk_die_size + " (" + gs_roll + ") + DEX mod " + dex_mod + " = " + gs_damage + " " + dmg_name + " damage to " + target.name + ". (" + attacker.risk_dice_current + "/" + attacker.risk_dice_max + " Risk Dice)", true);
+		combat.apply_damage(target, gs_damage, weapon_dmg_type, attacker);
+		return true;
+	}
+
+	// Valda's Spire Gunslinger maneuver Maverick Spirit (paras 215-216): "When you fail
+	// an Intelligence, Wisdom, or Charisma ability check or saving throw, you can expend
+	// one Risk Die to add it to the roll, potentially turning it into a success. You can
+	// only use this maneuver once per turn." Smart-spend: only auto-fires if the rolled
+	// Risk Die would actually turn the failure into a success.
+	int try_maverick_spirit(combatant@ target, int dc, int current_total, string label) {
+		if (@target == null) return current_total;
+		if (target.class_name != "Gunslinger") return current_total;
+		if (current_total >= dc) return current_total; // not failing
+		if (target.risk_dice_current <= 0) return current_total;
+		if (target.maverick_spirit_used_this_turn) return current_total;
+		// Smart-spend: roll the die and only commit if it turns the failure into a success.
+		int ms_roll = random(1, target.risk_die_size);
+		int new_total = current_total + ms_roll;
+		if (new_total < dc) return current_total; // would still fail — don't burn the use
+		target.maverick_spirit_used_this_turn = true;
+		target.risk_dice_current--;
+		broadcast_announce(target.name + " uses Maverick Spirit! Adds 1d" + target.risk_die_size + " (" + ms_roll + ") to the " + label + " (new total " + new_total + ") — succeeded! (" + target.risk_dice_current + "/" + target.risk_dice_max + " Risk Dice)", true);
+		return new_total;
+	}
+
 	void clear_haste_effect(combatant@ target, bool apply_lethargy = true, bool announce = true) {
 		if (@target == null or !target.hasted) return;
 		target.speed = target.speed / 2;
@@ -3145,6 +3192,7 @@ class battle_manager {
 						bool saved = save_total >= save_dc_val;
 						broadcast_roll(prev.name, "WIS save vs Hold Person (end of turn)", save_roll, save_bonus, save_total, saved ? "Freed!" : "Still paralyzed!");
 						if (!saved) { int new_total = try_flash_of_genius(prev, save_dc_val, save_total, "WIS save vs Hold Person"); if (new_total >= save_dc_val) saved = true; }
+						if (!saved) { int ms_total = try_maverick_spirit(prev, save_dc_val, save_total, "WIS save vs Hold Person"); if (ms_total >= save_dc_val) saved = true; }
 						if (saved) {
 							prev.remove_condition(COND_PARALYZED);
 							broadcast_to_battle({{"type", message_types::condition_removed}, {"target", prev.name}, {"condition", "Paralyzed"}});
@@ -3208,6 +3256,7 @@ class battle_manager {
 						bool saved = save_total >= save_dc_val;
 						broadcast_roll(prev.name, "WIS save vs Fear (end of turn)", save_roll, save_bonus, save_total, saved ? "Courage returns!" : "Still frightened!");
 						if (!saved) { int new_total = try_flash_of_genius(prev, save_dc_val, save_total, "WIS save vs Fear"); if (new_total >= save_dc_val) saved = true; }
+						if (!saved) { int ms_total = try_maverick_spirit(prev, save_dc_val, save_total, "WIS save vs Fear"); if (ms_total >= save_dc_val) saved = true; }
 						if (saved) {
 							prev.remove_condition(COND_FRIGHTENED);
 							broadcast_to_battle({{"type", message_types::condition_removed}, {"target", prev.name}, {"condition", "Frightened"}});
@@ -3229,6 +3278,7 @@ class battle_manager {
 						bool saved = save_total >= save_dc_val;
 						broadcast_roll(prev.name, "WIS save vs Tasha's Hideous Laughter (end of turn)", save_roll, save_bonus, save_total, saved ? "Laughter fades!" : "Still laughing!");
 						if (!saved) { int new_total = try_flash_of_genius(prev, save_dc_val, save_total, "WIS save vs Tasha's Hideous Laughter"); if (new_total >= save_dc_val) saved = true; }
+						if (!saved) { int ms_total = try_maverick_spirit(prev, save_dc_val, save_total, "WIS save vs Tasha's Hideous Laughter"); if (ms_total >= save_dc_val) saved = true; }
 						if (saved) {
 							prev.remove_condition(COND_INCAPACITATED);
 							prev.remove_condition(COND_PRONE);
@@ -3427,6 +3477,13 @@ class battle_manager {
 		}
 		// Reckless Attack ends at the start of the barbarian's next turn (PHB 2024 para 2785).
 		c.reckless_attack_active = false;
+
+		// Valda's Spire Gunslinger maneuvers (paras 213-216): per-turn use flags reset.
+		c.grazing_shot_used_this_turn = false;
+		c.maverick_spirit_used_this_turn = false;
+		// Valda's Spire Gunslinger Blindfire (paras 209-210): "until the end of the current
+		// turn." Cleared at start of next turn so the buff doesn't bleed across rounds.
+		c.blindfire_active = false;
 
 		// Sacred Weapon glow reminder
 		if (c.sacred_weapon_active) {
@@ -4746,6 +4803,17 @@ class battle_manager {
 			}
 		}
 
+		// Valda's Spire Gunslinger maneuver Maverick Spirit (paras 215-216): for failed
+		// INT/WIS/CHA ability checks routed through the pending_roll system, the Gunslinger
+		// can expend a Risk Die to add it to the roll. Smart-spend handled in helper.
+		if (pr.roll_type == ROLL_ABILITY_CHECK and pr.dc > 0 and total < pr.dc and (pr.ability_id == ABILITY_INT or pr.ability_id == ABILITY_WIS or pr.ability_id == ABILITY_CHA)) {
+			int ms_total = try_maverick_spirit(c, pr.dc, total, pr.reason);
+			if (ms_total > total) {
+				reported_modifier += (ms_total - total);
+				total = ms_total;
+			}
+		}
+
 		// PHB 2024 Cleric L1 Divine Order — Thaumaturge (para 3603): "your mystical
 		// connection to the divine gives you a bonus to your Intelligence (Arcana or
 		// Religion) checks. The bonus equals your Wisdom modifier (minimum of +1)."
@@ -4854,6 +4922,14 @@ class battle_manager {
 
 			string attack_reason = pr.attack_name != "" ? pr.attack_name + " attack against " + target.name : "to attack " + target.name;
 			broadcast_roll(c.name, attack_reason, natural_roll, reported_modifier, total, outcome);
+
+			// Valda's Spire Gunslinger maneuver Grazing Shot (paras 213-214): on miss with a
+			// ranged weapon attack, expend one Risk Die for risk_die + DEX mod weapon-type damage.
+			// "no action required" + "once per turn" — helper handles per-turn flag and Risk Die.
+			if (!hit and !is_fumble and pr.is_weapon_attack and !pr.is_spell_effect) {
+				int gs_dmg_type = pr.damage_dice_count > 0 ? pr.damage_type : get_attack_damage_type(c, false);
+				try_grazing_shot(c, target, gs_dmg_type);
+			}
 
 			// Reaction prompt: offer defender reactions BEFORE resolving hit
 			// Only if: target is a player, has reaction, attack would hit, not a fumble
@@ -7820,6 +7896,7 @@ class battle_manager {
 					broadcast_roll(t.name, "WIS save vs Fear", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Frightened!");
 					if (!saved and try_countercharm_reroll(t, save_dc, save_bonus + bless_bonus, "WIS save vs Fear")) saved = true;
 					if (!saved) { int new_total = try_flash_of_genius(t, save_dc, save_total, "WIS save vs Fear"); if (new_total >= save_dc) saved = true; }
+				if (!saved) { int ms_total = try_maverick_spirit(t, save_dc, save_total, "WIS save vs Fear"); if (ms_total >= save_dc) saved = true; }
 					if (!saved) {
 						t.add_condition(COND_FRIGHTENED);
 						broadcast_to_battle({{"type", message_types::condition_applied}, {"target", t.name}, {"condition", "Frightened"}});
@@ -7848,6 +7925,7 @@ class battle_manager {
 					broadcast_roll(t.name, "WIS save vs Hypnotic Pattern", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Charmed!");
 					if (!saved and try_countercharm_reroll(t, save_dc, save_bonus + bless_bonus, "WIS save vs Hypnotic Pattern")) saved = true;
 					if (!saved) { int new_total = try_flash_of_genius(t, save_dc, save_total, "WIS save vs Hypnotic Pattern"); if (new_total >= save_dc) saved = true; }
+				if (!saved) { int ms_total = try_maverick_spirit(t, save_dc, save_total, "WIS save vs Hypnotic Pattern"); if (ms_total >= save_dc) saved = true; }
 					if (!saved) {
 						t.add_condition(COND_CHARMED);
 						t.add_condition(COND_INCAPACITATED);
@@ -8119,6 +8197,7 @@ class battle_manager {
 				broadcast_roll(target.name, "WIS save vs Cause Fear", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Frightened!");
 				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Cause Fear")) saved = true;
 				if (!saved) { int new_total = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Cause Fear"); if (new_total >= save_dc) saved = true; }
+			if (!saved) { int ms_total = try_maverick_spirit(target, save_dc, save_total, "WIS save vs Cause Fear"); if (ms_total >= save_dc) saved = true; }
 				if (!saved) {
 					target.add_condition(COND_FRIGHTENED);
 					broadcast_announce(target.name + " awakens to their own mortality and is Frightened of " + c.name + "!", true);
@@ -8792,6 +8871,7 @@ class battle_manager {
 				broadcast_roll(target.name, "WIS save vs Phantasmal Killer", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Frightened!");
 				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Phantasmal Killer")) saved = true;
 				if (!saved) { int new_total = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Phantasmal Killer"); if (new_total >= save_dc) saved = true; }
+			if (!saved) { int ms_total = try_maverick_spirit(target, save_dc, save_total, "WIS save vs Phantasmal Killer"); if (ms_total >= save_dc) saved = true; }
 				if (!saved) {
 					combat.apply_damage(target, total_damage, DMG_PSYCHIC, c);
 					target.add_condition(COND_FRIGHTENED);
@@ -9136,6 +9216,7 @@ class battle_manager {
 					bool saved = save_total >= save_dc;
 					if (!saved and try_countercharm_reroll(t, save_dc, save_bonus + bless_bonus, "WIS save vs Mass Suggestion")) saved = true;
 					if (!saved) { int new_total = try_flash_of_genius(t, save_dc, save_total, "WIS save vs Mass Suggestion"); if (new_total >= save_dc) saved = true; }
+				if (!saved) { int ms_total = try_maverick_spirit(t, save_dc, save_total, "WIS save vs Mass Suggestion"); if (ms_total >= save_dc) saved = true; }
 					if (!saved) {
 						t.add_condition(COND_CHARMED);
 						count++;
@@ -9156,6 +9237,7 @@ class battle_manager {
 				broadcast_roll(target.name, "WIS save vs Command", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Commanded!");
 				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Command")) saved = true;
 				if (!saved) { int new_total = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Command"); if (new_total >= save_dc) saved = true; }
+			if (!saved) { int ms_total = try_maverick_spirit(target, save_dc, save_total, "WIS save vs Command"); if (ms_total >= save_dc) saved = true; }
 				if (!saved) {
 					// Approximation: target loses its action next turn (treated as Incapacitated for one turn)
 					// then immediately recovers. We mark it with the existing COND_CHARMED to suppress its turn.
@@ -9175,6 +9257,7 @@ class battle_manager {
 				broadcast_roll(target.name, "WIS save vs Suggestion", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Charmed!");
 				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Suggestion")) saved = true;
 				if (!saved) { int new_total = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Suggestion"); if (new_total >= save_dc) saved = true; }
+			if (!saved) { int ms_total = try_maverick_spirit(target, save_dc, save_total, "WIS save vs Suggestion"); if (ms_total >= save_dc) saved = true; }
 				if (!saved) {
 					target.add_condition(COND_CHARMED);
 					broadcast_announce(target.name + " is charmed by " + c.name + "'s Suggestion. The charm ends if you or an ally damages them.", true);
@@ -9370,6 +9453,7 @@ class battle_manager {
 				broadcast_roll(target.name, "WIS save vs Eyebite", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Afflicted!");
 				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Eyebite")) saved = true;
 				if (!saved) { int new_total = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Eyebite"); if (new_total >= save_dc) saved = true; }
+			if (!saved) { int ms_total = try_maverick_spirit(target, save_dc, save_total, "WIS save vs Eyebite"); if (ms_total >= save_dc) saved = true; }
 				if (!saved) {
 					target.add_condition(COND_FRIGHTENED);
 					broadcast_announce(target.name + " is Panicked by " + c.name + "'s Eyebite!", true);
@@ -9857,6 +9941,7 @@ class battle_manager {
 				broadcast_roll(target.name, "WIS save vs Dominate Person", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Charmed!");
 				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Dominate Person")) saved = true;
 				if (!saved) { int new_total = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Dominate Person"); if (new_total >= save_dc) saved = true; }
+			if (!saved) { int ms_total = try_maverick_spirit(target, save_dc, save_total, "WIS save vs Dominate Person"); if (ms_total >= save_dc) saved = true; }
 				if (!saved) {
 					target.add_condition(COND_CHARMED);
 					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Charmed"}});
@@ -9886,6 +9971,7 @@ class battle_manager {
 				broadcast_roll(target.name, "WIS save vs Charm Person", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Charmed!");
 				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Charm Person")) saved = true;
 				if (!saved) { int new_total = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Charm Person"); if (new_total >= save_dc) saved = true; }
+			if (!saved) { int ms_total = try_maverick_spirit(target, save_dc, save_total, "WIS save vs Charm Person"); if (ms_total >= save_dc) saved = true; }
 				if (!saved) {
 					target.add_condition(COND_CHARMED);
 					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Charmed"}});
@@ -10595,6 +10681,7 @@ class battle_manager {
 				broadcast_roll(target.name, "WIS save vs Dominate Monster", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Charmed!");
 				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Dominate Monster")) saved = true;
 				if (!saved) { int new_total = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Dominate Monster"); if (new_total >= save_dc) saved = true; }
+			if (!saved) { int ms_total = try_maverick_spirit(target, save_dc, save_total, "WIS save vs Dominate Monster"); if (ms_total >= save_dc) saved = true; }
 				if (!saved) {
 					target.add_condition(COND_CHARMED);
 					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Charmed"}});
@@ -10890,6 +10977,7 @@ class battle_manager {
 				broadcast_roll(target.name, "WIS save vs Enthrall", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Charmed!");
 				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Enthrall")) saved = true;
 				if (!saved) { int new_total = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Enthrall"); if (new_total >= save_dc) saved = true; }
+			if (!saved) { int ms_total = try_maverick_spirit(target, save_dc, save_total, "WIS save vs Enthrall"); if (ms_total >= save_dc) saved = true; }
 				if (!saved) {
 					target.add_condition(COND_CHARMED);
 					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Charmed"}});
@@ -11004,6 +11092,7 @@ class battle_manager {
 				broadcast_roll(target.name, "WIS save vs Charm Monster", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Charmed!");
 				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Charm Monster")) saved = true;
 				if (!saved) { int new_total = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Charm Monster"); if (new_total >= save_dc) saved = true; }
+			if (!saved) { int ms_total = try_maverick_spirit(target, save_dc, save_total, "WIS save vs Charm Monster"); if (ms_total >= save_dc) saved = true; }
 				if (!saved) {
 					target.add_condition(COND_CHARMED);
 					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Charmed"}});
@@ -11027,6 +11116,7 @@ class battle_manager {
 				broadcast_roll(target.name, "WIS save vs Dominate Beast", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Charmed!");
 				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Dominate Beast")) saved = true;
 				if (!saved) { int new_total = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Dominate Beast"); if (new_total >= save_dc) saved = true; }
+			if (!saved) { int ms_total = try_maverick_spirit(target, save_dc, save_total, "WIS save vs Dominate Beast"); if (ms_total >= save_dc) saved = true; }
 				if (!saved) {
 					target.add_condition(COND_CHARMED);
 					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Charmed"}});
@@ -11960,6 +12050,7 @@ class battle_manager {
 					broadcast_roll(t.name, "WIS save vs Weird", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Terrified!");
 					if (!saved and try_countercharm_reroll(t, save_dc, save_bonus + bless_bonus, "WIS save vs Weird")) saved = true;
 					if (!saved) { int new_total = try_flash_of_genius(t, save_dc, save_total, "WIS save vs Weird"); if (new_total >= save_dc) saved = true; }
+				if (!saved) { int ms_total = try_maverick_spirit(t, save_dc, save_total, "WIS save vs Weird"); if (ms_total >= save_dc) saved = true; }
 					if (!saved) {
 						combat.apply_damage(t, dmg, DMG_PSYCHIC, c);
 						t.add_condition(COND_FRIGHTENED);
