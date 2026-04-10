@@ -1970,6 +1970,14 @@ class battle_manager {
 		if (attacker.class_name == "Ranger" and attacker.level >= 17 and attacker.hunters_mark_target_id != 0 and attacker.hunters_mark_target_id == target.id) {
 			adv = true;
 		}
+		// PHB 2024 Rogue L3 Steady Aim (para 6550-6551): "you give yourself Advantage
+		// on your next attack roll on the current turn." Consumed inline by the next
+		// attack. The flag is set by the bonus action handler and reset at start of
+		// each turn (advance_turn) so it cannot leak across turns.
+		if (attacker.class_name == "Rogue" and attacker.steady_aim_pending) {
+			adv = true;
+			attacker.steady_aim_pending = false;
+		}
 		// Samurai Fighter: Fighting Spirit — advantage on attacks when active
 		if (attacker.class_name == "Fighter" and attacker.subclass == "Samurai" and attacker.fighting_spirit_active) {
 			adv = true;
@@ -1978,6 +1986,14 @@ class battle_manager {
 		// Cavalier: marked target gets advantage if attacking Cavalier's ally
 		// (simplified implementation: no marker bonus for now)
 		// Sacred Weapon: add CHA mod to attack rolls (handled via attack bonus modification)
+
+		// PHB 2024 Rogue L18 Elusive (para 6576-6577): "No attack roll can have
+		// Advantage against you unless you have the Incapacitated condition." Strip
+		// any advantage that would have been granted to the attacker against this
+		// target — applied last so it overrides every prior source of advantage.
+		if (target.elusive_active and !target.has_condition(COND_INCAPACITATED)) {
+			adv = false;
+		}
 	}
 
 	bool has_hostile_within_5_feet(combatant@ attacker) {
@@ -3233,6 +3249,11 @@ class battle_manager {
 
 		// Reset first hit tracking for subclass on-hit effects
 		c.is_first_hit_this_turn = true;
+		// PHB 2024 Rogue L1 Sneak Attack (para 6537): "Once per turn" — reset.
+		c.sneak_attack_used_this_turn = false;
+		// PHB 2024 Rogue L3 Steady Aim (para 6550-6551): pending advantage flag clears
+		// each new turn — only valid for one attack on the turn it was activated.
+		c.steady_aim_pending = false;
 		// Reset Shield Master once-per-turn shove
 		c.shield_bash_used_this_turn = false;
 		// PHB 2024 Cleric L7 Divine Strike (para 3619): "Once on each of your turns" — reset.
@@ -4074,7 +4095,7 @@ class battle_manager {
 
 	// ---- Subclass On-Hit Damage ----
 	// Called after a successful attack hit, returns bonus damage to add to total.
-	int apply_subclass_on_hit_damage(combatant@ attacker, combatant@ target, bool is_weapon_attack) {
+	int apply_subclass_on_hit_damage(combatant@ attacker, combatant@ target, bool is_weapon_attack, bool had_advantage = false, bool had_disadvantage = false) {
 		int bonus = 0;
 		if (@attacker == null or @target == null) return 0;
 
@@ -4478,6 +4499,43 @@ class battle_manager {
 			broadcast_announce(attacker.name + "'s Righteous Strike adds " + prof_dmg + " radiant damage! (1 focus spent)", false);
 		}
 
+		// PHB 2024 Rogue L1 Sneak Attack (para 6537-6540): "Once per turn, you can deal
+		// an extra 1d6 damage to one creature you hit with an attack roll if you have
+		// Advantage on the roll and the attack uses a Finesse or a Ranged weapon. The
+		// extra damage's type is the same as the weapon's type. You don't need Advantage
+		// on the attack roll if at least one of your allies is within 5 feet of the
+		// target, the ally doesn't have the Incapacitated condition, and you don't have
+		// Disadvantage on the attack roll."
+		// Damage scales 1d6 -> 10d6 per Rogue Features table (paras 6457-6533).
+		if (attacker.class_name == "Rogue" and is_weapon_attack and !attacker.sneak_attack_used_this_turn
+			and (attacker.main_hand_finesse or attacker.main_hand_is_ranged)) {
+			bool sa_qualifies = false;
+			if (had_advantage) {
+				sa_qualifies = true;
+			} else if (!had_disadvantage) {
+				// Look for a non-incapacitated ally within 5 ft of the target.
+				for (uint ai = 0; ai < combat.combatants.length(); ai++) {
+					combatant@ ally = combat.combatants[ai];
+					if (@ally == null or ally.id == attacker.id or ally.is_dead) continue;
+					if (ally.is_player != attacker.is_player) continue;
+					if (combat.mode == "pvp") continue; // PvP: no allies for SA condition
+					if (ally.has_condition(COND_INCAPACITATED)) continue;
+					if (feet_distance(ally.x, ally.y, target.x, target.y) <= 5) {
+						sa_qualifies = true;
+						break;
+					}
+				}
+			}
+			if (sa_qualifies) {
+				attacker.sneak_attack_used_this_turn = true;
+				int sa_dice = (attacker.level + 1) / 2;
+				int sa_bonus = 0;
+				for (int sd = 0; sd < sa_dice; sd++) sa_bonus += random(1, 6);
+				bonus += sa_bonus;
+				broadcast_announce(attacker.name + "'s Sneak Attack deals " + sa_bonus + " extra damage! (" + sa_dice + "d6)", true);
+			}
+		}
+
 		// Inquisitive Rogue: Insightful Fighting — sneak attack without advantage vs studied target
 		if (attacker.class_name == "Rogue" and attacker.subclass == "Inquisitive" and attacker.inquisitive_target == target.id and attacker.is_first_hit_this_turn and is_weapon_attack) {
 			int dice = (attacker.level + 1) / 2;
@@ -4540,10 +4598,12 @@ class battle_manager {
 				total = str_score;
 			}
 		}
-		// Reliable Talent (PHB 2024 Rogue L11): "Whenever you make an ability check that
-		// uses a skill proficiency, you can treat a d20 roll of 9 or lower as a 10."
-		// Applies to ANY skill check where the rogue is proficient, broader than Silver
-		// Tongue which only hits Persuasion/Deception.
+		// PHB 2024 Rogue L7 Reliable Talent (para 6565-6566): "Whenever you make an
+		// ability check that uses one of your skill or tool proficiencies, you can
+		// treat a d20 roll of 9 or lower as a 10." Applies to ANY skill check where
+		// the rogue is proficient, broader than Silver Tongue which only hits
+		// Persuasion/Deception. (Source table line 6480 places this at L7 — was
+		// gated to L11 in the legacy code carrying a 2014 mechanic.)
 		if (c.reliable_talent_active and pr.roll_type == ROLL_ABILITY_CHECK and natural_roll < 10) {
 			// Extract skill name from resolution_tag ("skill_stealth" -> "Stealth")
 			if (pr.resolution_tag.find("skill_") == 0) {
@@ -4724,6 +4784,12 @@ class battle_manager {
 						reaction_options.insert_last("deflect_attacks");
 					}
 				}
+				// PHB 2024 Rogue L5 Uncanny Dodge (para 6561-6562): "When an attacker
+				// that you can see hits you with an attack roll, you can take a Reaction
+				// to halve the attack's damage against you (round down)."
+				if (target.class_name == "Rogue" and target.level >= 5 and !target.has_condition(COND_INCAPACITATED)) {
+					reaction_options.insert_last("uncanny_dodge");
+				}
 
 				if (reaction_options.length() > 0) {
 					user@ def_user = find_user_for_combatant(target);
@@ -4755,6 +4821,7 @@ class battle_manager {
 							else if (reaction_options[oi] == "entropic_ward") opts += "Entropic Ward (force the hit to miss)";
 							else if (reaction_options[oi] == "arcane_deflection") opts += "Arcane Deflection (+4 AC)";
 							else if (reaction_options[oi] == "deflect_attacks") opts += "Deflect Attacks (reduce by 1d10+DEX+level)";
+							else if (reaction_options[oi] == "uncanny_dodge") opts += "Uncanny Dodge (halve the damage)";
 						}
 						def_user.send({{"type", message_types::reaction_prompt}, {"attacker", c.name}, {"options", opts}, {"options_csv", opts_csv}});
 						return; // Pause — wait for reaction_response
@@ -5027,8 +5094,10 @@ class battle_manager {
 				broadcast_announce(c.name + "'s Colossus Slayer deals " + hunter_damage + " extra damage!", false);
 			}
 
-			// Subclass on-hit bonus damage
-			int subclass_damage = apply_subclass_on_hit_damage(c, target, pr.is_weapon_attack);
+			// Subclass on-hit bonus damage (passes advantage/disadvantage so Sneak Attack
+			// can verify the source-required condition: Advantage on the roll OR ally
+			// within 5 ft of target with no Disadvantage on the attack).
+			int subclass_damage = apply_subclass_on_hit_damage(c, target, pr.is_weapon_attack, pr.has_advantage, pr.has_disadvantage);
 			if (subclass_damage > 0) total_damage += subclass_damage;
 
 			// PHB 2024 Cleric L7 Blessed Strikes — Divine Strike (para 3619): "Once on
@@ -5925,6 +5994,16 @@ class battle_manager {
 					: get_attack_damage_type(attacker, false);
 				defender.deflect_attacks_orig_damage_type = dtype;
 				broadcast_announce(defender.name + " uses Deflect Attacks! Incoming damage reduced by " + reduction + ".", true);
+			}
+		}
+		else if (choice == "uncanny_dodge" and defender.is_player) {
+			// PHB 2024 Rogue L5 Uncanny Dodge (para 6561-6562): "halve the attack's
+			// damage against you (round down)." Reaction-gated; halving is applied
+			// when the damage roll resolves in apply_damage.
+			if (defender.class_name == "Rogue" and defender.level >= 5 and !defender.has_condition(COND_INCAPACITATED)) {
+				defender.has_reaction = false;
+				defender.uncanny_dodge_pending = true;
+				broadcast_announce(defender.name + " uses Uncanny Dodge! Incoming damage will be halved.", true);
 			}
 		}
 

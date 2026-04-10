@@ -352,9 +352,39 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 - Tireless L10 exhaustion-halving on Short Rest (deferred until exhaustion subsystem exists).
 - Weapon Mastery property application to attack resolution (shared with Fighter Tactical Master and Paladin L1).
 
+### Rogue Audit (2026-04-09) — Basic Rules 2024 paras 6443-6605
+
+| Feature | Level | Source para | Status |
+|---------|-------|-------------|--------|
+| **Expertise** (2 skill proficiencies → expertise) | 1 | 6529-6531 | ✓ Done — Rogue init grants expertise on 2 skills (default Stealth + Perception). Player choice at character creation deferred. |
+| **Sneak Attack** (1d6 → 10d6, once per turn, finesse/ranged + advantage OR ally within 5ft no disadvantage) | 1 | 6537-6540 | ✓ Done 2026-04-09 — `apply_subclass_on_hit_damage` now has the base case. Tracks `sneak_attack_used_this_turn` (reset in `advance_turn`). Scaling: `(level+1)/2` dice. Conditions: weapon attack + finesse/ranged + (advantage OR ally-within-5ft-of-target with no disadvantage on roll). |
+| **Thieves' Cant** (lore — speak/write Thieves' Cant) | 1 | 6541-6542 | DEFERRED — narrative-only, no combat impact. |
+| **Weapon Mastery** (2 weapons) | 1 | 6543-6544 | DEFERRED — base weapon mastery system not yet wired to attack resolution. |
+| **Cunning Action** (Bonus Action: Dash, Disengage, Hide) | 2 | 6545-6546 | ✓ Done — bonus action handler routes Dash/Disengage/Hide. |
+| **Rogue Subclass** | 3 | 6547 | ✓ Done — 12 subclasses implemented. |
+| **Steady Aim** (Bonus Action: Advantage on next attack this turn, Speed = 0 until end of turn) | 3 | 6550-6551 | ✓ Done 2026-04-09 — bonus action handler in `users _dom.nvgt`, `steady_aim_pending` flag, advantage flag set in `apply_attack_advantage_state`, `movement_remaining = 0` enforces speed=0 clause. Requires unmoved Speed (`movement_remaining >= speed`) per source. Client menu entry gated. |
+| **Cunning Strike** (Poison/Trip/Withdraw effects, swap SA dice for riders) | 5 | 6552-6560 | DEFERRED — needs prompt infrastructure for SA-die-cost effect tradeoffs. |
+| **Ability Score Improvement** | 4/8/12/16/19 | 6549 | ✓ Done — global feat-grant system. |
+| **Uncanny Dodge** (Reaction halves attack damage round down) | 5 | 6561-6562 | ✓ Done 2026-04-09 — reaction option added to `reaction_options` array. `uncanny_dodge_pending` flag set in `handle_reaction_response`, consumed in `apply_damage` to halve final damage post-reductions. Gated on `!Incapacitated`. Client text label added. |
+| **Evasion** (DEX save vs half damage → no damage on success, half on fail) | 7 | 6563-6564 | ✓ Done — `evasion_active` flag was missing init at L7 (only Monk got it); fixed in batch 0 (commit 5e78f1c). |
+| **Reliable Talent** (treat d20 ≤9 as 10 on proficient checks) | 7 | 6565-6566 | ✓ Done 2026-04-09 — was incorrectly gated at L11; corrected to L7 in `character_data.nvgt` init. Comment in `finalize_roll_result` updated to L7 + para 6565-6566. |
+| **Improved Cunning Strike** (use 2 effects) | 11 | 6567-6568 | DEFERRED — depends on Cunning Strike prompt. |
+| **Devious Strikes** (Daze/Knock Out/Obscure effects added to Cunning Strike) | 14 | 6569-6573 | DEFERRED — depends on Cunning Strike prompt. |
+| **Slippery Mind** (proficiency in WIS and CHA saves) | 15 | 6574-6575 | ✓ Done 2026-04-09 — init grants both save proficiencies. |
+| **Elusive** (no attack roll has Advantage against you unless Incapacitated) | 18 | 6576-6577 | ✓ Done 2026-04-09 — `elusive_active` flag set at L18 init; override at end of `apply_attack_advantage_state` clears advantage when defender is L18+ Rogue and not Incapacitated. |
+| **Epic Boon** | 19 | 6578-6579 | ✓ Done — Epic Boon feat catalog. |
+| **Stroke of Luck** (1/short rest: turn a failed D20 Test into a 20) | 20 | 6580-6582 | PARTIAL 2026-04-09 — `stroke_of_luck_available` flag set at L20 init. Auto-fire-on-fail prompt deferred (cleanest implementation needs reroll-prompt chain integration). |
+
+**Pending follow-up Rogue batches:**
+- Cunning Strike L5 (Poison / Trip / Withdraw): per-effect prompt that subtracts SA dice cost before rolling SA damage. Effects: Poison (1d6 cost, CON save vs Poisoned 1 min), Trip (1d6, DEX save vs Prone), Withdraw (1d6, half-speed move with no OAs).
+- Improved Cunning Strike L11: allow stacking up to 2 effects on the same SA hit.
+- Devious Strikes L14: Daze (2d6), Knock Out (6d6), Obscure (3d6) added to Cunning Strike menu.
+- Stroke of Luck L20 auto-prompt: when a player fails a D20 test (attack/save/check) and `stroke_of_luck_available`, prompt them to convert the roll into a 20 (slot it into existing reroll prompt chain after Heroic Inspiration).
+- Sneak Attack interactions: verify it triggers correctly for Soulknife Psychic Blades and Inquisitive Insightful Fighting (existing subclass riders).
+
 - **Paladin:** Lay on Hands (pool size), Divine Smite (slot-based in 2024), Aura of Courage, Cleansing Touch — all addressed in 2026-04-09 audit; remaining items in pending list above.
 - **Ranger:** Favored Enemy / Roving / Tireless / Relentless Hunter / Nature's Veil / Precise Hunter / Feral Senses / Foe Slayer all addressed 2026-04-09; deferred items in Ranger pending list above.
-- **Rogue:** Sneak Attack dice scaling, Cunning Strike (2024), Reliable Talent
+- **Rogue:** Sneak Attack base case / Steady Aim / Uncanny Dodge / Reliable Talent L7 fix / Slippery Mind / Elusive / Stroke of Luck flag all addressed 2026-04-09; deferred Cunning Strike family in Rogue pending list above.
 - **Sorcerer:** Font of Magic, Metamagic options (need full list), Sorcerous Restoration
 - **Warlock:** Pact Boon selection, Mystic Arcanum, Eldritch Master
 - **Wizard:** Arcane Recovery, Spell Mastery, Signature Spells

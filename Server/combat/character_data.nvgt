@@ -1687,9 +1687,23 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         // damage, you instead take no damage if you succeed on the saving throw and
         // only half damage if you fail." Wired via evasion_active in combat_engine.
         if (cs.level >= 7) c.evasion_active = true;
-        // PHB 2024 Rogue L11 Reliable Talent: treat d20 <=9 as 10 on ability checks
-        // using proficient skills
-        if (cs.level >= 11) c.reliable_talent_active = true;
+        // PHB 2024 Rogue L7 Reliable Talent (para 6565-6566): "Whenever you make an
+        // ability check that uses one of your skill or tool proficiencies, you can
+        // treat a d20 roll of 9 or lower as a 10." Source table line 6480 puts this
+        // at L7 alongside Evasion (NOT L11 — that was a 2014 carry-over bug).
+        if (cs.level >= 7) c.reliable_talent_active = true;
+        // PHB 2024 Rogue L15 Slippery Mind (para 6574-6575): "You gain proficiency
+        // in Wisdom and Charisma saving throws."
+        if (cs.level >= 15) {
+            if (c.save_proficiencies[ABILITY_WIS] == 0) c.save_proficiencies[ABILITY_WIS] = 1;
+            if (c.save_proficiencies[ABILITY_CHA] == 0) c.save_proficiencies[ABILITY_CHA] = 1;
+        }
+        // PHB 2024 Rogue L18 Elusive (para 6576-6577): "No attack roll can have
+        // Advantage against you unless you have the Incapacitated condition."
+        if (cs.level >= 18) c.elusive_active = true;
+        // PHB 2024 Rogue L20 Stroke of Luck (para 6580-6582): "If you fail a D20
+        // Test, you can turn the roll into a 20." Once per Short or Long Rest.
+        if (cs.level >= 20) c.stroke_of_luck_available = true;
         if (cs.subclass == "Misfortune Bringer" and cs.level >= 3) {
             c.misfortune_jinx_active = false;
         }

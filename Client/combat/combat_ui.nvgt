@@ -659,6 +659,7 @@ bool check_reaction_prompt_input() {
 			else if (choice_name == "entropic_ward") choice_name = "Entropic Ward";
 			else if (choice_name == "arcane_deflection") choice_name = "Arcane Deflection";
 			else if (choice_name == "deflect_attacks") choice_name = "Deflect Attacks";
+			else if (choice_name == "uncanny_dodge") choice_name = "Uncanny Dodge";
 			speak("Using " + choice_name + "!", true);
 			return true;
 		}
@@ -974,10 +975,16 @@ void show_bonus_action_menu() {
 	// PHB 2024 Ranger L10/L14 base class features
 	int natures_veil_opt = -1;
 	int tireless_temp_hp_opt = -1;
+	// PHB 2024 Rogue L3 Steady Aim (para 6550-6551)
+	int steady_aim_opt = -1;
 
 	if (lc == "barbarian" and !my_is_raging and my_rage_uses_remaining > 0) rage_opt = m.add_item("Rage. Bonus action. Uses left: " + my_rage_uses_remaining + ". Damage bonus: " + my_rage_damage_bonus + ".");
 	if (lc == "fighter" and my_second_wind_uses_remaining > 0) second_wind_opt = m.add_item("Second Wind. Bonus action. Heal 1d10 plus fighter level. Uses left: " + my_second_wind_uses_remaining + " of " + my_second_wind_uses_max + ".");
 	if (lc == "rogue" and level >= 2) cunning_opt = m.add_item("Cunning Action. Bonus action. Dash, Disengage, or Hide.");
+	// PHB 2024 Rogue L3 Steady Aim (para 6550-6551): "As a Bonus Action, you give yourself
+	// Advantage on your next attack roll on the current turn... You can use this Bonus Action
+	// only if your Speed is 0 on this turn... your Speed is 0 until the end of the current turn."
+	if (lc == "rogue" and level >= 3 and my_movement_remaining >= my_speed) steady_aim_opt = m.add_item("Steady Aim. Bonus action. Gain Advantage on your next attack this turn, but your Speed is 0 until end of turn.");
 	if (lc == "paladin" and my_lay_on_hands_pool > 0) lay_hands_opt = m.add_item("Lay on Hands. Bonus action. Pool: " + my_lay_on_hands_pool + ".");
 	if (lc == "monk" and level >= 2) flurry_opt = m.add_item("Flurry of Blows. 1 Focus Point. Focus Points: " + my_focus_points + ".");
 	int patient_defense_opt = -1;
@@ -1409,6 +1416,7 @@ void show_bonus_action_menu() {
 	if (rage_opt >= 0) options++;
 	if (second_wind_opt >= 0) options++;
 	if (cunning_opt >= 0) options++;
+	if (steady_aim_opt >= 0) options++;
 	if (lay_hands_opt >= 0) options++;
 	if (flurry_opt >= 0) options++;
 	if (bardic_opt >= 0) options++;
@@ -1455,6 +1463,10 @@ void show_bonus_action_menu() {
 		if (cp == 1) action = "disengage";
 		else if (cp == 2) action = "hide";
 		send({{"type", message_types::bonus_action}, {"feature", "cunning_action"}, {"action", action}});
+	}
+	else if (steady_aim_opt >= 0 and res == steady_aim_opt) {
+		// PHB 2024 Rogue L3 Steady Aim (para 6550-6551)
+		send({{"type", message_types::bonus_action}, {"feature", "steady_aim"}});
 	}
 	else if (lay_hands_opt >= 0 and res == lay_hands_opt) {
 		use_lay_on_hands();

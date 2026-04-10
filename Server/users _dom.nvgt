@@ -1729,6 +1729,21 @@ void handle_user_message(user@ u, json_object@ msg)
 			if (t_grant > c.temp_hp) c.temp_hp = t_grant;
 			u.room.bm.broadcast_announce(c.name + "'s Tireless grants " + t_grant + " temporary HP. (" + c.tireless_temp_hp_uses_remaining + " uses remaining)", true);
 		}
+		else if (feature == "steady_aim") {
+			// PHB 2024 Rogue L3 Steady Aim (para 6550-6551): "As a Bonus Action, you
+			// give yourself Advantage on your next attack roll on the current turn.
+			// You can use this feature only if you haven't moved during this turn,
+			// and after you use it, your Speed is 0 until the end of the current
+			// turn."
+			if (c.class_name != "Rogue" or c.level < 3) { u.send({{"type", message_types::announce}, {"text", "Your character cannot use Steady Aim."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
+			if (c.movement_remaining < c.speed) { u.send({{"type", message_types::announce}, {"text", "Steady Aim requires that you have not moved this turn."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.steady_aim_pending = true;
+			c.movement_remaining = 0; // Speed 0 until end of turn (cannot move further).
+			u.room.bm.broadcast_announce(c.name + " uses Steady Aim. Their next attack has Advantage, but their Speed is 0 until the end of this turn.", true);
+		}
 		else if (feature == "cunning_action") {
 			if (c.class_name != "Rogue" or c.level < 2) { u.send({{"type", message_types::announce}, {"text", "Your character cannot use Cunning Action."}, {"interrupt", true}}); return; }
 			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }

@@ -527,6 +527,25 @@ class combatant {
 	// PHB 2024 Ranger L10 Tireless Temporary Hit Points (para 6178-6180): Magic action
 	// grants 1d8 + WIS mod temp HP. Uses = WIS mod per long rest.
 	int tireless_temp_hp_uses_remaining = 0;
+	// PHB 2024 Rogue L1 Sneak Attack (para 6537-6540): "Once per turn, you can deal
+	// an extra 1d6 damage to one creature you hit with an attack roll if you have
+	// Advantage on the roll and the attack uses a Finesse or a Ranged weapon."
+	bool sneak_attack_used_this_turn = false;
+	// PHB 2024 Rogue L3 Steady Aim (para 6550-6551): "As a Bonus Action, you give
+	// yourself Advantage on your next attack roll on the current turn... your Speed
+	// is 0 until the end of the current turn." Sets advantage flag for the next roll.
+	bool steady_aim_pending = false;
+	// PHB 2024 Rogue L18 Elusive (para 6576-6577): "No attack roll can have Advantage
+	// against you unless you have the Incapacitated condition." Set on init for L18+.
+	bool elusive_active = false;
+	// PHB 2024 Rogue L20 Stroke of Luck (para 6580-6582): "If you fail a D20 Test,
+	// you can turn the roll into a 20." Once per Short or Long Rest.
+	bool stroke_of_luck_available = false;
+	// PHB 2024 Rogue L5 Uncanny Dodge (para 6561-6562): "When an attacker that you
+	// can see hits you with an attack roll, you can take a Reaction to halve the
+	// attack's damage against you (round down)." Set in handle_reaction_response,
+	// consumed in apply_damage.
+	bool uncanny_dodge_pending = false;
 	uint hex_target_id = 0;
 	bool spiritual_weapon_active = false;
 	int spiritual_weapon_slot_level = 0;
@@ -1201,6 +1220,14 @@ class battle {
 				target.deflect_attacks_reduced_to_zero = true;
 			}
 			target.deflect_attacks_reduction = 0;
+		}
+
+		// PHB 2024 Rogue L5 Uncanny Dodge (para 6561-6562): "halve the attack's damage
+		// against you (round down)." Set in handle_reaction_response when defender chose
+		// the reaction; consumed here once per triggering attack.
+		if (target.uncanny_dodge_pending) {
+			amount = amount / 2;
+			target.uncanny_dodge_pending = false;
 		}
 
 		// Heavy Armor Master: reduce B/P/S damage by Proficiency Bonus when wearing heavy armor
