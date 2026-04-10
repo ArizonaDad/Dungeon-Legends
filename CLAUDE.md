@@ -155,11 +155,13 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 - Separate roll to hit (d20 + ability mod + proficiency vs AC), then roll for damage
 
 - Advantage/disadvantage from conditions (prone, paralyzed, dodging, etc.)
+- **Condition Mechanics**: Paralyzed/Unconscious → auto-crit on melee hit within 5ft. Incapacitated blocks OAs and defensive reactions. Stunned/Paralyzed/Unconscious auto-skip turns.
 
 - **Extra Attack**: Fighters level 5 (2 attacks), 11 (3 attacks), 17 (3 attacks + 2 Action Surge). Other martials get 1 extra at level 5.
 
 - **Reaction Prompt System**: When a player is about to be hit, they are prompted for available reactions before hit resolves. Options: Shield (+5 AC), Cutting Words (-1d4-d12), Warding Flare (force reroll), Defensive Duelist (+Prof AC), Restore Balance (cancel advantage), Spirit Shield (reduce damage 2d6+), Entropic Ward (force miss), Arcane Deflection (+2 AC), Warding Maneuver (+1d8 AC, resistance if still hit), Armor of Hexes (d6, 4+ miss), Deflect Attacks (reduce 1d10+DEX+level), Uncanny Dodge (halve damage), Storm's Fury (sorcerer level lightning + push), Shadowy Dodge (impose disadvantage), Spectral Defense (resistance to all attack damage)
-- **Resistance System**: Species and feats grant resistances to fire, cold, necrotic, psychic, acid, lightning, piercing, poison (+ immunity) — half damage on applicable types
+- **Save Failure Reaction Chain**: At each condition-applying save failure site (22 total), the chain fires in order: `try_countercharm_reroll` → `try_fanatical_focus` → `try_flash_of_genius` → `try_maverick_spirit` → `try_mage_slayer_guarded_mind` → `try_boon_of_fate_bonus` → condition application. All smart-spend (only fire when they could actually help).
+- **Resistance System**: Species and feats grant resistances to fire, cold, necrotic, psychic, acid, lightning, piercing, poison (+ immunity) — half damage on applicable types. Elemental Adept bypasses resistance for chosen damage type via `ea_bypass` flag.
 - **Wild Magic Surge**: Wild Magic Sorcerers roll d20 on 1+ level spell cast. On natural 1, a random surge effect triggers (fire burst, temp HP, healing, invisibility, spell slot recovery, etc.)
 - **Divine Smite**: Dual mode — bonus action pre-cast OR auto-prompt on melee hit (keys 1-5 for slot level, Escape to skip)
 - **Grapple/Shove**: 2024 rules — target makes STR or DEX saving throw (DC 8 + STR mod + Prof), not contested checks
@@ -520,6 +522,17 @@ Origin feats: alert, crafter, healer, lucky, magic_initiate, musician, savage_at
 General feats: actor, athlete, charger, chef, crossbow_expert, crusher, defensive_duelist, dual_wielder, durable, elemental_adept, fey_touched, great_weapon_master, heavily_armored, heavy_armor_master, inspiring_leader, keen_mind, lightly_armored, mage_slayer, martial_weapon_training, medium_armor_master, moderately_armored, mounted_combatant, observant, piercer, poisoner, polearm_master, resilient, ritual_caster, sentinel, shadow_touched, sharpshooter, shield_master, skill_expert, skulker, slasher, speedy, spell_sniper, telekinetic, telepathic, war_caster, weapon_master
 Fighting Style feats: archery, blind_fighting, defense, dueling, great_weapon_fighting, interception, protection, thrown_weapon_fighting, two_weapon_fighting, unarmed_fighting
 Epic Boon feats: combat_prowess, dimensional_travel, energy_resistance, fate, fortitude, irresistible_offense, recovery, skill, speed, spell_recall, the_night_spirit, truesight
+
+**Fully Implemented Feat Combat Mechanics:**
+- **Elemental Adept** (PHB 2024 para 7610): Resistance bypass in `apply_damage` for Acid/Cold/Fire/Lightning/Thunder. Dice floor of 2 in `roll_single_attack_damage_die` for spell damage. Type chosen via Shift+P menu, persisted to account.
+- **Mage Slayer Guarded Mind** (PHB 2024 para 7693): Auto-succeed INT/WIS/CHA save 1/SR. Wired into 22 save failure sites. Short rest reset.
+- **Boon of Recovery** (PHB 2024 para 7879): BA heal half max HP, 1/LR. Server handler + client menu.
+- **Boon of Spell Recall** (PHB 2024 para 7882): Free spell cast 1/LR. Inserted into spell slot consumption pipeline after Signature Spells.
+- **Boon of Dimensional Travel** (PHB 2024 para 7876): Blink Steps — free teleport 30ft to target after Attack or Magic action. Available from bonus action menu. Per-turn flag.
+- **Boon of Fate** (PHB 2024 para 7877): 2d4 bonus on ally save failures within 60ft. Smart-spend wired into 22 save sites. 1/SR reset.
+- **Boon of Energy Resistance**: Not in source files (confirmed search of PHB 2024 + Basic Rules). Removed from TODO.
+
+**Previously implemented:** combat_prowess (+1d6 weapon miss → hit 1/turn), fortitude (+40 HP), irresistible_offense (+2d10 force 1/turn), skill (+1d10 ability check 1/turn), speed (+30ft), the_night_spirit (300ft darkvision + see invisible), truesight (Truesight 60ft)
 
 ### Audio System
 
