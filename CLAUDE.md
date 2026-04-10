@@ -158,7 +158,7 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 
 - **Extra Attack**: Fighters level 5 (2 attacks), 11 (3 attacks), 17 (3 attacks + 2 Action Surge). Other martials get 1 extra at level 5.
 
-- **Reaction Prompt System**: When a player is about to be hit, they are prompted for available reactions before hit resolves. Options: Shield (+5 AC), Cutting Words (-Id4-d12), Warding Flare (force reroll), Defensive Duelist (+Prof AC), Restore Balance (cancel advantage), Spirit Shield (reduce damage 2d6+), Entropic Ward (force miss), Arcane Deflection (+2 AC), Armor of Hexes (d6 roll, 4+ forces miss on cursed attacker)
+- **Reaction Prompt System**: When a player is about to be hit, they are prompted for available reactions before hit resolves. Options: Shield (+5 AC), Cutting Words (-1d4-d12), Warding Flare (force reroll), Defensive Duelist (+Prof AC), Restore Balance (cancel advantage), Spirit Shield (reduce damage 2d6+), Entropic Ward (force miss), Arcane Deflection (+2 AC), Warding Maneuver (+1d8 AC, resistance if still hit), Armor of Hexes (d6, 4+ miss), Deflect Attacks (reduce 1d10+DEX+level), Uncanny Dodge (halve damage), Storm's Fury (sorcerer level lightning + push), Shadowy Dodge (impose disadvantage)
 - **Resistance System**: Species and feats grant resistances to fire, cold, necrotic, psychic, acid, lightning, piercing, poison (+ immunity) — half damage on applicable types
 - **Wild Magic Surge**: Wild Magic Sorcerers roll d20 on 1+ level spell cast. On natural 1, a random surge effect triggers (fire burst, temp HP, healing, invisibility, spell slot recovery, etc.)
 - **Divine Smite**: Dual mode — bonus action pre-cast OR auto-prompt on melee hit (keys 1-5 for slot level, Escape to skip)
@@ -455,7 +455,10 @@ Per-class audit of all 13 base class features against `basic_rules_full.txt` (Ba
 
 **Key Combat Features:**
 - Grave Cleric Path to the Grave (vulnerability doubling on TARGET), Circle of Mortality, Sentinel at Death's Door (auto-resolve crit negation within 30ft), Keeper of Souls (on-kill heal most-injured ally)
-- Forge +1 AC, Peace Emboldening Bond, Twilight Sanctuary, Order Voice of Authority
+- Forge Domain Soul of the Forge (fire resist + heavy armor AC), Saint of Forge and Fire (B/P/S resist)
+- Oath of Conquest Aura of Conquest (frightened speed 0 + psychic dmg in 10/30ft aura), Scornful Rebuke (CHA mod psychic on hit)
+- Gloom Stalker Dread Ambusher (+WIS initiative, +10ft first turn), Stalker's Flurry (miss→extra attack), Shadowy Dodge (reaction impose disadvantage)
+- Peace Emboldening Bond, Twilight Sanctuary, Order Voice of Authority
 - Hexblade Curse (prof bonus damage, crit 19-20, heal on kill), Armor of Hexes (reaction d6 miss), Master of Hexes (auto-transfer curse on kill)
 - Samurai Fighting Spirit, Horizon Walker Planar Warrior
 - Storm Herald Storm Aura, Rune Knight Giant Might, Wild Magic Surge table

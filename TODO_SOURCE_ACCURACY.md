@@ -845,6 +845,39 @@ Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 
 **Wiring status:** Data modules built, compiled, committed, and pushed to master. Per-character UI integration (creation prompts, level-up unlocks, action menu entries) deferred — these are scaffolding for the upcoming character creation rewrite. Combatant fields exist for Piety + Group Patrons; Vestige/Bastion/Transformation tracking will be per-account JSON.
 
+### Forge Domain Cleric Subclass Audit (2026-04-10) — Xanathar's paras 701-755
+
+| Feature | Level | Source para | Status |
+|---------|-------|-------------|--------|
+| **Bonus Proficiencies** (heavy armor, smith's tools) | 1 | 719-720 | DEFERRED — proficiency system handles at character creation. |
+| **Blessing of the Forge** (+1 weapon or armor per LR) | 1 | 738-740 | DEFERRED — needs item enchantment infrastructure. +1 AC approximation in `calculate_ac` noted. |
+| **Domain Spells** (searing_smite, heat_metal, magic_weapon, elemental_weapon, protection_from_energy, wall_of_fire) | 1-9 | 721-735 | ✓ Done — all 6 auto-prepared in `character_data.nvgt` init block. |
+| **Soul of the Forge** (fire resistance + +1 AC in heavy armor) | 6 | 746-749 | ✓ Done — `fire_resistance = true`, +1 AC, extra +1 AC gated on heavy armor type check. |
+| **Divine Strike → Blessed Strikes** (1d8 fire at L8, 2d8 at L14) | 8/14 | 750-751 | ✓ Done — wired through existing Blessed Strikes/divine_strike system. |
+| **Saint of Forge and Fire** (fire immunity approximated as resistance, B/P/S resistance in heavy armor) | 17 | 752-755 | ✓ Done — `fire_resistance = true` (immunity approximation), `bludgeoning/piercing/slashing_resistance = true` gated on heavy armor. |
+
+### Oath of Conquest Paladin Subclass Audit (2026-04-10) — Xanathar's paras 1949-2003
+
+| Feature | Level | Source para | Status |
+|---------|-------|-------------|--------|
+| **Oath Spells** (armor_of_agathys, command, hold_person, spiritual_weapon, bestow_curse, fear, dominate_beast, stoneskin, cloudkill, dominate_person) | 3-17 | 1973-1987 | ✓ Done — all 10 auto-prepared in `character_data.nvgt` init block. |
+| **Conquering Presence** (Channel Divinity: frighten each creature of choice within 30ft, WIS save) | 3 | 1988-1991 | DEFERRED — Channel Divinity system exists but needs dedicated AoE frighten action. |
+| **Guided Strike** (Channel Divinity: +10 to attack roll) | 3 | 1988-1991 | PARTIAL — `guided_strike_pending` field exists. Activation handler not yet wired. |
+| **Aura of Conquest** (frightened creatures in 10ft/30ft aura: speed 0, half-paladin-level psychic damage at turn start) | 7/18 | 1992-1995 | ✓ Done — `aura_of_conquest_active` + `aura_of_conquest_range` (10→30 at L18). Wired in `advance_turn`: scans for frightened enemies within range, sets speed 0, applies psychic damage. |
+| **Scornful Rebuke** (when hit, attacker takes CHA mod psychic damage, min 1) | 15 | 1996-1997 | ✓ Done — `scornful_rebuke_active` flag. Wired in ROLL_DAMAGE path after Fire Shield / Refraction Shield. |
+| **Invincible Conqueror** (Action: 1 min resistance to all damage + extra attack + crit 19-20, 1/LR) | 20 | 1998-2003 | DEFERRED — fields added (`invincible_conqueror_active/_used`), activation handler needs action + 10-round timer. |
+
+### Gloom Stalker Ranger Subclass Audit (2026-04-10) — Xanathar's paras 2130-2163
+
+| Feature | Level | Source para | Status |
+|---------|-------|-------------|--------|
+| **Gloom Stalker Magic** (disguise_self, rope_trick, fear, greater_invisibility, seeming) | 3-17 | 2137-2151 | ✓ Done — all 5 auto-prepared at appropriate Ranger levels. |
+| **Dread Ambusher** (+WIS to initiative, +10ft first turn, extra attack on first turn dealing +1d8) | 3 | 2152-2154 | PARTIAL — WIS initiative bonus wired in `request_next_initiative`. +10ft speed on round 1 wired in `advance_turn`. Extra attack with +1d8 damage uses existing `dread_ambusher_used` flag (attack resolution handler deferred — needs first-turn gating in attack action). |
+| **Umbral Sight** (darkvision 60ft, invisible in darkness to darkvision-reliant creatures) | 3 | 2155-2157 | DEFERRED — no darkvision/lighting system exists. Flavor/exploration feature, not combat. |
+| **Iron Mind** (WIS save proficiency, or INT/CHA if already proficient) | 7 | 2158-2159 | ✓ Done — `save_proficiencies[ABILITY_WIS] = 1` with INT/CHA fallback in `character_data.nvgt`. |
+| **Stalker's Flurry** (on miss with weapon attack, make another weapon attack, 1/turn) | 11 | 2160-2161 | ✓ Done — `stalkers_flurry_active` flag, `stalkers_flurry_used_this_turn` per-turn tracking. Full attack + damage roll chain in ROLL_ATTACK miss path. |
+| **Shadowy Dodge** (reaction: impose disadvantage if attacker has no advantage) | 15 | 2162-2163 | ✓ Done — `shadowy_dodge_active` flag. Reaction option gated on `!has_effective_advantage`. Handler rolls second d20, takes lower, recalculates attack total. |
+
 ---
 
 ## Working Rule Going Forward
