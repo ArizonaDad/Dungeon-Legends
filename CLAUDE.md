@@ -569,6 +569,16 @@ Epic Boon feats: combat_prowess, dimensional_travel, energy_resistance, fate, fo
 - **Shield Master Interpose** (PHB 2024 para 7797): Reaction on successful DEX save for half damage → take 0 damage. Costs reaction, only fires if no Evasion.
 - **Athlete Free Stand** (PHB 2024 para 7557): Standing from prone costs 0 movement instead of half speed.
 
+**Batch 2026-04-10 continued (commit df369e4):**
+- **Central AoE Spell Save Path — Full Save Failure Chain**: The single central save-damage resolution path (~line 2410 in battle_manager.nvgt) that handles ALL standard multi-target damage-save spells (Fireball, Cone of Cold, Lightning Bolt, etc.) now has the complete save failure reaction chain: Indomitable Might STR floor → Arcane Deflection → Flash of Genius → Maverick Spirit → Mage Slayer Guarded Mind → Boon of Fate → Stroke of Luck. Covers all spells routed through the generic save-for-half pipeline.
+- **Power Surge on Save-Damage Path** (PHB 2024 War Magic L6): War Magic Wizards now apply Power Surge bonus force damage (level/2, min 1) to save-based spell damage on the central AoE path. Previously only fired on spell attack hits in `finalize_roll_result`.
+
+**Batch 2026-04-10 continued (mechanics batch):**
+- **Save Failure Chain wired to 15 individual spell handlers**: Finger of Death, Disintegrate, Blight, Cone of Cold, Cloudkill, Call Lightning, Chain Lightning, Meteor Swarm, Vitriolic Sphere, Flame Strike (damage chain: Arcane Deflection → Flash of Genius → Maverick Spirit → Boon of Fate → Stroke of Luck). Blindness/Deafness, Slow, Polymorph, Evard's Black Tentacles, Feeblemind (condition chain: adds Disciplined Survivor + Mage Slayer where applicable).
+- **Druid Beast Spells L18** (PHB 2024 para 4449): L18+ Druids can now cast spells while in Wild Shape form. `beast_spells_active` flag bypass in `handle_cast`.
+- **Paladin Abjure Foes L9** (PHB 2024 para 5655-5657): Channel Divinity Magic action. Auto-targets nearest CHA mod (min 1) hostiles within 60ft. WIS save or Frightened. Full save failure chain. Client menu entry for all Paladins L9+.
+- **Paladin Channel Divinity Uses Fix**: Paladins now correctly receive 2 CD uses at L3+ (was 0 — init was missing from character_data.nvgt). Fixes Sacred Weapon, Vow of Enmity, Nature's Wrath, and all CD features.
+
 **Previously implemented:** combat_prowess (+1d6 weapon miss → hit 1/turn), fortitude (+40 HP), irresistible_offense (+2d10 force 1/turn), skill (+1d10 ability check 1/turn), speed (+30ft), the_night_spirit (300ft darkvision + see invisible), truesight (Truesight 60ft)
 
 ### Audio System

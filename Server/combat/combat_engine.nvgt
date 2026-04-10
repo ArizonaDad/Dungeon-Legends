@@ -879,6 +879,7 @@ class combatant {
 	bool spiritual_weapon_active = false;
 	int spiritual_weapon_slot_level = 0;
 	bool wild_shape_active = false;
+	bool beast_spells_active = false; // PHB 2024 Druid L18 Beast Spells (para 4449): cast spells in Wild Shape
 	int wild_shape_uses = 2; // PHB Druid L2: 2 uses per short/long rest
 	string wild_shape_form_id = "";
 	bool wild_shape_just_ended = false;

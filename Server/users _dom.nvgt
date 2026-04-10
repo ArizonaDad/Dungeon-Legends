@@ -2915,6 +2915,56 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.room.bm.broadcast_announce(c.name + " swears a Vow of Enmity against " + target.name + "! Advantage on attack rolls against them. " + c.channel_divinity_uses + " Channel Divinity use" + (c.channel_divinity_uses == 1 ? "" : "s") + " remain.", true);
 		}
 
+		else if (feature == "channel_abjure_foes") {
+			// PHB 2024 Paladin L9 Abjure Foes (para 5655-5657): Magic action, expend 1 CD.
+			// Up to CHA mod (min 1) creatures within 60 ft make WIS save or Frightened 1 min.
+			if (c.class_name != "Paladin") { u.send({{"type", message_types::announce}, {"text", "Only Paladins can use Abjure Foes."}, {"interrupt", true}}); return; }
+			if (c.level < 9) { u.send({{"type", message_types::announce}, {"text", "Abjure Foes requires level 9."}, {"interrupt", true}}); return; }
+			if (c.channel_divinity_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Channel Divinity uses remaining."}, {"interrupt", true}}); return; }
+			if (!c.has_action) { u.send({{"type", message_types::announce}, {"text", "No action remaining (Abjure Foes uses your action)."}, {"interrupt", true}}); return; }
+			c.has_action = false;
+			c.used_action = true;
+			c.channel_divinity_uses--;
+			int cha_mod = c.get_ability_mod(ABILITY_CHA);
+			int max_targets = cha_mod > 0 ? cha_mod : 1;
+			int save_dc = 8 + c.proficiency + c.get_ability_mod(ABILITY_CHA);
+			// Auto-target nearest hostiles within 60 ft
+			combatant@[] candidates;
+			for (uint ci = 0; ci < u.room.bm.combat.combatants.length(); ci++) {
+				combatant@ t = u.room.bm.combat.combatants[ci];
+				if (@t == null or t.is_dead or t.id == c.id) continue;
+				if (!u.room.bm.combat.are_hostile(c, t)) continue;
+				if (feet_distance(c.x, c.y, t.x, t.y) > 60) continue;
+				candidates.insert_last(t);
+			}
+			int affected = 0;
+			for (uint ci = 0; ci < candidates.length() and affected < max_targets; ci++) {
+				combatant@ t = candidates[ci];
+				int save_roll = random(1, 20);
+				int save_bonus = t.get_save_bonus(ABILITY_WIS);
+				int bless_bonus = u.room.bm.roll_bless_bonus(t);
+				int save_total = save_roll + save_bonus + bless_bonus;
+				bool saved = save_total >= save_dc;
+				// Save failure chain (WIS — Mage Slayer applies)
+				if (!saved and u.room.bm.try_arcane_deflection_save(t, save_dc, save_total)) saved = true;
+				if (!saved) { int ds = u.room.bm.try_disciplined_survivor_reroll(t, save_dc, save_total, save_bonus + bless_bonus, "WIS save vs Abjure Foes"); if (ds >= save_dc) saved = true; }
+				if (!saved) { int fg = u.room.bm.try_flash_of_genius(t, save_dc, save_total, "WIS save vs Abjure Foes"); if (fg >= save_dc) saved = true; }
+				if (!saved) { int mv = u.room.bm.try_maverick_spirit(t, save_dc, save_total, "WIS save vs Abjure Foes"); if (mv >= save_dc) saved = true; }
+				if (!saved and u.room.bm.try_mage_slayer_guarded_mind(t, ABILITY_WIS)) saved = true;
+				if (!saved) { int bf = u.room.bm.try_boon_of_fate_bonus(t, save_total, save_dc); if (bf >= save_dc) saved = true; }
+				if (!saved and u.room.bm.try_stroke_of_luck_save(t, save_dc, save_bonus + bless_bonus)) saved = true;
+				u.room.bm.broadcast_roll(t.name, "WIS save vs Abjure Foes", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Frightened!");
+				if (!saved) {
+					t.add_condition(COND_FRIGHTENED);
+					t.frightened_source_id = c.id;
+					u.room.bm.broadcast_to_battle({{"type", message_types::condition_applied}, {"target", t.name}, {"condition", "Frightened"}});
+					affected++;
+				}
+			}
+			u.room.bm.broadcast_announce(c.name + " channels Abjure Foes! " + affected + " creature" + (affected == 1 ? "" : "s") + " frightened. " + c.channel_divinity_uses + " Channel Divinity use" + (c.channel_divinity_uses == 1 ? "" : "s") + " remain.", true);
+			u.room.bm.broadcast_state();
+		}
+
 		else if (feature == "channel_preserve_life") {
 			// Life Cleric: Channel Divinity - Preserve Life
 			if (c.class_name != "Cleric" or c.subclass != "Life Domain") { u.send({{"type", message_types::announce}, {"text", "Only Life Domain clerics can use Preserve Life."}, {"interrupt", true}}); return; }

@@ -211,6 +211,8 @@ void apply_class_defaults(character_sheet@ cs) {
         cs.is_caster = true; cs.spellcasting_ability = ABILITY_CHA;
         cs.armor_type = "chain_mail"; cs.has_shield = true; // Heavy armor + shield
         cs.lay_on_hands_pool = cs.level * 5;
+        // PHB 2024 Paladin L3 Channel Divinity (para 5653-5654): 2 uses per long rest
+        if (cs.level >= 3) cs.channel_divinity_uses = 2;
         if (cs.level >= 5) cs.extra_attacks = 1;
         apply_half_caster_slots(cs);
     } else if (c == "Ranger") {
@@ -2368,6 +2370,8 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         if (cs.level >= 2) c.wild_companion_active = true;
         // PHB 2024 Druid L7 Elemental Fury: choose damage type swap on Wild Shape attacks
         if (cs.level >= 7) c.elemental_fury_active = true;
+        // PHB 2024 Druid L18 Beast Spells (para 4449): cast spells while in Wild Shape
+        if (cs.level >= 18) c.beast_spells_active = true;
         if (cs.subclass == "Circle of the Shepherd" and cs.level >= 2) {
             c.shepherd_circle_active = true;
         }

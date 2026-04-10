@@ -1029,6 +1029,7 @@ void show_bonus_action_menu() {
 	int vow_opt = -1;
 	int inspire_opt = -1;
 	int nature_opt = -1;
+	int abjure_foes_opt = -1;
 	int preserve_opt = -1;
 	int war_priest_opt = -1;
 	int shadow_opt = -1;
@@ -1398,6 +1399,10 @@ void show_bonus_action_menu() {
 		}
 		if (subclass == "Oath of Ancients") {
 			nature_opt = m.add_item("Nature's Wrath. Channel Divinity. Restrain a target. Strength or Dexterity save.");
+		}
+		// PHB 2024 Paladin L9 Abjure Foes — all Paladins
+		if (level >= 9) {
+			abjure_foes_opt = m.add_item("Abjure Foes. Channel Divinity action. Frighten up to Charisma modifier hostiles within 60 feet.");
 		}
 	}
 	if (lc == "cleric") {
@@ -2193,6 +2198,10 @@ void show_bonus_action_menu() {
 		}
 		send({{"type", message_types::bonus_action}, {"feature", "channel_natures_wrath"}, {"target_id", current_target_id}});
 		speak("Nature's Wrath. Restraining the target.", true);
+	}
+	else if (abjure_foes_opt >= 0 and res == abjure_foes_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "channel_abjure_foes"}});
+		speak("Abjure Foes. Frightening nearby hostiles.", true);
 	}
 	else if (preserve_opt >= 0 and res == preserve_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "channel_preserve_life"}});
