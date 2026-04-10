@@ -331,6 +331,16 @@ class combatant {
 	bool ferocious_charger_active = false; // L15: deferred (needs movement path tracking)
 	bool ferocious_charger_used_this_turn = false;
 	bool vigilant_defender_active = false; // L18: deferred (needs multi-reaction system)
+	// Oath of Conquest Paladin (Xanathar's paras 1992-2003)
+	bool scornful_rebuke_active = false; // L15: attacker takes CHA mod psychic on hit
+	bool aura_of_conquest_active = false; // L7: frightened creatures speed 0 + psychic dmg
+	int aura_of_conquest_range = 0; // 10 at L7, 30 at L18
+	bool invincible_conqueror_active = false; // L20: all resist + extra attack + crit 19-20
+	bool invincible_conqueror_used = false; // 1/LR tracking
+	// Gloom Stalker Ranger (Xanathar's paras 2130-2163)
+	bool stalkers_flurry_active = false; // L11: on miss, make another weapon attack
+	bool stalkers_flurry_used_this_turn = false; // once per turn
+	bool shadowy_dodge_active = false; // L15: reaction to impose disadvantage
 	int superiority_maneuvers_known = 0; // Battle Master
 	int drunken_master_advantage = 0; // Drunken Master Monk
 	int divine_soul_magic_used = 0; // Divine Soul sorcerer
@@ -1367,6 +1377,7 @@ class battle {
 		c.swashbuckler_attacked_this_turn = false;
 		c.trip_attack_pending = false;
 		c.precision_attack_pending = false;
+		c.stalkers_flurry_used_this_turn = false;
 
 		// Reaction resets at start of YOUR turn
 		c.has_reaction = true;
@@ -2003,6 +2014,13 @@ class battle {
 				state["my_warding_maneuver_uses_max"] = c.warding_maneuver_uses_max;
 				state["my_hold_the_line_active"] = c.hold_the_line_active;
 				state["my_vigilant_defender_active"] = c.vigilant_defender_active;
+				// Xanathar's Oath of Conquest Paladin (paras 1992-2003)
+				state["my_scornful_rebuke_active"] = c.scornful_rebuke_active;
+				state["my_aura_of_conquest_active"] = c.aura_of_conquest_active;
+				state["my_invincible_conqueror_active"] = c.invincible_conqueror_active;
+				// Xanathar's Gloom Stalker Ranger (paras 2130-2163)
+				state["my_stalkers_flurry_active"] = c.stalkers_flurry_active;
+				state["my_shadowy_dodge_active"] = c.shadowy_dodge_active;
 				// Potion buff rounds remaining
 				state["my_potion_damage_rounds"] = c.potion_damage_rounds;
 				state["my_potion_ac_rounds"] = c.potion_ac_rounds;

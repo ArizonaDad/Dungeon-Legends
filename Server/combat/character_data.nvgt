@@ -2343,6 +2343,31 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         if (cs.subclass == "Oath of the Crown" and cs.level >= 3) {
             c.oath_of_crown_active = true;
         }
+        // Xanathar's Oath of Conquest (paras 1949-2003)
+        if (cs.subclass == "Oath of Conquest") {
+            // L3 Oath Spells (para 1973-1987): always prepared
+            if (!c.knows_spell("armor_of_agathys")) c.prepared_spells.insert_last("armor_of_agathys");
+            if (!c.knows_spell("command")) c.prepared_spells.insert_last("command");
+            if (!c.knows_spell("hold_person")) c.prepared_spells.insert_last("hold_person");
+            if (!c.knows_spell("spiritual_weapon")) c.prepared_spells.insert_last("spiritual_weapon");
+            if (!c.knows_spell("bestow_curse")) c.prepared_spells.insert_last("bestow_curse");
+            if (!c.knows_spell("fear")) c.prepared_spells.insert_last("fear");
+            if (!c.knows_spell("dominate_beast")) c.prepared_spells.insert_last("dominate_beast");
+            if (!c.knows_spell("stoneskin")) c.prepared_spells.insert_last("stoneskin");
+            if (!c.knows_spell("cloudkill")) c.prepared_spells.insert_last("cloudkill");
+            if (!c.knows_spell("dominate_person")) c.prepared_spells.insert_last("dominate_person");
+            // L7 Aura of Conquest (para 1992-1995): frightened creatures in aura
+            // have speed 0 and take half-paladin-level psychic damage at turn start
+            if (cs.level >= 7) {
+                c.aura_of_conquest_active = true;
+                c.aura_of_conquest_range = 10;
+            }
+            if (cs.level >= 18) c.aura_of_conquest_range = 30;
+            // L15 Scornful Rebuke (para 1996-1997): attacker takes CHA mod psychic on hit
+            if (cs.level >= 15) c.scornful_rebuke_active = true;
+            // L20 Invincible Conqueror (para 1998-2003): deferred (needs action + 1min timer)
+            // if (cs.level >= 20) c.invincible_conqueror_used = false;
+        }
     }
     if (cs.class_name == "Ranger") {
         // PHB 2024 Ranger L1 Favored Enemy (para 6155-6157): "You always have the
@@ -2812,6 +2837,36 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         c.orders_demand_used = false;
     }
 
+    // Xanathar's Forge Domain (paras 701-755)
+    if (cs.class_name == "Cleric" and cs.subclass == "Forge Domain") {
+        // L1 Blessing of the Forge (para 738-740): +1 AC handled in calculate_ac (line ~455)
+        // L1 Domain Spells (para 721-735): always prepared
+        if (!c.knows_spell("searing_smite")) c.prepared_spells.insert_last("searing_smite");
+        if (!c.knows_spell("heat_metal")) c.prepared_spells.insert_last("heat_metal");
+        if (!c.knows_spell("magic_weapon")) c.prepared_spells.insert_last("magic_weapon");
+        if (!c.knows_spell("elemental_weapon")) c.prepared_spells.insert_last("elemental_weapon");
+        if (!c.knows_spell("protection_from_energy")) c.prepared_spells.insert_last("protection_from_energy");
+        if (!c.knows_spell("wall_of_fire")) c.prepared_spells.insert_last("wall_of_fire");
+        // L6 Soul of the Forge (para 746-749): fire resistance + extra +1 AC in heavy armor
+        if (cs.level >= 6) {
+            c.fire_resistance = true;
+            if (cs.armor_type == "chain_mail" or cs.armor_type == "splint" or cs.armor_type == "plate" or cs.armor_type == "ring_mail") {
+                c.armor_class += 1;
+            }
+        }
+        // L8 Divine Strike (para 750-751): 1d8 fire at L8, 2d8 at L14 — handled via Blessed Strikes system
+        if (cs.level >= 8) c.blessed_strikes_choice = "divine_strike";
+        // L17 Saint of Forge and Fire (para 752-755): fire resistance→immunity (approximated as resistance stays),
+        // B/P/S resistance from nonmagical attacks while in heavy armor
+        if (cs.level >= 17) {
+            if (cs.armor_type == "chain_mail" or cs.armor_type == "splint" or cs.armor_type == "plate" or cs.armor_type == "ring_mail") {
+                c.bludgeoning_resistance = true;
+                c.piercing_resistance = true;
+                c.slashing_resistance = true;
+            }
+        }
+    }
+
     // Xanathar's Grave Domain (paras 756-803)
     if (cs.class_name == "Cleric" and cs.subclass == "Grave Domain") {
         // L1 Circle of Mortality (para 788-790): max healing dice at 0 HP + spare the dying
@@ -2919,8 +2974,31 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
 
     // Ranger subclasses
     if (cs.class_name == "Ranger") {
-        if (cs.subclass == "Gloom Stalker" and cs.level >= 3) {
-            c.dread_ambusher_used = false;
+        // Xanathar's Gloom Stalker (paras 2130-2163)
+        if (cs.subclass == "Gloom Stalker") {
+            if (cs.level >= 3) {
+                c.dread_ambusher_used = false;
+                // L3 Gloom Stalker Magic (para 2137-2151): always-known spells
+                if (!c.knows_spell("disguise_self")) c.prepared_spells.insert_last("disguise_self");
+                if (cs.level >= 5 and !c.knows_spell("rope_trick")) c.prepared_spells.insert_last("rope_trick");
+                if (cs.level >= 9 and !c.knows_spell("fear")) c.prepared_spells.insert_last("fear");
+                if (cs.level >= 13 and !c.knows_spell("greater_invisibility")) c.prepared_spells.insert_last("greater_invisibility");
+                if (cs.level >= 17 and !c.knows_spell("seeming")) c.prepared_spells.insert_last("seeming");
+            }
+            // L7 Iron Mind (para 2158-2159): WIS save proficiency
+            if (cs.level >= 7) {
+                if (c.save_proficiencies[ABILITY_WIS] == 0) {
+                    c.save_proficiencies[ABILITY_WIS] = 1;
+                } else {
+                    // Already have WIS: gain INT or CHA (auto-pick INT)
+                    if (c.save_proficiencies[ABILITY_INT] == 0) c.save_proficiencies[ABILITY_INT] = 1;
+                    else c.save_proficiencies[ABILITY_CHA] = 1;
+                }
+            }
+            // L11 Stalker's Flurry (para 2160-2161): on miss, make another weapon attack
+            if (cs.level >= 11) c.stalkers_flurry_active = true;
+            // L15 Shadowy Dodge (para 2162-2163): reaction to impose disadvantage
+            if (cs.level >= 15) c.shadowy_dodge_active = true;
         }
     }
 
