@@ -1744,6 +1744,79 @@ void handle_user_message(user@ u, json_object@ msg)
 			c.movement_remaining = 0; // Speed 0 until end of turn (cannot move further).
 			u.room.bm.broadcast_announce(c.name + " uses Steady Aim. Their next attack has Advantage, but their Speed is 0 until the end of this turn.", true);
 		}
+		else if (feature == "innate_sorcery") {
+			// PHB 2024 Sorcerer L1 Innate Sorcery (para 6963-6967): "As a Bonus Action,
+			// you can unleash that magic for 1 minute, during which you gain the following
+			// benefits: • The spell save DC of your Sorcerer spells increases by 1.
+			// • You have Advantage on the attack rolls of Sorcerer spells you cast.
+			// You can use this feature twice, and you regain all expended uses of it
+			// when you finish a Long Rest."
+			//
+			// PHB 2024 Sorcerer L7 Sorcery Incarnate (para 7004-7006): "If you have no
+			// uses of Innate Sorcery left, you can use it if you spend 2 Sorcery Points
+			// when you take the Bonus Action to activate it."
+			if (c.class_name != "Sorcerer" or c.level < 1) { u.send({{"type", message_types::announce}, {"text", "Your character cannot use Innate Sorcery."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
+			if (c.innate_sorcery_active) { u.send({{"type", message_types::announce}, {"text", "Innate Sorcery is already active."}, {"interrupt", true}}); return; }
+			bool used_sp = false;
+			if (c.innate_sorcery_uses_remaining > 0) {
+				c.innate_sorcery_uses_remaining--;
+			} else if (c.level >= 7 and c.sorcery_points >= 2) {
+				// Sorcery Incarnate: spend 2 SP to activate when out of uses
+				c.sorcery_points -= 2;
+				used_sp = true;
+			} else {
+				u.send({{"type", message_types::announce}, {"text", c.level >= 7 ? "No uses of Innate Sorcery left and not enough Sorcery Points (need 2)." : "No uses of Innate Sorcery left."}, {"interrupt", true}});
+				return;
+			}
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.innate_sorcery_active = true;
+			c.innate_sorcery_rounds_remaining = 10; // 1 minute = 10 rounds
+			string activate_msg = c.name + " unleashes Innate Sorcery! Spell save DC +1 and Advantage on Sorcerer spell attack rolls for 1 minute.";
+			if (used_sp) activate_msg += " (Sorcery Incarnate: 2 Sorcery Points spent.)";
+			u.room.bm.broadcast_announce(activate_msg, true);
+		}
+		else if (feature == "font_of_magic_to_slot") {
+			// PHB 2024 Sorcerer L2 Font of Magic — Creating Spell Slots (para 6973-6993):
+			// "As a Bonus Action, you can transform unexpended Sorcery Points into one
+			// spell slot." Cost table: L1=2 SP, L2=3 SP, L3=5 SP, L4=6 SP, L5=7 SP.
+			if (c.class_name != "Sorcerer" or c.level < 2) { u.send({{"type", message_types::announce}, {"text", "Your character cannot use Font of Magic."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
+			int slot_level = msg.exists("slot_level") ? int(msg["slot_level"]) : 1;
+			int sp_cost = 0;
+			if (slot_level == 1) sp_cost = 2;
+			else if (slot_level == 2) sp_cost = 3;
+			else if (slot_level == 3) sp_cost = 5;
+			else if (slot_level == 4) sp_cost = 6;
+			else if (slot_level == 5) sp_cost = 7;
+			else { u.send({{"type", message_types::announce}, {"text", "Invalid slot level (1-5 only)."}, {"interrupt", true}}); return; }
+			// Source: minimum Sorcerer level (3=L3, 4=L5, 5=L7).
+			int min_level = 2;
+			if (slot_level == 3) min_level = 3;
+			else if (slot_level == 4) min_level = 5;
+			else if (slot_level == 5) min_level = 7;
+			if (c.level < min_level) { u.send({{"type", message_types::announce}, {"text", "You must be level " + min_level + " to create a level " + slot_level + " spell slot."}, {"interrupt", true}}); return; }
+			if (c.sorcery_points < sp_cost) { u.send({{"type", message_types::announce}, {"text", "You need " + sp_cost + " Sorcery Points to create a level " + slot_level + " spell slot."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.sorcery_points -= sp_cost;
+			c.spell_slots_current[slot_level]++;
+			u.room.bm.broadcast_announce(c.name + " converts " + sp_cost + " Sorcery Points into a level " + slot_level + " spell slot.", true);
+		}
+		else if (feature == "font_of_magic_to_sp") {
+			// PHB 2024 Sorcerer L2 Font of Magic — Converting Spell Slots to Sorcery Points
+			// (para 6972): "You can expend a spell slot to gain a number of Sorcery Points
+			// equal to the slot's level (no action required)."
+			if (c.class_name != "Sorcerer" or c.level < 2) { u.send({{"type", message_types::announce}, {"text", "Your character cannot use Font of Magic."}, {"interrupt", true}}); return; }
+			int slot_level = msg.exists("slot_level") ? int(msg["slot_level"]) : 1;
+			if (slot_level < 1 or slot_level > 9) { u.send({{"type", message_types::announce}, {"text", "Invalid slot level."}, {"interrupt", true}}); return; }
+			if (c.spell_slots_current[slot_level] <= 0) { u.send({{"type", message_types::announce}, {"text", "You have no level " + slot_level + " spell slots to convert."}, {"interrupt", true}}); return; }
+			if (c.sorcery_points + slot_level > c.sorcery_points_max) { u.send({{"type", message_types::announce}, {"text", "You cannot exceed your Sorcery Point maximum of " + c.sorcery_points_max + "."}, {"interrupt", true}}); return; }
+			c.spell_slots_current[slot_level]--;
+			c.sorcery_points += slot_level;
+			u.room.bm.broadcast_announce(c.name + " converts a level " + slot_level + " spell slot into " + slot_level + " Sorcery Points.", true);
+		}
 		else if (feature == "cunning_action") {
 			if (c.class_name != "Rogue" or c.level < 2) { u.send({{"type", message_types::announce}, {"text", "Your character cannot use Cunning Action."}, {"interrupt", true}}); return; }
 			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }

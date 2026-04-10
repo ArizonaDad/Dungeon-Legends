@@ -382,6 +382,37 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 - Stroke of Luck L20 auto-prompt: when a player fails a D20 test (attack/save/check) and `stroke_of_luck_available`, prompt them to convert the roll into a 20 (slot it into existing reroll prompt chain after Heroic Inspiration).
 - Sneak Attack interactions: verify it triggers correctly for Soulknife Psychic Blades and Inquisitive Insightful Fighting (existing subclass riders).
 
+### Sorcerer Audit (2026-04-09) — Basic Rules 2024 paras 6632-7044
+
+| Feature | Level | Source para | Status |
+|---------|-------|-------------|--------|
+| **Spellcasting** (CHA, Arcane Focus) | 1 | 6952-6962 | ✓ Done — `cs.is_caster=true`, `spellcasting_ability=ABILITY_CHA`. |
+| **Innate Sorcery** (Bonus Action: +1 spell save DC + Advantage on Sorcerer spell attacks for 1 minute, 2/LR) | 1 | 6963-6967 | ✓ Done 2026-04-09 — bonus action handler in `users _dom.nvgt`, `innate_sorcery_active` flag, +1 DC in `spell_save_dc()`, advantage in `apply_attack_advantage_state()` (new `is_spell_attack` parameter), 10-round tickdown in `advance_turn`, broadcast to client. |
+| **Font of Magic** (SP pool, convert slot↔SP) | 2 | 6968-6993 | ✓ Done 2026-04-09 — Sorcery Points = level. Bonus action handlers: `font_of_magic_to_slot` (cost table 1=2/2=3/3=5/4=6/5=7 SP with min-level gating) and `font_of_magic_to_sp` (free action, gain SP = slot level, capped at max). Client menu entries with sub-menu for slot level. |
+| **Metamagic** (2 options at L2, +2 at L10, +2 at L17) | 2 | 6994-6997 | PARTIAL — Quickened/Twinned/Subtle implemented as toggle flags (3 of 10 options). Stub flags for Careful/Distant/Empowered/Extended/Heightened/Seeking/Transmuted added but not yet wired into spell pipeline. |
+| **Sorcerer Subclass** | 3 | 6998-6999 | ✓ Done — Draconic, Wild Magic, Aberrant, Storm, Clockwork, Divine Soul, Frost, Desert Soul, Light Weaver, Shadow. |
+| **Ability Score Improvement** | 4/8/12/16 | 7000-7001 | ✓ Done — global feat-grant system. |
+| **Sorcerous Restoration** (regain SP up to half level on short rest, 1/LR) | 5 | 7002-7003 | PARTIAL 2026-04-09 — `sorcerous_restoration_available` flag set on init. Short rest plumbing not implemented yet, so the regain trigger is deferred. |
+| **Sorcery Incarnate** (spend 2 SP for Innate Sorcery use; 2 metamagic per spell while active) | 7 | 7004-7006 | PARTIAL 2026-04-09 — bonus action handler accepts the 2 SP fallback for Innate Sorcery activation. Multi-metamagic-per-spell while active deferred to metamagic pipeline rewrite. |
+| **Metamagic** (2 more options) | 10 | 7011 | DEFERRED — depends on the metamagic option choice prompt at level-up (we currently grant Quickened/Twinned/Subtle by default to all Sorcerers). |
+| **Metamagic** (2 more options) | 17 | 7011 | DEFERRED — same as L10. |
+| **Epic Boon** | 19 | 7007-7008 | ✓ Done — Epic Boon feat catalog. |
+| **Arcane Apotheosis** | 20 | 7009 | SOURCE GAP — Basic Rules 2024 para 7009 has no body text for L20 capstone (jumps directly to "Metamagic Options" header). Likely a docx-extraction artifact. Flagged for re-extraction from PHB 2024 PDF or escalation to user. |
+
+**Pending follow-up Sorcerer batches:**
+- Metamagic option selection at L2/L10/L17 (player choice prompt). Currently we grant Quickened/Twinned/Subtle by default to all Sorcerers. Source allows the player to pick from 10.
+- Metamagic options not yet wired to spell pipeline:
+  - **Careful Spell** (1 SP, paras 7012-7014): cast-time prompt to designate up to CHA mod allies who auto-succeed save and take 0 damage from a save-based spell.
+  - **Distant Spell** (1 SP, paras 7015-7017): doubles spell range (or makes Touch range 30 ft). Needs spell range modifier in cast pipeline.
+  - **Empowered Spell** (1 SP, paras 7018-7021): reroll up to CHA mod damage dice. Stackable with other metamagic. Needs damage roll hook.
+  - **Extended Spell** (1 SP, paras 7022-7025): doubles concentration spell duration up to 24 h, advantage on concentration saves while active. Needs duration tracker on concentration effects.
+  - **Heightened Spell** (2 SP, paras 7026-7028): one target has Disadvantage on its save vs the spell. Needs save-call pipeline modifier.
+  - **Seeking Spell** (1 SP, paras 7032-7035): reroll a missed spell attack. Stackable with other metamagic. Needs miss-resolution hook.
+  - **Transmuted Spell** (1 SP, paras 7039-7041): change damage type among Acid/Cold/Fire/Lightning/Poison/Thunder. Needs damage type swap in cast pipeline.
+- Sorcery Incarnate L7 multi-metamagic-per-spell — needs metamagic pipeline rewrite to allow 2 simultaneous flags during a single cast.
+- Sorcerous Restoration L5 — needs short rest subsystem (currently we only have long rest reset).
+- Arcane Apotheosis L20 — escalate to user; basic_rules_full.txt para 7009 has no body text.
+
 - **Paladin:** Lay on Hands (pool size), Divine Smite (slot-based in 2024), Aura of Courage, Cleansing Touch — all addressed in 2026-04-09 audit; remaining items in pending list above.
 - **Ranger:** Favored Enemy / Roving / Tireless / Relentless Hunter / Nature's Veil / Precise Hunter / Feral Senses / Foe Slayer all addressed 2026-04-09; deferred items in Ranger pending list above.
 - **Rogue:** Sneak Attack base case / Steady Aim / Uncanny Dodge / Reliable Talent L7 fix / Slippery Mind / Elusive / Stroke of Luck flag all addressed 2026-04-09; deferred Cunning Strike family in Rogue pending list above.

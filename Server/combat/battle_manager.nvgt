@@ -1699,7 +1699,7 @@ class battle_manager {
 		if (!combat.can_see(caster, target)) return false;
 		bool adv = false;
 		bool disadv = false;
-		apply_attack_advantage_state(caster, target, dist, spell_attack_is_ranged(caster, spell, effective_range), adv, disadv);
+		apply_attack_advantage_state(caster, target, dist, spell_attack_is_ranged(caster, spell, effective_range), adv, disadv, true);
 		queue_spell_attack_roll(caster_user, caster, target, spell, pr.modifier, pr.damage_dice_count, pr.damage_dice_sides, pr.damage_modifier, pr.attacks_remaining - 1, adv, disadv, remaining_csv);
 		return true;
 	}
@@ -1911,10 +1911,14 @@ class battle_manager {
 		check_battle_end();
 	}
 
-	void apply_attack_advantage_state(combatant@ attacker, combatant@ target, int dist, bool attack_is_ranged, bool&out adv, bool&out disadv) {
+	void apply_attack_advantage_state(combatant@ attacker, combatant@ target, int dist, bool attack_is_ranged, bool&out adv, bool&out disadv, bool is_spell_attack = false) {
 		adv = false;
 		disadv = false;
 		if (@attacker == null or @target == null) return;
+		// PHB 2024 Sorcerer L1 Innate Sorcery (para 6963-6967): "You have Advantage
+		// on the attack rolls of Sorcerer spells you cast." Only applied when the
+		// attack is a Sorcerer spell attack and the active Sorcerer has the buff up.
+		if (is_spell_attack and attacker.class_name == "Sorcerer" and attacker.innate_sorcery_active) adv = true;
 		bool can_ignore_invisible = attacker.has_feat("boon_of_truesight") and dist <= 60;
 		// Barbarian Reckless Attack (PHB 2024 para 2785): "When you make your first attack
 		// roll on your turn, you can decide to attack recklessly. Doing so gives you Advantage
@@ -3005,6 +3009,15 @@ class battle_manager {
 					broadcast_announce(prev.name + "'s Nature's Veil fades.", false);
 				}
 			}
+			// PHB 2024 Sorcerer L1 Innate Sorcery (para 6963-6967): "for 1 minute" — 10
+			// rounds. Tick down on each of the Sorcerer's turn-ends; expire at 0.
+			if (prev.innate_sorcery_active and prev.innate_sorcery_rounds_remaining > 0) {
+				prev.innate_sorcery_rounds_remaining--;
+				if (prev.innate_sorcery_rounds_remaining <= 0) {
+					prev.innate_sorcery_active = false;
+					broadcast_announce(prev.name + "'s Innate Sorcery fades.", false);
+				}
+			}
 			if (prev.raging) {
 				if (prev.is_dead or prev.current_hp <= 0) {
 					prev.raging = false;
@@ -3933,7 +3946,7 @@ class battle_manager {
 		bool attack_is_ranged = caster.main_hand_is_ranged;
 		bool adv = false;
 		bool disadv = false;
-		apply_attack_advantage_state(caster, target, dist, attack_is_ranged, adv, disadv);
+		apply_attack_advantage_state(caster, target, dist, attack_is_ranged, adv, disadv, true);
 		reveal_hidden_combatant(caster, "making a True Strike attack");
 
 		pending_roll pr;
@@ -7420,7 +7433,7 @@ class battle_manager {
 
 			bool adv = false;
 			bool disadv = false;
-			apply_attack_advantage_state(c, target, dist, spell_attack_is_ranged(c, spell, effective_range), adv, disadv);
+			apply_attack_advantage_state(c, target, dist, spell_attack_is_ranged(c, spell, effective_range), adv, disadv, true);
 			queue_spell_attack_roll(u, c, target, spell, spell_atk, damage_count, damage_sides, 0, attack_instances - 1, adv, disadv);
 			broadcast_state();
 			return;

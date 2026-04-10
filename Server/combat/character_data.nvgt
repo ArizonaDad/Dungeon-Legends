@@ -1589,10 +1589,19 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
             c.fire_resistance = true;
         }
     }
-    // PHB 2024 Sorcerer L1 Innate Sorcery + L2 Font of Magic + L3 Metamagic
-    // Font of Magic already gives sorcery_points = level. Metamagic options at L3+ are
+    // PHB 2024 Sorcerer L1 Innate Sorcery + L2 Font of Magic + L2 Metamagic
+    // Font of Magic already gives sorcery_points = level. Metamagic options are
     // toggle flags the player activates before casting; defaults all off.
     if (cs.class_name == "Sorcerer") {
+        // PHB 2024 Sorcerer L1 Innate Sorcery (para 6963-6967): 2 uses per long rest
+        if (cs.level >= 1) {
+            c.innate_sorcery_uses_max = 2;
+            c.innate_sorcery_uses_remaining = 2;
+        }
+        // PHB 2024 Sorcerer L5 Sorcerous Restoration (para 7002-7003): 1/long rest flag
+        if (cs.level >= 5) {
+            c.sorcerous_restoration_available = true;
+        }
         if (cs.subclass == "Frost Sorcerer") {
             c.frost_sorcerer_aura = true;
             // Source: cold resistance at L6, immunity at L18; no flat weapon bonus

@@ -505,7 +505,11 @@ int spell_save_dc(combatant@ caster, string spell_id = "") {
     if (override_ability >= 0) spell_ability = override_ability;
     if (spell_ability < 0 or spell_ability > 5) spell_ability = ABILITY_INT;
     int mod = caster.get_ability_mod(spell_ability);
-    return 8 + caster.proficiency + mod;
+    int dc = 8 + caster.proficiency + mod;
+    // PHB 2024 Sorcerer L1 Innate Sorcery (para 6963-6967): "The spell save DC of
+    // your Sorcerer spells increases by 1." Only applies to Sorcerer-class casters.
+    if (caster.class_name == "Sorcerer" and caster.innate_sorcery_active) dc += 1;
+    return dc;
 }
 
 // Calculate spell attack bonus

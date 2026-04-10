@@ -159,9 +159,35 @@ class combatant {
 	bool wild_companion_active = false;    // L2: cast Find Familiar via Wild Shape
 	bool elemental_fury_active = false;    // L7: damage type swap on Wild Shape attacks
 	// Sorcerer PHB 2024 base class features
-	bool metamagic_quickened_active = false; // L3 Metamagic - Quickened Spell pending toggle
-	bool metamagic_twinned_active = false;   // L3 Metamagic - Twinned Spell pending toggle
-	bool metamagic_subtle_active = false;    // L3 Metamagic - Subtle Spell pending toggle
+	// PHB 2024 Sorcerer L1 Innate Sorcery (para 6963-6967): "As a Bonus Action, you
+	// can unleash that magic for 1 minute, during which you gain the following benefits:
+	// • The spell save DC of your Sorcerer spells increases by 1.
+	// • You have Advantage on the attack rolls of Sorcerer spells you cast.
+	// You can use this feature twice, and you regain all expended uses of it when you
+	// finish a Long Rest."
+	int innate_sorcery_uses_remaining = 0;
+	int innate_sorcery_uses_max = 0;
+	bool innate_sorcery_active = false;
+	int innate_sorcery_rounds_remaining = 0; // 1 minute = 10 rounds
+	// PHB 2024 Sorcerer L5 Sorcerous Restoration (para 7002-7003): once per long rest,
+	// regain SP up to half level on a short rest. We track availability so future short
+	// rest plumbing can consume it.
+	bool sorcerous_restoration_available = false;
+	// PHB 2024 Sorcerer L7 Sorcery Incarnate (para 7004-7006): when out of Innate Sorcery
+	// uses, can spend 2 SP to activate it; while active, can use up to 2 metamagic per spell.
+	bool sorcery_incarnate_active = false;
+	bool metamagic_quickened_active = false; // L2 Metamagic - Quickened Spell pending toggle
+	bool metamagic_twinned_active = false;   // L2 Metamagic - Twinned Spell pending toggle
+	bool metamagic_subtle_active = false;    // L2 Metamagic - Subtle Spell pending toggle
+	// PHB 2024 Sorcerer L2 Metamagic options not yet wired (para 7011-7044):
+	bool metamagic_careful_active = false;   // 1 SP - allies auto-succeed save (CHA mod creatures)
+	bool metamagic_distant_active = false;   // 1 SP - double range / 30ft for Touch
+	bool metamagic_empowered_active = false; // 1 SP - reroll up to CHA mod damage dice
+	bool metamagic_extended_active = false;  // 1 SP - double duration up to 24h, advantage on conc saves
+	bool metamagic_heightened_active = false; // 2 SP - one target has disadvantage on saves vs spell
+	bool metamagic_seeking_active = false;   // 1 SP - reroll missed spell attack
+	bool metamagic_transmuted_active = false; // 1 SP - swap damage type Acid/Cold/Fire/Lightning/Poison/Thunder
+	int metamagic_transmuted_target_type = 0; // Damage type ID to convert to
 	// Warlock PHB 2024 base class features
 	int eldritch_invocations_known = 0;    // L1+: scales by level
 	bool pact_of_the_blade = false;        // Pact Boon variants
@@ -1620,6 +1646,11 @@ class battle {
 				// PHB 2024 Ranger L10 Tireless / L14 Nature's Veil — broadcast use counts
 				state["my_natures_veil_uses_remaining"] = c.natures_veil_uses_remaining;
 				state["my_tireless_temp_hp_uses_remaining"] = c.tireless_temp_hp_uses_remaining;
+				// PHB 2024 Sorcerer L1 Innate Sorcery / L2 Font of Magic
+				state["my_innate_sorcery_uses_remaining"] = c.innate_sorcery_uses_remaining;
+				state["my_innate_sorcery_active"] = c.innate_sorcery_active;
+				state["my_sorcery_points"] = c.sorcery_points;
+				state["my_sorcery_points_max"] = c.sorcery_points_max;
 				// Potion buff rounds remaining
 				state["my_potion_damage_rounds"] = c.potion_damage_rounds;
 				state["my_potion_ac_rounds"] = c.potion_ac_rounds;

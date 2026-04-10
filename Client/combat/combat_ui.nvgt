@@ -186,6 +186,11 @@ int my_lay_on_hands_pool = 0;
 // PHB 2024 Ranger L10 Tireless / L14 Nature's Veil — synced from server
 int my_natures_veil_uses_remaining = 0;
 int my_tireless_temp_hp_uses_remaining = 0;
+// PHB 2024 Sorcerer L1 Innate Sorcery / L2 Font of Magic — synced from server
+int my_innate_sorcery_uses_remaining = 0;
+bool my_innate_sorcery_active = false;
+int my_sorcery_points = 0;
+int my_sorcery_points_max = 0;
 int my_bardic_inspiration_uses = 0;
 int my_bardic_inspiration_grant_die = 0;
 int my_bardic_inspiration_die = 0;
@@ -977,6 +982,10 @@ void show_bonus_action_menu() {
 	int tireless_temp_hp_opt = -1;
 	// PHB 2024 Rogue L3 Steady Aim (para 6550-6551)
 	int steady_aim_opt = -1;
+	// PHB 2024 Sorcerer L1 Innate Sorcery / L2 Font of Magic
+	int innate_sorcery_opt = -1;
+	int font_of_magic_to_slot_opt = -1;
+	int font_of_magic_to_sp_opt = -1;
 
 	if (lc == "barbarian" and !my_is_raging and my_rage_uses_remaining > 0) rage_opt = m.add_item("Rage. Bonus action. Uses left: " + my_rage_uses_remaining + ". Damage bonus: " + my_rage_damage_bonus + ".");
 	if (lc == "fighter" and my_second_wind_uses_remaining > 0) second_wind_opt = m.add_item("Second Wind. Bonus action. Heal 1d10 plus fighter level. Uses left: " + my_second_wind_uses_remaining + " of " + my_second_wind_uses_max + ".");
@@ -985,6 +994,19 @@ void show_bonus_action_menu() {
 	// Advantage on your next attack roll on the current turn... You can use this Bonus Action
 	// only if your Speed is 0 on this turn... your Speed is 0 until the end of the current turn."
 	if (lc == "rogue" and level >= 3 and my_movement_remaining >= my_speed) steady_aim_opt = m.add_item("Steady Aim. Bonus action. Gain Advantage on your next attack this turn, but your Speed is 0 until end of turn.");
+	// PHB 2024 Sorcerer L1 Innate Sorcery (para 6963-6967)
+	if (lc == "sorcerer" and !my_innate_sorcery_active and (my_innate_sorcery_uses_remaining > 0 or (level >= 7 and my_sorcery_points >= 2))) {
+		string label = "Innate Sorcery. Bonus action. Spell save DC plus 1 and Advantage on Sorcerer spell attacks for 1 minute. Uses left: " + my_innate_sorcery_uses_remaining + ".";
+		if (my_innate_sorcery_uses_remaining == 0 and level >= 7) label += " Sorcery Incarnate: spend 2 Sorcery Points to use it anyway. Sorcery Points: " + my_sorcery_points + ".";
+		innate_sorcery_opt = m.add_item(label);
+	}
+	// PHB 2024 Sorcerer L2 Font of Magic (para 6968-6993)
+	if (lc == "sorcerer" and level >= 2 and my_sorcery_points >= 2) {
+		font_of_magic_to_slot_opt = m.add_item("Font of Magic: convert Sorcery Points to a spell slot. Sorcery Points: " + my_sorcery_points + " of " + my_sorcery_points_max + ".");
+	}
+	if (lc == "sorcerer" and level >= 2 and my_sorcery_points < my_sorcery_points_max) {
+		font_of_magic_to_sp_opt = m.add_item("Font of Magic: convert a spell slot to Sorcery Points. Sorcery Points: " + my_sorcery_points + " of " + my_sorcery_points_max + ".");
+	}
 	if (lc == "paladin" and my_lay_on_hands_pool > 0) lay_hands_opt = m.add_item("Lay on Hands. Bonus action. Pool: " + my_lay_on_hands_pool + ".");
 	if (lc == "monk" and level >= 2) flurry_opt = m.add_item("Flurry of Blows. 1 Focus Point. Focus Points: " + my_focus_points + ".");
 	int patient_defense_opt = -1;
@@ -1417,6 +1439,9 @@ void show_bonus_action_menu() {
 	if (second_wind_opt >= 0) options++;
 	if (cunning_opt >= 0) options++;
 	if (steady_aim_opt >= 0) options++;
+	if (innate_sorcery_opt >= 0) options++;
+	if (font_of_magic_to_slot_opt >= 0) options++;
+	if (font_of_magic_to_sp_opt >= 0) options++;
 	if (lay_hands_opt >= 0) options++;
 	if (flurry_opt >= 0) options++;
 	if (bardic_opt >= 0) options++;
@@ -1467,6 +1492,43 @@ void show_bonus_action_menu() {
 	else if (steady_aim_opt >= 0 and res == steady_aim_opt) {
 		// PHB 2024 Rogue L3 Steady Aim (para 6550-6551)
 		send({{"type", message_types::bonus_action}, {"feature", "steady_aim"}});
+	}
+	else if (innate_sorcery_opt >= 0 and res == innate_sorcery_opt) {
+		// PHB 2024 Sorcerer L1 Innate Sorcery (para 6963-6967)
+		send({{"type", message_types::bonus_action}, {"feature", "innate_sorcery"}});
+	}
+	else if (font_of_magic_to_slot_opt >= 0 and res == font_of_magic_to_slot_opt) {
+		// PHB 2024 Sorcerer L2 Font of Magic — Creating Spell Slots (para 6973-6993)
+		menu@ fm = setup_sub_menu("Font of Magic: choose slot level to create:");
+		fm.add_item("Level 1 spell slot. Cost: 2 Sorcery Points.");
+		if (level >= 3) fm.add_item("Level 2 spell slot. Cost: 3 Sorcery Points.");
+		if (level >= 5) fm.add_item("Level 3 spell slot. Cost: 5 Sorcery Points.");
+		if (level >= 7) fm.add_item("Level 4 spell slot. Cost: 6 Sorcery Points.");
+		if (level >= 9) fm.add_item("Level 5 spell slot. Cost: 7 Sorcery Points.");
+		int fp = fm.run();
+		if (fp < 0) return;
+		int slot_level = fp + 1;
+		send({{"type", message_types::bonus_action}, {"feature", "font_of_magic_to_slot"}, {"slot_level", slot_level}});
+	}
+	else if (font_of_magic_to_sp_opt >= 0 and res == font_of_magic_to_sp_opt) {
+		// PHB 2024 Sorcerer L2 Font of Magic — Converting Spell Slots to Sorcery Points (para 6972)
+		menu@ fm = setup_sub_menu("Font of Magic: choose slot level to convert to Sorcery Points:");
+		for (int sl = 1; sl <= 9; sl++) {
+			if (my_spell_slots_current[sl] > 0) fm.add_item("Level " + sl + " slot. Gain " + sl + " Sorcery Points. (You have " + my_spell_slots_current[sl] + " level " + sl + " slots.)");
+		}
+		int fp = fm.run();
+		if (fp < 0) return;
+		// Map back to actual slot level
+		int picked_level = -1;
+		int idx = 0;
+		for (int sl = 1; sl <= 9; sl++) {
+			if (my_spell_slots_current[sl] > 0) {
+				if (idx == fp) { picked_level = sl; break; }
+				idx++;
+			}
+		}
+		if (picked_level < 1) return;
+		send({{"type", message_types::bonus_action}, {"feature", "font_of_magic_to_sp"}, {"slot_level", picked_level}});
 	}
 	else if (lay_hands_opt >= 0 and res == lay_hands_opt) {
 		use_lay_on_hands();
@@ -3089,6 +3151,10 @@ void parse_game_state(json_object@ msg) {
 	my_lay_on_hands_pool = msg.exists("my_lay_on_hands_pool") ? int(msg["my_lay_on_hands_pool"]) : 0;
 	my_natures_veil_uses_remaining = msg.exists("my_natures_veil_uses_remaining") ? int(msg["my_natures_veil_uses_remaining"]) : 0;
 	my_tireless_temp_hp_uses_remaining = msg.exists("my_tireless_temp_hp_uses_remaining") ? int(msg["my_tireless_temp_hp_uses_remaining"]) : 0;
+	my_innate_sorcery_uses_remaining = msg.exists("my_innate_sorcery_uses_remaining") ? int(msg["my_innate_sorcery_uses_remaining"]) : 0;
+	my_innate_sorcery_active = msg.exists("my_innate_sorcery_active") ? bool(msg["my_innate_sorcery_active"]) : false;
+	my_sorcery_points = msg.exists("my_sorcery_points") ? int(msg["my_sorcery_points"]) : 0;
+	my_sorcery_points_max = msg.exists("my_sorcery_points_max") ? int(msg["my_sorcery_points_max"]) : 0;
 	my_bardic_inspiration_uses = msg.exists("my_bardic_inspiration_uses") ? int(msg["my_bardic_inspiration_uses"]) : 0;
 	my_bardic_inspiration_grant_die = msg.exists("my_bardic_inspiration_grant_die") ? int(msg["my_bardic_inspiration_grant_die"]) : 0;
 	my_bardic_inspiration_die = msg.exists("my_bardic_inspiration_die") ? int(msg["my_bardic_inspiration_die"]) : 0;
@@ -3248,6 +3314,10 @@ void reset_combat_state() {
 	my_lay_on_hands_pool = 0;
 	my_natures_veil_uses_remaining = 0;
 	my_tireless_temp_hp_uses_remaining = 0;
+	my_innate_sorcery_uses_remaining = 0;
+	my_innate_sorcery_active = false;
+	my_sorcery_points = 0;
+	my_sorcery_points_max = 0;
 	my_bardic_inspiration_uses = 0;
 	my_bardic_inspiration_grant_die = 0;
 	my_bardic_inspiration_die = 0;
