@@ -870,6 +870,8 @@ class combatant {
 	string cunning_strike_effect2 = "";  // L11 Improved Cunning Strike: second effect
 	bool cunning_strike_dazed = false;   // Target is dazed (can only move OR action OR BA next turn)
 	int cunning_strike_dazed_rounds = 0; // Daze lasts until start of target's next turn
+	// PHB 2024 Mobile feat (para 7635): track creatures attacked this turn for per-creature OA immunity.
+	uint[] mobile_attacked_ids;
 	uint hex_target_id = 0;
 	bool spiritual_weapon_active = false;
 	int spiritual_weapon_slot_level = 0;
@@ -1181,6 +1183,9 @@ class combatant {
 		// Xanathar's War Magic L10 Durable Magic (para 2941-2942): "While you maintain
 		// concentration on a spell, you have a +2 bonus to... all saving throws."
 		if (durable_magic_active and is_concentrating) mod += 2;
+		// Tasha's Rune Knight L3 Giant's Might (para 3125-3130): "You have Advantage
+		// on Strength checks and Strength saving throws." while active.
+		if (giants_might_active and ability_id == ABILITY_STR) mod += 5;
 		return mod;
 	}
 

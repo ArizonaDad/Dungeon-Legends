@@ -1815,9 +1815,10 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
     // Tasha's Circle of the Stars Druid (paras 2131-2181)
     if (cs.class_name == "Druid" and cs.subclass == "Circle of the Stars" and cs.level >= 2) {
         c.starry_form_type = "Chalice"; // default
-        // L2 Star Map (para 2139-2145): know guidance + guiding bolt (free casts = prof)
+        // L2 Star Map (para 2139-2145): know guidance + guiding bolt; free guiding bolt casts = prof bonus/LR
         if (!c.knows_spell("guidance")) c.prepared_spells.insert_last("guidance");
         if (!c.knows_spell("guiding_bolt")) c.prepared_spells.insert_last("guiding_bolt");
+        c.grant_free_cast("guiding_bolt", c.proficiency);
         // L14 Full of Stars (para 2179-2181): B/P/S resistance while in starry form
         // (applied dynamically in apply_damage when starry_form_active, see below)
     }
@@ -2349,6 +2350,8 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         }
     }
     if (cs.class_name == "Druid") {
+        // PHB 2024 Druid L1 Druidic (para 4384-4386): always have Speak with Animals prepared.
+        if (!c.knows_spell("speak_with_animals")) c.prepared_spells.insert_last("speak_with_animals");
         // PHB 2024 Druid L1 Primal Order, L7 Elemental Fury — copy choices
         c.primal_order = cs.primal_order;
         c.elemental_fury_choice = cs.elemental_fury_choice;
