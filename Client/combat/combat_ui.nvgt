@@ -1895,7 +1895,7 @@ void show_bonus_action_menu() {
 		mm.add_item("Seeking Spell. 1 SP. Reroll a missed spell attack.");
 		mm.add_item("Subtle Spell. 1 SP. Cast without verbal, somatic, or material components.");
 		mm.add_item("Transmuted Spell. 1 SP. Change damage type to acid, cold, fire, lightning, poison, or thunder.");
-		mm.add_item("Twinned Spell. 1 SP. Increase effective spell level by 1 for extra target.");
+		mm.add_item("Twinned Spell. 1 SP plus spell level minus 1. Target a second creature with the same spell.");
 		int mm_res = mm.run();
 		if (mm_res < 0) return;
 		string[] mm_options = {"careful", "distant", "empowered", "extended", "heightened", "quickened", "seeking", "subtle", "transmuted", "twinned"};
