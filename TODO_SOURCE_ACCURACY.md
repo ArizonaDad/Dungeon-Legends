@@ -413,6 +413,27 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 - Sorcerous Restoration L5 — needs short rest subsystem (currently we only have long rest reset).
 - Arcane Apotheosis L20 — escalate to user; basic_rules_full.txt para 7009 has no body text.
 
+### Storm Sorcery Subclass Audit (2026-04-09) — Xanathar's paras 2515-2577
+
+| Feature | Level | Source para | Status |
+|---------|-------|-------------|--------|
+| **Wind Speaker** (learn Primordial + 4 dialects) | 1 | 2515-2520 | SKIPPED — language only, no combat effect. |
+| **Tempestuous Magic** (fly 10 ft without OA before/after casting L1+ spell) | 1 | 2521-2526 | SKIPPED — `tempestuous_magic` flag existed prior; no behavioral change needed in this audit. |
+| **Heart of the Storm** (lightning/thunder resistance + eruption damage to enemies within 10 ft when casting L1+ lightning/thunder spell) | 6 | 2527-2545 | ✓ Done 2026-04-09 — eruption damage (half Sorcerer level round down) to enemies within 10 ft on qualifying spell cast. Lightning and thunder resistance granted on init. |
+| **Storm Guide** (stop rain in 20 ft sphere or direct winds in 100 ft) | 6 | 2546-2555 | SKIPPED — out-of-combat weather control, no combat effect. |
+| **Storm's Fury** (reaction when hit by melee: sorcerer-level lightning damage + STR save or pushed 20 ft) | 14 | 2556-2567 | ✓ Done 2026-04-09 — reaction prompt on melee hit, deals Sorcerer-level lightning damage, STR save DC = spell save DC or pushed 20 ft in straight line. |
+| **Wind Soul** (immunity to lightning + thunder damage, fly 60 ft, action to grant 6 allies fly 30 for 1 hour) | 18 | 2568-2577 | ✓ Done 2026-04-09 — lightning + thunder immunity and fly 60 ft on init. Deferred: ally-fly action (grant 6 allies fly 30 for 1 hour, lose own fly until LR). |
+
+### Divine Soul Subclass Audit (2026-04-09) — Xanathar's paras 2578-2639
+
+| Feature | Level | Source para | Status |
+|---------|-------|-------------|--------|
+| **Divine Magic** (access to Cleric spell list + affinity spell) | 1 | 2578-2600 | ✓ Done 2026-04-09 — affinity choice via Shift+P, auto-prepared spell based on chosen affinity (Good/Evil/Law/Chaos/Neutrality). |
+| **Favored by the Gods** (add 2d4 to failed attack or save, 1/SR) | 1 | 2601-2610 | ✓ Done 2026-04-09 — auto 2d4 additive in reroll chain, 1/SR via `favored_by_the_gods_available` flag. |
+| **Empowered Healing** (reroll healing dice for self or ally within 5 ft, 1 SP per reroll) | 6 | 2611-2620 | PARTIAL — `empowered_healing_active` flag set on init. Heal-dice reroll mechanic deferred (needs hook into healing spell resolution pipeline). |
+| **Otherworldly Wings** (bonus action toggle spectral wings, fly 30 ft) | 14 | 2621-2630 | ✓ Done 2026-04-09 — toggle bonus action, fly 30 ft while active. |
+| **Unearthly Recovery** (bonus action heal half max HP when below half HP, 1/LR) | 18 | 2631-2639 | ✓ Done 2026-04-09 — bonus action handler, heals half max HP, gated on current HP < half max HP, `unearthly_recovery_available` flag 1/LR. |
+
 ### Warlock Audit (2026-04-09) — Basic Rules 2024 paras 7589-7799
 
 | Feature | Level | Source para | Status |
