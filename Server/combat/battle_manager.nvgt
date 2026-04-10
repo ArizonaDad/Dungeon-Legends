@@ -3618,6 +3618,25 @@ class battle_manager {
 		// be handled separately if positional tracking is added later).
 		caster.fog_cloud_active = false;
 		caster.darkness_active = false;
+		// Polymorph: restore original HP/AC when concentration breaks.
+		// Basic Rules 2024 Polymorph (para 14624-14626): "The creature reverts to
+		// its normal form when it drops to 0 Hit Points or the spell ends."
+		if (caster.concentration_spell == "polymorph") {
+			for (uint pi = 0; pi < combat.combatants.length(); pi++) {
+				combatant@ pt = combat.combatants[pi];
+				if (@pt == null or pt.is_dead) continue;
+				if (pt.polymorph_caster_id == caster.id and pt.polymorph_original_hp > 0) {
+					pt.armor_class = pt.polymorph_original_ac;
+					pt.current_hp = pt.polymorph_original_hp;
+					if (pt.current_hp > pt.max_hp) pt.current_hp = pt.max_hp;
+					pt.remove_condition(COND_CHARMED);
+					pt.polymorph_original_hp = 0;
+					pt.polymorph_original_ac = 0;
+					pt.polymorph_caster_id = 0;
+					broadcast_announce(pt.name + " reverts from Polymorph!", true);
+				}
+			}
+		}
 		// Extended Spell: advantage on concentration saves ends with concentration
 		caster.extended_spell_concentration = false;
 	}
@@ -11119,6 +11138,7 @@ class battle_manager {
 				if (!saved) {
 					target.polymorph_original_hp = target.current_hp;
 					target.polymorph_original_ac = target.armor_class;
+					target.polymorph_caster_id = c.id;
 					target.armor_class -= 5;
 					if (target.armor_class < 5) target.armor_class = 5;
 					target.current_hp = 30;

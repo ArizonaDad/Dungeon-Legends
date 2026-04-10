@@ -1091,6 +1091,7 @@ class combatant {
 	// Polymorph tracking
 	int polymorph_original_hp = 0;
 	int polymorph_original_ac = 0;
+	uint polymorph_caster_id = 0;
 
 	// Lucky feat
 	int luck_points = 0;
@@ -1788,6 +1789,20 @@ class battle {
 		if (target.wild_shape_active and target.current_hp <= 0) {
 			int overflow = -target.current_hp;
 			restore_wild_shape(target, overflow);
+		}
+
+		// Basic Rules 2024 Polymorph (para 14624-14626): "The creature reverts to
+		// its normal form when it drops to 0 Hit Points." Excess damage carries over.
+		if (target.polymorph_original_hp > 0 and target.current_hp <= 0) {
+			int overflow = -target.current_hp;
+			target.armor_class = target.polymorph_original_ac;
+			target.current_hp = target.polymorph_original_hp - overflow;
+			if (target.current_hp > target.max_hp) target.current_hp = target.max_hp;
+			if (target.current_hp < 0) target.current_hp = 0;
+			target.remove_condition(COND_CHARMED);
+			target.polymorph_original_hp = 0;
+			target.polymorph_original_ac = 0;
+			target.polymorph_caster_id = 0;
 		}
 
 		// Concentration check
