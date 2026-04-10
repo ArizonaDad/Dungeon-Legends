@@ -53,6 +53,8 @@ class combatant {
 	bool has_moved = false;
 	bool used_action = false;
 	bool used_bonus_action = false;
+	bool cast_ba_spell_this_turn = false;    // PHB 2024 Bonus Action Spell rule tracking
+	bool cast_leveled_spell_this_turn = false; // Blocks BA spells after a leveled action spell
 
 	// Conditions (array of active condition IDs)
 	int[] conditions;

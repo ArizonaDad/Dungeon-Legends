@@ -4579,6 +4579,9 @@ class battle_manager {
 		c.is_first_hit_this_turn = true;
 		// PHB 2024 Rogue L1 Sneak Attack (para 6537): "Once per turn" — reset.
 		c.sneak_attack_used_this_turn = false;
+		// PHB 2024 Bonus Action Spell rule (para 7986-7989): per-turn tracking.
+		c.cast_ba_spell_this_turn = false;
+		c.cast_leveled_spell_this_turn = false;
 		// Counterspell readied action expires at start of your next turn
 		c.counterspell_pending = false;
 		// PHB 2024 Boon of Dimensional Travel Blink Steps (para 7876)
@@ -10167,6 +10170,19 @@ class battle_manager {
 			quickened_this_cast = true;
 		}
 
+		// PHB 2024 Bonus Action Spell rule (para 7986-7989): "If you cast a spell
+		// that has a casting time of Bonus Action, you can't cast another spell during
+		// the same turn except a cantrip that has a casting time of an action."
+		bool is_ba_cast = (spell.casting_time == 1 or quickened_this_cast);
+		if (is_ba_cast and spell.level > 0 and c.cast_leveled_spell_this_turn) {
+			u.send({{"type", message_types::announce}, {"text", "You already cast a leveled spell this turn. You can only cast a cantrip as a bonus action."}, {"interrupt", true}});
+			return;
+		}
+		if (!is_ba_cast and spell.casting_time == 0 and spell.level > 0 and c.cast_ba_spell_this_turn) {
+			u.send({{"type", message_types::announce}, {"text", "You cast a bonus action spell this turn. You can only cast a cantrip with your action."}, {"interrupt", true}});
+			return;
+		}
+
 		// Check casting time: 0=action, 1=bonus action, 2=reaction
 		if (spell.casting_time == 0 and !quickened_this_cast and !c.has_action) {
 			u.send({{"type", message_types::announce}, {"text", "You've already used your action this turn. Press F and choose End Turn, or press B for a bonus action."}, {"interrupt", true}});
@@ -10311,6 +10327,13 @@ class battle_manager {
 		}
 		else if (spell.casting_time == 1) { c.has_bonus_action = false; c.used_bonus_action = true; }
 		else if (spell.casting_time == 2) { c.has_reaction = false; }
+
+		// PHB 2024 Bonus Action Spell tracking: record what was cast this turn
+		if (quickened_this_cast or spell.casting_time == 1) {
+			if (spell.level > 0) c.cast_ba_spell_this_turn = true;
+		} else if (spell.casting_time == 0 and spell.level > 0) {
+			c.cast_leveled_spell_this_turn = true;
+		}
 
 		// Basic Rules 2024 Sanctuary (para 14826): "If the warded creature makes an
 		// attack, casts a spell that affects an enemy, or deals damage to another

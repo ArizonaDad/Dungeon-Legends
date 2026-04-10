@@ -155,7 +155,10 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 - Separate roll to hit (d20 + ability mod + proficiency vs AC), then roll for damage
 
 - Advantage/disadvantage from conditions (prone, paralyzed, dodging, etc.)
-- **Condition Mechanics**: Paralyzed/Unconscious → auto-crit on melee hit within 5ft. Incapacitated blocks OAs and defensive reactions. Stunned/Paralyzed/Unconscious auto-skip turns.
+- **Condition Mechanics**: Paralyzed/Unconscious → auto-crit on melee hit within 5ft. Incapacitated blocks actions/bonus actions/reactions (gated in handle_attack, handle_cast, bonus action handler). Stunned/Paralyzed/Unconscious auto-skip turns. Stunned/Paralyzed auto-fail STR/DEX saves (-100 in get_save_bonus). Frightened/Poisoned impose disadvantage on ability checks (request_skill_check). Restrained imposes disadvantage on DEX saves (-5 approx in get_save_bonus). Blinded target grants advantage to attackers (apply_attack_advantage_state). Petrified grants resistance to all damage + poison immunity (apply_damage + add_condition guard).
+- **Crit at 0 HP**: Critical hits on unconscious creatures count as 2 death save failures (was_crit parameter in apply_damage).
+- **Sanctuary Enforcement** (Basic Rules 2024 para 14826): WIS save enforced on all 3 attack paths (handle_attack, start_monster_attack_sequence, start_player_bot_attack_sequence). Self-break when warded creature attacks or casts a spell affecting an enemy.
+- **Bonus Action Spell Rule** (PHB 2024 para 7986-7989): If a bonus action spell is cast, only cantrips may be cast as the action. Tracked via `cast_ba_spell_this_turn` / `cast_leveled_spell_this_turn` flags. Quickened Spell counts as BA spell.
 
 - **Extra Attack**: Fighters level 5 (2 attacks), 11 (3 attacks), 17 (3 attacks + 2 Action Surge). Other martials get 1 extra at level 5.
 
