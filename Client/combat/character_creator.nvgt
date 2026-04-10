@@ -1097,7 +1097,7 @@ void get_subclass_options(string class_name, string[]@ names, string[]@ descript
         add_text_pair(names, descriptions, "Inquisition Domain", "Inquisition Domain. Hunt heretics and counter magic. (Grim Hollow)");
         add_text_pair(names, descriptions, "Mind Domain", "Mind Domain. Psychic power through divine devotion. (Exploring Eberron)");
         add_text_pair(names, descriptions, "Arcana Domain", "Arcana Domain. Knowledge of arcane secrets + wizard cantrips. (Sword Coast) — Coming Soon");
-        add_text_pair(names, descriptions, "Keeper Domain", "Keeper Domain. Protect allies with martial prowess, leadership, and divine reactions. (Book of Ebon Tides)");
+        add_text_pair(names, descriptions, "Keeper Domain", "Keeper Domain. Protect allies with martial prowess, leadership, and divine reactions. (Book of Ebon Tides) — Coming Soon");
         add_text_pair(names, descriptions, "Shadow Domain", "Shadow Domain. Walk between light and dark; stealth, invisibility, and shadow grasp. (Book of Ebon Tides)");
     } else if (class_name == "Druid") {
         add_text_pair(names, descriptions, "Circle of the Land", "Circle of the Land. Draw deeper magic from a chosen environment.");
