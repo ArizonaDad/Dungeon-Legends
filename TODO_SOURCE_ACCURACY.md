@@ -910,6 +910,39 @@ Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 | **Searing Sunburst** (action: 20ft-radius 150ft, 2d6 radiant CON save, +2d6 per ki up to 3) | 11 | 1851-1858 | DEFERRED — AoE ki-scaled spell not yet implemented. |
 | **Sun Shield** (bright light 30ft, when hit by melee: 5+WIS radiant, reaction) | 17 | 1859-1865 | ✓ Done — `sun_shield_active` flag. Wired in ROLL_DAMAGE path after apply_damage: `5 + target.get_ability_mod(ABILITY_WIS)` radiant to melee attacker, consumes reaction. |
 
+### Horizon Walker Ranger Subclass Audit (2026-04-10) — Xanathar's paras 2195-2209
+
+| Feature | Level | Source para | Status |
+|---------|-------|-------------|--------|
+| **Horizon Walker Magic** (protection from evil, misty step, haste, banishment, teleportation circle) | 3-17 | 2180-2181 | DEFERRED — auto-prepared spell system not yet wired for subclass spells. |
+| **Detect Portal** (action: sense nearest planar portal within 1 mile, 1/SR) | 3 | 2195-2198 | DEFERRED — exploration/utility, no combat effect. |
+| **Planar Warrior** (BA: mark target, next weapon hit = +1d8/2d8 force, all damage becomes force) | 3 | 2199-2201 | ✓ Done — `planar_warrior_active` flag. BA handler in `users _dom.nvgt`. Damage rider in `apply_subclass_on_hit_damage`. Scales to 2d8 at L11. |
+| **Ethereal Step** (BA: cast etherealness, ends at end of turn, 1/SR) | 7 | 2202-2204 | DEFERRED — etherealness mechanics (phase through objects, invisible) require movement/visibility system changes. |
+| **Distant Strike** (teleport 10ft before each attack; if hitting 2+ different creatures, make 1 extra attack) | 11 | 2205-2207 | DEFERRED — per-attack teleport + multi-target tracking complex. |
+| **Spectral Defense** (reaction: resistance to all damage from one attack) | 15 | 2208-2209 | ✓ Done — `spectral_defense_active` flag. Reaction option in prompt section. Handler sets `warding_maneuver_resistance` for damage halving. |
+
+### Monster Slayer Ranger Subclass Audit (2026-04-10) — Xanathar's paras 2238-2250
+
+| Feature | Level | Source para | Status |
+|---------|-------|-------------|--------|
+| **Monster Slayer Magic** (protection from evil, zone of truth, magic circle, banishment, hold monster) | 3-17 | 2210-2237 | DEFERRED — auto-prepared spell system not yet wired for subclass spells. |
+| **Hunter's Sense** (action: learn creature immunities/resistances/vulnerabilities, WIS mod uses/LR) | 3 | 2238-2240 | DEFERRED — creature trait inspection not exposed to player UI. |
+| **Slayer's Prey** (BA: mark target, +1d6 first weapon hit per turn, lasts until SR/LR or new target) | 3 | 2241-2243 | ✓ Done — `monster_slayer_prey`, `monster_slayer_target`, `slayer_prey_used_this_turn` flags. BA handler stores target. +1d6 in `apply_subclass_on_hit_damage`. |
+| **Supernatural Defense** (+1d6 to saves when Slayer's Prey target forces a save) | 7 | 2244-2245 | PARTIAL — `supernatural_defense_active` flag set on init. Save bonus logic deferred (requires hooking into save resolution for specific attacker gating). |
+| **Magic-User's Nemesis** (reaction: counter spell/teleport within 60ft, WIS save vs DC, 1/SR) | 11 | 2246-2248 | DEFERRED — `magic_users_nemesis_used` flag set on init. Counterspell-like reaction requires spell-cast interception system. |
+| **Slayer's Counter** (reaction: when prey forces save, make weapon attack first, hit = auto-succeed save) | 15 | 2249-2250 | DEFERRED — `slayers_counter_active` flag set on init. Complex save-interruption mechanics. |
+
+### Oath of Redemption Paladin Subclass Audit (2026-04-10) — Xanathar's paras 2004-2056
+
+| Feature | Level | Source para | Status |
+|---------|-------|-------------|--------|
+| **Oath Spells** (sanctuary, sleep, calm emotions, hold person, counterspell, hypnotic pattern, resilient sphere, stoneskin, hold monster, wall of force) | 3-17 | 2028-2042 | DEFERRED — auto-prepared spell system not yet wired for subclass spells. |
+| **CD: Emissary of Peace** (+5 Persuasion for 10 minutes) | 3 | 2045 | DEFERRED — non-combat social feature. |
+| **CD: Rebuke the Violent** (reaction when attacker damages ally within 30ft: WIS save, radiant damage = damage dealt, half on save) | 3 | 2046 | ✓ Done — `rebuke_violent_ready` flag. CD handler in `users _dom.nvgt`. Trigger auto-resolves in ROLL_DAMAGE path: scans for Redemption Paladin within 30ft, WIS save vs DC. |
+| **Aura of the Guardian** (reaction: take ally's damage within 10/30ft, unreducible) | 7 | 2047-2048 | PARTIAL — `aura_of_guardian_active` + `aura_of_guardian_range` set on init (10 at L7, 30 at L18). Damage-transfer reaction logic deferred. |
+| **Protective Spirit** (end of turn: regain 1d6+half level HP if below half HP and not incapacitated) | 15 | 2050-2051 | ✓ Done — `protective_spirit_active` flag. Passive heal wired in `advance_turn` after Sharpen the Blade tickdown. |
+| **Emissary of Redemption** (resistance to all creature damage + radiant retaliation = half damage taken; lost vs creatures you attack) | 20 | 2052-2056 | PARTIAL — `emissary_of_redemption_active` flag set on init at L20. Combat logic (resistance + retaliation + exclusion tracking) deferred. |
+
 ---
 
 ## Working Rule Going Forward

@@ -158,7 +158,7 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 
 - **Extra Attack**: Fighters level 5 (2 attacks), 11 (3 attacks), 17 (3 attacks + 2 Action Surge). Other martials get 1 extra at level 5.
 
-- **Reaction Prompt System**: When a player is about to be hit, they are prompted for available reactions before hit resolves. Options: Shield (+5 AC), Cutting Words (-1d4-d12), Warding Flare (force reroll), Defensive Duelist (+Prof AC), Restore Balance (cancel advantage), Spirit Shield (reduce damage 2d6+), Entropic Ward (force miss), Arcane Deflection (+2 AC), Warding Maneuver (+1d8 AC, resistance if still hit), Armor of Hexes (d6, 4+ miss), Deflect Attacks (reduce 1d10+DEX+level), Uncanny Dodge (halve damage), Storm's Fury (sorcerer level lightning + push), Shadowy Dodge (impose disadvantage)
+- **Reaction Prompt System**: When a player is about to be hit, they are prompted for available reactions before hit resolves. Options: Shield (+5 AC), Cutting Words (-1d4-d12), Warding Flare (force reroll), Defensive Duelist (+Prof AC), Restore Balance (cancel advantage), Spirit Shield (reduce damage 2d6+), Entropic Ward (force miss), Arcane Deflection (+2 AC), Warding Maneuver (+1d8 AC, resistance if still hit), Armor of Hexes (d6, 4+ miss), Deflect Attacks (reduce 1d10+DEX+level), Uncanny Dodge (halve damage), Storm's Fury (sorcerer level lightning + push), Shadowy Dodge (impose disadvantage), Spectral Defense (resistance to all attack damage)
 - **Resistance System**: Species and feats grant resistances to fire, cold, necrotic, psychic, acid, lightning, piercing, poison (+ immunity) — half damage on applicable types
 - **Wild Magic Surge**: Wild Magic Sorcerers roll d20 on 1+ level spell cast. On natural 1, a random surge effect triggers (fire burst, temp HP, healing, invisibility, spell slot recovery, etc.)
 - **Divine Smite**: Dual mode — bonus action pre-cast OR auto-prompt on melee hit (keys 1-5 for slot level, Escape to skip)
@@ -478,6 +478,9 @@ Per-class audit of all 13 base class features against `basic_rules_full.txt` (Ba
 - Drunken Master Drunken Technique (Flurry grants Disengage + 10ft speed)
 - Kensei Deft Strike (1 ki on weapon hit for +MA die damage), Kensei's Shot (BA +1d4 ranged), Sharpen the Blade (BA 1-3 ki for +1/+2/+3 attack and damage, 1 min, no magic weapon stack), Unerring Accuracy (reroll weapon miss 1/turn)
 - Sun Soul Sun Shield (5+WIS radiant to melee attacker, consumes reaction)
+- Horizon Walker Spectral Defense (reaction: resistance to all attack damage)
+- Monster Slayer Slayer's Prey (+1d6 first weapon hit per turn on marked target)
+- Oath of Redemption Rebuke the Violent (CD reaction: radiant damage equal to damage dealt on WIS fail), Protective Spirit (end-of-turn heal 1d6+half level if below half HP)
 - Oath of the Hearth Burning Weapon (+CHA fire damage while active)
 - Gunslinger White Hat Lay Down the Law (Risk Die temp HP + retaliation reaction)
 
