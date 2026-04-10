@@ -384,6 +384,21 @@ class combatant {
 	bool sculpt_spells_active = false; // Evoker Wizard
 	bool improved_illusions = false; // Illusionist Wizard
 	bool arcane_deflection_available = false; // War Magic Wizard
+	// PHB 2024 Sorcerer Draconic Sorcery L6 Elemental Affinity (para 7559): choose Acid/Cold/Fire/Lightning/Poison
+	string elemental_affinity_type = ""; // "acid"/"cold"/"fire"/"lightning"/"poison"
+	// PHB 2024 Sorcerer Draconic Sorcery L14 Dragon Wings (para 7561-7563)
+	bool dragon_wings_active = false;
+	int dragon_wings_rounds_remaining = 0;
+	bool dragon_wings_used_this_rest = false;
+	// PHB 2024 Sorcerer Draconic Sorcery L18 Dragon Companion (para 7564-7566)
+	bool dragon_companion_used_this_rest = false;
+	// PHB 2024 Wizard Evoker L3 Potent Cantrip (para 9259-9260)
+	bool potent_cantrip_active = false;
+	// PHB 2024 Wizard Evoker L10 Empowered Evocation (para 9263-9264)
+	bool empowered_evocation_active = false;
+	// PHB 2024 Wizard Evoker L14 Overchannel (para 9265-9268): max damage for L1-5 spells
+	bool overchannel_pending = false;
+	int overchannel_uses_this_rest = 0;
 	bool form_of_dread_active = false; // Undead Warlock
 	int form_of_dread_rounds = 0;
 	bool genie_vessel_active = false; // Genie Warlock
@@ -1389,6 +1404,20 @@ class battle {
 		if (damage_type == DMG_BLUDGEONING and target.bludgeoning_resistance) amount = (amount + 1) / 2;
 		if (damage_type == DMG_SLASHING and target.slashing_resistance) amount = (amount + 1) / 2;
 		if (damage_type == DMG_FIRE and target.fire_resistance) amount = (amount + 1) / 2;
+		// PHB 2024 Sorcerer Draconic Sorcery L6 Elemental Affinity (para 7559-7560):
+		// "You have Resistance to that damage type" (the type chosen for Elemental
+		// Affinity). Resistance halves damage of the chosen type.
+		if (target.class_name == "Sorcerer" and target.subclass == "Draconic Sorcery" and target.level >= 6 and target.elemental_affinity_type != "") {
+			int ea_dmg_int = -1;
+			if (target.elemental_affinity_type == "acid") ea_dmg_int = DMG_ACID;
+			else if (target.elemental_affinity_type == "cold") ea_dmg_int = DMG_COLD;
+			else if (target.elemental_affinity_type == "fire") ea_dmg_int = DMG_FIRE;
+			else if (target.elemental_affinity_type == "lightning") ea_dmg_int = DMG_LIGHTNING;
+			else if (target.elemental_affinity_type == "poison") ea_dmg_int = DMG_POISON;
+			if (ea_dmg_int >= 0 and damage_type == ea_dmg_int) {
+				amount = (amount + 1) / 2;
+			}
+		}
 		// Mother of Sorrows Poison Soul (Book of Ebon Tides para 1135):
 		// "Any poison damage you deal ignores any resistance or immunity."
 		// Poisoner feat (PHB para 7715): "When you make a damage roll that deals Poison
@@ -1816,6 +1845,15 @@ class battle {
 				state["my_headshot_active"] = c.headshot_active;
 				state["my_headshot_used"] = c.headshot_used;
 				state["my_cheat_death_used"] = c.cheat_death_used;
+				// PHB 2024 Sorcerer Draconic Sorcery L6/L14/L18 + Wizard Evoker L3/L10/L14
+				state["my_elemental_affinity_type"] = c.elemental_affinity_type;
+				state["my_dragon_wings_active"] = c.dragon_wings_active;
+				state["my_dragon_wings_used_this_rest"] = c.dragon_wings_used_this_rest;
+				state["my_dragon_companion_used_this_rest"] = c.dragon_companion_used_this_rest;
+				state["my_potent_cantrip_active"] = c.potent_cantrip_active;
+				state["my_empowered_evocation_active"] = c.empowered_evocation_active;
+				state["my_overchannel_pending"] = c.overchannel_pending;
+				state["my_overchannel_uses_this_rest"] = c.overchannel_uses_this_rest;
 				// Potion buff rounds remaining
 				state["my_potion_damage_rounds"] = c.potion_damage_rounds;
 				state["my_potion_ac_rounds"] = c.potion_ac_rounds;

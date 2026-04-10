@@ -109,6 +109,9 @@ class character_sheet {
     string elemental_fury_choice = "";
     // Primal Strike damage type sub-choice: "cold" / "fire" / "lightning" / "thunder".
     string primal_strike_damage_type = "";
+    // PHB 2024 Sorcerer Draconic Sorcery L6 Elemental Affinity (para 7559-7560):
+    // "acid" / "cold" / "fire" / "lightning" / "poison". Set via set_elemental_affinity.
+    string elemental_affinity_type = "";
 }
 
 int bardic_inspiration_die_for_level(int level) {
@@ -1522,9 +1525,35 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         c.fast_hands_enabled = true;
     }
 
-    // Wizard Evoker: Sculpt Spells (level 2+)
-    if (cs.class_name == "Wizard" and cs.subclass == "Evoker" and cs.level >= 2) {
-        c.sculpt_spells_active = true;
+    // PHB 2024 Wizard Evoker (paras 9253-9268)
+    if (cs.class_name == "Wizard" and cs.subclass == "Evoker") {
+        // L3 Potent Cantrip (para 9259-9260): "When you cast a cantrip at a creature
+        // and you miss with the attack roll or the target succeeds on a saving throw
+        // against the cantrip, the target takes half the cantrip's damage (if any)
+        // but suffers no additional effect from the cantrip."
+        if (cs.level >= 3) {
+            c.potent_cantrip_active = true;
+        }
+        // L6 Sculpt Spells (para 9261-9262): "When you cast an Evocation spell that
+        // affects other creatures that you can see, you can choose a number of them
+        // equal to 1 plus the spell's level. The chosen creatures automatically
+        // succeed on their saving throws against the spell, and they take no damage
+        // if they would normally take half damage on a successful save."
+        if (cs.level >= 6) {
+            c.sculpt_spells_active = true;
+        }
+        // L10 Empowered Evocation (para 9263-9264): "Whenever you cast a Wizard spell
+        // from the Evocation school, you can add your Intelligence modifier to one
+        // damage roll of that spell."
+        if (cs.level >= 10) {
+            c.empowered_evocation_active = true;
+        }
+        // L14 Overchannel (para 9265-9268): max damage on L1-5 spells; first use free,
+        // subsequent uses deal escalating necrotic damage to the caster (2d12 per slot
+        // level, +1d12 per prior use this rest, ignoring resistance/immunity).
+        if (cs.level >= 14) {
+            c.overchannel_uses_this_rest = 0;
+        }
     }
 
     // Wizard Illusionist: Improved Illusions (level 2+)
@@ -1628,6 +1657,8 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
     // Font of Magic already gives sorcery_points = level. Metamagic options are
     // toggle flags the player activates before casting; defaults all off.
     if (cs.class_name == "Sorcerer") {
+        // PHB 2024 Sorcerer Draconic Sorcery L6 Elemental Affinity — copy player choice.
+        c.elemental_affinity_type = cs.elemental_affinity_type;
         // PHB 2024 Sorcerer L1 Innate Sorcery (para 6963-6967): 2 uses per long rest
         if (cs.level >= 1) {
             c.innate_sorcery_uses_max = 2;
@@ -1636,6 +1667,39 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         // PHB 2024 Sorcerer L5 Sorcerous Restoration (para 7002-7003): 1/long rest flag
         if (cs.level >= 5) {
             c.sorcerous_restoration_available = true;
+        }
+        // PHB 2024 Sorcerer Draconic Sorcery (paras 7539-7566)
+        if (cs.subclass == "Draconic Sorcery") {
+            // L3 Draconic Spells (para 7551-7558): always-prepared spells learned at
+            // 3/5/7/9. Draconic Resilience HP/AC bonus already wired in calculate_hp/ac.
+            if (cs.level >= 3) {
+                if (!c.knows_spell("alter_self")) c.prepared_spells.insert_last("alter_self");
+                if (!c.knows_spell("chromatic_orb")) c.prepared_spells.insert_last("chromatic_orb");
+                if (!c.knows_spell("command")) c.prepared_spells.insert_last("command");
+                if (!c.knows_spell("dragons_breath")) c.prepared_spells.insert_last("dragons_breath");
+            }
+            if (cs.level >= 5) {
+                if (!c.knows_spell("fear")) c.prepared_spells.insert_last("fear");
+                if (!c.knows_spell("fly")) c.prepared_spells.insert_last("fly");
+            }
+            if (cs.level >= 7) {
+                if (!c.knows_spell("arcane_eye")) c.prepared_spells.insert_last("arcane_eye");
+                if (!c.knows_spell("charm_monster")) c.prepared_spells.insert_last("charm_monster");
+            }
+            if (cs.level >= 9) {
+                if (!c.knows_spell("legend_lore")) c.prepared_spells.insert_last("legend_lore");
+                if (!c.knows_spell("summon_dragon")) c.prepared_spells.insert_last("summon_dragon");
+            }
+            // L6 Elemental Affinity (para 7559-7560): player must choose damage type
+            // via Shift+P set_elemental_affinity command. Default empty = unset.
+            // L14 Dragon Wings (para 7561-7563): bonus action handler
+            if (cs.level >= 14) {
+                c.dragon_wings_used_this_rest = false;
+            }
+            // L18 Dragon Companion (para 7564-7566): free Summon Dragon 1/LR
+            if (cs.level >= 18) {
+                c.dragon_companion_used_this_rest = false;
+            }
         }
         if (cs.subclass == "Frost Sorcerer") {
             c.frost_sorcerer_aura = true;

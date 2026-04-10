@@ -1458,7 +1458,8 @@ void handle_user_message(user@ u, json_object@ msg)
 			or feature == "set_divine_order" or feature == "set_blessed_strikes"
 			or feature == "set_divine_strike_damage_type"
 			or feature == "set_primal_order" or feature == "set_elemental_fury"
-			or feature == "set_primal_strike_damage_type";
+			or feature == "set_primal_strike_damage_type"
+			or feature == "set_elemental_affinity";
 		combatant@ c = null;
 		if (is_phase1_config) {
 			@c = u.room.bm.find_player_combatant(u.username);
@@ -1776,6 +1777,88 @@ void handle_user_message(user@ u, json_object@ msg)
 			string activate_msg = c.name + " unleashes Innate Sorcery! Spell save DC +1 and Advantage on Sorcerer spell attack rolls for 1 minute.";
 			if (used_sp) activate_msg += " (Sorcery Incarnate: 2 Sorcery Points spent.)";
 			u.room.bm.broadcast_announce(activate_msg, true);
+		}
+		else if (feature == "dragon_wings") {
+			// PHB 2024 Sorcerer Draconic Sorcery L14 Dragon Wings (para 7561-7563):
+			// "As a Bonus Action, you can cause draconic wings to appear on your back.
+			// The wings last for 1 hour or until you dismiss them (no action required).
+			// For the duration, you have a Fly Speed of 60 feet. Once you use this
+			// feature, you can't use it again until you finish a Long Rest unless you
+			// spend 3 Sorcery Points (no action required) to restore your use of it."
+			if (c.class_name != "Sorcerer" or c.subclass != "Draconic Sorcery" or c.level < 14) {
+				u.send({{"type", message_types::announce}, {"text", "Your character cannot use Dragon Wings."}, {"interrupt", true}});
+				return;
+			}
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
+			if (c.dragon_wings_active) { u.send({{"type", message_types::announce}, {"text", "Dragon Wings are already active."}, {"interrupt", true}}); return; }
+			if (c.dragon_wings_used_this_rest) {
+				u.send({{"type", message_types::announce}, {"text", "Dragon Wings already used this rest. Spend 3 Sorcery Points (use dragon_wings_restore) to restore the use."}, {"interrupt", true}});
+				return;
+			}
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.dragon_wings_active = true;
+			c.dragon_wings_rounds_remaining = 600; // 1 hour ≈ 600 rounds (cap is just a long ceiling)
+			c.dragon_wings_used_this_rest = true;
+			c.flying_speed = 60;
+			u.room.bm.broadcast_announce(c.name + " sprouts draconic wings and gains a Fly Speed of 60 feet for 1 hour!", true);
+		}
+		else if (feature == "dragon_wings_restore") {
+			// PHB 2024 Sorcerer Draconic Sorcery L14 Dragon Wings refresh (para 7563):
+			// "unless you spend 3 Sorcery Points (no action required) to restore your
+			// use of it."
+			if (c.class_name != "Sorcerer" or c.subclass != "Draconic Sorcery" or c.level < 14) {
+				u.send({{"type", message_types::announce}, {"text", "Your character cannot restore Dragon Wings."}, {"interrupt", true}});
+				return;
+			}
+			if (!c.dragon_wings_used_this_rest) {
+				u.send({{"type", message_types::announce}, {"text", "Dragon Wings is not used yet — no need to restore it."}, {"interrupt", true}});
+				return;
+			}
+			if (c.sorcery_points < 3) {
+				u.send({{"type", message_types::announce}, {"text", "Need 3 Sorcery Points to restore Dragon Wings."}, {"interrupt", true}});
+				return;
+			}
+			c.sorcery_points -= 3;
+			c.dragon_wings_used_this_rest = false;
+			u.room.bm.broadcast_announce(c.name + " spends 3 Sorcery Points to restore Dragon Wings.", true);
+		}
+		else if (feature == "summon_dragon_free") {
+			// PHB 2024 Sorcerer Draconic Sorcery L18 Dragon Companion (para 7564-7566):
+			// "You can cast Summon Dragon without a Material component. You can also
+			// cast it once without a spell slot, and you regain the ability to cast it
+			// in this way when you finish a Long Rest. Whenever you start casting the
+			// spell, you can modify it so that it doesn't require Concentration. If you
+			// do so, the spell's duration becomes 1 minute for that casting."
+			if (c.class_name != "Sorcerer" or c.subclass != "Draconic Sorcery" or c.level < 18) {
+				u.send({{"type", message_types::announce}, {"text", "Your character cannot use Dragon Companion."}, {"interrupt", true}});
+				return;
+			}
+			if (c.dragon_companion_used_this_rest) {
+				u.send({{"type", message_types::announce}, {"text", "Free Summon Dragon already used this rest."}, {"interrupt", true}});
+				return;
+			}
+			if (!c.has_action) { u.send({{"type", message_types::announce}, {"text", "No action remaining (Summon Dragon is an Action)."}, {"interrupt", true}}); return; }
+			// Grant a phantom L5 slot for the next Summon Dragon cast and flag it as the free use.
+			c.dragon_companion_used_this_rest = true;
+			c.grant_free_cast("summon_dragon", 1);
+			u.room.bm.broadcast_announce(c.name + "'s Dragon Companion grants a free Summon Dragon cast — use the cast menu to summon it.", true);
+		}
+		else if (feature == "overchannel") {
+			// PHB 2024 Wizard Evoker L14 Overchannel (para 9265-9268): toggle a flag
+			// that the next L1-5 damage spell will deal max damage. The first use is
+			// free; subsequent uses deal escalating necrotic damage to the caster.
+			if (c.class_name != "Wizard" or c.subclass != "Evoker" or c.level < 14) {
+				u.send({{"type", message_types::announce}, {"text", "Your character cannot use Overchannel."}, {"interrupt", true}});
+				return;
+			}
+			if (c.overchannel_pending) {
+				u.send({{"type", message_types::announce}, {"text", "Overchannel is already pending for the next damage spell."}, {"interrupt", true}});
+				return;
+			}
+			c.overchannel_pending = true;
+			string warn = c.overchannel_uses_this_rest >= 1 ? " WARNING: this is use #" + (c.overchannel_uses_this_rest + 1) + " — you will take " + (2 + c.overchannel_uses_this_rest - 1) + "d12 necrotic damage per spell level after the cast." : " First use this rest is free.";
+			u.room.bm.broadcast_announce(c.name + " primes Overchannel — your next L1-5 damage spell will deal maximum damage." + warn, true);
 		}
 		else if (feature == "font_of_magic_to_slot") {
 			// PHB 2024 Sorcerer L2 Font of Magic — Creating Spell Slots (para 6973-6993):
@@ -3434,6 +3517,37 @@ void handle_user_message(user@ u, json_object@ msg)
 				}
 			}
 			u.send({{"type", message_types::announce}, {"text", "Primal Strike damage type set to " + pst + "."}, {"interrupt", true}});
+		}
+		else if (feature == "set_elemental_affinity") {
+			// PHB 2024 Sorcerer Draconic Sorcery L6 Elemental Affinity (para 7559-7560):
+			// "Choose one of those types: Acid, Cold, Fire, Lightning, or Poison. You
+			// have Resistance to that damage type, and when you cast a spell that deals
+			// damage of that type, you can add your Charisma modifier to one damage
+			// roll of that spell."
+			string ea_choice = msg.exists("value") ? string(msg["value"]) : "";
+			if (ea_choice != "acid" and ea_choice != "cold" and ea_choice != "fire" and ea_choice != "lightning" and ea_choice != "poison") {
+				u.send({{"type", message_types::announce}, {"text", "Elemental Affinity must be acid, cold, fire, lightning, or poison."}, {"interrupt", true}});
+				return;
+			}
+			if (c.class_name != "Sorcerer" or c.subclass != "Draconic Sorcery") {
+				u.send({{"type", message_types::announce}, {"text", "Only Draconic Sorcery Sorcerers can choose Elemental Affinity."}, {"interrupt", true}});
+				return;
+			}
+			if (c.level < 6) {
+				u.send({{"type", message_types::announce}, {"text", "Elemental Affinity unlocks at Sorcerer L6."}, {"interrupt", true}});
+				return;
+			}
+			c.elemental_affinity_type = ea_choice;
+			if (@u.account != null) {
+				json_object@ data = u.account.data;
+				string ckey = get_character_storage_key(u.room.game_type);
+				if (data.exists(ckey)) {
+					json_object@ ch = data[ckey];
+					ch["elemental_affinity_type"] = ea_choice;
+					u.account.commit();
+				}
+			}
+			u.send({{"type", message_types::announce}, {"text", "Elemental Affinity set to " + ea_choice + ". You now have resistance to " + ea_choice + " damage and add CHA to one damage roll of " + ea_choice + " spells."}, {"interrupt", true}});
 		}
 		else if (feature == "wild_companion") {
 			// PHB 2024 Druid L2 Wild Companion (para 4420-4422): "As a Magic action, you

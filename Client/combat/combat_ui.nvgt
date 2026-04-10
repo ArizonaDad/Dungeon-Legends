@@ -191,6 +191,15 @@ int my_innate_sorcery_uses_remaining = 0;
 bool my_innate_sorcery_active = false;
 int my_sorcery_points = 0;
 int my_sorcery_points_max = 0;
+// PHB 2024 Sorcerer Draconic Sorcery L6/L14/L18 + Wizard Evoker L3/L10/L14 — synced from server
+string my_elemental_affinity_type = "";
+bool my_dragon_wings_active = false;
+bool my_dragon_wings_used_this_rest = false;
+bool my_dragon_companion_used_this_rest = false;
+bool my_potent_cantrip_active = false;
+bool my_empowered_evocation_active = false;
+bool my_overchannel_pending = false;
+int my_overchannel_uses_this_rest = 0;
 // PHB 2024 Warlock L2 Magical Cunning / L9 Contact Patron / L11+ Mystic Arcanum — synced from server
 bool my_magical_cunning_available = false;
 bool my_contact_patron_available = false;
@@ -1026,6 +1035,12 @@ void show_bonus_action_menu() {
 	int innate_sorcery_opt = -1;
 	int font_of_magic_to_slot_opt = -1;
 	int font_of_magic_to_sp_opt = -1;
+	// PHB 2024 Sorcerer Draconic Sorcery L14 Dragon Wings / L18 Dragon Companion (paras 7561-7566)
+	int dragon_wings_opt = -1;
+	int dragon_wings_restore_opt = -1;
+	int summon_dragon_free_opt = -1;
+	// PHB 2024 Wizard Evoker L14 Overchannel (paras 9265-9268)
+	int overchannel_opt = -1;
 	// PHB 2024 Warlock L2 Magical Cunning / L9 Contact Patron / L11+ Mystic Arcanum
 	int magical_cunning_opt = -1;
 	int contact_patron_opt = -1;
@@ -1050,6 +1065,30 @@ void show_bonus_action_menu() {
 	}
 	if (lc == "sorcerer" and level >= 2 and my_sorcery_points < my_sorcery_points_max) {
 		font_of_magic_to_sp_opt = m.add_item("Font of Magic: convert a spell slot to Sorcery Points. Sorcery Points: " + my_sorcery_points + " of " + my_sorcery_points_max + ".");
+	}
+	// PHB 2024 Sorcerer Draconic Sorcery L14 Dragon Wings (paras 7561-7563): Bonus action,
+	// dragon wings sprout, fly speed 60 ft for 1 hour. 1/Long Rest, or 3 Sorcery Points to refresh.
+	if (lc == "sorcerer" and subclass == "Draconic Sorcery" and level >= 14 and !my_dragon_wings_active and !my_dragon_wings_used_this_rest) {
+		dragon_wings_opt = m.add_item("Dragon Wings. Bonus action. Fly 60 feet for 1 hour. 1 per long rest.");
+	}
+	if (lc == "sorcerer" and subclass == "Draconic Sorcery" and level >= 14 and my_dragon_wings_used_this_rest and my_sorcery_points >= 3) {
+		dragon_wings_restore_opt = m.add_item("Restore Dragon Wings. Spend 3 Sorcery Points. Sorcery Points: " + my_sorcery_points + ".");
+	}
+	// PHB 2024 Sorcerer Draconic Sorcery L18 Dragon Companion (paras 7564-7566): cast
+	// Summon Dragon without a slot or material components. 1/Long Rest.
+	if (lc == "sorcerer" and subclass == "Draconic Sorcery" and level >= 18 and !my_dragon_companion_used_this_rest) {
+		summon_dragon_free_opt = m.add_item("Dragon Companion: cast Summon Dragon without a slot. 1 per long rest.");
+	}
+	// PHB 2024 Wizard Evoker L14 Overchannel (paras 9265-9268): When you cast a Wizard
+	// spell of levels 1-5 that deals damage, deal max damage. After first use per long
+	// rest, take 2d12 necrotic per spell level (escalates +1d12 per use until long rest).
+	if (lc == "wizard" and subclass == "Evoker" and level >= 14 and !my_overchannel_pending) {
+		string oc_label = "Overchannel. Toggle: next Wizard spell level 1-5 you cast deals max damage.";
+		if (my_overchannel_uses_this_rest >= 1) {
+			int extra = 2 + (my_overchannel_uses_this_rest - 1);
+			oc_label += " WARNING: you will take " + extra + "d12 necrotic per spell level after casting.";
+		}
+		overchannel_opt = m.add_item(oc_label);
 	}
 	// PHB 2024 Warlock L2 Magical Cunning (paras 7782-7783): Magic action; perform an
 	// esoteric rite for 1 minute. Regain Pact Magic spell slots, no more than half max
@@ -1529,6 +1568,10 @@ void show_bonus_action_menu() {
 	if (innate_sorcery_opt >= 0) options++;
 	if (font_of_magic_to_slot_opt >= 0) options++;
 	if (font_of_magic_to_sp_opt >= 0) options++;
+	if (dragon_wings_opt >= 0) options++;
+	if (dragon_wings_restore_opt >= 0) options++;
+	if (summon_dragon_free_opt >= 0) options++;
+	if (overchannel_opt >= 0) options++;
 	if (magical_cunning_opt >= 0) options++;
 	if (contact_patron_opt >= 0) options++;
 	if (mystic_arcanum_opt >= 0) options++;
@@ -1629,6 +1672,22 @@ void show_bonus_action_menu() {
 		}
 		if (picked_level < 1) return;
 		send({{"type", message_types::bonus_action}, {"feature", "font_of_magic_to_sp"}, {"slot_level", picked_level}});
+	}
+	else if (dragon_wings_opt >= 0 and res == dragon_wings_opt) {
+		// PHB 2024 Sorcerer Draconic Sorcery L14 Dragon Wings (paras 7561-7563)
+		send({{"type", message_types::bonus_action}, {"feature", "dragon_wings"}});
+	}
+	else if (dragon_wings_restore_opt >= 0 and res == dragon_wings_restore_opt) {
+		// PHB 2024 Sorcerer Draconic Sorcery L14 Dragon Wings refresh (paras 7561-7563)
+		send({{"type", message_types::bonus_action}, {"feature", "dragon_wings_restore"}});
+	}
+	else if (summon_dragon_free_opt >= 0 and res == summon_dragon_free_opt) {
+		// PHB 2024 Sorcerer Draconic Sorcery L18 Dragon Companion (paras 7564-7566)
+		send({{"type", message_types::bonus_action}, {"feature", "summon_dragon_free"}});
+	}
+	else if (overchannel_opt >= 0 and res == overchannel_opt) {
+		// PHB 2024 Wizard Evoker L14 Overchannel (paras 9265-9268)
+		send({{"type", message_types::bonus_action}, {"feature", "overchannel"}});
 	}
 	else if (magical_cunning_opt >= 0 and res == magical_cunning_opt) {
 		// PHB 2024 Warlock L2 Magical Cunning (paras 7782-7783) — server uses Magic action,
@@ -2507,6 +2566,11 @@ void show_phase1_menu() {
 			primal_strike_dmg_opt = m.add_item("Set Primal Strike damage type (Cold, Fire, Lightning, or Thunder — only used if Elemental Fury is Primal Strike).");
 		}
 	}
+	// PHB 2024 Sorcerer Draconic Sorcery L6 Elemental Affinity (para 7559-7560).
+	int elemental_affinity_opt = -1;
+	if (lc_class == "sorcerer" and current_subclass_name() == "Draconic Sorcery" and current_character_level() >= 6) {
+		elemental_affinity_opt = m.add_item("Set Draconic Elemental Affinity damage type (Acid, Cold, Fire, Lightning, or Poison).");
+	}
 	int status_opt = m.add_item("Show full Phase 1 status.");
 	int cancel_opt = m.add_item("Cancel.");
 
@@ -2707,6 +2771,26 @@ void show_phase1_menu() {
 		else if (pick == th) chosen = "thunder";
 		send({{"type", message_types::bonus_action}, {"feature", "set_primal_strike_damage_type"}, {"value", chosen}});
 		speak("Primal Strike damage type set to " + chosen + ".", true);
+	}
+	else if (elemental_affinity_opt >= 0 and res == elemental_affinity_opt) {
+		// PHB 2024 Sorcerer Draconic Sorcery L6 Elemental Affinity (para 7559-7560)
+		menu@ eam = setup_sub_menu("Choose Draconic Elemental Affinity damage type.");
+		int ac = eam.add_item("Acid.");
+		int co = eam.add_item("Cold.");
+		int fi = eam.add_item("Fire.");
+		int li = eam.add_item("Lightning.");
+		int po = eam.add_item("Poison.");
+		int cnc = eam.add_item("Cancel.");
+		int pick = eam.run();
+		if (pick < 0 or pick == cnc) return;
+		string chosen = "";
+		if (pick == ac) chosen = "acid";
+		else if (pick == co) chosen = "cold";
+		else if (pick == fi) chosen = "fire";
+		else if (pick == li) chosen = "lightning";
+		else if (pick == po) chosen = "poison";
+		send({{"type", message_types::bonus_action}, {"feature", "set_elemental_affinity"}, {"value", chosen}});
+		speak("Elemental Affinity set to " + chosen + ".", true);
 	}
 	else if (res == status_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "query_phase1"}});
@@ -3297,6 +3381,15 @@ void parse_game_state(json_object@ msg) {
 	my_innate_sorcery_active = msg.exists("my_innate_sorcery_active") ? bool(msg["my_innate_sorcery_active"]) : false;
 	my_sorcery_points = msg.exists("my_sorcery_points") ? int(msg["my_sorcery_points"]) : 0;
 	my_sorcery_points_max = msg.exists("my_sorcery_points_max") ? int(msg["my_sorcery_points_max"]) : 0;
+	// PHB 2024 Sorcerer Draconic Sorcery L6/L14/L18 + Wizard Evoker L3/L10/L14
+	my_elemental_affinity_type = msg.exists("my_elemental_affinity_type") ? string(msg["my_elemental_affinity_type"]) : "";
+	my_dragon_wings_active = msg.exists("my_dragon_wings_active") ? bool(msg["my_dragon_wings_active"]) : false;
+	my_dragon_wings_used_this_rest = msg.exists("my_dragon_wings_used_this_rest") ? bool(msg["my_dragon_wings_used_this_rest"]) : false;
+	my_dragon_companion_used_this_rest = msg.exists("my_dragon_companion_used_this_rest") ? bool(msg["my_dragon_companion_used_this_rest"]) : false;
+	my_potent_cantrip_active = msg.exists("my_potent_cantrip_active") ? bool(msg["my_potent_cantrip_active"]) : false;
+	my_empowered_evocation_active = msg.exists("my_empowered_evocation_active") ? bool(msg["my_empowered_evocation_active"]) : false;
+	my_overchannel_pending = msg.exists("my_overchannel_pending") ? bool(msg["my_overchannel_pending"]) : false;
+	my_overchannel_uses_this_rest = msg.exists("my_overchannel_uses_this_rest") ? int(msg["my_overchannel_uses_this_rest"]) : 0;
 	my_magical_cunning_available = msg.exists("my_magical_cunning_available") ? bool(msg["my_magical_cunning_available"]) : false;
 	my_contact_patron_available = msg.exists("my_contact_patron_available") ? bool(msg["my_contact_patron_available"]) : false;
 	my_mystic_arcanum_6_available = msg.exists("my_mystic_arcanum_6_available") ? bool(msg["my_mystic_arcanum_6_available"]) : false;
@@ -3495,6 +3588,14 @@ void reset_combat_state() {
 	my_innate_sorcery_active = false;
 	my_sorcery_points = 0;
 	my_sorcery_points_max = 0;
+	my_elemental_affinity_type = "";
+	my_dragon_wings_active = false;
+	my_dragon_wings_used_this_rest = false;
+	my_dragon_companion_used_this_rest = false;
+	my_potent_cantrip_active = false;
+	my_empowered_evocation_active = false;
+	my_overchannel_pending = false;
+	my_overchannel_uses_this_rest = 0;
 	my_magical_cunning_available = false;
 	my_contact_patron_available = false;
 	my_mystic_arcanum_6_available = false;

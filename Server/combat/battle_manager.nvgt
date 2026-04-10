@@ -1747,6 +1747,25 @@ class battle_manager {
 
 	void resolve_spell_save_damage_roll(combatant@ caster, pending_roll@ pr, int natural_roll) {
 		if (@caster == null or @pr == null or !pr.is_spell_effect or !pr.spell_requires_save or @combat == null) return;
+		// PHB 2024 Wizard Evoker L14 Overchannel (para 9265-9268): "When you cast a
+		// Wizard spell with a spell slot of levels 1-5 that deals damage, you can deal
+		// maximum damage with that spell on the turn you cast it. The first time you
+		// do so, you suffer no adverse effect. If you use this feature again before you
+		// finish a Long Rest, you take 2d12 Necrotic damage for each level of the spell
+		// slot immediately after you cast it. This damage ignores Resistance and
+		// Immunity. Each time you use this feature again before finishing a Long Rest,
+		// the Necrotic damage per spell level increases by 1d12."
+		spell_def@ oc_spell = get_spell(pr.spell_id);
+		bool overchannel_used_now = false;
+		int overchannel_spell_level_used = 0;
+		if (caster.overchannel_pending and @oc_spell != null and oc_spell.level >= 1 and oc_spell.level <= 5 and caster.class_name == "Wizard" and caster.subclass == "Evoker" and caster.level >= 14) {
+			int max_dice = pr.damage_dice_count * pr.damage_dice_sides;
+			if (max_dice > natural_roll) natural_roll = max_dice;
+			caster.overchannel_pending = false;
+			overchannel_used_now = true;
+			overchannel_spell_level_used = oc_spell.level;
+			broadcast_announce(caster.name + " unleashes Overchannel — maximum damage!", true);
+		}
 		int base_damage = natural_roll + pr.damage_modifier;
 		if (base_damage < 1) base_damage = 1;
 		// PHB 2024 Cleric L7 Blessed Strikes — Potent Spellcasting (para 3620):
@@ -1763,6 +1782,35 @@ class battle_manager {
 		if (@pcs_spell != null and pcs_spell.level == 0 and pcs_spell.class_list.find("druid") >= 0) {
 			int dpc_bonus = caster.druid_potent_spellcasting_bonus();
 			if (dpc_bonus > 0) base_damage += dpc_bonus;
+		}
+		// PHB 2024 Wizard Evoker L10 Empowered Evocation (para 9263-9264): "Whenever
+		// you cast a Wizard spell from the Evocation school, you can add your
+		// Intelligence modifier to one damage roll of that spell."
+		if (@pcs_spell != null and pcs_spell.school == "evocation" and caster.empowered_evocation_active and caster.class_name == "Wizard") {
+			int int_mod_ee = caster.get_ability_mod(ABILITY_INT);
+			if (int_mod_ee > 0) {
+				base_damage += int_mod_ee;
+				broadcast_announce(caster.name + "'s Empowered Evocation adds +" + int_mod_ee + " to the damage.", false);
+			}
+		}
+		// PHB 2024 Sorcerer Draconic Sorcery L6 Elemental Affinity (para 7559-7560):
+		// "When you cast a spell that deals damage of the type associated with your
+		// Draconic Ancestry, you can add your Charisma modifier to one damage roll of
+		// that spell." Damage type is set via Shift+P set_elemental_affinity choice.
+		if (caster.class_name == "Sorcerer" and caster.subclass == "Draconic Sorcery" and caster.level >= 6 and caster.elemental_affinity_type != "") {
+			int affinity_dmg_int = -1;
+			if (caster.elemental_affinity_type == "acid") affinity_dmg_int = DMG_ACID;
+			else if (caster.elemental_affinity_type == "cold") affinity_dmg_int = DMG_COLD;
+			else if (caster.elemental_affinity_type == "fire") affinity_dmg_int = DMG_FIRE;
+			else if (caster.elemental_affinity_type == "lightning") affinity_dmg_int = DMG_LIGHTNING;
+			else if (caster.elemental_affinity_type == "poison") affinity_dmg_int = DMG_POISON;
+			if (affinity_dmg_int >= 0 and pr.damage_type == affinity_dmg_int) {
+				int cha_mod_ea = caster.get_ability_mod(ABILITY_CHA);
+				if (cha_mod_ea > 0) {
+					base_damage += cha_mod_ea;
+					broadcast_announce(caster.name + "'s Elemental Affinity adds +" + cha_mod_ea + " " + caster.elemental_affinity_type + " damage.", false);
+				}
+			}
 		}
 		string dmg_type_name = "damage";
 		if (pr.damage_type >= 0 and pr.damage_type < int(DAMAGE_TYPE_NAMES.length())) {
@@ -1792,8 +1840,42 @@ class battle_manager {
 			targets.insert_last(center_target);
 		}
 
+		// PHB 2024 Wizard Evoker L6 Sculpt Spells (para 9261-9262): "When you cast an
+		// Evocation spell that affects other creatures that you can see, you can choose
+		// a number of them equal to 1 plus the spell's level. The chosen creatures
+		// automatically succeed on their saving throws against the spell, and they
+		// take no damage if they would normally take half damage on a successful save."
+		// Auto-pick allies (matching is_player) up to the limit and skip them entirely.
+		// TODO: full player choice prompt for selecting any creatures (deferred — current
+		// auto-pick implements the only sensible use case: protecting allies in PvE).
+		bool sculpt_active = (caster.sculpt_spells_active and @oc_spell != null and oc_spell.school == "evocation" and caster.class_name == "Wizard");
+		uint sculpt_skipped_ids_count = 0;
+		uint[] sculpt_skipped_ids;
+		if (sculpt_active and pr.spell_is_aoe and @oc_spell != null) {
+			int sculpt_max = 1 + oc_spell.level;
+			int sculpt_used = 0;
+			for (uint si = 0; si < targets.length() and sculpt_used < sculpt_max; si++) {
+				combatant@ st = targets[si];
+				if (@st == null) continue;
+				if (st.is_player == caster.is_player and combat.mode != "pvp") {
+					sculpt_skipped_ids.insert_last(st.id);
+					sculpt_used++;
+				}
+			}
+			sculpt_skipped_ids_count = sculpt_skipped_ids.length();
+			if (sculpt_skipped_ids_count > 0) {
+				broadcast_announce(caster.name + "'s Sculpt Spells protects " + sculpt_skipped_ids_count + " " + (sculpt_skipped_ids_count == 1 ? "ally" : "allies") + " from " + pr.spell_name + ".", false);
+			}
+		}
+
 		for (uint ti = 0; ti < targets.length(); ti++) {
 			combatant@ t = targets[ti];
+			// Sculpt Spells: skip protected allies entirely (auto-success, no damage).
+			bool sculpt_protected = false;
+			for (uint sk = 0; sk < sculpt_skipped_ids_count; sk++) {
+				if (sculpt_skipped_ids[sk] == t.id) { sculpt_protected = true; break; }
+			}
+			if (sculpt_protected) continue;
 			int save_roll = random(1, 20);
 			int save_bonus = t.get_save_bonus(pr.spell_save_type);
 			int bless_bonus = roll_bless_bonus(t);
@@ -1913,6 +1995,26 @@ class battle_manager {
 				broadcast_to_battle({{"type", message_types::creature_died}, {"name", t.name}, {"is_player", t.is_player}, {"killed_by", caster.name}, {"was_full_hp", aoe_target_was_full}, {"was_overkill", damage >= t.max_hp * 2}, {"was_stealth", aoe_caster_was_hidden}});
 			}
 			check_concentration(t, damage, caster);
+		}
+
+		// PHB 2024 Wizard Evoker L14 Overchannel self-damage (para 9265-9268): only
+		// after the second+ use of the feature this rest. First use is free.
+		if (overchannel_used_now) {
+			if (caster.overchannel_uses_this_rest >= 1) {
+				int extra_dice_per_level = 2 + (caster.overchannel_uses_this_rest - 1); // 2d12 second use, 3d12 third, etc.
+				int total_dice = extra_dice_per_level * overchannel_spell_level_used;
+				int self_damage = 0;
+				for (int sd = 0; sd < total_dice; sd++) self_damage += random(1, 12);
+				broadcast_announce(caster.name + " suffers " + self_damage + " necrotic damage from Overchannel backlash!", true);
+				// Direct HP subtraction — bypasses resistance/immunity per source.
+				caster.current_hp -= self_damage;
+				if (caster.current_hp < 0) caster.current_hp = 0;
+				if (caster.current_hp == 0) {
+					caster.is_dead = true;
+					broadcast_to_battle({{"type", message_types::creature_died}, {"name", caster.name}, {"is_player", caster.is_player}, {"killed_by", "Overchannel backlash"}, {"was_full_hp", false}, {"was_overkill", false}, {"was_stealth", false}});
+				}
+			}
+			caster.overchannel_uses_this_rest++;
 		}
 
 		broadcast_state();
@@ -2892,6 +2994,8 @@ class battle_manager {
 					if (ch.exists("primal_order")) cs.primal_order = string(ch["primal_order"]);
 					if (ch.exists("elemental_fury_choice")) cs.elemental_fury_choice = string(ch["elemental_fury_choice"]);
 					if (ch.exists("primal_strike_damage_type")) cs.primal_strike_damage_type = string(ch["primal_strike_damage_type"]);
+					// PHB 2024 Sorcerer Draconic Sorcery L6 Elemental Affinity choice (para 7559-7560)
+					if (ch.exists("elemental_affinity_type")) cs.elemental_affinity_type = string(ch["elemental_affinity_type"]);
 					has_char = true;
 				} else if (lobby_game_type == GAME_TYPE_SANDBOX and data.exists(ACCOUNT_KEY_LEGACY_CHARACTER)) {
 					json_object@ ch = data[ACCOUNT_KEY_LEGACY_CHARACTER];
@@ -3230,6 +3334,18 @@ class battle_manager {
 				if (prev.innate_sorcery_rounds_remaining <= 0) {
 					prev.innate_sorcery_active = false;
 					broadcast_announce(prev.name + "'s Innate Sorcery fades.", false);
+				}
+			}
+			// PHB 2024 Sorcerer Draconic Sorcery L14 Dragon Wings (para 7561-7563):
+			// "The wings last for 1 hour or until you dismiss them." 1 hour ≈ 600
+			// rounds. Tick down on each of the Sorcerer's turn-ends; clear flying
+			// speed and the active flag at 0.
+			if (prev.dragon_wings_active and prev.dragon_wings_rounds_remaining > 0) {
+				prev.dragon_wings_rounds_remaining--;
+				if (prev.dragon_wings_rounds_remaining <= 0) {
+					prev.dragon_wings_active = false;
+					if (prev.flying_speed == 60) prev.flying_speed = 0;
+					broadcast_announce(prev.name + "'s Dragon Wings fade.", false);
 				}
 			}
 			// Valda's Spire Gunslinger L5 Gut Shot debuff tickdown (paras 184-185):
@@ -5071,6 +5187,29 @@ class battle_manager {
 			if (!hit and !is_fumble and pr.is_weapon_attack and !pr.is_spell_effect) {
 				int gs_dmg_type = pr.damage_dice_count > 0 ? pr.damage_type : get_attack_damage_type(c, false);
 				try_grazing_shot(c, target, gs_dmg_type);
+			}
+
+			// PHB 2024 Wizard Evoker L3 Potent Cantrip (para 9259-9260): "When you cast
+			// a cantrip at a creature and you miss with the attack roll or the target
+			// succeeds on a saving throw against the cantrip, the target takes half the
+			// cantrip's damage (if any) but suffers no additional effect from the
+			// cantrip." Save-based cantrip path is already covered incidentally by the
+			// unconditional half-on-save in resolve_spell_save_damage_roll (line 1872).
+			if (!hit and pr.is_spell_effect and pr.spell_uses_attack_roll and c.potent_cantrip_active and c.class_name == "Wizard") {
+				spell_def@ pc_spell = get_spell(pr.spell_id);
+				if (@pc_spell != null and pc_spell.level == 0 and pr.damage_dice_count > 0 and pr.damage_dice_sides > 0) {
+					int pc_total = 0;
+					for (int pi = 0; pi < pr.damage_dice_count; pi++) pc_total += random(1, pr.damage_dice_sides);
+					pc_total += pr.damage_modifier;
+					int pc_half = pc_total / 2;
+					if (pc_half < 1) pc_half = 1;
+					broadcast_announce(c.name + "'s Potent Cantrip deals " + pc_half + " " + DAMAGE_TYPE_NAMES[pr.damage_type] + " damage to " + target.name + " on the miss.", false);
+					combat.apply_damage(target, pc_half, pr.damage_type, c);
+					broadcast_to_battle({{"type", message_types::damage_dealt}, {"attacker", c.name}, {"target", target.name}, {"amount", pc_half}, {"damage_type", DAMAGE_TYPE_NAMES[pr.damage_type]}, {"is_crit", false}, {"is_spell", true}});
+					if (target.is_dead) {
+						broadcast_to_battle({{"type", message_types::creature_died}, {"name", target.name}, {"is_player", target.is_player}, {"killed_by", c.name}, {"was_full_hp", false}, {"was_overkill", false}, {"was_stealth", false}});
+					}
+				}
 			}
 
 			// Reaction prompt: offer defender reactions BEFORE resolving hit
