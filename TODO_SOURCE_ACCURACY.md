@@ -219,7 +219,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 | Feature | Level | Source para | Status |
 |---|---|---|---|
 | Spellcasting (full caster, WIS, prepared) | 1 | 4372-4383 | ✓ Done |
-| Druidic (Speak with Animals always prepared) | 1 | 4384-4386 | PARTIAL — language flavor only; auto-prepare of Speak with Animals deferred |
+| Druidic (Speak with Animals always prepared) | 1 | 4384-4386 | ✓ Done — auto-prepared in `character_data.nvgt` Druid init block (line 2359). |
 | **Primal Order** (Magician or Warden — once-per-character choice) | 1 | 4387-4390 | ✓ Done 2026-04-09 — `primal_order` field on character_sheet + combatant. Configured via Shift+P → "Set Druid Primal Order". Magician bonus to Arcana/Nature checks (WIS mod, min +1) wired in `finalize_roll_result`. Warden martial-weapon + medium-armor proficiency at character creation deferred to a future `apply_class_defaults` pass. |
 | Wild Shape (BA, scale 2/3/4 uses at L2/6/14, temp HP) | 2 | 4391-4419 | ✓ Done — and 2026-04-09 added the use-count scaling to `apply_class_defaults` (was hard-coded to 2). |
 | **Wild Companion** (Magic action, expend slot or WS use, cast Find Familiar) | 2 | 4420-4422 | ✓ Done 2026-04-09 — bonus action handler in `users _dom.nvgt` consumes WS use first, falls back to lowest spell slot. Find Familiar narrative-only (no grid familiar pet, matches no-pet-grid policy). Client menu entry visible at Druid L2+. |
@@ -227,7 +227,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 | **Wild Resurgence** (slot → WS use 1/turn; WS use → L1 slot 1/long rest) | 5 | 4427-4429 | ✓ Done 2026-04-09 — two no-action bonus action handlers (`wild_resurgence_slot_to_use` and `wild_resurgence_use_to_slot`). Per-turn and per-rest tracking flags reset at turn start (slot → use) and on long rest (use → slot). |
 | **Elemental Fury** (Potent Spellcasting OR Primal Strike — choose at L7) | 7 | 4430-4433 | ✓ Done 2026-04-09 — `elemental_fury_choice` field. Primal Strike: `roll_primal_strike` helper applies +1d8 cold/fire/lightning/thunder once per turn on weapon and Wild Shape attacks (mirrors Cleric Divine Strike). Potent Spellcasting: `druid_potent_spellcasting_bonus` adds WIS mod to Druid cantrip damage (produce_flame inline + generic spell save damage path both updated). Damage type sub-choice persisted. Configured via Shift+P. |
 | **Improved Elemental Fury** (Primal Strike +2d8 / Potent Spellcasting cantrip range +300 ft) | 15 | 4434-4437 | ✓ Done 2026-04-09 — Primal Strike doubles dice at L15+ via `roll_primal_strike`. Potent Spellcasting cantrip range extension is descriptive only (range checks pass at +300 ft regardless since combat grid is small). |
-| **Beast Spells** (cast spells in Wild Shape form, except costed material components) | 18 | 4438-4439 | ✗ DEFERRED — requires Wild Shape spellcasting refactor (current code blocks spellcasting in beast form). |
+| **Beast Spells** (cast spells in Wild Shape form, except costed material components) | 18 | 4438-4439 | ✓ Done 2026-04-10 — `beast_spells_active` flag set on Druid L18+ init; `handle_cast` bypasses Wild Shape spellcasting block when flag is set. |
 | **Archdruid: Evergreen Wild Shape** (regen WS on Initiative if 0 uses) | 20 | 4444 | ✓ Done 2026-04-10 — wired in `request_next_initiative` after Dire Gambit block. Restores 1 WS use when rolling initiative with 0 uses remaining. |
 | **Archdruid: Nature Magician** (convert WS uses to a single spell slot, 1/long rest) | 20 | 4445 | ✗ DEFERRED — needs a player-prompt "how many uses to convert" UI. Per-rest flag is in place. |
 
@@ -281,7 +281,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 | **Self-Restoration** (auto remove Charmed/Frightened/Poisoned at end of turn) | 10 | 5362-5364 | ✓ Done 2026-04-09 — `self_restoration_active` flag and end-of-turn cleanup in `advance_turn` (highest-priority condition removed first). |
 | **Subclass feature** | 11 | 5256 | ✓ Done. |
 | **Deflect Energy** (Deflect Attacks works on any damage type) | 13 | 5365-5366 | ✓ Done 2026-04-09 — Deflect Attacks reaction option is offered for any damage type when defender is L13+ (the L3 gating only enforces B/P/S below L13). |
-| **Disciplined Survivor** (all save profs + reroll failed save with FP) | 14 | 5367-5369 | PARTIAL 2026-04-09 — all save proficiencies set in `character_data.nvgt` Monk L14+ block. Save reroll prompt deferred (needs failed-save prompt chain integration). |
+| **Disciplined Survivor** (all save profs + reroll failed save with FP) | 14 | 5367-5369 | ✓ Done 2026-04-10 — all save proficiencies set at L14+. `try_disciplined_survivor_reroll` helper wired into 22+ save failure sites. Spends 1 FP, smart-spend only if nat 20 + bonus >= DC. |
 | **Perfect Focus** (regain to 4 FP on initiative if 3 or fewer) | 15 | 5370-5371 | ✓ Done 2026-04-09 — applied in `finish_initiative()` immediately after initiative rolls. Tops up to 4 if current < 4. Announced to players. Uncanny Metabolism path unaffected (UM fully refills anyway). |
 | **Subclass feature** | 17 | 5292 | ✓ Done. |
 | **Superior Defense** (3 FP, 1 minute Resistance to all but Force) | 18 | 5372-5373 | ✓ Done 2026-04-09 — new `superior_defense_active` + `superior_defense_rounds_remaining` fields, bonus action handler, damage halving in `apply_damage` for any non-Force damage type, round-tick in `start_turn`, ends if Incapacitated. |
@@ -290,7 +290,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 
 **Pending follow-up Monk batches:**
 - Deflect Attacks redirect target picker (Focus Point spend, 5ft melee / 60ft ranged, DEX save, 2× MA die + DEX mod same damage type)
-- Disciplined Survivor failed-save reroll prompt chain (L14)
+- ~~Disciplined Survivor failed-save reroll prompt chain (L14)~~ RESOLVED 2026-04-10 — `try_disciplined_survivor_reroll` wired into 22+ save failure sites.
 - Heightened Focus Step of the Wind ally-carry (needs targeting prompt)
 - Empowered Strikes Force/normal damage type prompt (L6) — could be a persistent toggle bonus action
 
@@ -309,7 +309,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 | **Extra Attack** (2 attacks) | 5 | 5671-5672 | ✓ Done — `cs.extra_attacks=1` set in init. |
 | **Faithful Steed** (Find Steed always prepared, 1 free cast/LR) | 5 | 5673-5675 | PARTIAL 2026-04-09 — new `faithful_steed_free_cast_used` flag added; Find Steed companion summon (mount entity with stats) deferred per existing Beast Master/Steel Defender pattern. |
 | **Aura of Protection** (10ft Emanation, +CHA mod to saves) | 6 | 5676-5679 | ✓ Done 2026-04-10 — refresh_paladin_auras() scans all friendly Paladins by position. Ally coverage for Aura of Protection (CHA mod to saves within 10ft/30ft at L18) and Aura of Courage (Frightened immunity within range). Called at turn start and after movement. |
-| **Abjure Foes** (CD action, 60ft, CHA mod targets, WIS save Frightened) | 9 | 5680-5681 | DEFERRED — needs target-distribution prompt (CHA mod creatures in 60ft). |
+| **Abjure Foes** (CD action, 60ft, CHA mod targets, WIS save Frightened) | 9 | 5680-5681 | ✓ Done 2026-04-10 — Auto-targets nearest CHA mod (min 1) hostiles within 60ft. Full WIS save failure chain. Client menu entry for all Paladins L9+. |
 | **Aura of Courage** (Frightened immunity in aura) | 10 | 5682-5683 | ✓ Done 2026-04-10 — Ally coverage wired via refresh_paladin_auras(). Frightened immunity applied to allies within 10ft (30ft at L18) of any L10+ Paladin. |
 | **Radiant Strikes** (+1d8 radiant on melee weapon/unarmed hit) | 11 | 5684-5685 | ✓ Done 2026-04-09 — block added in `battle_manager.nvgt` after Druid Primal Strike: every qualifying hit adds 1d8 radiant. Excludes ranged weapons per source ("Melee weapon or Unarmed Strike"). |
 | **Restoring Touch** (LoH heals + remove condition list, 5 HP each) | 14 | 5686-5687 | ✓ Done — `lay_on_hands` handler already accepts L14 conditions (Blinded/Charmed/Deafened/Frightened/Paralyzed/Stunned) at 5 HP each. |
@@ -317,7 +317,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 | **Epic Boon** | 19 | 5690-5691 | ✓ Done — Epic Boon feat catalog. |
 
 **Pending follow-up Paladin batches:**
-- Abjure Foes L9 Channel Divinity action — needs CHA mod target distribution prompt within 60ft, WIS save vs spell save DC, 1-min Frightened (limited-action while Frightened condition).
+- ~~Abjure Foes L9 Channel Divinity action~~ RESOLVED 2026-04-10 — auto-targets nearest CHA mod hostiles within 60ft, WIS save with full failure chain, Frightened on fail.
 - ~~Aura range loop for ally coverage of Aura of Protection (saves), Aura of Courage (Frightened immunity), and L18 Aura Expansion (10ft → 30ft).~~ RESOLVED 2026-04-10 — refresh_paladin_auras() scans all friendly Paladins by position. Ally coverage for Aura of Protection + Aura of Courage within 10ft/30ft at L18. Called at turn start and after movement.
 - Faithful Steed L5 mount summon (full companion entity) — deferred along with the rest of the mount system.
 - Fighting Style at character creation flow + Blessed Warrior cleric cantrip selection prompt.
@@ -504,16 +504,16 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 
 | Feature | Level | Source para | Status |
 |---------|-------|-------------|--------|
-| **Arcane Deflection** (reaction: +2 AC vs attack OR +4 to failed save; can't cast non-cantrip until end of next turn) | 2 | 2932-2934 | ✓ Done — reaction handler in `battle_manager.nvgt`. Fixed from wrong +4 AC to correct +2 AC per source. +4 save variant not yet wired (saves use a different prompt path). Non-cantrip restriction deferred (needs cast-gating flag). |
+| **Arcane Deflection** (reaction: +2 AC vs attack OR +4 to failed save; can't cast non-cantrip until end of next turn) | 2 | 2932-2934 | ✓ Done — AC reaction in prompt system (+2 AC). Save variant `try_arcane_deflection_save` (+4 save) wired into 28+ save failure sites (smart-spend). Non-cantrip restriction enforced via `arcane_deflection_no_spell_turns = 2` checked in `handle_cast`. L14 Deflecting Shroud fires on both AC and save uses. |
 | **Tactical Wit** (+INT mod to initiative rolls) | 2 | 2935-2936 | ✓ Done — `tactical_wit_active` flag set on init; `request_next_initiative` adds `c.get_ability_mod(ABILITY_INT)` to initiative modifier. |
 | **Power Surge** (store surges max=INT mod, gain from dispel_magic/counterspell success, spend 1/turn for half-level force damage on wizard spell hit) | 6 | 2937-2940 | PARTIAL — Charges init'd at INT mod, auto-spend on spell attack hit for `level/2` force damage (1/turn), gain from `dispel_magic` success. Deferred: gain from `counterspell` (interception not fully resolved), Power Surge on save-based spell damage (too scattered across 80+ handlers), short-rest "if 0 surges, gain 1" recovery. |
 | **Durable Magic** (+2 AC and +2 all saving throws while concentrating) | 10 | 2941-2942 | ✓ Done — `durable_magic_active` flag; AC dynamically added/removed at concentration start/`clear_concentration_effects`; +2 saves in `get_save_bonus` when `durable_magic_active and is_concentrating`. |
 | **Deflecting Shroud** (when Arcane Deflection used, up to 3 enemies within 60ft take half-wizard-level force damage) | 14 | 2943-2944 | ✓ Done — `deflecting_shroud_active` flag; damage loop in Arcane Deflection reaction handler, iterates combatants, skips allies/dead, distance check ≤60ft, caps at 3 targets. |
 
 **Pending War Magic follow-ups:**
-- Arcane Deflection +4 save variant — need to wire into failed-save resolution path (currently only the AC reaction exists)
-- Arcane Deflection non-cantrip casting restriction — need a flag that blocks non-cantrip spell casts until end of next turn after using the reaction
-- Power Surge: counterspell gain (depends on counterspell interception being fully resolved), save-based spell damage rider, short-rest 0→1 recovery
+- ~~Arcane Deflection +4 save variant~~ RESOLVED 2026-04-10 — `try_arcane_deflection_save` wired into 28+ save failure sites.
+- ~~Arcane Deflection non-cantrip casting restriction~~ RESOLVED 2026-04-10 — `arcane_deflection_no_spell_turns` enforced in `handle_cast`.
+- Power Surge: counterspell gain (depends on counterspell interception being fully resolved), short-rest 0→1 recovery. Save-based spell damage rider wired to central AoE path 2026-04-10.
 
 ### Grave Domain Cleric Subclass Audit (2026-04-10) — Xanathar's paras 794-832
 
@@ -532,7 +532,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 | Feature | Level | Source para | Status |
 |---------|-------|-------------|--------|
 | **Hexblade's Curse** (bonus action: +prof damage, crit 19-20, heal on kill = warlock level + CHA mod, 1/SR) | 1 | 2278-2288 | ✓ Done — `hexblade_curse_used` flag, `hexblade_curse_target` tracking. Crit threshold wired in `get_critical_threshold`. Heal + damage in `maybe_apply_on_kill_features` + `apply_subclass_on_hit_damage`. |
-| **Hex Warrior** (CHA for melee weapon attacks) | 1 | 2275-2277 | DEFERRED — needs weapon-stat override system. |
+| **Hex Warrior** (CHA for melee weapon attacks) | 1 | 2275-2277 | ✓ Done 2026-04-10 — `get_weapon_attack_ability_mod` uses highest of STR/DEX/CHA for Hexblade non-two-handed melee attacks. |
 | **Expanded Spell List** (shield, wrathful_smite, blur, branding_smite, blink, elemental_weapon, phantasmal_killer, staggering_smite, banishing_smite, cone_of_cold) | 1-9 | 2271-2274 | ✓ Done — auto-prepared via init. |
 | **Accursed Specter** (raise spectre from humanoid killed with curse) | 6 | 2289-2291 | DEFERRED — needs summon/companion system extension. |
 | **Armor of Hexes** (reaction: d6, 4+ forces cursed attacker to miss) | 10 | 2295-2298 | ✓ Done — reaction prompt option when cursed target attacks warlock. Resolution: `random(1,6) >= 4` → `rp.attack_total = 0`. |
@@ -606,7 +606,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 - Spell-Storing Item L11 — store an Artificer L1-3 spell in an object during Long Rest, anyone holding can use Magic action to cast (`2*INT mod` uses).
 - Refreshed Genius L14 + Magical Guidance L20 — Short Rest subsystem dependency.
 - Cheat Death L20 — depends on Replicate Magic Item infrastructure.
-- Flash of Genius coverage extension — wire `try_flash_of_genius` into the remaining ~80 inline save sites (damage saves for Fireball, Lightning Bolt, Cone of Cold, Disintegrate, etc.) so it provides full RAW coverage on every failed save.
+- Flash of Genius coverage extension — MOSTLY RESOLVED 2026-04-10: `try_flash_of_genius` now wired into central AoE save path + 28 individual spell handler save sites (all high-impact spells covered). Remaining low-frequency spell saves (wall spells, utility saves) have diminishing returns.
 - Tinker's Magic L1 Magic action — needs a hazards system for ball bearings/caltrops in adjacent tiles.
 
 ### Gunslinger Audit (2026-04-09) — Valda's Spire of Secrets paras 159-203

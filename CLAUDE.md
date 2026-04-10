@@ -578,6 +578,10 @@ Epic Boon feats: combat_prowess, dimensional_travel, energy_resistance, fate, fo
 - **Druid Beast Spells L18** (PHB 2024 para 4449): L18+ Druids can now cast spells while in Wild Shape form. `beast_spells_active` flag bypass in `handle_cast`.
 - **Paladin Abjure Foes L9** (PHB 2024 para 5655-5657): Channel Divinity Magic action. Auto-targets nearest CHA mod (min 1) hostiles within 60ft. WIS save or Frightened. Full save failure chain. Client menu entry for all Paladins L9+.
 - **Paladin Channel Divinity Uses Fix**: Paladins now correctly receive 2 CD uses at L3+ (was 0 — init was missing from character_data.nvgt). Fixes Sacred Weapon, Vow of Enmity, Nature's Wrath, and all CD features.
+- **Save Failure Chain wired to 7 more spell handlers** (batch 3): Ice Storm, Circle of Death, Harm, Blade Barrier, Moonbeam (damage chain), Stinking Cloud (condition chain).
+- **Save Failure Chain wired to final 6 spell handlers** (batch 4): Sickening Radiance (CON, condition chain — exhaustion), Phantasmal Force (INT, damage chain), Enlarge/Reduce (CON, condition chain), Sunbeam (CON, condition chain — Blinded), Sunburst (CON, condition chain — Blinded), Insect Plague (CON, damage chain). All individual spell save sites now covered (28+ total including central AoE path).
+- **Coming Soon subclass labels fixed**: Removed stale "Coming Soon" from 4 shipped subclasses (Shadow Gnawer, College of Mercantile, Keeper Domain, Shadow Arcane Tradition). 9 truly unfinished subclasses retain the label.
+- **TODO_SOURCE_ACCURACY.md sweep**: Marked 8 stale DEFERRED/PARTIAL items as RESOLVED (Beast Spells, Abjure Foes, Disciplined Survivor, Hex Warrior, Arcane Deflection save+restriction, Flash of Genius coverage, Druidic auto-prepare).
 
 **Previously implemented:** combat_prowess (+1d6 weapon miss → hit 1/turn), fortitude (+40 HP), irresistible_offense (+2d10 force 1/turn), skill (+1d10 ability check 1/turn), speed (+30ft), the_night_spirit (300ft darkvision + see invisible), truesight (Truesight 60ft)
 
