@@ -6567,7 +6567,7 @@ class battle_manager {
 			}
 			bool target_was_full_hp = (target.current_hp == target.max_hp);
 			bool attacker_was_hidden = c.is_hidden;
-			combat.apply_damage(target, total_damage, pr.damage_type, c);
+			combat.apply_damage(target, total_damage, pr.damage_type, c, pr.is_crit);
 
 			// Mirror Image (Basic Rules para 14260): "Each time a creature hits you with
 			// an attack roll during the spell's duration, roll a d6 for each of your

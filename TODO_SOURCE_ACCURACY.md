@@ -439,7 +439,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 | Feature | Level | Source para | Status |
 |---------|-------|-------------|--------|
 | **Eyes of the Dark** (darkvision 120 ft; L3: learn darkness, can cast with 2 SP and see through it) | 1/3 | 2590-2592 | PARTIAL — darkness auto-prepared at L3. See-through-darkness with SP casting deferred (needs SP-casting hook in spell pipeline). |
-| **Strength of the Grave** (CHA save DC 5+damage when reduced to 0 HP, drop to 1 instead; not if radiant or crit; 1/LR) | 1 | 2593-2595 | ✓ Done — wired in `apply_damage`. Source para ref added. Radiant exclusion works. Crit exclusion DEFERRED (needs `was_crit` plumbing through `apply_damage`). |
+| **Strength of the Grave** (CHA save DC 5+damage when reduced to 0 HP, drop to 1 instead; not if radiant or crit; 1/LR) | 1 | 2593-2595 | ✓ Done — wired in `apply_damage`. Source para ref added. Radiant exclusion works. Crit exclusion done 2026-04-10 via was_crit parameter on apply_damage. |
 | **Hound of Ill Omen** (BA 3 SP, summon dire wolf variant targeting one creature within 120 ft) | 6 | 2596-2602 | ✓ Done 2026-04-09 — BA handler in `users _dom.nvgt`, spawns companion with dire wolf stats (HP 37 + half level, AC 14, Speed 50, 2d6+3 piercing). Deferred: save disadvantage when hound within 5 ft of target (needs centralized spell save helper or per-site wiring). |
 | **Shadow Walk** (BA teleport 120 ft when in dim light/darkness) | 14 | 2603-2604 | ✓ Done 2026-04-09 — BA handler teleports toward locked target up to 120 ft. Dim/dark gating not enforced (no lighting system). |
 | **Umbral Form** (BA 6 SP, resistance to all except force/radiant, move through objects, 1 min) | 18 | 2605-2607 | ✓ Done 2026-04-09 — BA handler, 6 SP cost, `shadow_umbral_active` flag, 10-round tickdown in `advance_turn`, dismiss as BA. Resistance wired in `apply_damage`. |
@@ -542,7 +542,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 
 | Feature | Level | Source para | Status |
 |---------|-------|-------------|--------|
-| **Bonus Proficiency** (History/Insight/Performance/Persuasion or language) | 3 | 1700-1701 | DEFERRED — skill proficiency grant at init not yet wired. |
+| **Bonus Proficiency** (History/Insight/Performance/Persuasion or language) | 3 | 1700-1701 | Done 2026-04-10 -- auto-grants first unproficient of History/Insight/Performance/Persuasion at init. |
 | **Fighting Spirit** (BA: advantage on weapon attacks this turn + 5/10/15 temp HP; 3 uses/LR) | 3 | 1702-1704 | ✓ Done — FIXED uses from proficiency_bonus to correct 3/LR. Temp HP scaling 5/10/15 at L3/10/15 already correct. |
 | **Elegant Courtier** (+WIS mod to Persuasion checks; WIS save proficiency) | 7 | 1705-1707 | PARTIAL — WIS save proficiency added at init. Persuasion +WIS mod requires extending the skill check modifier system (deferred). |
 | **Tireless Spirit** (regain 1 Fighting Spirit on initiative if at 0 uses) | 10 | 1708-1709 | ✓ Done — wired in `request_next_initiative`. |
@@ -553,7 +553,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 
 | Feature | Level | Source para | Status |
 |---------|-------|-------------|--------|
-| **Arcane Archer Lore** (Arcana or Nature proficiency + prestidigitation or druidcraft cantrip) | 3 | 1616-1617 | DEFERRED — skill/cantrip grants at init not wired. |
+| **Arcane Archer Lore** (Arcana or Nature proficiency + prestidigitation or druidcraft cantrip) | 3 | 1616-1617 | Done 2026-04-10 -- auto-grants Arcana (or Nature fallback) proficiency + prestidigitation cantrip at init. |
 | **Arcane Shot** (2 uses/SR, apply shot effect on ranged hit, 1/turn; 8 shot options) | 3 | 1618-1621 | SKELETON — uses tracked (2/rest), pending flag set via BA menu. Shot effects NOT applied in battle_manager (flag never read). Shot type selection menu hardcoded to one type. Full 8-shot implementation pending. |
 | **Magic Arrow** (nonmagical arrows become magical to overcome resistance/immunity) | 7 | 1622-1623 | DEFERRED — no weapon-magic-damage system exists. |
 | **Curving Shot** (BA: reroll missed arrow attack vs different target within 60ft) | 7 | 1624-1625 | DEFERRED — needs miss-redirect mechanic. |
@@ -862,7 +862,7 @@ Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 |---------|-------|-------------|--------|
 | **Oath Spells** (armor_of_agathys, command, hold_person, spiritual_weapon, bestow_curse, fear, dominate_beast, stoneskin, cloudkill, dominate_person) | 3-17 | 1973-1987 | ✓ Done — all 10 auto-prepared in `character_data.nvgt` init block. |
 | **Conquering Presence** (Channel Divinity: frighten each creature of choice within 30ft, WIS save) | 3 | 1988-1991 | DEFERRED — Channel Divinity system exists but needs dedicated AoE frighten action. |
-| **Guided Strike** (Channel Divinity: +10 to attack roll) | 3 | 1988-1991 | PARTIAL — `guided_strike_pending` field exists. Activation handler not yet wired. |
+| **Guided Strike** (Channel Divinity: +10 to attack roll) | 3 | 1988-1991 | Done -- field + activation handler + consumption all wired (BA + CD use + +10 attack bonus). Was incorrectly marked PARTIAL. |
 | **Aura of Conquest** (frightened creatures in 10ft/30ft aura: speed 0, half-paladin-level psychic damage at turn start) | 7/18 | 1992-1995 | ✓ Done — `aura_of_conquest_active` + `aura_of_conquest_range` (10→30 at L18). Wired in `advance_turn`: scans for frightened enemies within range, sets speed 0, applies psychic damage. |
 | **Scornful Rebuke** (when hit, attacker takes CHA mod psychic damage, min 1) | 15 | 1996-1997 | ✓ Done — `scornful_rebuke_active` flag. Wired in ROLL_DAMAGE path after Fire Shield / Refraction Shield. |
 | **Invincible Conqueror** (Action: 1 min resistance to all damage + extra attack + crit 19-20, 1/LR) | 20 | 1998-2003 | DEFERRED — fields added (`invincible_conqueror_active/_used`), activation handler needs action + 10-round timer. |
@@ -882,7 +882,7 @@ Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 
 | Feature | Level | Source para | Status |
 |---------|-------|-------------|--------|
-| **Bonus Proficiencies** (Performance, brewer's supplies) | 3 | 1785-1786 | DEFERRED — tool/skill proficiency system exists but not wired for subclass auto-grants at init. |
+| **Bonus Proficiencies** (Performance, brewer's supplies) | 3 | 1785-1786 | Done 2026-04-10 -- auto-grants Performance proficiency at init. |
 | **Drunken Technique** (on Flurry of Blows: free Disengage + 10ft speed) | 3 | 1787-1790 | ✓ Done — `drunken_technique_active` flag. Wired in Flurry handler: `took_disengage = true` + `movement_remaining += 10`. |
 | **Tipsy Sway: Leap to Your Feet** (stand from prone for 5ft instead of half speed) | 6 | 1791-1793 | DEFERRED — prone stand cost not tracked granularly. |
 | **Tipsy Sway: Redirect Attack** (reaction when missed: redirect attack to another creature within 5ft) | 6 | 1794-1797 | PARTIAL — `drunken_master_redirect` reaction handler exists (consumes 1 ki + reaction), but full redirect-to-new-target resolution is stub. |
@@ -914,7 +914,7 @@ Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 
 | Feature | Level | Source para | Status |
 |---------|-------|-------------|--------|
-| **Horizon Walker Magic** (protection from evil, misty step, haste, banishment, teleportation circle) | 3-17 | 2180-2181 | DEFERRED — auto-prepared spell system not yet wired for subclass spells. |
+| **Horizon Walker Magic** (protection from evil, misty step, haste, banishment, teleportation circle) | 3-17 | 2180-2181 | Done 2026-04-10 -- 5 spells auto-prepared at init by Ranger level (protection_from_evil_and_good, misty_step, haste, banishment, teleportation_circle). |
 | **Detect Portal** (action: sense nearest planar portal within 1 mile, 1/SR) | 3 | 2195-2198 | DEFERRED — exploration/utility, no combat effect. |
 | **Planar Warrior** (BA: mark target, next weapon hit = +1d8/2d8 force, all damage becomes force) | 3 | 2199-2201 | ✓ Done — `planar_warrior_active` flag. BA handler in `users _dom.nvgt`. Damage rider in `apply_subclass_on_hit_damage`. Scales to 2d8 at L11. |
 | **Ethereal Step** (BA: cast etherealness, ends at end of turn, 1/SR) | 7 | 2202-2204 | DEFERRED — etherealness mechanics (phase through objects, invisible) require movement/visibility system changes. |
@@ -925,7 +925,7 @@ Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 
 | Feature | Level | Source para | Status |
 |---------|-------|-------------|--------|
-| **Monster Slayer Magic** (protection from evil, zone of truth, magic circle, banishment, hold monster) | 3-17 | 2210-2237 | DEFERRED — auto-prepared spell system not yet wired for subclass spells. |
+| **Monster Slayer Magic** (protection from evil, zone of truth, magic circle, banishment, hold monster) | 3-17 | 2210-2237 | Done 2026-04-10 -- 5 spells auto-prepared at init by Ranger level (protection_from_evil_and_good, zone_of_truth, magic_circle, banishment, hold_monster). |
 | **Hunter's Sense** (action: learn creature immunities/resistances/vulnerabilities, WIS mod uses/LR) | 3 | 2238-2240 | DEFERRED — creature trait inspection not exposed to player UI. |
 | **Slayer's Prey** (BA: mark target, +1d6 first weapon hit per turn, lasts until SR/LR or new target) | 3 | 2241-2243 | ✓ Done — `monster_slayer_prey`, `monster_slayer_target`, `slayer_prey_used_this_turn` flags. BA handler stores target. +1d6 in `apply_subclass_on_hit_damage`. |
 | **Supernatural Defense** (+1d6 to saves when Slayer's Prey target forces a save) | 7 | 2244-2245 | PARTIAL — `supernatural_defense_active` flag set on init. Save bonus logic deferred (requires hooking into save resolution for specific attacker gating). |
@@ -936,7 +936,7 @@ Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 
 | Feature | Level | Source para | Status |
 |---------|-------|-------------|--------|
-| **Oath Spells** (sanctuary, sleep, calm emotions, hold person, counterspell, hypnotic pattern, resilient sphere, stoneskin, hold monster, wall of force) | 3-17 | 2028-2042 | DEFERRED — auto-prepared spell system not yet wired for subclass spells. |
+| **Oath Spells** (sanctuary, sleep, calm emotions, hold person, counterspell, hypnotic pattern, resilient sphere, stoneskin, hold monster, wall of force) | 3-17 | 2028-2042 | Done 2026-04-10 -- 10 spells auto-prepared at init (sanctuary, sleep, calm_emotions, hold_person, counterspell, hypnotic_pattern, resilient_sphere, stoneskin, hold_monster, wall_of_force). |
 | **CD: Emissary of Peace** (+5 Persuasion for 10 minutes) | 3 | 2045 | DEFERRED — non-combat social feature. |
 | **CD: Rebuke the Violent** (reaction when attacker damages ally within 30ft: WIS save, radiant damage = damage dealt, half on save) | 3 | 2046 | ✓ Done — `rebuke_violent_ready` flag. CD handler in `users _dom.nvgt`. Trigger auto-resolves in ROLL_DAMAGE path: scans for Redemption Paladin within 30ft, WIS save vs DC. |
 | **Aura of the Guardian** (reaction: take ally's damage within 10/30ft, unreducible) | 7 | 2047-2048 | PARTIAL — `aura_of_guardian_active` + `aura_of_guardian_range` set on init (10 at L7, 30 at L18). Damage-transfer reaction logic deferred. |
@@ -1044,7 +1044,7 @@ Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 
 | Feature | Level | Source para | Status |
 |---------|-------|-------------|--------|
-| **Expanded Spell List** (Cure Wounds, Flaming Sphere, Lesser Restoration, Daylight, Revivify, Guardian of Faith, Wall of Fire, Flame Strike, Greater Restoration) | 1-9 | 2720-2726 | DEFERRED — auto-prepared spell system not yet wired for Warlock patron spells. |
+| **Expanded Spell List** (Cure Wounds, Flaming Sphere, Lesser Restoration, Daylight, Revivify, Guardian of Faith, Wall of Fire, Flame Strike, Greater Restoration) | 1-9 | 2720-2726 | Done 2026-04-10 -- 9 spells auto-prepared at init by Warlock level (cure_wounds, flaming_sphere, lesser_restoration, daylight, revivify, guardian_of_faith, wall_of_fire, flame_strike, greater_restoration). |
 | **Bonus Cantrips** (Light, Sacred Flame) | 1 | 2727-2728 | ✓ Done — auto-added to `prepared_spells` at init. |
 | **Healing Light** (BA: pool of 1+level d6s, spend 1-CHA mod dice to heal creature within 60ft) | 1 | 2729-2735 | ✓ Done — `healing_light_dice` field initialized to `1 + cs.level`. BA handler with dice spending. Client menu entry wired. |
 | **Radiant Soul** (resistance to radiant damage; when casting fire/radiant spell, add CHA to one damage roll) | 6 | 2736-2739 | ✓ Done 2026-04-10 — radiant resistance at init + CHA mod added to fire/radiant spell damage in both save-based (`resolve_spell_save_damage_roll`) and attack-roll (`ROLL_DAMAGE`) paths. Per-turn flag `radiant_soul_used_this_turn`. |

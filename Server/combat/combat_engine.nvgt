@@ -1478,7 +1478,7 @@ class battle {
 		if (target.current_hp > target.max_hp) target.current_hp = target.max_hp;
 	}
 
-	void apply_damage(combatant@ target, int amount, int damage_type, combatant@ source = null) {
+	void apply_damage(combatant@ target, int amount, int damage_type, combatant@ source = null, bool was_crit = false) {
 		if (@target == null or target.is_dead) return;
 		if (amount <= 0) return;
 
@@ -1661,8 +1661,8 @@ class battle {
 			// "When damage reduces you to 0 HP, you can make a CHA save (DC 5 + damage).
 			// On success, drop to 1 HP instead. Can't use if reduced by radiant damage
 			// or by a critical hit. After success, can't use again until LR."
-			// TODO: source also excludes critical hits — needs was_crit plumbing through apply_damage
-			if (target.class_name == "Sorcerer" and target.subclass == "Shadow Magic" and !target.strength_of_the_grave_used and damage_type != DMG_RADIANT and !target.is_dead) {
+			// Xanathar's source also excludes critical hits per para 2594
+			if (target.class_name == "Sorcerer" and target.subclass == "Shadow Magic" and !target.strength_of_the_grave_used and damage_type != DMG_RADIANT and !was_crit and !target.is_dead) {
 				int overflow_check = -target.current_hp;
 				if (overflow_check < target.max_hp) { // Not instant death (killed outright)
 					int save_roll = random(1, 20);

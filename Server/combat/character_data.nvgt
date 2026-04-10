@@ -1460,6 +1460,12 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
 
     // Xanathar's Samurai Fighter (paras 1700-1714)
     if (cs.class_name == "Fighter" and cs.subclass == "Samurai" and cs.level >= 3) {
+        // L3 Bonus Proficiency (para 1700-1701): "You gain proficiency in one of
+        // the following skills: History, Insight, Performance, or Persuasion."
+        if (!c.has_skill_proficiency("History")) c.skill_proficiencies.insert_last("History");
+        else if (!c.has_skill_proficiency("Insight")) c.skill_proficiencies.insert_last("Insight");
+        else if (!c.has_skill_proficiency("Performance")) c.skill_proficiencies.insert_last("Performance");
+        else if (!c.has_skill_proficiency("Persuasion")) c.skill_proficiencies.insert_last("Persuasion");
         // L3 Fighting Spirit (para 1702-1704): 3 uses per long rest
         c.fighting_spirit_uses = 3;
         // L7 Elegant Courtier (para 1705-1707): WIS save proficiency
@@ -1517,8 +1523,14 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         c.giants_might_uses = proficiency_bonus(cs.level);
     }
 
-    // Arcane Archer Fighter: Arcane Shot uses (2 per rest, scales with level)
+    // Xanathar's Arcane Archer Fighter (paras 1599-1646)
     if (cs.class_name == "Fighter" and cs.subclass == "Arcane Archer" and cs.level >= 3) {
+        // L3 Arcane Archer Lore (para 1616-1617): "You gain proficiency in either
+        // the Arcana or the Nature skill, and you choose to learn either the
+        // Prestidigitation or the Druidcraft cantrip."
+        if (!c.has_skill_proficiency("Arcana")) c.skill_proficiencies.insert_last("Arcana");
+        else if (!c.has_skill_proficiency("Nature")) c.skill_proficiencies.insert_last("Nature");
+        if (!c.knows_spell("prestidigitation")) c.prepared_spells.insert_last("prestidigitation");
         c.arcane_shot_uses = 2;
     }
 
@@ -1754,12 +1766,24 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
 
     // Xanathar's Horizon Walker Ranger (paras 2195-2209)
     if (cs.class_name == "Ranger" and cs.subclass == "Horizon Walker") {
+        // L3 Horizon Walker Magic (para 2180-2181): always-prepared spells
+        if (!c.knows_spell("protection_from_evil_and_good")) c.prepared_spells.insert_last("protection_from_evil_and_good");
+        if (cs.level >= 5) { if (!c.knows_spell("misty_step")) c.prepared_spells.insert_last("misty_step"); }
+        if (cs.level >= 9) { if (!c.knows_spell("haste")) c.prepared_spells.insert_last("haste"); }
+        if (cs.level >= 13) { if (!c.knows_spell("banishment")) c.prepared_spells.insert_last("banishment"); }
+        if (cs.level >= 17) { if (!c.knows_spell("teleportation_circle")) c.prepared_spells.insert_last("teleportation_circle"); }
         // L3 Planar Warrior already handled by existing planar_warrior_active
         if (cs.level >= 15) c.spectral_defense_active = true;
     }
 
     // Xanathar's Monster Slayer Ranger (paras 2238-2250)
     if (cs.class_name == "Ranger" and cs.subclass == "Monster Slayer") {
+        // L3 Monster Slayer Magic (para 2210-2237): always-prepared spells
+        if (!c.knows_spell("protection_from_evil_and_good")) c.prepared_spells.insert_last("protection_from_evil_and_good");
+        if (cs.level >= 5) { if (!c.knows_spell("zone_of_truth")) c.prepared_spells.insert_last("zone_of_truth"); }
+        if (cs.level >= 9) { if (!c.knows_spell("magic_circle")) c.prepared_spells.insert_last("magic_circle"); }
+        if (cs.level >= 13) { if (!c.knows_spell("banishment")) c.prepared_spells.insert_last("banishment"); }
+        if (cs.level >= 17) { if (!c.knows_spell("hold_monster")) c.prepared_spells.insert_last("hold_monster"); }
         if (cs.level >= 3) c.monster_slayer_prey = true;
         if (cs.level >= 7) c.supernatural_defense_active = true;
         if (cs.level >= 15) c.slayers_counter_active = true;
@@ -1767,6 +1791,17 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
 
     // Xanathar's Oath of Redemption Paladin (paras 2004-2056)
     if (cs.class_name == "Paladin" and cs.subclass == "Oath of Redemption") {
+        // L3 Oath Spells (para 2028-2042): always prepared
+        if (!c.knows_spell("sanctuary")) c.prepared_spells.insert_last("sanctuary");
+        if (!c.knows_spell("sleep")) c.prepared_spells.insert_last("sleep");
+        if (!c.knows_spell("calm_emotions")) c.prepared_spells.insert_last("calm_emotions");
+        if (!c.knows_spell("hold_person")) c.prepared_spells.insert_last("hold_person");
+        if (!c.knows_spell("counterspell")) c.prepared_spells.insert_last("counterspell");
+        if (!c.knows_spell("hypnotic_pattern")) c.prepared_spells.insert_last("hypnotic_pattern");
+        if (!c.knows_spell("resilient_sphere")) c.prepared_spells.insert_last("resilient_sphere");
+        if (!c.knows_spell("stoneskin")) c.prepared_spells.insert_last("stoneskin");
+        if (!c.knows_spell("hold_monster")) c.prepared_spells.insert_last("hold_monster");
+        if (!c.knows_spell("wall_of_force")) c.prepared_spells.insert_last("wall_of_force");
         if (cs.level >= 7) {
             c.aura_of_guardian_active = true;
             c.aura_of_guardian_range = 10;
@@ -2377,6 +2412,10 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         }
         // Xanathar's Way of the Drunken Master (paras 1780-1805)
         if (cs.subclass == "Way of the Drunken Master") {
+            // L3 Bonus Proficiencies (para 1785-1786): "You gain proficiency in
+            // the Performance skill if you don't already have it. Your martial
+            // arts technique mixes combat training with the precision of a dancer."
+            if (!c.has_skill_proficiency("Performance")) c.skill_proficiencies.insert_last("Performance");
             // L3 Drunken Technique (para 1796-1797): Disengage + 10ft on Flurry
             if (cs.level >= 3) c.drunken_technique_active = true;
             // L6 Tipsy Sway — Redirect Attack: handled via existing drunken_master_opportunity
@@ -3019,6 +3058,13 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
             // "You learn the Light and Sacred Flame cantrips."
             if (!c.knows_spell("light")) c.prepared_spells.insert_last("light");
             if (!c.knows_spell("sacred_flame")) c.prepared_spells.insert_last("sacred_flame");
+            // Xanathar's Celestial L1-9 Expanded Spell List (paras 2720-2726):
+            if (!c.knows_spell("cure_wounds")) c.prepared_spells.insert_last("cure_wounds");
+            if (!c.knows_spell("flaming_sphere")) c.prepared_spells.insert_last("flaming_sphere");
+            if (!c.knows_spell("lesser_restoration")) c.prepared_spells.insert_last("lesser_restoration");
+            if (cs.level >= 5) { if (!c.knows_spell("daylight")) c.prepared_spells.insert_last("daylight"); if (!c.knows_spell("revivify")) c.prepared_spells.insert_last("revivify"); }
+            if (cs.level >= 7) { if (!c.knows_spell("guardian_of_faith")) c.prepared_spells.insert_last("guardian_of_faith"); if (!c.knows_spell("wall_of_fire")) c.prepared_spells.insert_last("wall_of_fire"); }
+            if (cs.level >= 9) { if (!c.knows_spell("flame_strike")) c.prepared_spells.insert_last("flame_strike"); if (!c.knows_spell("greater_restoration")) c.prepared_spells.insert_last("greater_restoration"); }
             // Xanathar's Celestial L6 Radiant Soul (paras 2736-2739):
             // "you gain resistance to radiant damage"
             if (cs.level >= 6) c.radiant_resistance = true;
