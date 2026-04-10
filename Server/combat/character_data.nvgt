@@ -3015,9 +3015,23 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
     if (cs.class_name == "Warlock") {
         if (cs.subclass == "Celestial Patron") {
             c.healing_light_dice = 1 + cs.level;
+            // Xanathar's Celestial L1 Bonus Cantrips (paras 2727-2728):
+            // "You learn the Light and Sacred Flame cantrips."
+            if (!c.knows_spell("light")) c.prepared_spells.insert_last("light");
+            if (!c.knows_spell("sacred_flame")) c.prepared_spells.insert_last("sacred_flame");
             // Xanathar's Celestial L6 Radiant Soul (paras 2736-2739):
             // "you gain resistance to radiant damage"
             if (cs.level >= 6) c.radiant_resistance = true;
+            // Xanathar's Celestial L10 Celestial Resilience (paras 2740-2743):
+            // "you gain temporary hit points whenever you finish a short or long rest.
+            // These temporary hit points equal your warlock level + your Charisma modifier.
+            // Additionally, choose up to five creatures [...] each gains temporary hit
+            // points equal to half your warlock level + your Charisma modifier."
+            if (cs.level >= 10) {
+                int cha_mod = ability_modifier(cs.charisma);
+                int self_temp = cs.level + cha_mod;
+                if (self_temp > 0 and c.temp_hp < self_temp) c.temp_hp = self_temp;
+            }
         }
         // PHB 2024 Warlock Eldritch Invocations: known count scales by level per the
         // Warlock Features table (paras 7607-7762). L1=1, L2-4=3, L5-6=5, L7-8=6,

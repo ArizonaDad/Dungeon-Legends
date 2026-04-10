@@ -1027,7 +1027,7 @@ Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 | **Skirmisher** (reaction: move half speed when enemy ends turn within 5ft, no OA) | 3 | 2391-2393 | PARTIAL — `scout_skirmisher` flag set on init. Manual BA activation exists but automatic end-of-enemy-turn trigger not implemented (needs per-movement event hooks). |
 | **Survivalist** (proficiency + expertise in Nature and Survival) | 3 | 2394-2395 | ✓ Done — auto-grants Nature + Survival proficiency and expertise at init. |
 | **Superior Mobility** (+10ft speed to walk/climb/swim) | 9 | 2396-2397 | ✓ Done — `c.speed += 10` at init. Climb/swim deferred (no climbing/swimming combat). |
-| **Ambush Master** (advantage on initiative; first creature hit in first turn grants all allies advantage vs it until start of next turn) | 13 | 2398-2399 | DEFERRED — initiative advantage + team-wide advantage marker. |
+| **Ambush Master** (advantage on initiative; first creature hit in first turn grants all allies advantage vs it until start of next turn) | 13 | 2398-2399 | PARTIAL — initiative advantage wired in `request_next_initiative`. Team-wide advantage marker on first hit deferred. |
 | **Sudden Strike** (if take Attack action, can make extra attack as BA against different creature with SA) | 17 | 2400-2401 | DEFERRED — extra attack via BA with SA on different target. |
 
 ### Swashbuckler Rogue Subclass Audit (2026-04-10) — Xanathar's paras 2418-2430
@@ -1045,10 +1045,10 @@ Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 | Feature | Level | Source para | Status |
 |---------|-------|-------------|--------|
 | **Expanded Spell List** (Cure Wounds, Flaming Sphere, Lesser Restoration, Daylight, Revivify, Guardian of Faith, Wall of Fire, Flame Strike, Greater Restoration) | 1-9 | 2720-2726 | DEFERRED — auto-prepared spell system not yet wired for Warlock patron spells. |
-| **Bonus Cantrips** (Light, Sacred Flame) | 1 | 2727-2728 | DEFERRED — auto-grant cantrips at subclass selection. |
+| **Bonus Cantrips** (Light, Sacred Flame) | 1 | 2727-2728 | ✓ Done — auto-added to `prepared_spells` at init. |
 | **Healing Light** (BA: pool of 1+level d6s, spend 1-CHA mod dice to heal creature within 60ft) | 1 | 2729-2735 | ✓ Done — `healing_light_dice` field initialized to `1 + cs.level`. BA handler with dice spending. Client menu entry wired. |
 | **Radiant Soul** (resistance to radiant damage; when casting fire/radiant spell, add CHA to one damage roll) | 6 | 2736-2739 | PARTIAL — `radiant_resistance` auto-granted at init. CHA spell damage rider deferred (requires per-spell damage hook). |
-| **Celestial Resilience** (temp HP = Warlock level + CHA at end of SR/LR; 5 allies get half Warlock level + CHA) | 10 | 2740-2743 | DEFERRED — rest-triggered temp HP distribution. |
+| **Celestial Resilience** (temp HP = Warlock level + CHA at end of SR/LR; 5 allies get half Warlock level + CHA) | 10 | 2740-2743 | PARTIAL — self temp HP (level + CHA) applied at combat init. Ally temp HP distribution deferred (no rest system yet). |
 | **Searing Vengeance** (at start of turn while dying: regain half max HP + stand + 2d8+CHA radiant to chosen creatures within 30ft, blinding on fail, 1/LR) | 14 | 2744-2747 | DEFERRED — death save replacement trigger + AoE radiant burst. |
 
 ---

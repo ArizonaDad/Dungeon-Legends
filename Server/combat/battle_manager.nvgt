@@ -3437,6 +3437,9 @@ class battle_manager {
 		// Valda's Spire Gunslinger L1 Quick Draw (paras 162-164): "You have Advantage
 		// on Initiative rolls."
 		if (c.class_name == "Gunslinger" and c.quick_draw_active) pr.has_advantage = true;
+		// Xanathar's Scout L13 Ambush Master (para 2398-2399):
+		// "you have advantage on initiative rolls"
+		if (c.class_name == "Rogue" and c.subclass == "Scout" and c.level >= 13) pr.has_advantage = true;
 		// PHB 2024 Bard Level 18: Superior Inspiration (para 2760-2761):
 		// "When you roll Initiative, you regain expended uses of Bardic Inspiration
 		// until you have two if you have fewer than that."
