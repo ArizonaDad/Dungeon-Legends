@@ -2456,6 +2456,20 @@ class battle_manager {
 		// on attack rolls and saving throws until the start of your next turn."
 		if (attacker.zealous_presence_buff_active) adv = true;
 
+		// PHB 2024 Weapon Mastery — Vex (para 10351): "you have Advantage on your
+		// next attack roll against that creature before the end of your next turn."
+		if (attacker.mastery_vex_active and attacker.mastery_vex_target_id == target.id) {
+			adv = true;
+			attacker.mastery_vex_active = false;
+			attacker.mastery_vex_target_id = 0;
+		}
+		// PHB 2024 Weapon Mastery — Sap (para 10345): "that creature has Disadvantage
+		// on its next attack roll before the start of your next turn."
+		if (attacker.mastery_sap_active) {
+			disadv = true;
+			attacker.mastery_sap_active = false;
+		}
+
 		// PHB 2024 Rogue L18 Elusive (para 6576-6577): "No attack roll can have
 		// Advantage against you unless you have the Incapacitated condition." Strip
 		// any advantage that would have been granted to the attacker against this
@@ -3344,6 +3358,8 @@ class battle_manager {
 		// be handled separately if positional tracking is added later).
 		caster.fog_cloud_active = false;
 		caster.darkness_active = false;
+		// Extended Spell: advantage on concentration saves ends with concentration
+		caster.extended_spell_concentration = false;
 	}
 
 	// ---- Swarming Modifier Helper ----
@@ -4231,6 +4247,21 @@ class battle_manager {
 		c.steady_aim_pending = false;
 		// Reset Shield Master once-per-turn shove
 		c.shield_bash_used_this_turn = false;
+		// PHB 2024 Weapon Mastery per-turn resets
+		c.cleave_used_this_turn = false;
+		// Slow mastery: restore speed on targets this combatant slowed
+		if (@combat != null) {
+			for (uint sl = 0; sl < combat.combatants.length(); sl++) {
+				combatant@ sl_t = combat.combatants[sl];
+				if (@sl_t != null and sl_t.mastery_slow_applied) {
+					sl_t.speed += 10;
+					sl_t.mastery_slow_applied = false;
+				}
+			}
+		}
+		c.mastery_sap_active = false;
+		c.mastery_vex_active = false;
+		c.mastery_vex_target_id = 0;
 		// PHB 2024 Cleric L7 Divine Strike (para 3619): "Once on each of your turns" — reset.
 		c.divine_strike_used_this_turn = false;
 		// PHB 2024 Druid L7 Primal Strike (para 4433): "Once on each of your turns" — reset.
@@ -4436,6 +4467,9 @@ class battle_manager {
 		if (target.has_feat("war_caster")) con_mod += 5;
 		// 2024 Mage Slayer feat: damaging a concentrating creature gives it disadvantage on concentration save
 		bool mage_slayer_disadv = (@attacker != null and attacker.has_feat("mage_slayer"));
+		// PHB 2024 Sorcerer Metamagic Extended Spell (para 7029): "you have Advantage
+		// on any Constitution saving throw you make to maintain Concentration on it."
+		bool extended_adv = target.extended_spell_concentration;
 
 		user@ u = find_user_for_combatant(target);
 		if (target.is_player and @u != null and !u.is_bot) {
@@ -4449,14 +4483,21 @@ class battle_manager {
 			pr.reason = "Constitution save to maintain concentration on " + target.concentration_spell + " (DC " + dc + ")";
 			pr.dc = dc;
 			pr.has_disadvantage = mage_slayer_disadv;
+			if (extended_adv) pr.has_advantage = true;
 			if (mage_slayer_disadv) broadcast_announce(attacker.name + "'s Mage Slayer imposes disadvantage on " + target.name + "'s concentration save!", false);
+			if (extended_adv) broadcast_announce(target.name + " has advantage on the concentration save from Extended Spell!", false);
 			@current_roll = pr;
 
 			send_roll_request(u, pr);
 		} else {
 			// Auto-roll for monsters/bots.
 			int natural = random(1, 20);
-			if (mage_slayer_disadv) {
+			if (extended_adv and !mage_slayer_disadv) {
+				int r2 = random(1, 20);
+				if (r2 > natural) natural = r2;
+				broadcast_announce(target.name + " has advantage on the concentration save from Extended Spell!", false);
+			}
+			if (mage_slayer_disadv and !extended_adv) {
 				int r2 = random(1, 20);
 				if (r2 < natural) natural = r2;
 				broadcast_announce(attacker.name + "'s Mage Slayer imposes disadvantage on " + target.name + "'s concentration save!", false);
@@ -6705,6 +6746,18 @@ class battle_manager {
 					advance_turn();
 				}
 			}
+			// PHB 2024 Weapon Mastery — Graze (para 10339): "If your attack roll with
+			// this weapon misses a creature, you can deal damage to that creature equal
+			// to the ability modifier you used to make the attack roll."
+			if (!hit and !is_fumble and pr.is_weapon_attack and !pr.is_spell_effect
+				and c.main_hand_mastery == MASTERY_GRAZE and @target != null and !target.is_dead) {
+				int graze_mod = get_weapon_attack_ability_mod(c);
+				if (c.main_hand_is_ranged) graze_mod = c.get_ability_mod(ABILITY_DEX);
+				if (graze_mod > 0) {
+					combat.apply_damage(target, graze_mod, c.main_hand_damage_type, c);
+					broadcast_announce(c.name + "'s Graze mastery deals " + graze_mod + " damage to " + target.name + " despite the miss!", false);
+				}
+			}
 			if (!hit) broadcast_state();
 			if (pr.resolution_tag == "resume_current_turn" and @combat != null and combat.battle_active) {
 				resume_current_turn_after_interrupt();
@@ -7303,6 +7356,88 @@ class battle_manager {
 					broadcast_announce(c.name + "'s Shield Master knocks " + target.name + " prone! (save " + sb_save + " vs DC " + sb_dc + ")", true);
 				} else {
 					broadcast_announce(target.name + " resists " + c.name + "'s Shield Master shove (save " + sb_save + " vs DC " + sb_dc + ").", false);
+				}
+			}
+
+			// PHB 2024 Weapon Mastery properties (paras 10335-10352). Only fire on
+			// weapon attacks (not spells) when the attacker has mastery for their weapon.
+			if (pr.is_weapon_attack and !pr.is_spell_effect and c.main_hand_mastery != MASTERY_NONE and !target.is_dead) {
+				int mastery = c.main_hand_mastery;
+				// Push (para 10343): push target up to 10 ft straight away if Large or smaller
+				if (mastery == MASTERY_PUSH and target.size <= SIZE_LARGE) {
+					int push_dir_x = 0; int push_dir_y = 0;
+					if (target.x > c.x) push_dir_x = 1;
+					else if (target.x < c.x) push_dir_x = -1;
+					if (target.y > c.y) push_dir_y = 1;
+					else if (target.y < c.y) push_dir_y = -1;
+					if (push_dir_x != 0 or push_dir_y != 0) {
+						target.x += push_dir_x * 2; target.y += push_dir_y * 2; // 10 ft = 2 tiles
+						broadcast_announce(c.name + "'s Push mastery shoves " + target.name + " 10 feet away!", false);
+					}
+				}
+				// Sap (para 10345): target has Disadvantage on next attack before start of your next turn
+				else if (mastery == MASTERY_SAP) {
+					target.mastery_sap_active = true;
+					broadcast_announce(c.name + "'s Sap mastery gives " + target.name + " disadvantage on its next attack!", false);
+				}
+				// Slow (para 10347): reduce target speed by 10 ft until start of your next turn
+				else if (mastery == MASTERY_SLOW and !target.mastery_slow_applied) {
+					target.mastery_slow_applied = true;
+					if (target.speed >= 10) target.speed -= 10;
+					if (target.movement_remaining >= 10) target.movement_remaining -= 10;
+					broadcast_announce(c.name + "'s Slow mastery reduces " + target.name + "'s speed by 10 feet!", false);
+				}
+				// Topple (para 10349): CON save (DC 8 + ability mod + prof) or Prone
+				else if (mastery == MASTERY_TOPPLE) {
+					int atk_mod = get_weapon_attack_ability_mod(c);
+					int tp_dc = 8 + atk_mod + c.proficiency;
+					int tp_save = random(1, 20) + target.get_save_bonus(ABILITY_CON);
+					if (tp_save < tp_dc) {
+						target.add_condition(COND_PRONE);
+						broadcast_announce(c.name + "'s Topple mastery knocks " + target.name + " prone! (save " + tp_save + " vs DC " + tp_dc + ")", true);
+					} else {
+						broadcast_announce(target.name + " resists Topple (save " + tp_save + " vs DC " + tp_dc + ").", false);
+					}
+				}
+				// Vex (para 10351): advantage on next attack vs this target
+				else if (mastery == MASTERY_VEX) {
+					c.mastery_vex_active = true;
+					c.mastery_vex_target_id = target.id;
+				}
+				// Cleave (para 10337): free melee attack vs second creature within 5 ft of
+				// target and within attacker's reach, no ability mod to damage, once/turn
+				else if (mastery == MASTERY_CLEAVE and !c.cleave_used_this_turn and !c.main_hand_is_ranged) {
+					c.cleave_used_this_turn = true;
+					combatant@ cleave_target = null;
+					for (uint ct = 0; ct < combat.combatants.length(); ct++) {
+						combatant@ ct_c = combat.combatants[ct];
+						if (@ct_c == null or ct_c.is_dead or ct_c.id == target.id or ct_c.id == c.id) continue;
+						if (!combat.are_hostile(c, ct_c)) continue;
+						float ct_to_target = sqrt(float((ct_c.x - target.x) * (ct_c.x - target.x) + (ct_c.y - target.y) * (ct_c.y - target.y))) * 5.0f;
+						float ct_to_attacker = sqrt(float((ct_c.x - c.x) * (ct_c.x - c.x) + (ct_c.y - c.y) * (ct_c.y - c.y))) * 5.0f;
+						if (ct_to_target <= 5 and ct_to_attacker <= c.main_hand_range) {
+							@cleave_target = ct_c;
+							break;
+						}
+					}
+					if (@cleave_target != null) {
+						int cleave_atk = random(1, 20);
+						int atk_mod = get_weapon_attack_ability_mod(c);
+						int cleave_total = cleave_atk + atk_mod + c.proficiency;
+						if (cleave_atk == 1) {
+							broadcast_announce(c.name + "'s Cleave at " + cleave_target.name + " misses (natural 1).", false);
+						} else if (cleave_atk == 20 or cleave_total >= cleave_target.armor_class) {
+							int cleave_dmg = 0;
+							for (int cd = 0; cd < c.main_hand_damage_count; cd++) cleave_dmg += random(1, c.main_hand_damage_dice);
+							// No ability mod added per source: "don't add your ability modifier to that damage unless that modifier is negative"
+							if (atk_mod < 0) cleave_dmg += atk_mod;
+							if (cleave_dmg < 1) cleave_dmg = 1;
+							combat.apply_damage(cleave_target, cleave_dmg, c.main_hand_damage_type, c);
+							broadcast_announce(c.name + "'s Cleave hits " + cleave_target.name + " for " + cleave_dmg + " damage!", true);
+						} else {
+							broadcast_announce(c.name + "'s Cleave at " + cleave_target.name + " misses (roll " + cleave_total + " vs AC " + cleave_target.armor_class + ").", false);
+						}
+					}
 				}
 			}
 
@@ -9513,6 +9648,13 @@ class battle_manager {
 			c.is_concentrating = true;
 			c.concentration_spell = spell.name;
 			c.add_condition(COND_CONCENTRATING);
+			// PHB 2024 Sorcerer Metamagic Extended Spell (para 7029): advantage on
+			// concentration saves for this spell.
+			if (c.metamagic_extended_active) {
+				c.extended_spell_concentration = true;
+			} else {
+				c.extended_spell_concentration = false;
+			}
 			// Xanathar's War Magic L10 Durable Magic (para 2941-2942): "While you maintain
 			// concentration on a spell, you have a +2 bonus to AC..."
 			if (c.durable_magic_active) c.armor_class += 2;
@@ -10228,7 +10370,14 @@ class battle_manager {
 					if (!saved) {
 						combat.apply_damage(t, total_damage, DMG_RADIANT, c);
 						t.exhaustion_level += 1;
-						broadcast_announce(t.name + " takes " + total_damage + " radiant damage and gains 1 level of exhaustion.", false);
+						broadcast_announce(t.name + " takes " + total_damage + " radiant damage and gains 1 level of exhaustion (level " + t.exhaustion_level + ").", false);
+						// PHB 2024 Exhaustion (para 16254): "You die if your Exhaustion level is 6."
+						if (t.exhaustion_level >= 6 and !t.is_dead) {
+							t.is_dead = true;
+							t.current_hp = 0;
+							broadcast_announce(t.name + " dies from exhaustion!", true);
+							broadcast_to_battle({{"type", message_types::creature_died}, {"name", t.name}, {"id", t.id}});
+						}
 					}
 				}
 				broadcast_state();

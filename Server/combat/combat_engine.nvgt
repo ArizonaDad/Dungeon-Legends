@@ -609,6 +609,12 @@ class combatant {
 	bool fire_shield_warm = true; // true=warm (cold resist, reflects fire), false=chill (fire resist, reflects cold)
 	// Shield Master 2024: once per turn, Shield Bash rider on melee hit
 	bool shield_bash_used_this_turn = false;
+	// PHB 2024 Weapon Mastery properties — per-turn tracking
+	bool cleave_used_this_turn = false;
+	bool mastery_slow_applied = false; // target flag: speed reduced by Slow mastery
+	bool mastery_sap_active = false;   // target flag: disadvantage on next attack
+	bool mastery_vex_active = false;   // attacker flag: advantage on next attack vs vex_target
+	uint mastery_vex_target_id = 0;
 	// Concentration Breaker tracking (Mage Slayer 2024)
 	bool guarded_mind_used = false; // 1/rest auto-succeed on failed INT/WIS/CHA save
 	// Setting subclasses (Batch 17)
@@ -881,6 +887,8 @@ class combatant {
 	int main_hand_range = 5;           // melee = 5, ranged = varies
 	bool main_hand_finesse = false;
 	bool main_hand_is_ranged = false;
+	int main_hand_mastery = MASTERY_NONE; // PHB 2024 Weapon Mastery property
+	bool extended_spell_concentration = false; // PHB 2024 Sorcerer Extended Spell: advantage on conc saves
 	int monster_attack_bonus = 0;
 	int monster_attack_damage_mod = 0;
 	string monster_attack2_name = "";
