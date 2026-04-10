@@ -4607,6 +4607,16 @@ class battle_manager {
 			if (c.class_name == "Cleric" and c.level >= 18) cd_max = 3;
 			if (c.channel_divinity_uses < cd_max) c.channel_divinity_uses++;
 		}
+		// PHB 2024 Sorcerer L5 Sorcerous Restoration (para 7002-7003):
+		// "You regain expended Sorcery Points whenever you finish a Short Rest.
+		// The number of Sorcery Points you regain equals half your Sorcerer level (round down)."
+		if (c.class_name == "Sorcerer" and c.level >= 5 and c.sorcerous_restoration_available) {
+			int sp_regain = c.level / 2;
+			c.sorcery_points += sp_regain;
+			if (c.sorcery_points > c.sorcery_points_max) c.sorcery_points = c.sorcery_points_max;
+			c.sorcerous_restoration_available = false;
+			broadcast_announce(c.name + " regains " + sp_regain + " Sorcery Points via Sorcerous Restoration.", false);
+		}
 
 		// Clear conditions and concentration
 		c.remove_condition(COND_FRIGHTENED);
@@ -4911,8 +4921,11 @@ class battle_manager {
 				if (enemy.main_hand_is_ranged) continue;
 				// Swashbuckler Rogue: Fancy Footwork — enemies attacked by Swashbuckler can't make OA
 				if (mover.class_name == "Rogue" and mover.subclass == "Swashbuckler" and enemy.swashbuckler_attacked_this_turn) continue;
-				// Feat: Mobile — (not yet implemented)
-				// This enemy gets an opportunity attack.
+				// PHB 2024 Mobile feat (para 7635): "When you make a melee attack against
+				// a creature, you don't provoke Opportunity Attacks from that creature for
+				// the rest of the turn, whether you hit or not." Approximated as blanket
+				// OA immunity (strict RAW is only vs creatures the mover attacked this turn).
+				if (mover.has_feat("mobile")) continue;
 				enemy.has_reaction = false;
 				broadcast_announce(enemy.name + " makes an opportunity attack against " + mover.name + "!");
 				// Calculate attack bonus.
