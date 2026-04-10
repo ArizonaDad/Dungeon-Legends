@@ -1325,6 +1325,9 @@ class battle_manager {
 	int get_passive_perception(combatant@ c) {
 		if (@c == null) return 10;
 		int passive = 10 + c.get_skill_bonus("Perception", ABILITY_WIS);
+		// PHB 2024 Observant (para 7696): "+5 bonus to your Passive Perception
+		// and Passive Investigation scores."
+		if (c.has_feat("observant")) passive += 5;
 		if (passive < 1) passive = 1;
 		return passive;
 	}
@@ -2539,6 +2542,27 @@ class battle_manager {
 			attacker.mastery_sap_active = false;
 		}
 
+		// PHB 2024 Fighting Style: Protection (para 7868): "When a creature you can
+		// see attacks a target other than you that is within 5 feet of you, you can
+		// use your Reaction to impose Disadvantage on the attack roll. Requires Shield."
+		if (@combat != null) {
+			for (uint pi = 0; pi < combat.combatants.length(); pi++) {
+				combatant@ protector = combat.combatants[pi];
+				if (@protector == null or protector.is_dead or !protector.is_alive()) continue;
+				if (!protector.is_conscious() or protector.is_incapacitated_check()) continue;
+				if (protector.id == attacker.id or protector.id == target.id) continue;
+				if (!protector.has_feat("protection")) continue;
+				if (!protector.has_shield) continue;
+				if (!protector.has_reaction) continue;
+				if (combat.are_hostile(protector, target)) continue;
+				if (feet_distance(protector.x, protector.y, target.x, target.y) > 5) continue;
+				if (!combat.can_see(protector, attacker)) continue;
+				protector.has_reaction = false;
+				disadv = true;
+				broadcast_announce(protector.name + "'s Protection imposes Disadvantage on " + attacker.name + "'s attack against " + target.name + "!", true);
+				break;
+			}
+		}
 		// PHB 2024 Rogue L18 Elusive (para 6576-6577): "No attack roll can have
 		// Advantage against you unless you have the Incapacitated condition." Strip
 		// any advantage that would have been granted to the attacker against this
@@ -2828,7 +2852,10 @@ class battle_manager {
 		bool adv = false;
 		bool disadv = false;
 		apply_attack_advantage_state(bot, target, dist, bot.main_hand_is_ranged, adv, disadv);
-		reveal_hidden_combatant(bot, "making an attack");
+		// PHB 2024 Skulker (para 7783): defer reveal for ranged Skulker attacks
+		if (!(bot.is_hidden and bot.has_feat("skulker") and bot.main_hand_is_ranged)) {
+			reveal_hidden_combatant(bot, "making an attack");
+		}
 		broadcast_announce(bot.name + " attacks " + target.name + " with " + bot.main_hand + ".", false);
 
 		pending_roll pr;
@@ -7729,8 +7756,33 @@ class battle_manager {
 					if (@ptg_c != null and ptg_c.path_to_grave_target == target.id) ptg_c.path_to_grave_target = 0;
 				}
 			}
+			// PHB 2024 Fighting Style: Interception (para 7864): "When a creature you
+			// can see hits a target, other than you, within 5 feet of you with an attack,
+			// you can use your Reaction to reduce the damage by 1d10 + Proficiency Bonus."
+			if (!target.is_dead and @combat != null) {
+				for (uint ic = 0; ic < combat.combatants.length(); ic++) {
+					combatant@ protector = combat.combatants[ic];
+					if (@protector == null or protector.is_dead or !protector.is_alive()) continue;
+					if (!protector.is_conscious() or protector.is_incapacitated_check()) continue;
+					if (protector.id == target.id or protector.id == c.id) continue;
+					if (!protector.has_feat("interception")) continue;
+					if (!protector.has_reaction) continue;
+					if (!combat.are_hostile(protector, c)) continue;
+					if (feet_distance(protector.x, protector.y, target.x, target.y) > 5) continue;
+					if (!combat.can_see(protector, c)) continue;
+					protector.has_reaction = false;
+					int reduction = random(1, 10) + protector.proficiency;
+					if (reduction > total_damage) reduction = total_damage;
+					total_damage -= reduction;
+					if (total_damage < 0) total_damage = 0;
+					broadcast_announce(protector.name + "'s Interception reduces damage to " + target.name + " by " + reduction + "!", true);
+					break;
+				}
+			}
 			bool target_was_full_hp = (target.current_hp == target.max_hp);
 			bool attacker_was_hidden = c.is_hidden;
+			// PHB 2024 Skulker: reveal on hit (deferred from attack declaration)
+			if (c.is_hidden) reveal_hidden_combatant(c, "hitting with an attack");
 			combat.apply_damage(target, total_damage, pr.damage_type, c, pr.is_crit);
 
 			// Mirror Image (Basic Rules para 14260): "Each time a creature hits you with
@@ -9371,7 +9423,12 @@ class battle_manager {
 			}
 			return;
 		}
-		reveal_hidden_combatant(c, "making an attack");
+		// PHB 2024 Skulker (para 7783): "If you make an attack roll while Hidden and
+		// the attack misses, making the attack roll doesn't end the Hidden condition."
+		// Defer reveal for ranged attacks with Skulker; reveal on hit in finalize_roll_result.
+		if (!(c.is_hidden and c.has_feat("skulker") and c.main_hand_is_ranged)) {
+			reveal_hidden_combatant(c, "making an attack");
+		}
 
 		// Store attack context in pending roll.
 		pending_roll pr;
