@@ -2203,6 +2203,16 @@ class battle_manager {
 				break;
 			}
 		}
+		// Xanathar's Ancestral Guardian L3 Ancestral Protectors (para 389-390):
+		// "that target has disadvantage on any attack roll that isn't against you"
+		if (attacker.ancestral_protector_marked_by != 0 and @target != null and @combat != null) {
+			for (uint ag = 0; ag < combat.combatants.length(); ag++) {
+				combatant@ ag_c = combat.combatants[ag];
+				if (@ag_c == null or ag_c.is_dead or ag_c.id != attacker.ancestral_protector_marked_by) continue;
+				if (target.id != ag_c.id) disadv = true; // attacking someone other than the barbarian
+				break;
+			}
+		}
 		// Sacred Weapon: add CHA mod to attack rolls (handled via attack bonus modification)
 
 		// PHB 2024 Rogue L18 Elusive (para 6576-6577): "No attack roll can have
@@ -3328,6 +3338,18 @@ class battle_manager {
 			c.bardic_inspiration_uses = 2;
 			broadcast_announce(c.name + "'s Superior Inspiration restores " + restored + " Bardic Inspiration use" + (restored == 1 ? "" : "s") + ".", false);
 		}
+		// Xanathar's Samurai L10 Tireless Spirit (para 1708-1709): "when you roll
+		// initiative and have no uses of Fighting Spirit remaining, you regain one use."
+		if (c.class_name == "Fighter" and c.subclass == "Samurai" and c.level >= 10 and c.fighting_spirit_uses <= 0) {
+			c.fighting_spirit_uses = 1;
+			broadcast_announce(c.name + "'s Tireless Spirit restores 1 Fighting Spirit use!", false);
+		}
+		// Xanathar's Arcane Archer L15 Ever-Ready Shot (para 1626-1627): "If you roll
+		// initiative and have no uses of Arcane Shot remaining, you regain one use of it."
+		if (c.class_name == "Fighter" and c.subclass == "Arcane Archer" and c.level >= 15 and c.arcane_shot_uses <= 0) {
+			c.arcane_shot_uses = 1;
+			broadcast_announce(c.name + "'s Ever-Ready Shot restores 1 Arcane Shot use!", false);
+		}
 		// Valda's Spire Gunslinger L15 Dire Gambit (para 196): "Whenever you roll
 		// Initiative or score a Critical Hit, you regain one expended Risk Die."
 		if (c.class_name == "Gunslinger" and c.dire_gambit_active and c.risk_dice_current < c.risk_dice_max) {
@@ -3843,6 +3865,16 @@ class battle_manager {
 		c.power_surge_used_this_turn = false;
 		// Xanathar's Grave Domain L17 Keeper of Souls (para 802-803): once per round.
 		c.keeper_of_souls_used_this_turn = false;
+		// Xanathar's Ancestral Guardian L3 Ancestral Protectors expiry (para 389):
+		// "Until the start of your next turn." Clear marks at start of barbarian's turn.
+		if (c.class_name == "Barbarian" and c.subclass == "Ancestral Guardian") {
+			for (uint ag = 0; ag < combat.combatants.length(); ag++) {
+				if (combat.combatants[ag].ancestral_protector_marked_by == c.id) {
+					combat.combatants[ag].ancestral_protector_marked_by = 0;
+				}
+			}
+			c.ancestral_protector_target = 0;
+		}
 		// Xanathar's Cavalier L3 Unwavering Mark expiry (para 1669): "until the end of
 		// your next turn." On the Cavalier's turn start: if flag is false, clear all marks
 		// by this Cavalier; if true, set to false (marks persist through this turn).
@@ -5367,6 +5399,15 @@ class battle_manager {
 				target.marked_by_cavalier_id = c.id;
 				c.cavalier_mark_turn_flag = true;
 			}
+			// Xanathar's Ancestral Guardian L3 Ancestral Protectors (para 389-390):
+			// "the first creature you hit with an attack on your turn becomes the target
+			// of the warriors." Mark only the FIRST creature hit per turn while raging.
+			if (hit and c.class_name == "Barbarian" and c.subclass == "Ancestral Guardian" and c.raging and !c.ancestral_protector_hit_this_turn) {
+				target.ancestral_protector_marked_by = c.id;
+				c.ancestral_protector_target = int(target.id);
+				c.ancestral_protector_hit_this_turn = true;
+				broadcast_announce(c.name + "'s ancestral spirits focus on " + target.name + "!", false);
+			}
 
 			string attack_reason = pr.attack_name != "" ? pr.attack_name + " attack against " + target.name : "to attack " + target.name;
 			broadcast_roll(c.name, attack_reason, natural_roll, reported_modifier, total, outcome);
@@ -6043,6 +6084,20 @@ class battle_manager {
 			}
 			string dmg_type_str = (pr.damage_type >= 0 and pr.damage_type < int(DAMAGE_TYPE_NAMES.length())) ? DAMAGE_TYPE_NAMES[pr.damage_type] : "physical";
 			broadcast_to_battle({{"type", message_types::damage_dealt}, {"attacker", c.name}, {"target", target.name}, {"amount", total_damage}, {"damage_type", dmg_type_str}, {"is_crit", pr.is_crit}, {"weapon", pr.attack_name}, {"is_weapon_attack", pr.is_weapon_attack}});
+			// Xanathar's Ancestral Guardian L3 Ancestral Protectors (para 389-390):
+			// "when the target hits a creature other than you with an attack, that creature
+			// has resistance to the damage dealt by the attack."
+			if (c.ancestral_protector_marked_by != 0 and @combat != null) {
+				for (uint agr = 0; agr < combat.combatants.length(); agr++) {
+					combatant@ ag_c = combat.combatants[agr];
+					if (@ag_c == null or ag_c.is_dead or ag_c.id != c.ancestral_protector_marked_by) continue;
+					if (target.id != ag_c.id) {
+						total_damage = total_damage / 2;
+						broadcast_announce(target.name + " has resistance from Ancestral Protectors — damage halved to " + total_damage + "!", true);
+					}
+					break;
+				}
+			}
 			// Xanathar's Grave Domain L2 Path to the Grave (para 794-796): "the next time
 			// you or an ally hits the cursed creature with an attack, the creature has
 			// vulnerability to all of that attack's damage, and then the curse ends."
@@ -6868,15 +6923,25 @@ class battle_manager {
 			}
 		}
 		else if (choice == "spirit_shield" and defender.is_player) {
-			// Ancestral Guardian Barbarian: Spirit Shield — reduce incoming damage by 2d6
+			// Xanathar's Ancestral Guardian L6 Spirit Shield (para 391-393): reduce
+			// incoming damage by 2d6/3d6/4d6.
 			if (defender.raging and defender.class_name == "Barbarian" and defender.subclass == "Ancestral Guardian") {
 				defender.has_reaction = false;
 				int reduction = random(1, 6) + random(1, 6);
 				if (defender.level >= 10) reduction += random(1, 6);
 				if (defender.level >= 14) reduction += random(1, 6);
-				// Store damage reduction for when damage is applied
 				defender.spirit_shield_reduction = reduction;
 				broadcast_announce(defender.name + " summons Spirit Shield! Next damage reduced by " + reduction + ".", true);
+				// Xanathar's Ancestral Guardian L14 Vengeful Ancestors (para 397-398):
+				// "the attacker takes an amount of force damage equal to the damage that
+				// your Spirit Shield prevents."
+				if (defender.level >= 14 and @combat != null) {
+					combatant@ ss_attacker = combat.get_combatant(rp.attacker_id);
+					if (@ss_attacker != null and !ss_attacker.is_dead) {
+						combat.apply_damage(ss_attacker, reduction, DMG_FORCE, defender);
+						broadcast_announce(defender.name + "'s Vengeful Ancestors deal " + reduction + " force damage to " + ss_attacker.name + "!", true);
+					}
+				}
 			}
 		}
 		else if (choice == "entropic_ward" and defender.is_player) {

@@ -3182,14 +3182,16 @@ void handle_user_message(user@ u, json_object@ msg)
 		}
 
 		else if (feature == "arcane_shot") {
-			// Arcane Archer Fighter: activate an arcane shot type for next hit
+			// Xanathar's Arcane Archer L3 Arcane Shot (para 1618-1621): "Once per turn
+			// when you fire an arrow [...] you can apply one of your Arcane Shot options."
+			// NOT a bonus action — free action applied on hit. Pre-set here via menu.
 			if (c.class_name != "Fighter" or c.subclass != "Arcane Archer") { u.send({{"type", message_types::announce}, {"text", "Only Arcane Archers can use Arcane Shot."}, {"interrupt", true}}); return; }
 			if (c.arcane_shot_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Arcane Shot uses remaining."}, {"interrupt", true}}); return; }
-			string shot_type = msg.exists("shot_type") ? string(msg["shot_type"]) : "beguiling";
+			string shot_type = msg.exists("shot_type") ? string(msg["shot_type"]) : "bursting";
 			c.arcane_shot_pending = true;
 			c.arcane_shot_type = shot_type;
 			c.arcane_shot_uses--;
-			u.room.bm.broadcast_announce(c.name + " readies " + shot_type + " arcane shot! Next ranged attack applies the effect.", false);
+			u.room.bm.broadcast_announce(c.name + " readies " + shot_type + " Arcane Shot! (" + c.arcane_shot_uses + " uses remaining)", false);
 		}
 
 		else if (feature == "abjure_extraplanar") {
