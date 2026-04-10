@@ -434,6 +434,27 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 | **Otherworldly Wings** (bonus action toggle spectral wings, fly 30 ft) | 14 | 2621-2630 | ✓ Done 2026-04-09 — toggle bonus action, fly 30 ft while active. |
 | **Unearthly Recovery** (bonus action heal half max HP when below half HP, 1/LR) | 18 | 2631-2639 | ✓ Done 2026-04-09 — bonus action handler, heals half max HP, gated on current HP < half max HP, `unearthly_recovery_available` flag 1/LR. |
 
+### Shadow Magic Subclass Audit (2026-04-09) — Xanathar's paras 2557-2607
+
+| Feature | Level | Source para | Status |
+|---------|-------|-------------|--------|
+| **Eyes of the Dark** (darkvision 120 ft; L3: learn darkness, can cast with 2 SP and see through it) | 1/3 | 2590-2592 | PARTIAL — darkness auto-prepared at L3. See-through-darkness with SP casting deferred (needs SP-casting hook in spell pipeline). |
+| **Strength of the Grave** (CHA save DC 5+damage when reduced to 0 HP, drop to 1 instead; not if radiant or crit; 1/LR) | 1 | 2593-2595 | ✓ Done — wired in `apply_damage`. Source para ref added. Radiant exclusion works. Crit exclusion DEFERRED (needs `was_crit` plumbing through `apply_damage`). |
+| **Hound of Ill Omen** (BA 3 SP, summon dire wolf variant targeting one creature within 120 ft) | 6 | 2596-2602 | ✓ Done 2026-04-09 — BA handler in `users _dom.nvgt`, spawns companion with dire wolf stats (HP 37 + half level, AC 14, Speed 50, 2d6+3 piercing). Deferred: save disadvantage when hound within 5 ft of target (needs centralized spell save helper or per-site wiring). |
+| **Shadow Walk** (BA teleport 120 ft when in dim light/darkness) | 14 | 2603-2604 | ✓ Done 2026-04-09 — BA handler teleports toward locked target up to 120 ft. Dim/dark gating not enforced (no lighting system). |
+| **Umbral Form** (BA 6 SP, resistance to all except force/radiant, move through objects, 1 min) | 18 | 2605-2607 | ✓ Done 2026-04-09 — BA handler, 6 SP cost, `shadow_umbral_active` flag, 10-round tickdown in `advance_turn`, dismiss as BA. Resistance wired in `apply_damage`. |
+
+### Aberrant Mind Subclass Audit (2026-04-09) — Tasha's paras 3894-3952
+
+| Feature | Level | Source para | Status |
+|---------|-------|-------------|--------|
+| **Psionic Spells** (auto-learn spells per level: arms of Hadar, dissonant whispers, mind sliver, calm emotions, detect thoughts, hunger of Hadar, sending, Evard's black tentacles, telekinesis) | 1-9 | 3914-3930 | ✓ Done 2026-04-09 — auto-prepared in character_data init. Summon aberration (L7) and Rary's telepathic bond (L9) skipped (not in spell catalog). |
+| **Telepathic Speech** (BA 30 ft telepathic connection, sorcerer-level minutes) | 1 | 3932-3935 | SKIPPED — non-combat feature (telepathy flavor). |
+| **Psionic Sorcery** (cast psionic spells with SP = spell level instead of slot, no components) | 6 | 3936-3938 | DEFERRED — needs spell choice prompt "Cast with slot or SP?" in spell pipeline. Flag `psionic_sorcery_active` not yet set. |
+| **Psychic Defenses** (psychic resistance + advantage on charm/frighten saves) | 6 | 3939-3941 | PARTIAL — psychic resistance via `psychic_resistance` flag (fixed double-halving bug). `charm_frighten_save_advantage` flag added but not yet wired into specific charm/frighten save sites. |
+| **Revelation in Flesh** (BA 1+ SP, 10 min: see invisible 60 ft / fly speed / swim / squeeze) | 14 | 3942-3948 | ✓ Done 2026-04-09 — BA handler with sub-menu (see invisible / fly / both), 100-round tickdown in `advance_turn`. Swim and squeeze options skipped (non-combat). |
+| **Warping Implosion** (action teleport 120 ft + 30 ft AoE 3d10 force STR save, 1/LR or 5 SP) | 18 | 3949-3952 | ✓ Done 2026-04-09 — action handler, teleport toward target, AoE loop with STR save vs spell DC, half on success, 1/LR or 5 SP recharge. |
+
 ### Warlock Audit (2026-04-09) — Basic Rules 2024 paras 7589-7799
 
 | Feature | Level | Source para | Status |
