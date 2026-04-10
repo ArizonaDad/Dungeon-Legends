@@ -4955,8 +4955,12 @@ class battle_manager {
 			int new_dist = feet_distance(new_x, new_y, enemy.x, enemy.y);
 			int reach = enemy.main_hand_range;
 			if (reach < 5) reach = 5;
-			// Opportunity attack triggers when leaving reach.
-			if (old_dist <= reach and new_dist > reach) {
+			// Opportunity attack triggers when leaving reach OR entering reach (Polearm Master).
+			// PHB 2024 Polearm Master (para 7714): "Other creatures provoke Opportunity
+			// Attacks from you when they enter your reach."
+			bool leaving_reach = (old_dist <= reach and new_dist > reach);
+			bool entering_reach = (old_dist > reach and new_dist <= reach and enemy.has_feat("polearm_master") and !enemy.main_hand_is_ranged);
+			if (leaving_reach or entering_reach) {
 				if (enemy.main_hand_is_ranged) continue;
 				// Swashbuckler Rogue: Fancy Footwork — enemies attacked by Swashbuckler can't make OA
 				if (mover.class_name == "Rogue" and mover.subclass == "Swashbuckler" and enemy.swashbuckler_attacked_this_turn) continue;
