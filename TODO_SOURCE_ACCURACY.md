@@ -943,6 +943,43 @@ Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 | **Protective Spirit** (end of turn: regain 1d6+half level HP if below half HP and not incapacitated) | 15 | 2050-2051 | ✓ Done — `protective_spirit_active` flag. Passive heal wired in `advance_turn` after Sharpen the Blade tickdown. |
 | **Emissary of Redemption** (resistance to all creature damage + radiant retaliation = half damage taken; lost vs creatures you attack) | 20 | 2052-2056 | PARTIAL — `emissary_of_redemption_active` flag set on init at L20. Combat logic (resistance + retaliation + exclusion tracking) deferred. |
 
+### Path of the Storm Herald Barbarian Subclass Audit (2026-04-10) — Xanathar's paras 416-434
+
+| Feature | Level | Source para | Status |
+|---------|-------|-------------|--------|
+| **Storm Aura** (10ft aura on rage: desert=fire dmg, sea=lightning DEX save, tundra=temp HP) | 3 | 416-422 | ✓ Done — `apply_storm_aura_effect()` helper with 3-environment support. Auto-fires on rage entry + BA handler for per-turn reactivation. Flat dmg 2/3/4/5/6 scaling (desert/tundra), d6 dice 1/2/3/4 (sea). Environment stored in `storm_aura_damage_type` (DMG_FIRE/LIGHTNING/COLD). |
+| **Storm Soul** (passive resistance: desert=fire, sea=lightning+swim, tundra=cold) | 6 | 423-427 | PARTIAL — resistance fields exist on combatant (fire/lightning/cold_resistance), but not set by Storm Herald init. Needs environment-based auto-grant. |
+| **Shielding Storm** (aura grants Storm Soul resistance to allies) | 10 | 428-429 | DEFERRED — extending resistance to other combatants in AoE requires per-turn resistance tracking. |
+| **Raging Storm** (desert=reaction fire on melee hit, sea=reaction prone on hit, tundra=STR save speed 0) | 14 | 430-434 | DEFERRED — 3 reaction/trigger variants. Desert variant similar to Scornful Rebuke pattern. |
+
+### College of Glamour Bard Subclass Audit (2026-04-10) — Xanathar's paras 549-565
+
+| Feature | Level | Source para | Status |
+|---------|-------|-------------|--------|
+| **Mantle of Inspiration** (BA, 1 BI: flat 5/8/11/14 temp HP to CHA mod allies within 60ft) | 3 | 549-552 | ✓ Done — BA handler in `users _dom.nvgt`. Fixed: was BI die+CHA, now flat 5/8/11/14 per source. Movement reaction deferred (allies can move up to speed without OA). |
+| **Enthralling Performance** (1-minute performance, WIS save or charmed for 1 hour) | 3 | 553-557 | DEFERRED — non-combat social feature. |
+| **Mantle of Majesty** (BA: free Command each turn for 1 minute, concentration, 1/LR) | 6 | 558-561 | DEFERRED — requires casting pipeline integration for free Command each turn. |
+| **Unbreakable Majesty** (BA 1 min: attackers must CHA save or can't attack you this turn) | 14 | 562-565 | DEFERRED — requires per-attacker save check before attack resolution. |
+
+### College of Swords Bard Subclass Audit (2026-04-10) — Xanathar's paras 579-595
+
+| Feature | Level | Source para | Status |
+|---------|-------|-------------|--------|
+| **Bonus Proficiencies** (medium armor, scimitar) | 3 | 579-581 | N/A — proficiency tracking exists but not auto-granted by subclass. |
+| **Fighting Style** (Dueling or Two-Weapon Fighting) | 3 | 582-585 | PARTIAL — Dueling/TWF feat system exists; not auto-prompted at subclass selection for Swords Bard. |
+| **Blade Flourish** (on Attack action +10ft speed; on weapon hit spend 1 BI for extra damage + variant) | 3 | 586-591 | PARTIAL — `blade_flourish_active` flag. BA handler spends BI, grants bonus BI-die damage on next weapon hit. Missing: +10ft speed on Attack action, 3 Flourish variants (Defensive=+AC, Slashing=AoE, Mobile=push+move). |
+| **Extra Attack** (attack twice per Attack action) | 6 | 592-593 | ✓ Done — `c.extra_attacks = 1` at L6 in character_data.nvgt. |
+| **Master's Flourish** (Blade Flourish can roll d6 instead of spending BI) | 14 | 594-595 | DEFERRED — requires free-Flourish path that doesn't consume BI. |
+
+### College of Whispers Bard Subclass Audit (2026-04-10) — Xanathar's paras 610-631
+
+| Feature | Level | Source para | Status |
+|---------|-------|-------------|--------|
+| **Psychic Blades** (on weapon hit, spend 1 BI: 2d6/3d6/5d6/8d6 psychic, 1/round on turn) | 3 | 610-613 | ✓ Done — `psychic_blades_pending` flag. Fixed: was wrong scaling formula. Now correctly 2d6/3d6/5d6/8d6 at L3/5/10/15 per source. |
+| **Words of Terror** (1-min speech, WIS save or frightened, 1/SR) | 3 | 614-618 | DEFERRED — non-combat social feature. |
+| **Mantle of Whispers** (reaction: capture dead humanoid's shadow, use as disguise) | 6 | 619-624 | DEFERRED — non-combat espionage feature. |
+| **Shadow Lore** (action: WIS save or charmed 8 hours, obeys commands) | 14 | 625-631 | DEFERRED — non-combat social feature. |
+
 ---
 
 ## Working Rule Going Forward

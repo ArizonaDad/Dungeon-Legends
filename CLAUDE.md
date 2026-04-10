@@ -331,7 +331,7 @@ Adding a new prompted spell or feature: in `handle_cast` (or the relevant action
 
 ### Bonus Action Menu (B key)
 
-- **Barbarian**: Rage + Berserker Frenzy (bonus melee attack while raging)
+- **Barbarian**: Rage + Berserker Frenzy (bonus melee attack while raging) + Storm Aura (Storm Herald BA, desert/sea/tundra)
 
 - **Fighter**: Action Surge, Second Wind + Battle Master Maneuvers (Trip/Precision/Riposte) + Psi Warrior Strike
 
