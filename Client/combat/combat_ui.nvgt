@@ -208,6 +208,16 @@ bool my_favored_by_gods_available = false;
 string my_divine_soul_affinity = "";
 bool my_otherworldly_wings_active = false;
 bool my_unearthly_recovery_available = false;
+// Xanathar's Shadow Magic (paras 2557-2607)
+bool my_shadow_walk_available = false;
+bool my_shadow_umbral_active = false;
+int my_shadow_umbral_rounds = 0;
+bool my_strength_of_the_grave_used = false;
+// Tasha's Aberrant Mind (paras 3894-3952)
+bool my_psionic_defenses_active = false;
+bool my_revelation_in_flesh_active = false;
+int my_revelation_in_flesh_rounds = 0;
+bool my_warping_implosion_available = false;
 // PHB 2024 Warlock L2 Magical Cunning / L9 Contact Patron / L11+ Mystic Arcanum — synced from server
 bool my_magical_cunning_available = false;
 bool my_contact_patron_available = false;
@@ -1050,6 +1060,13 @@ void show_bonus_action_menu() {
 	// Xanathar's Divine Soul L14 Otherworldly Wings / L18 Unearthly Recovery (paras 2551-2556)
 	int otherworldly_wings_opt = -1;
 	int unearthly_recovery_opt = -1;
+	// Xanathar's Shadow Magic (paras 2557-2607)
+	int hound_of_ill_omen_opt = -1;
+	int shadow_walk_opt = -1;
+	int shadow_umbral_form_opt = -1;
+	// Tasha's Aberrant Mind (paras 3894-3952)
+	int revelation_in_flesh_opt = -1;
+	int warping_implosion_opt = -1;
 	// PHB 2024 Wizard Evoker L14 Overchannel (paras 9265-9268)
 	int overchannel_opt = -1;
 	// PHB 2024 Warlock L2 Magical Cunning / L9 Contact Patron / L11+ Mystic Arcanum
@@ -1098,6 +1115,28 @@ void show_bonus_action_menu() {
 	// Xanathar's Divine Soul L18 Unearthly Recovery (para 2554-2556)
 	if (lc == "sorcerer" and subclass == "Divine Soul" and level >= 18 and my_unearthly_recovery_available) {
 		unearthly_recovery_opt = m.add_item("Unearthly Recovery. Bonus action. Below half HP: regain half max HP. 1 per long rest.");
+	}
+	// Xanathar's Shadow Magic L6 Hound of Ill Omen (para 2596-2602)
+	if (lc == "sorcerer" and subclass == "Shadow Magic" and level >= 6) {
+		hound_of_ill_omen_opt = m.add_item("Hound of Ill Omen. Bonus action. 3 SP: summon a shadow hound to stalk a target.");
+	}
+	// Xanathar's Shadow Magic L14 Shadow Walk (para 2603-2604)
+	if (lc == "sorcerer" and subclass == "Shadow Magic" and level >= 14) {
+		shadow_walk_opt = m.add_item("Shadow Walk. Bonus action. Teleport up to 120 feet (dim light/darkness).");
+	}
+	// Xanathar's Shadow Magic L18 Umbral Form (para 2605-2607)
+	if (lc == "sorcerer" and subclass == "Shadow Magic" and level >= 18) {
+		string umbral_label = my_shadow_umbral_active ? "Dismiss Umbral Form. Bonus action." : "Umbral Form. Bonus action. 6 SP: resistance to all except force/radiant for 1 minute.";
+		shadow_umbral_form_opt = m.add_item(umbral_label);
+	}
+	// Tasha's Aberrant Mind L14 Revelation in Flesh (para 3942-3948)
+	if (lc == "sorcerer" and subclass == "Aberrant Sorcery" and level >= 14) {
+		revelation_in_flesh_opt = m.add_item("Revelation in Flesh. Bonus action. 1+ SP: see invisible 60ft, or fly speed = walk speed, or both (2 SP).");
+	}
+	// Tasha's Aberrant Mind L18 Warping Implosion (para 3949-3952)
+	if (lc == "sorcerer" and subclass == "Aberrant Sorcery" and level >= 18) {
+		string wi_label = my_warping_implosion_available ? "Warping Implosion. Action. Teleport 120ft + 30ft AoE 3d10 force. 1/LR." : "Warping Implosion. Action. 5 SP to reuse.";
+		warping_implosion_opt = m.add_item(wi_label);
 	}
 	// PHB 2024 Wizard Evoker L14 Overchannel (paras 9265-9268): When you cast a Wizard
 	// spell of levels 1-5 that deals damage, deal max damage. After first use per long
@@ -1714,6 +1753,37 @@ void show_bonus_action_menu() {
 	else if (unearthly_recovery_opt >= 0 and res == unearthly_recovery_opt) {
 		// Xanathar's Divine Soul L18 Unearthly Recovery (paras 2554-2556)
 		send({{"type", message_types::bonus_action}, {"feature", "unearthly_recovery"}});
+	}
+	else if (hound_of_ill_omen_opt >= 0 and res == hound_of_ill_omen_opt) {
+		// Xanathar's Shadow Magic L6 Hound of Ill Omen (para 2596-2602)
+		send({{"type", message_types::bonus_action}, {"feature", "hound_of_ill_omen"}, {"target_id", current_target_id}});
+	}
+	else if (shadow_walk_opt >= 0 and res == shadow_walk_opt) {
+		// Xanathar's Shadow Magic L14 Shadow Walk (para 2603-2604)
+		send({{"type", message_types::bonus_action}, {"feature", "shadow_walk"}, {"target_id", current_target_id}});
+	}
+	else if (shadow_umbral_form_opt >= 0 and res == shadow_umbral_form_opt) {
+		// Xanathar's Shadow Magic L18 Umbral Form (para 2605-2607)
+		send({{"type", message_types::bonus_action}, {"feature", "shadow_umbral_form"}});
+	}
+	else if (revelation_in_flesh_opt >= 0 and res == revelation_in_flesh_opt) {
+		// Tasha's Aberrant Mind L14 Revelation in Flesh (para 3942-3948)
+		// Offer sub-menu for option choice
+		menu@ rm = setup_sub_menu("Choose Revelation in Flesh option:");
+		rm.add_item("See Invisible 60 feet. 1 SP.");
+		rm.add_item("Fly Speed equal to walking speed. 1 SP.");
+		rm.add_item("Both: See Invisible + Fly. 2 SP.");
+		int rr = rm.run();
+		if (rr >= 0) {
+			string opt = "see_invisible";
+			if (rr == 1) opt = "fly";
+			else if (rr == 2) opt = "both";
+			send({{"type", message_types::bonus_action}, {"feature", "revelation_in_flesh"}, {"option", opt}});
+		}
+	}
+	else if (warping_implosion_opt >= 0 and res == warping_implosion_opt) {
+		// Tasha's Aberrant Mind L18 Warping Implosion (para 3949-3952)
+		send({{"type", message_types::bonus_action}, {"feature", "warping_implosion"}, {"target_id", current_target_id}});
 	}
 	else if (overchannel_opt >= 0 and res == overchannel_opt) {
 		// PHB 2024 Wizard Evoker L14 Overchannel (paras 9265-9268)
@@ -3453,6 +3523,16 @@ void parse_game_state(json_object@ msg) {
 	my_divine_soul_affinity = msg.exists("my_divine_soul_affinity") ? string(msg["my_divine_soul_affinity"]) : "";
 	my_otherworldly_wings_active = msg.exists("my_otherworldly_wings_active") ? bool(msg["my_otherworldly_wings_active"]) : false;
 	my_unearthly_recovery_available = msg.exists("my_unearthly_recovery_available") ? bool(msg["my_unearthly_recovery_available"]) : false;
+	// Xanathar's Shadow Magic state
+	my_shadow_walk_available = msg.exists("my_shadow_walk_available") ? bool(msg["my_shadow_walk_available"]) : false;
+	my_shadow_umbral_active = msg.exists("my_shadow_umbral_active") ? bool(msg["my_shadow_umbral_active"]) : false;
+	my_shadow_umbral_rounds = msg.exists("my_shadow_umbral_rounds") ? int(msg["my_shadow_umbral_rounds"]) : 0;
+	my_strength_of_the_grave_used = msg.exists("my_strength_of_the_grave_used") ? bool(msg["my_strength_of_the_grave_used"]) : false;
+	// Tasha's Aberrant Mind state
+	my_psionic_defenses_active = msg.exists("my_psionic_defenses_active") ? bool(msg["my_psionic_defenses_active"]) : false;
+	my_revelation_in_flesh_active = msg.exists("my_revelation_in_flesh_active") ? bool(msg["my_revelation_in_flesh_active"]) : false;
+	my_revelation_in_flesh_rounds = msg.exists("my_revelation_in_flesh_rounds") ? int(msg["my_revelation_in_flesh_rounds"]) : 0;
+	my_warping_implosion_available = msg.exists("my_warping_implosion_available") ? bool(msg["my_warping_implosion_available"]) : false;
 	my_magical_cunning_available = msg.exists("my_magical_cunning_available") ? bool(msg["my_magical_cunning_available"]) : false;
 	my_contact_patron_available = msg.exists("my_contact_patron_available") ? bool(msg["my_contact_patron_available"]) : false;
 	my_mystic_arcanum_6_available = msg.exists("my_mystic_arcanum_6_available") ? bool(msg["my_mystic_arcanum_6_available"]) : false;
@@ -3666,6 +3746,16 @@ void reset_combat_state() {
 	my_divine_soul_affinity = "";
 	my_otherworldly_wings_active = false;
 	my_unearthly_recovery_available = false;
+	// Xanathar's Shadow Magic
+	my_shadow_walk_available = false;
+	my_shadow_umbral_active = false;
+	my_shadow_umbral_rounds = 0;
+	my_strength_of_the_grave_used = false;
+	// Tasha's Aberrant Mind
+	my_psionic_defenses_active = false;
+	my_revelation_in_flesh_active = false;
+	my_revelation_in_flesh_rounds = 0;
+	my_warping_implosion_available = false;
 	my_magical_cunning_available = false;
 	my_contact_patron_available = false;
 	my_mystic_arcanum_6_available = false;

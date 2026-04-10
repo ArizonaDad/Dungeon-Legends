@@ -1909,6 +1909,183 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.room.bm.combat.apply_healing(c, heal);
 			u.room.bm.broadcast_announce(c.name + " invokes Unearthly Recovery and regains " + heal + " hit points!", true);
 		}
+		else if (feature == "hound_of_ill_omen") {
+			// Xanathar's Shadow Magic L6 Hound of Ill Omen (para 2596-2602): "As a bonus
+			// action, you can spend 3 sorcery points to magically summon a hound of ill
+			// omen to target one creature you can see within 120 feet."
+			// Uses dire wolf stats (Medium monstrosity, temp HP = half sorcerer level).
+			if (c.class_name != "Sorcerer" or c.subclass != "Shadow Magic" or c.level < 6) {
+				u.send({{"type", message_types::announce}, {"text", "Your character cannot summon a Hound of Ill Omen."}, {"interrupt", true}});
+				return;
+			}
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
+			if (c.sorcery_points < 3) { u.send({{"type", message_types::announce}, {"text", "You need 3 Sorcery Points to summon the Hound."}, {"interrupt", true}}); return; }
+			// Find the target from client message
+			combatant@ target = u.room.bm.combat.get_combatant(target_id);
+			if (@target == null or target.is_dead or target.id == c.id) { u.send({{"type", message_types::announce}, {"text", "No valid target for the Hound."}, {"interrupt", true}}); return; }
+			float hdx = float(target.x - c.x); float hdy = float(target.y - c.y);
+			float dist = sqrt(hdx * hdx + hdy * hdy) * 5.0f;
+			if (dist > 120) { u.send({{"type", message_types::announce}, {"text", "Target is out of range (120 ft)."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.sorcery_points -= 3;
+			// Dire wolf stats: HP 37 (5d10+10), AC 14, Speed 50, Bite +5 1d6+3 piercing
+			// Modified: Medium, temp HP = half sorcerer level, monstrosity
+			int hound_hp = 37 + c.level / 2; // Base HP + temp HP baked in
+			combatant@ hound = u.room.bm.spawn_companion(c, "hound_of_ill_omen", c.name + "'s Hound of Ill Omen", hound_hp, 14, 50, 5, 2, 6, 3, DMG_PIERCING, 0);
+			if (@hound != null) {
+				// Track hound target for save disadvantage
+				target.hound_caster_id = c.id;
+			}
+			u.room.bm.broadcast_announce(c.name + " spends 3 SP and summons a Hound of Ill Omen to stalk " + target.name + "!", true);
+		}
+		else if (feature == "shadow_walk") {
+			// Xanathar's Shadow Magic L14 Shadow Walk (para 2603-2604): "When you are in
+			// dim light or darkness, as a bonus action, you can magically teleport up to
+			// 120 feet to an unoccupied space you can see that is also in dim light or darkness."
+			if (c.class_name != "Sorcerer" or c.subclass != "Shadow Magic" or c.level < 14) {
+				u.send({{"type", message_types::announce}, {"text", "Your character cannot use Shadow Walk."}, {"interrupt", true}});
+				return;
+			}
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			// Teleport up to 120 ft toward locked target if one is provided
+			combatant@ sw_target = u.room.bm.combat.get_combatant(target_id);
+			if (@sw_target != null and !sw_target.is_dead and sw_target.id != c.id) {
+				float sdx = float(sw_target.x - c.x); float sdy = float(sw_target.y - c.y);
+				float dist = sqrt(sdx * sdx + sdy * sdy) * 5.0f;
+				if (dist <= 120) {
+					c.x = sw_target.x + 1;
+					c.y = sw_target.y;
+				}
+			}
+			u.room.bm.broadcast_announce(c.name + " steps through shadows, teleporting up to 120 feet!", true);
+		}
+		else if (feature == "shadow_umbral_form") {
+			// Xanathar's Shadow Magic L18 Umbral Form (para 2605-2607): "you can spend 6
+			// sorcery points as a bonus action to magically transform yourself into a shadowy
+			// form. In this form, you have resistance to all damage except force and radiant,
+			// and you can move through other creatures and objects as if they were difficult terrain."
+			// Duration: 1 minute (10 rounds). Ends if incapacitated, die, or dismiss.
+			if (c.class_name != "Sorcerer" or c.subclass != "Shadow Magic" or c.level < 18) {
+				u.send({{"type", message_types::announce}, {"text", "Your character cannot use Umbral Form."}, {"interrupt", true}});
+				return;
+			}
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
+			if (c.shadow_umbral_active) {
+				// Dismiss as BA
+				c.shadow_umbral_active = false;
+				c.shadow_umbral_rounds = 0;
+				c.has_bonus_action = false;
+				c.used_bonus_action = true;
+				u.room.bm.broadcast_announce(c.name + " dismisses their Umbral Form.", false);
+				return;
+			}
+			if (c.sorcery_points < 6) { u.send({{"type", message_types::announce}, {"text", "You need 6 Sorcery Points for Umbral Form."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.sorcery_points -= 6;
+			c.shadow_umbral_active = true;
+			c.shadow_umbral_rounds = 10;
+			u.room.bm.broadcast_announce(c.name + " transforms into a shadowy Umbral Form — resistance to all damage except force and radiant for 1 minute!", true);
+		}
+		else if (feature == "revelation_in_flesh") {
+			// Tasha's Aberrant Mind L14 Revelation in Flesh (para 3942-3948): "As a bonus
+			// action, you can spend 1 or more sorcery points to magically transform your
+			// body for 10 minutes. For each sorcery point you spend, you can gain one of
+			// the following benefits: see invisible 60ft, fly speed = walk speed, swim 2x, squeeze."
+			if (c.class_name != "Sorcerer" or c.subclass != "Aberrant Sorcery" or c.level < 14) {
+				u.send({{"type", message_types::announce}, {"text", "Your character cannot use Revelation in Flesh."}, {"interrupt", true}});
+				return;
+			}
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
+			// Parse chosen option from msg: "see_invisible" or "fly" (1 SP each)
+			string option = msg.exists("option") ? string(msg["option"]) : "fly";
+			int sp_cost = 1;
+			if (option == "both") sp_cost = 2; // Player chooses both
+			if (c.sorcery_points < sp_cost) { u.send({{"type", message_types::announce}, {"text", "You need " + sp_cost + " SP for Revelation in Flesh."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.sorcery_points -= sp_cost;
+			c.revelation_in_flesh_active = true;
+			c.revelation_in_flesh_rounds = 100; // 10 minutes
+			string effects = "";
+			if (option == "see_invisible" or option == "both") {
+				c.revelation_see_invisible = true;
+				effects += "See Invisible 60 ft";
+			}
+			if (option == "fly" or option == "both") {
+				c.revelation_fly = true;
+				c.flying_speed = c.speed;
+				if (effects != "") effects += " + ";
+				effects += "Fly " + c.speed + " ft";
+			}
+			u.room.bm.broadcast_announce(c.name + " reveals their aberrant form — " + effects + " for 10 minutes!", true);
+		}
+		else if (feature == "warping_implosion") {
+			// Tasha's Aberrant Mind L18 Warping Implosion (para 3949-3952): "As an action,
+			// you can teleport to an unoccupied space you can see within 120 feet. Immediately
+			// after, each creature within 30 feet of the space you left must make a STR save
+			// vs spell DC. Fail: 3d10 force + pulled. Success: half + no pull."
+			// 1/LR or 5 SP to reuse.
+			if (c.class_name != "Sorcerer" or c.subclass != "Aberrant Sorcery" or c.level < 18) {
+				u.send({{"type", message_types::announce}, {"text", "Your character cannot use Warping Implosion."}, {"interrupt", true}});
+				return;
+			}
+			if (!c.has_action) { u.send({{"type", message_types::announce}, {"text", "No action remaining."}, {"interrupt", true}}); return; }
+			bool used_sp = false;
+			if (!c.warping_implosion_available) {
+				// Try SP recharge
+				if (c.sorcery_points >= 5) {
+					c.sorcery_points -= 5;
+					used_sp = true;
+				} else {
+					u.send({{"type", message_types::announce}, {"text", "Warping Implosion already used this rest. Costs 5 SP to reuse."}, {"interrupt", true}});
+					return;
+				}
+			}
+			c.has_action = false;
+			if (!used_sp) c.warping_implosion_available = false;
+			// Save original position
+			int old_x = c.x;
+			int old_y = c.y;
+			// Teleport toward locked target or 120ft forward
+			combatant@ wi_target = u.room.bm.combat.get_combatant(target_id);
+			if (@wi_target != null and !wi_target.is_dead and wi_target.id != c.id) {
+				float wdx = float(wi_target.x - c.x); float wdy = float(wi_target.y - c.y);
+				float dist = sqrt(wdx * wdx + wdy * wdy) * 5.0f;
+				if (dist <= 120) {
+					c.x = wi_target.x + 1;
+					c.y = wi_target.y;
+				}
+			}
+			// AoE: 30ft around old position — 3d10 force + STR save
+			int spell_dc = 8 + c.proficiency + c.get_ability_mod(ABILITY_CHA);
+			int total_damage = random(1, 10) + random(1, 10) + random(1, 10);
+			string cost_note = used_sp ? " (5 SP)" : "";
+			u.room.bm.broadcast_announce(c.name + " unleashes Warping Implosion" + cost_note + " — teleporting 120 ft and causing a space-warping anomaly!", true);
+			for (uint i = 0; i < u.room.bm.combat.combatants.length(); i++) {
+				combatant@ t = u.room.bm.combat.combatants[i];
+				if (@t == null or t.is_dead or t.id == c.id) continue;
+				if (t.is_player == c.is_player) continue; // Skip allies — only hit enemies
+				// Check distance from OLD position
+				float dx = float(t.x - old_x);
+				float dy = float(t.y - old_y);
+				float d = sqrt(dx * dx + dy * dy) * 5.0f;
+				if (d <= 30) {
+					int str_save = random(1, 20) + t.get_ability_mod(ABILITY_STR);
+					if (str_save >= spell_dc) {
+						int half = (total_damage + 1) / 2;
+						u.room.bm.combat.apply_damage(t, half, DMG_FORCE, c);
+						u.room.bm.broadcast_announce(t.name + " resists the implosion! STR save " + str_save + " vs DC " + spell_dc + " — takes " + half + " force damage.", false);
+					} else {
+						u.room.bm.combat.apply_damage(t, total_damage, DMG_FORCE, c);
+						u.room.bm.broadcast_announce(t.name + " is pulled by the implosion! STR save " + str_save + " vs DC " + spell_dc + " — takes " + total_damage + " force damage!", true);
+					}
+				}
+			}
+		}
 		else if (feature == "font_of_magic_to_slot") {
 			// PHB 2024 Sorcerer L2 Font of Magic — Creating Spell Slots (para 6973-6993):
 			// "As a Bonus Action, you can transform unexpended Sorcery Points into one

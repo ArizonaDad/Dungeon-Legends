@@ -1511,9 +1511,69 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         c.mote_of_potential_active = true;
     }
 
-    // Aberrant Sorcery: Psionic Spells + Psychic Defenses (level 6: resistance to charm/frighten)
+    // Xanathar's Shadow Magic (paras 2557-2607)
+    if (cs.class_name == "Sorcerer" and cs.subclass == "Shadow Magic") {
+        // L1 Strength of the Grave (para 2593-2595): CHA save on 0 HP to drop to 1
+        c.strength_of_the_grave_used = false;
+        if (cs.level >= 3) {
+            // L3 Eyes of the Dark (para 2590-2592): learn darkness spell, can cast with 2 SP
+            if (!c.knows_spell("darkness")) c.prepared_spells.insert_last("darkness");
+        }
+        if (cs.level >= 14) {
+            // L14 Shadow Walk (para 2603-2604): BA teleport 120 ft in dim/dark
+            c.shadow_walk_available = true;
+        }
+        if (cs.level >= 18) {
+            // L18 Umbral Form (para 2605-2607): 6 SP BA, resistance to all except
+            // force/radiant, move through objects, 1 minute duration
+            // (activation handled in bonus action handler, flag set there)
+        }
+    }
+
+    // Tasha's Aberrant Mind (paras 3894-3952)
     if (cs.class_name == "Sorcerer" and cs.subclass == "Aberrant Sorcery") {
-        if (cs.level >= 6) c.psionic_defenses_active = true;
+        // L1 Psionic Spells (para 3914-3930): auto-learn spells per level
+        if (cs.level >= 1) {
+            // L1: arms of Hadar, dissonant whispers, mind sliver
+            if (!c.knows_spell("arms_of_hadar")) c.prepared_spells.insert_last("arms_of_hadar");
+            if (!c.knows_spell("dissonant_whispers")) c.prepared_spells.insert_last("dissonant_whispers");
+            if (!c.knows_spell("mind_sliver")) c.prepared_spells.insert_last("mind_sliver");
+        }
+        if (cs.level >= 3) {
+            // L3: calm emotions, detect thoughts
+            if (!c.knows_spell("calm_emotions")) c.prepared_spells.insert_last("calm_emotions");
+            if (!c.knows_spell("detect_thoughts")) c.prepared_spells.insert_last("detect_thoughts");
+        }
+        if (cs.level >= 5) {
+            // L5: hunger of Hadar, sending
+            if (!c.knows_spell("hunger_of_hadar")) c.prepared_spells.insert_last("hunger_of_hadar");
+            if (!c.knows_spell("sending")) c.prepared_spells.insert_last("sending");
+        }
+        if (cs.level >= 7) {
+            // L7: Evard's black tentacles, summon aberration
+            if (!c.knows_spell("evards_black_tentacles")) c.prepared_spells.insert_last("evards_black_tentacles");
+        }
+        if (cs.level >= 9) {
+            // L9: Rary's telepathic bond, telekinesis
+            if (!c.knows_spell("telekinesis")) c.prepared_spells.insert_last("telekinesis");
+        }
+        if (cs.level >= 6) {
+            // L6 Psychic Defenses (para 3939-3941): psychic resistance +
+            // advantage on saves against being charmed or frightened
+            c.psionic_defenses_active = true;
+            c.psychic_resistance = true;
+            c.charm_frighten_save_advantage = true;
+        }
+        if (cs.level >= 14) {
+            // L14 Revelation in Flesh (para 3942-3948): BA 1+ SP for 10 min
+            // transformation with multiple options
+            c.revelation_in_flesh_active = false; // activated via BA
+        }
+        if (cs.level >= 18) {
+            // L18 Warping Implosion (para 3949-3952): action teleport 120ft +
+            // 30ft AoE 3d10 force STR save, 1/LR or 5 SP
+            c.warping_implosion_available = true;
+        }
     }
 
     // Great Old One Warlock: Awakened Mind (telepathy flavor) + level 6 Entropic Ward

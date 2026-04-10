@@ -3350,6 +3350,29 @@ class battle_manager {
 					broadcast_announce(prev.name + "'s Dragon Wings fade.", false);
 				}
 			}
+			// Xanathar's Shadow Magic L18 Umbral Form (para 2605-2607): "1 minute"
+			// = 10 rounds. Resistance to all except force/radiant.
+			if (prev.shadow_umbral_active and prev.shadow_umbral_rounds > 0) {
+				prev.shadow_umbral_rounds--;
+				if (prev.shadow_umbral_rounds <= 0) {
+					prev.shadow_umbral_active = false;
+					broadcast_announce(prev.name + "'s Umbral Form fades.", false);
+				}
+			}
+			// Tasha's Aberrant Mind L14 Revelation in Flesh (para 3942-3948): "10 minutes"
+			// = 100 rounds. On expiry, clear chosen options.
+			if (prev.revelation_in_flesh_active and prev.revelation_in_flesh_rounds > 0) {
+				prev.revelation_in_flesh_rounds--;
+				if (prev.revelation_in_flesh_rounds <= 0) {
+					prev.revelation_in_flesh_active = false;
+					if (prev.revelation_fly) {
+						prev.flying_speed = 0;
+						prev.revelation_fly = false;
+					}
+					prev.revelation_see_invisible = false;
+					broadcast_announce(prev.name + "'s Revelation in Flesh ends.", false);
+				}
+			}
 			// Valda's Spire Gunslinger L5 Gut Shot debuff tickdown (paras 184-185):
 			// "For 1 minute or until the target replaces one of its attacks with
 			// dislodging the projectile, its Speed is halved..." 1 minute = 10 rounds.

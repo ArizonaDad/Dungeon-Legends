@@ -361,7 +361,18 @@ class combatant {
 	string wild_heart_animal = ""; // Bear/Eagle/Wolf/Elk/Tiger
 	bool world_tree_temp_hp = false; // World Tree Barbarian
 	int wild_magic_surge_pending = 0; // Wild Magic Sorcerer
-	bool psionic_defenses_active = false; // Aberrant Sorcerer
+	bool psionic_defenses_active = false; // Aberrant Sorcerer L6
+	bool charm_frighten_save_advantage = false; // Aberrant Sorcerer L6 Psychic Defenses
+	bool revelation_in_flesh_active = false; // Aberrant Mind L14
+	int revelation_in_flesh_rounds = 0;
+	bool revelation_see_invisible = false; // Revelation option: see invisible 60ft
+	bool revelation_fly = false; // Revelation option: fly speed = walk speed
+	bool warping_implosion_available = false; // Aberrant Mind L18
+	// Xanathar's Shadow Magic (paras 2557-2607)
+	bool shadow_walk_available = false; // Shadow Magic L14
+	bool shadow_umbral_active = false; // Shadow Magic L18 Umbral Form
+	int shadow_umbral_rounds = 0;
+	uint hound_caster_id = 0; // Shadow Magic Hound of Ill Omen — tracks which sorcerer's hound targets this combatant
 	bool awakened_mind_active = false; // Great Old One
 	bool entropic_ward_pending = false; // Great Old One
 	bool fast_hands_enabled = false; // Thief Rogue
@@ -1411,12 +1422,18 @@ class battle {
 			}
 		}
 
+		// Xanathar's Shadow Magic L18 Umbral Form (para 2605-2607): resistance to all
+		// damage except force and radiant while in shadowy form.
+		if (target.shadow_umbral_active and damage_type != DMG_FORCE and damage_type != DMG_RADIANT) {
+			amount = (amount + 1) / 2;
+		}
+
 		// Species/feat resistances and immunities
 		if (damage_type == DMG_COLD and target.cold_resistance) amount = (amount + 1) / 2;
 		if (damage_type == DMG_NECROTIC and target.necrotic_resistance) amount = (amount + 1) / 2;
 		if (damage_type == DMG_PSYCHIC and target.psychic_resistance) amount = (amount + 1) / 2;
-		// Aberrant Sorcery: Psychic Defenses — psychic resistance at level 6+
-		if (damage_type == DMG_PSYCHIC and target.psionic_defenses_active) amount = (amount + 1) / 2;
+		// Tasha's Aberrant Mind L6 Psychic Defenses (para 3939-3941): psychic resistance
+		// is now granted via psychic_resistance flag on init, not double-halving here.
 		if (damage_type == DMG_ACID and target.acid_resistance) amount = (amount + 1) / 2;
 		if (damage_type == DMG_LIGHTNING and target.lightning_immunity) amount = 0;
 		if (damage_type == DMG_THUNDER and target.thunder_immunity) amount = 0;
@@ -1519,10 +1536,14 @@ class battle {
 					}
 				}
 			}
-			// Shadow Magic Sorcerer: Strength of the Grave — CHA save DC 5+damage to avoid drop
+			// Xanathar's Shadow Magic L1 Strength of the Grave (para 2593-2595):
+			// "When damage reduces you to 0 HP, you can make a CHA save (DC 5 + damage).
+			// On success, drop to 1 HP instead. Can't use if reduced by radiant damage
+			// or by a critical hit. After success, can't use again until LR."
+			// TODO: source also excludes critical hits — needs was_crit plumbing through apply_damage
 			if (target.class_name == "Sorcerer" and target.subclass == "Shadow Magic" and !target.strength_of_the_grave_used and damage_type != DMG_RADIANT and !target.is_dead) {
 				int overflow_check = -target.current_hp;
-				if (overflow_check < target.max_hp) { // Not instant death
+				if (overflow_check < target.max_hp) { // Not instant death (killed outright)
 					int save_roll = random(1, 20);
 					int save_bonus = target.get_ability_mod(ABILITY_CHA);
 					int save_dc = 5 + amount;
@@ -1530,6 +1551,7 @@ class battle {
 					if (save_total >= save_dc) {
 						target.current_hp = 1;
 						target.strength_of_the_grave_used = true;
+						// Announcement handled by battle_manager after apply_damage returns
 						return;
 					}
 				}
@@ -1884,6 +1906,16 @@ class battle {
 				state["my_divine_soul_affinity"] = c.divine_soul_affinity;
 				state["my_otherworldly_wings_active"] = c.otherworldly_wings_active;
 				state["my_unearthly_recovery_available"] = c.unearthly_recovery_available;
+				// Xanathar's Shadow Magic (paras 2557-2607)
+				state["my_shadow_walk_available"] = c.shadow_walk_available;
+				state["my_shadow_umbral_active"] = c.shadow_umbral_active;
+				state["my_shadow_umbral_rounds"] = c.shadow_umbral_rounds;
+				state["my_strength_of_the_grave_used"] = c.strength_of_the_grave_used;
+				// Tasha's Aberrant Mind (paras 3894-3952)
+				state["my_psionic_defenses_active"] = c.psionic_defenses_active;
+				state["my_revelation_in_flesh_active"] = c.revelation_in_flesh_active;
+				state["my_revelation_in_flesh_rounds"] = c.revelation_in_flesh_rounds;
+				state["my_warping_implosion_available"] = c.warping_implosion_available;
 				// Potion buff rounds remaining
 				state["my_potion_damage_rounds"] = c.potion_damage_rounds;
 				state["my_potion_ac_rounds"] = c.potion_ac_rounds;
