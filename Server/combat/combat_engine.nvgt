@@ -273,7 +273,9 @@ class combatant {
 	int companion_attack_dmg_mod = 0;   // Damage flat modifier
 	int companion_attack_dmg_type = 0;  // Damage type ID
 	int lay_on_hands_pool = 0;
-	int aura_of_protection_bonus = 0; // PHB 2024 Paladin L7+: CHA mod added to all saves (self only currently)
+	int aura_of_protection_bonus = 0; // PHB 2024 Paladin L6+: CHA mod (source value on the Paladin)
+	int paladin_aura_received_bonus = 0; // Received bonus from best nearby Paladin aura (refreshed on move/turn)
+	bool paladin_aura_courage_immune = false; // L10+ Paladin within aura range: immune to Frightened
 	int bardic_inspiration_uses = 0;
 	int bardic_inspiration_grant_die = 0;
 	int bardic_inspiration_die = 0;
@@ -1079,14 +1081,12 @@ class combatant {
 		if (danger_sense_active and ability_id == ABILITY_DEX and !has_condition(COND_INCAPACITATED)) {
 			mod += 5;
 		}
-		// Paladin Aura of Protection (PHB 2024 L7): "You radiate a protective aura that
-		// fortifies the saving throws of you and your allies. You and creatures of your
-		// choice within 10 feet of you (or 30 feet at level 18) have a bonus to saving
-		// throws equal to your Charisma modifier (with a minimum bonus of +1)." Currently
-		// applied to the paladin themselves; ally aura coverage is deferred (needs a
-		// position-aware lookup at save time).
-		if (aura_of_protection_bonus > 0) {
-			mod += aura_of_protection_bonus;
+		// PHB 2024 Paladin L6 Aura of Protection (para 5665-5669): "You and your allies
+		// have a bonus to saving throws equal to your Charisma modifier (min +1) while
+		// within 10 ft (30 ft at L18)." Received bonus refreshed by battle_manager on
+		// turn start and movement — covers both the Paladin and nearby allies.
+		if (paladin_aura_received_bonus > 0) {
+			mod += paladin_aura_received_bonus;
 		}
 		// Xanathar's War Magic L10 Durable Magic (para 2941-2942): "While you maintain
 		// concentration on a spell, you have a +2 bonus to... all saving throws."
@@ -1103,11 +1103,10 @@ class combatant {
 
 	void add_condition(int cond_id) {
 		// PHB 2024 Paladin L10 Aura of Courage (para 5682-5683): "You and your allies
-		// have Immunity to the Frightened condition while in your Aura of Protection.
-		// If a Frightened ally enters the aura, that condition has no effect on that
-		// ally while there." Self-immunity always applies for L10+ Paladins; ally
-		// coverage is deferred (needs aura range checks).
-		if (cond_id == COND_FRIGHTENED and class_name == "Paladin" and level >= 10) return;
+		// have Immunity to the Frightened condition while in your Aura of Protection."
+		// paladin_aura_courage_immune is refreshed by battle_manager.refresh_paladin_auras()
+		// to cover both self and allies within the aura range.
+		if (cond_id == COND_FRIGHTENED and paladin_aura_courage_immune) return;
 		if (!has_condition(cond_id)) conditions.insert_last(cond_id);
 	}
 

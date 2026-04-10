@@ -241,6 +241,39 @@ class battle_manager {
 		broadcast_to_battle({{"type", message_types::roll_result}, {"natural", natural_roll}, {"total", total}, {"outcome", outcome}});
 	}
 
+	// PHB 2024 Paladin L6 Aura of Protection (para 5665-5669) + L10 Aura of Courage
+	// (para 5675-5679): refresh received bonuses for ALL combatants based on proximity
+	// to friendly Paladins. Called at turn start and after movement/push.
+	void refresh_paladin_auras() {
+		if (@combat == null) return;
+		for (uint i = 0; i < combat.combatants.length(); i++) {
+			combatant@ c = combat.combatants[i];
+			if (@c == null or c.is_dead) {
+				c.paladin_aura_received_bonus = 0;
+				c.paladin_aura_courage_immune = false;
+				continue;
+			}
+			int best_bonus = 0;
+			bool courage = false;
+			for (uint j = 0; j < combat.combatants.length(); j++) {
+				combatant@ p = combat.combatants[j];
+				if (@p == null or p.is_dead or p.class_name != "Paladin") continue;
+				if (p.has_condition(COND_INCAPACITATED)) continue;
+				// Must be on the same team
+				if (p.is_player != c.is_player and combat.mode != "pvp") continue;
+				int aura_range = p.level >= 18 ? 30 : 10;
+				if (feet_distance(c.x, c.y, p.x, p.y) <= aura_range) {
+					// Aura of Protection (L6+)
+					if (p.aura_of_protection_bonus > best_bonus) best_bonus = p.aura_of_protection_bonus;
+					// Aura of Courage (L10+)
+					if (p.level >= 10) courage = true;
+				}
+			}
+			c.paladin_aura_received_bonus = best_bonus;
+			c.paladin_aura_courage_immune = courage;
+		}
+	}
+
 	void broadcast_state() {
 		if (@combat == null) return;
 		for (uint i = 0; i < players.length(); i++) {
@@ -2901,6 +2934,9 @@ class battle_manager {
 				c.venomous_mark_target_id = 0;
 			}
 		}
+
+		// Refresh position-dependent aura bonuses at turn start
+		refresh_paladin_auras();
 
 		string round_text = "";
 		if (combat.current_turn_index == 0) {
@@ -8991,6 +9027,7 @@ class battle_manager {
 		c.movement_remaining -= move_cost;
 		c.has_moved = true;
 		announce_movement_to_visible_players(c, dx, dy, move_cost);
+		refresh_paladin_auras(); // Position changed — update aura coverage
 
 		// Check for opportunity attacks from enemies.
 		check_opportunity_attacks(c, old_x, old_y, new_x, new_y);
