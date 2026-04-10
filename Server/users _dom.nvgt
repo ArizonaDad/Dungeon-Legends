@@ -2233,6 +2233,79 @@ void handle_user_message(user@ u, json_object@ msg)
 			c.sorcery_points += slot_level;
 			u.room.bm.broadcast_announce(c.name + " converts a level " + slot_level + " spell slot into " + slot_level + " Sorcery Points.", true);
 		}
+		else if (feature == "metamagic") {
+			// PHB 2024 Sorcerer L2 Metamagic (para 6979-7020): toggle a metamagic option
+			// before casting a spell. SP deducted on activation; effect applied on next cast.
+			// Simplification: all 10 options available to all Sorcerers L2+ (source requires
+			// learning 2/4/6 — player choice at level-up deferred to future UI batch).
+			if (c.class_name != "Sorcerer" or c.level < 2) { u.send({{"type", message_types::announce}, {"text", "Only Sorcerers of level 2+ can use Metamagic."}, {"interrupt", true}}); return; }
+			string option = msg.exists("option") ? string(msg["option"]) : "";
+			// Clear all pending metamagic first (only one at a time per source, except Empowered/Seeking)
+			bool was_active = false;
+			if (option == "careful" and c.metamagic_careful_active) was_active = true;
+			if (option == "distant" and c.metamagic_distant_active) was_active = true;
+			if (option == "empowered" and c.metamagic_empowered_active) was_active = true;
+			if (option == "extended" and c.metamagic_extended_active) was_active = true;
+			if (option == "heightened" and c.metamagic_heightened_active) was_active = true;
+			if (option == "quickened" and c.metamagic_quickened_active) was_active = true;
+			if (option == "seeking" and c.metamagic_seeking_active) was_active = true;
+			if (option == "subtle" and c.metamagic_subtle_active) was_active = true;
+			if (option == "transmuted" and c.metamagic_transmuted_active) was_active = true;
+			if (option == "twinned" and c.metamagic_twinned_active) was_active = true;
+			if (was_active) {
+				// Deactivate the toggled metamagic (refund SP)
+				int refund = 1;
+				if (option == "heightened" or option == "quickened") refund = 2;
+				c.sorcery_points += refund;
+				if (option == "careful") c.metamagic_careful_active = false;
+				else if (option == "distant") c.metamagic_distant_active = false;
+				else if (option == "empowered") c.metamagic_empowered_active = false;
+				else if (option == "extended") c.metamagic_extended_active = false;
+				else if (option == "heightened") c.metamagic_heightened_active = false;
+				else if (option == "quickened") c.metamagic_quickened_active = false;
+				else if (option == "seeking") c.metamagic_seeking_active = false;
+				else if (option == "subtle") c.metamagic_subtle_active = false;
+				else if (option == "transmuted") c.metamagic_transmuted_active = false;
+				else if (option == "twinned") c.metamagic_twinned_active = false;
+				u.room.bm.broadcast_announce(c.name + " deactivates Metamagic: " + option + ". (" + refund + " SP refunded, " + c.sorcery_points + " SP remain)", false);
+				return;
+			}
+			// SP cost check
+			int cost = 1;
+			if (option == "heightened" or option == "quickened") cost = 2;
+			if (c.sorcery_points < cost) { u.send({{"type", message_types::announce}, {"text", "Not enough Sorcery Points. Need " + cost + ", have " + c.sorcery_points + "."}, {"interrupt", true}}); return; }
+			// Clear existing primary metamagic (not Empowered/Seeking which can stack per source)
+			if (option != "empowered" and option != "seeking") {
+				c.metamagic_careful_active = false;
+				c.metamagic_distant_active = false;
+				c.metamagic_extended_active = false;
+				c.metamagic_heightened_active = false;
+				c.metamagic_quickened_active = false;
+				c.metamagic_subtle_active = false;
+				c.metamagic_transmuted_active = false;
+				c.metamagic_twinned_active = false;
+			}
+			// Deduct SP and activate
+			c.sorcery_points -= cost;
+			string label = option;
+			if (option == "careful") { c.metamagic_careful_active = true; label = "Careful Spell"; }
+			else if (option == "distant") { c.metamagic_distant_active = true; label = "Distant Spell"; }
+			else if (option == "empowered") { c.metamagic_empowered_active = true; label = "Empowered Spell"; }
+			else if (option == "extended") { c.metamagic_extended_active = true; label = "Extended Spell"; }
+			else if (option == "heightened") { c.metamagic_heightened_active = true; label = "Heightened Spell"; }
+			else if (option == "quickened") { c.metamagic_quickened_active = true; label = "Quickened Spell"; }
+			else if (option == "seeking") { c.metamagic_seeking_active = true; label = "Seeking Spell"; }
+			else if (option == "subtle") { c.metamagic_subtle_active = true; label = "Subtle Spell"; }
+			else if (option == "transmuted") {
+				c.metamagic_transmuted_active = true; label = "Transmuted Spell";
+				// Transmuted target type sent by client
+				int ttype = msg.exists("damage_type") ? int(msg["damage_type"]) : DMG_FIRE;
+				c.metamagic_transmuted_target_type = ttype;
+			}
+			else if (option == "twinned") { c.metamagic_twinned_active = true; label = "Twinned Spell"; }
+			else { u.send({{"type", message_types::announce}, {"text", "Unknown Metamagic option: " + option}, {"interrupt", true}}); c.sorcery_points += cost; return; }
+			u.room.bm.broadcast_announce(c.name + " activates Metamagic: " + label + "! (" + cost + " SP spent, " + c.sorcery_points + " SP remain)", true);
+		}
 		else if (feature == "magical_cunning") {
 			// PHB 2024 Warlock L2 Magical Cunning (paras 7782-7783): "You can perform an
 			// esoteric rite for 1 minute. At the end of it, you regain expended Pact Magic

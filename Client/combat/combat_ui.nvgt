@@ -1109,10 +1109,11 @@ void show_bonus_action_menu() {
 	int tireless_temp_hp_opt = -1;
 	// PHB 2024 Rogue L3 Steady Aim (para 6550-6551)
 	int steady_aim_opt = -1;
-	// PHB 2024 Sorcerer L1 Innate Sorcery / L2 Font of Magic
+	// PHB 2024 Sorcerer L1 Innate Sorcery / L2 Font of Magic / L2 Metamagic
 	int innate_sorcery_opt = -1;
 	int font_of_magic_to_slot_opt = -1;
 	int font_of_magic_to_sp_opt = -1;
+	int metamagic_opt = -1;
 	// PHB 2024 Sorcerer Draconic Sorcery L14 Dragon Wings / L18 Dragon Companion (paras 7561-7566)
 	int dragon_wings_opt = -1;
 	int dragon_wings_restore_opt = -1;
@@ -1157,6 +1158,9 @@ void show_bonus_action_menu() {
 	}
 	if (lc == "sorcerer" and level >= 2 and my_sorcery_points < my_sorcery_points_max) {
 		font_of_magic_to_sp_opt = m.add_item("Font of Magic: convert a spell slot to Sorcery Points. Sorcery Points: " + my_sorcery_points + " of " + my_sorcery_points_max + ".");
+	}
+	if (lc == "sorcerer" and level >= 2 and my_sorcery_points >= 1) {
+		metamagic_opt = m.add_item("Metamagic: modify your next spell. Sorcery Points: " + my_sorcery_points + " of " + my_sorcery_points_max + ".");
 	}
 	// PHB 2024 Sorcerer Draconic Sorcery L14 Dragon Wings (paras 7561-7563): Bonus action,
 	// dragon wings sprout, fly speed 60 ft for 1 hour. 1/Long Rest, or 3 Sorcery Points to refresh.
@@ -1730,6 +1734,7 @@ void show_bonus_action_menu() {
 	if (innate_sorcery_opt >= 0) options++;
 	if (font_of_magic_to_slot_opt >= 0) options++;
 	if (font_of_magic_to_sp_opt >= 0) options++;
+	if (metamagic_opt >= 0) options++;
 	if (dragon_wings_opt >= 0) options++;
 	if (dragon_wings_restore_opt >= 0) options++;
 	if (summon_dragon_free_opt >= 0) options++;
@@ -1836,6 +1841,42 @@ void show_bonus_action_menu() {
 		}
 		if (picked_level < 1) return;
 		send({{"type", message_types::bonus_action}, {"feature", "font_of_magic_to_sp"}, {"slot_level", picked_level}});
+	}
+	else if (metamagic_opt >= 0 and res == metamagic_opt) {
+		// PHB 2024 Sorcerer L2 Metamagic (paras 6979-7020)
+		menu@ mm = setup_sub_menu("Choose a Metamagic option. Sorcery Points: " + my_sorcery_points + ".");
+		mm.add_item("Careful Spell. 1 SP. Allies auto-succeed on your spell's saves.");
+		mm.add_item("Distant Spell. 1 SP. Double spell range or Touch becomes 30 feet.");
+		mm.add_item("Empowered Spell. 1 SP. Reroll some damage dice.");
+		mm.add_item("Extended Spell. 1 SP. Double spell duration, advantage on concentration.");
+		mm.add_item("Heightened Spell. 2 SP. Target has disadvantage on saves vs your spell.");
+		mm.add_item("Quickened Spell. 2 SP. Cast an action spell as a bonus action.");
+		mm.add_item("Seeking Spell. 1 SP. Reroll a missed spell attack.");
+		mm.add_item("Subtle Spell. 1 SP. Cast without verbal, somatic, or material components.");
+		mm.add_item("Transmuted Spell. 1 SP. Change damage type to acid, cold, fire, lightning, poison, or thunder.");
+		mm.add_item("Twinned Spell. 1 SP. Increase effective spell level by 1 for extra target.");
+		int mm_res = mm.run();
+		if (mm_res < 0) return;
+		string[] mm_options = {"careful", "distant", "empowered", "extended", "heightened", "quickened", "seeking", "subtle", "transmuted", "twinned"};
+		string chosen = mm_options[mm_res];
+		if (chosen == "transmuted") {
+			// Sub-menu for damage type choice
+			menu@ dm = setup_sub_menu("Choose the new damage type for Transmuted Spell.");
+			dm.add_item("Acid");
+			dm.add_item("Cold");
+			dm.add_item("Fire");
+			dm.add_item("Lightning");
+			dm.add_item("Poison");
+			dm.add_item("Thunder");
+			int dm_res = dm.run();
+			if (dm_res < 0) return;
+			int[] dmg_types = {DMG_ACID, DMG_COLD, DMG_FIRE, DMG_LIGHTNING, DMG_POISON, DMG_THUNDER};
+			send({{"type", message_types::bonus_action}, {"feature", "metamagic"}, {"option", chosen}, {"damage_type", dmg_types[dm_res]}});
+			speak("Metamagic: Transmuted Spell activated.", true);
+		} else {
+			send({{"type", message_types::bonus_action}, {"feature", "metamagic"}, {"option", chosen}});
+			speak("Metamagic: " + chosen + " activated.", true);
+		}
 	}
 	else if (dragon_wings_opt >= 0 and res == dragon_wings_opt) {
 		// PHB 2024 Sorcerer Draconic Sorcery L14 Dragon Wings (paras 7561-7563)
