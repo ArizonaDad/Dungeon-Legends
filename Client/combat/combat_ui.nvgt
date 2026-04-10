@@ -258,6 +258,13 @@ bool my_deft_strike_active = false;
 int my_sharpen_the_blade_bonus = 0;
 bool my_unerring_accuracy_active = false;
 bool my_sun_shield_active = false;
+// Horizon Walker / Monster Slayer / Oath of Redemption (Xanathar's)
+bool my_spectral_defense_active = false;
+bool my_supernatural_defense_active = false;
+bool my_slayers_counter_active = false;
+bool my_aura_of_guardian_active = false;
+bool my_protective_spirit_active = false;
+bool my_emissary_of_redemption_active = false;
 // PHB 2024 Warlock L2 Magical Cunning / L9 Contact Patron / L11+ Mystic Arcanum — synced from server
 bool my_magical_cunning_available = false;
 bool my_contact_patron_available = false;
@@ -774,6 +781,7 @@ bool check_reaction_prompt_input() {
 			else if (choice_name == "armor_of_hexes") choice_name = "Armor of Hexes";
 			else if (choice_name == "storms_fury") choice_name = "Storm's Fury";
 			else if (choice_name == "shadowy_dodge") choice_name = "Shadowy Dodge";
+			else if (choice_name == "spectral_defense") choice_name = "Spectral Defense";
 			speak("Using " + choice_name + "!", true);
 			return true;
 		}
@@ -3675,6 +3683,13 @@ void parse_game_state(json_object@ msg) {
 	my_sharpen_the_blade_bonus = msg.exists("my_sharpen_the_blade_bonus") ? int(msg["my_sharpen_the_blade_bonus"]) : 0;
 	my_unerring_accuracy_active = msg.exists("my_unerring_accuracy_active") ? bool(msg["my_unerring_accuracy_active"]) : false;
 	my_sun_shield_active = msg.exists("my_sun_shield_active") ? bool(msg["my_sun_shield_active"]) : false;
+	// Horizon Walker / Monster Slayer / Oath of Redemption
+	my_spectral_defense_active = msg.exists("my_spectral_defense_active") ? bool(msg["my_spectral_defense_active"]) : false;
+	my_supernatural_defense_active = msg.exists("my_supernatural_defense_active") ? bool(msg["my_supernatural_defense_active"]) : false;
+	my_slayers_counter_active = msg.exists("my_slayers_counter_active") ? bool(msg["my_slayers_counter_active"]) : false;
+	my_aura_of_guardian_active = msg.exists("my_aura_of_guardian_active") ? bool(msg["my_aura_of_guardian_active"]) : false;
+	my_protective_spirit_active = msg.exists("my_protective_spirit_active") ? bool(msg["my_protective_spirit_active"]) : false;
+	my_emissary_of_redemption_active = msg.exists("my_emissary_of_redemption_active") ? bool(msg["my_emissary_of_redemption_active"]) : false;
 	my_magical_cunning_available = msg.exists("my_magical_cunning_available") ? bool(msg["my_magical_cunning_available"]) : false;
 	my_contact_patron_available = msg.exists("my_contact_patron_available") ? bool(msg["my_contact_patron_available"]) : false;
 	my_mystic_arcanum_6_available = msg.exists("my_mystic_arcanum_6_available") ? bool(msg["my_mystic_arcanum_6_available"]) : false;
@@ -3931,6 +3946,12 @@ void reset_combat_state() {
 	my_sharpen_the_blade_bonus = 0;
 	my_unerring_accuracy_active = false;
 	my_sun_shield_active = false;
+	my_spectral_defense_active = false;
+	my_supernatural_defense_active = false;
+	my_slayers_counter_active = false;
+	my_aura_of_guardian_active = false;
+	my_protective_spirit_active = false;
+	my_emissary_of_redemption_active = false;
 	my_magical_cunning_available = false;
 	my_contact_patron_available = false;
 	my_mystic_arcanum_6_available = false;

@@ -3486,6 +3486,18 @@ class battle_manager {
 					broadcast_announce(prev.name + "'s Sharpen the Blade fades.", false);
 				}
 			}
+			// Xanathar's Oath of Redemption L15 Protective Spirit (para 2050-2051):
+			// "You regain hit points equal to 1d6 + half your paladin level if you end
+			// your turn in combat with fewer than half of your hit points remaining."
+			if (prev.protective_spirit_active and !prev.is_dead and !prev.has_condition(COND_INCAPACITATED) and prev.current_hp < prev.max_hp / 2) {
+				int ps_heal = random(1, 6) + prev.level / 2;
+				int old_hp = prev.current_hp;
+				prev.current_hp += ps_heal;
+				if (prev.current_hp > prev.max_hp) prev.current_hp = prev.max_hp;
+				int actual_heal = prev.current_hp - old_hp;
+				if (actual_heal > 0) broadcast_announce(prev.name + "'s Protective Spirit heals " + actual_heal + " HP!", false);
+			}
+
 			// PHB 2024 Sorcerer Draconic Sorcery L14 Dragon Wings (para 7561-7563):
 			// "The wings last for 1 hour or until you dismiss them." 1 hour ≈ 600
 			// rounds. Tick down on each of the Sorcerer's turn-ends; clear flying
@@ -4788,13 +4800,25 @@ class battle_manager {
 			broadcast_announce(attacker.name + "'s Dreadful Strikes add " + fey_dmg + " psychic damage!", false);
 		}
 
-		// Horizon Walker: Planar Warrior — +1d8 force damage (changes damage type)
+		// Xanathar's Horizon Walker L3 Planar Warrior (para 2199-2201): "The next
+		// time you hit that creature on this turn with a weapon attack, all damage
+		// becomes force, and the creature takes an extra 1d8 force. At 11th, 2d8."
 		if (attacker.class_name == "Ranger" and attacker.subclass == "Horizon Walker" and is_weapon_attack and attacker.planar_warrior_active) {
 			int planar_dmg = random(1, 8);
 			if (attacker.level >= 11) planar_dmg += random(1, 8);
 			bonus += planar_dmg;
 			attacker.planar_warrior_active = false;
 			broadcast_announce(attacker.name + "'s Planar Warrior deals " + planar_dmg + " force damage!", false);
+		}
+
+		// Xanathar's Monster Slayer L3 Slayer's Prey (para 2241-2243): "The first
+		// time each turn that you hit that target with a weapon attack, it takes an
+		// extra 1d6 damage from the weapon."
+		if (attacker.class_name == "Ranger" and attacker.subclass == "Monster Slayer" and attacker.monster_slayer_prey and attacker.monster_slayer_target == target.id and is_weapon_attack and !attacker.slayer_prey_used_this_turn) {
+			attacker.slayer_prey_used_this_turn = true;
+			int prey_dmg = random(1, 6);
+			bonus += prey_dmg;
+			broadcast_announce(attacker.name + "'s Slayer's Prey deals " + prey_dmg + " extra damage!", false);
 		}
 
 		// Grave Domain Cleric: Path to the Grave vulnerability is now checked
@@ -5704,6 +5728,12 @@ class battle_manager {
 				if (target.shadowy_dodge_active and !has_effective_advantage(@current_roll)) {
 					reaction_options.insert_last("shadowy_dodge");
 				}
+				// Xanathar's Horizon Walker L15 Spectral Defense (para 2208-2209):
+				// "When you take damage from an attack, you can use your reaction to
+				// give yourself resistance to all of that attack's damage on this turn."
+				if (target.spectral_defense_active) {
+					reaction_options.insert_last("spectral_defense");
+				}
 
 				if (reaction_options.length() > 0) {
 					user@ def_user = find_user_for_combatant(target);
@@ -5740,6 +5770,7 @@ class battle_manager {
 							else if (reaction_options[oi] == "uncanny_dodge") opts += "Uncanny Dodge (halve the damage)";
 							else if (reaction_options[oi] == "storms_fury") opts += "Storm's Fury (" + target.level + " lightning damage to attacker + STR save or pushed 20 ft)";
 						else if (reaction_options[oi] == "shadowy_dodge") opts += "Shadowy Dodge (impose disadvantage on the attack)";
+							else if (reaction_options[oi] == "spectral_defense") opts += "Spectral Defense (resistance to all damage from this attack)";
 						}
 						def_user.send({{"type", message_types::reaction_prompt}, {"attacker", c.name}, {"options", opts}, {"options_csv", opts_csv}});
 						return; // Pause — wait for reaction_response
@@ -6340,6 +6371,36 @@ class battle_manager {
 				if (ss_dmg < 1) ss_dmg = 1;
 				combat.apply_damage(c, ss_dmg, DMG_RADIANT, target);
 				broadcast_announce(target.name + "'s Sun Shield flares! " + ss_dmg + " radiant damage to " + c.name + "!", true);
+			}
+
+			// Xanathar's Oath of Redemption L3 Rebuke the Violent CD (para 2046):
+			// "Immediately after an attacker within 30 feet of you deals damage with
+			// an attack against a creature other than you, you can use your reaction
+			// to force the attacker to make a Wisdom saving throw. On a failed save,
+			// the attacker takes radiant damage equal to the damage it just dealt."
+			if (@combat != null and c.id != target.id) {
+				for (uint rv = 0; rv < combat.combatants.length(); rv++) {
+					combatant@ pal = combat.combatants[rv];
+					if (@pal == null or pal.is_dead or pal.id == c.id or pal.id == target.id) continue;
+					if (pal.class_name != "Paladin" or pal.subclass != "Oath of Redemption") continue;
+					if (!pal.rebuke_violent_ready or !pal.has_reaction) continue;
+					if (feet_distance(pal.x, pal.y, c.x, c.y) > 30) continue;
+					// Auto-resolve: attacker makes WIS save vs paladin's spell save DC
+					int save_dc = 8 + pal.get_ability_mod(ABILITY_CHA) + pal.proficiency;
+					int save_roll = random(1, 20) + c.get_ability_mod(ABILITY_WIS);
+					if (c.save_proficiencies[ABILITY_WIS] == 1) save_roll += c.proficiency;
+					pal.rebuke_violent_ready = false;
+					pal.has_reaction = false;
+					if (save_roll < save_dc) {
+						combat.apply_damage(c, total_damage, DMG_RADIANT, pal);
+						broadcast_announce(pal.name + "'s Rebuke the Violent! " + c.name + " takes " + total_damage + " radiant damage!", true);
+					} else {
+						int half_dmg = total_damage / 2;
+						if (half_dmg > 0) combat.apply_damage(c, half_dmg, DMG_RADIANT, pal);
+						broadcast_announce(pal.name + "'s Rebuke the Violent! " + c.name + " saves, takes " + half_dmg + " radiant damage.", true);
+					}
+					break; // Only one paladin can rebuke per attack
+				}
 			}
 
 			// Xanathar's Cavalier L3 Unwavering Mark retaliation trigger (para 1671-1672):
@@ -7240,6 +7301,17 @@ class battle_manager {
 				rp.natural_roll = lower_roll;
 				rp.attack_total -= diff;
 				broadcast_announce(defender.name + " uses Shadowy Dodge! Second d20: " + second_roll + " (takes lower: " + lower_roll + "). New attack total: " + rp.attack_total + ".", true);
+			}
+		}
+		else if (choice == "spectral_defense" and defender.is_player) {
+			// Xanathar's Horizon Walker L15 Spectral Defense (para 2208-2209): "When
+			// you take damage from an attack, you can use your reaction to give yourself
+			// resistance to all of that attack's damage on this turn."
+			if (defender.spectral_defense_active) {
+				defender.has_reaction = false;
+				// Set a temporary flag that apply_damage will read to halve damage
+				defender.warding_maneuver_resistance = true; // reuse existing resistance flag
+				broadcast_announce(defender.name + " uses Spectral Defense! Resistance to all damage from this attack.", true);
 			}
 		}
 		else if (choice == "storms_fury" and defender.is_player) {

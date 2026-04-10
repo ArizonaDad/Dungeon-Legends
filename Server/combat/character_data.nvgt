@@ -1716,9 +1716,28 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         c.starry_form_type = "Chalice"; // default
     }
 
-    // Monster Slayer Ranger: Slayer's Prey
-    if (cs.class_name == "Ranger" and cs.subclass == "Monster Slayer" and cs.level >= 3) {
-        c.monster_slayer_prey = true;
+    // Xanathar's Horizon Walker Ranger (paras 2195-2209)
+    if (cs.class_name == "Ranger" and cs.subclass == "Horizon Walker") {
+        // L3 Planar Warrior already handled by existing planar_warrior_active
+        if (cs.level >= 15) c.spectral_defense_active = true;
+    }
+
+    // Xanathar's Monster Slayer Ranger (paras 2238-2250)
+    if (cs.class_name == "Ranger" and cs.subclass == "Monster Slayer") {
+        if (cs.level >= 3) c.monster_slayer_prey = true;
+        if (cs.level >= 7) c.supernatural_defense_active = true;
+        if (cs.level >= 15) c.slayers_counter_active = true;
+    }
+
+    // Xanathar's Oath of Redemption Paladin (paras 2004-2056)
+    if (cs.class_name == "Paladin" and cs.subclass == "Oath of Redemption") {
+        if (cs.level >= 7) {
+            c.aura_of_guardian_active = true;
+            c.aura_of_guardian_range = 10;
+        }
+        if (cs.level >= 15) c.protective_spirit_active = true;
+        if (cs.level >= 18) c.aura_of_guardian_range = 30;
+        if (cs.level >= 20) c.emissary_of_redemption_active = true;
     }
 
     // Xanathar's Storm Sorcery (paras 2608-2639)

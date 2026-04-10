@@ -441,10 +441,22 @@ class combatant {
 	bool sun_bolt_ready = false; // L3: Radiant Sun Bolt (existing)
 	bool sun_shield_active = false; // L17: reaction dmg on melee hit + aura toggle
 	bool rebuke_violent_ready = false; // Oath of Redemption
+	// Horizon Walker Ranger (Xanathar's paras 2195-2209)
+	bool spectral_defense_active = false; // L15: reaction, resist all damage from one attack
+	// Monster Slayer Ranger (Xanathar's paras 2238-2250)
+	bool supernatural_defense_active = false; // L7: +1d6 to saves vs prey
+	bool magic_users_nemesis_used = false; // L11: reaction counter-spell, 1/SR
+	bool slayers_counter_active = false; // L15: reaction weapon attack on prey's forced save
+	// Oath of Redemption Paladin (Xanathar's paras 2004-2056)
+	bool aura_of_guardian_active = false; // L7: reaction absorb ally damage
+	int aura_of_guardian_range = 0; // 10ft at L7, 30ft at L18
+	bool protective_spirit_active = false; // L15: heal 1d6+half level at end of turn if below half HP
+	bool emissary_of_redemption_active = false; // L20: resist all + radiant retaliation
 	bool beast_companion_active = false; // Beast Master Ranger
 	uint beast_companion_id = 0;
 	bool monster_slayer_prey = false; // Monster Slayer Ranger
 	uint monster_slayer_target = 0;
+	bool slayer_prey_used_this_turn = false; // 1d6 once per turn
 	bool drake_companion_active = false; // Drakewarden Ranger
 	bool tempestuous_magic_active = false; // Storm Sorcery L1
 	// Xanathar's Storm Sorcery L6 Heart of the Storm (para 2629-2630): lightning+thunder resistance + eruption damage
@@ -1395,6 +1407,7 @@ class battle {
 		c.kenseis_shot_active = false;
 		c.deft_strike_used_this_turn = false;
 		c.unerring_accuracy_used_this_turn = false;
+		c.slayer_prey_used_this_turn = false;
 
 		// Reaction resets at start of YOUR turn
 		c.has_reaction = true;
@@ -2045,6 +2058,13 @@ class battle {
 				state["my_sharpen_the_blade_bonus"] = c.sharpen_the_blade_bonus;
 				state["my_unerring_accuracy_active"] = c.unerring_accuracy_active;
 				state["my_sun_shield_active"] = c.sun_shield_active;
+				// Horizon Walker / Monster Slayer / Oath of Redemption (Xanathar's)
+				state["my_spectral_defense_active"] = c.spectral_defense_active;
+				state["my_supernatural_defense_active"] = c.supernatural_defense_active;
+				state["my_slayers_counter_active"] = c.slayers_counter_active;
+				state["my_aura_of_guardian_active"] = c.aura_of_guardian_active;
+				state["my_protective_spirit_active"] = c.protective_spirit_active;
+				state["my_emissary_of_redemption_active"] = c.emissary_of_redemption_active;
 				// Potion buff rounds remaining
 				state["my_potion_damage_rounds"] = c.potion_damage_rounds;
 				state["my_potion_ac_rounds"] = c.potion_ac_rounds;
