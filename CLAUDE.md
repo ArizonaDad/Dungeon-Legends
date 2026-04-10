@@ -210,7 +210,9 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 
 - Concentration management (drop old when casting new). Full cleanup in `clear_concentration_effects()`: clears Spirit Guardians, Divine Favor, Holy Weapon, Fire Shield, Stoneskin, Fly, Ensnaring Strike, Sanctuary, Venomous Mark, Fog Cloud, Darkness, Hunter's Mark, Hex, Bane, Bless, Haste, Heroism, Pass Without Trace, Adjust Density, and Durable Magic AC bonus.
 
-- Spirit Guardians: 15ft aura, 3d8+ radiant damage on enemies starting turn within range, half their movement
+- Spirit Guardians: 15ft aura, 3d8+ radiant damage on enemies starting turn within range OR entering the aura on movement (once per turn via `spirit_guardians_damaged_this_turn` flag). Halved movement while in aura. Movement entry trigger wired into both `handle_move` (player) and monster AI loop.
+
+- **Polymorph HP restoration** (Basic Rules 2024 para 14624-14626): On concentration break, original HP/AC restored via `polymorph_caster_id` tracking in `clear_concentration_effects`. On 0 HP in beast form, excess damage carries over to original form (in `apply_damage`, mirroring Wild Shape pattern).
 
 - Spell slot consumption (lowest available >= spell level)
 

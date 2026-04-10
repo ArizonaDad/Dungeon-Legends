@@ -1713,6 +1713,37 @@ class battle_manager {
 			}
 		}
 
+		// PHB 2024 Hunter's Mark (para 13825-13826): "If the target drops to 0 Hit
+		// Points before this spell ends, you can use a Bonus Action on a later turn
+		// to mark a new creature." Auto-transfer to nearest hostile within 90ft
+		// (following Hexblade's Curse pattern for bot/NPC compatibility).
+		if (target.is_dead) {
+			for (uint hm = 0; hm < combat.combatants.length(); hm++) {
+				combatant@ hmc = combat.combatants[hm];
+				if (@hmc == null or hmc.is_dead) continue;
+				if (hmc.hunters_mark_target_id != target.id) continue;
+				// Find nearest hostile within 90ft
+				combatant@ hm_new = null;
+				float hm_best = 999;
+				for (uint hmt = 0; hmt < combat.combatants.length(); hmt++) {
+					combatant@ hmt_c = combat.combatants[hmt];
+					if (@hmt_c == null or hmt_c.is_dead or hmt_c.id == target.id) continue;
+					if (!combat.are_hostile(hmc, hmt_c)) continue;
+					int hm_dist = feet_distance(hmc.x, hmc.y, hmt_c.x, hmt_c.y);
+					if (hm_dist <= 90 and float(hm_dist) < hm_best) {
+						hm_best = float(hm_dist);
+						@hm_new = hmt_c;
+					}
+				}
+				if (@hm_new != null) {
+					hmc.hunters_mark_target_id = hm_new.id;
+					broadcast_announce(hmc.name + "'s Hunter's Mark transfers to " + hm_new.name + "!", false);
+				} else {
+					hmc.hunters_mark_target_id = 0;
+				}
+			}
+		}
+
 		// Xanathar's Grave Domain L17 Keeper of Souls (para 802-803): "At the start
 		// of your turn, if there is a creature that has died since the start of your
 		// last turn within 60 feet... you or one creature within 60 feet regains HP
@@ -3637,6 +3668,10 @@ class battle_manager {
 				}
 			}
 		}
+		// Heat Metal: BA re-damage ends with concentration
+		caster.heat_metal_active = false;
+		caster.heat_metal_target_id = 0;
+		caster.heat_metal_dice_count = 0;
 		// Extended Spell: advantage on concentration saves ends with concentration
 		caster.extended_spell_concentration = false;
 	}
@@ -5597,8 +5632,16 @@ class battle_manager {
 		}
 
 		// Step 1: Move toward the nearest player until one of the monster's attacks is in range.
+		// PHB 2024 Frightened (para 16222): can't willingly move closer to fear source.
+		bool monster_frightened_blocked = false;
+		if (monster.has_condition(COND_FRIGHTENED) and monster.frightened_source_id > 0) {
+			combatant@ fear_src = combat.get_combatant(monster.frightened_source_id);
+			if (@fear_src != null and !fear_src.is_dead and @nearest == fear_src) {
+				monster_frightened_blocked = true;
+			}
+		}
 		int desired_attack_range = get_monster_desired_attack_range(monster, nearest_dist);
-		while (monster.movement_remaining >= FEET_PER_TILE and nearest_dist > desired_attack_range) {
+		while (monster.movement_remaining >= FEET_PER_TILE and nearest_dist > desired_attack_range and !monster_frightened_blocked) {
 			int old_x = monster.x;
 			int old_y = monster.y;
 			int dx = 0;
@@ -5607,6 +5650,16 @@ class battle_manager {
 			else if (nearest.x < monster.x) dx = -1;
 			if (nearest.y > monster.y) dy = 1;
 			else if (nearest.y < monster.y) dy = -1;
+
+			// PHB 2024 Frightened: block movement closer to fear source
+			if (monster.has_condition(COND_FRIGHTENED) and monster.frightened_source_id > 0) {
+				combatant@ mfs = combat.get_combatant(monster.frightened_source_id);
+				if (@mfs != null and !mfs.is_dead) {
+					int cur_fd = feet_distance(monster.x, monster.y, mfs.x, mfs.y);
+					int new_fd = feet_distance(monster.x + (dx != 0 ? dx : 0), monster.y + (dx == 0 and dy != 0 ? dy : 0), mfs.x, mfs.y);
+					if (new_fd < cur_fd) break;
+				}
+			}
 
 			// Move one axis at a time (prefer x-axis, then y-axis).
 			if (dx != 0) {
@@ -7644,6 +7697,7 @@ class battle_manager {
 						broadcast_announce(c.name + "'s Reach for the Skies STUNS " + target.name + "! (Gold Star Hero)", true);
 					} else {
 						target.add_condition(COND_FRIGHTENED);
+						target.frightened_source_id = c.id;
 						target.add_condition(COND_INCAPACITATED);
 						broadcast_announce(c.name + " calls for " + target.name + " to surrender — Frightened and Incapacitated!", true);
 					}
@@ -9651,6 +9705,20 @@ class battle_manager {
 		if (msg.exists("dx")) dx = int(msg["dx"]);
 		if (msg.exists("dy")) dy = int(msg["dy"]);
 
+		// PHB 2024 Frightened (para 16222): "The creature can't willingly move
+		// closer to the source of its fear."
+		if (c.has_condition(COND_FRIGHTENED) and c.frightened_source_id > 0) {
+			combatant@ fear_source = combat.get_combatant(c.frightened_source_id);
+			if (@fear_source != null and !fear_source.is_dead) {
+				int old_fear_dist = feet_distance(c.x, c.y, fear_source.x, fear_source.y);
+				int new_fear_dist = feet_distance(c.x + dx, c.y + dy, fear_source.x, fear_source.y);
+				if (new_fear_dist < old_fear_dist) {
+					u.send({{"type", message_types::error}, {"text", "You are Frightened and cannot move closer to " + fear_source.name + "!"}});
+					return;
+				}
+			}
+		}
+
 		// PHB 2024 Prone condition (para 16240): "The creature can crawl or spend
 		// half its movement to stand up and thereby end the condition." Standing
 		// costs half total speed; deducted before the move.
@@ -9976,6 +10044,147 @@ class battle_manager {
 			broadcast_announce(c.name + " grapples " + target.name + "!");
 		} else {
 			broadcast_announce(target.name + " breaks free from " + c.name + "'s grapple attempt.");
+		}
+		broadcast_state();
+	}
+
+	// PHB 2024 Grappled (para 16216): "Escape. The Grappled creature can use its
+	// action to make a Strength (Athletics) or Dexterity (Acrobatics) check against
+	// the grapple's escape DC (8 + grappler's STR mod + grappler's proficiency)."
+	void handle_grapple_escape(user@ u) {
+		if (@combat == null or @u == null) return;
+		combatant@ c = combat.current_combatant();
+		if (@c == null or !c.is_player or c.player_username != u.username) return;
+		if (!c.has_condition(COND_GRAPPLED)) {
+			u.send({{"type", message_types::error}, {"text", "You are not grappled."}});
+			return;
+		}
+		if (!c.has_action) {
+			u.send({{"type", message_types::error}, {"text", "You've already used your action this turn."}});
+			return;
+		}
+		if (c.is_incapacitated_check()) {
+			u.send({{"type", message_types::announce}, {"text", "You are incapacitated and cannot take actions."}, {"interrupt", true}});
+			return;
+		}
+
+		c.has_action = false;
+		c.used_action = true;
+
+		combatant@ grappler = combat.get_combatant(c.grapple_source_id);
+		int escape_dc = 8;
+		if (@grappler != null and !grappler.is_dead) {
+			escape_dc = 8 + grappler.get_ability_mod(ABILITY_STR) + grappler.proficiency;
+		}
+
+		// Use the better of Athletics (STR) or Acrobatics (DEX)
+		int str_bonus = c.get_ability_mod(ABILITY_STR);
+		int dex_bonus = c.get_ability_mod(ABILITY_DEX);
+		// Add proficiency if proficient in Athletics or Acrobatics
+		bool str_prof = false;
+		bool dex_prof = false;
+		for (uint sp = 0; sp < c.skill_proficiencies.length(); sp++) {
+			if (c.skill_proficiencies[sp] == "Athletics") str_prof = true;
+			if (c.skill_proficiencies[sp] == "Acrobatics") dex_prof = true;
+		}
+		if (str_prof) str_bonus += c.proficiency;
+		if (dex_prof) dex_bonus += c.proficiency;
+		// Check expertise
+		for (uint se = 0; se < c.skill_expertise.length(); se++) {
+			if (c.skill_expertise[se] == "Athletics" and str_prof) str_bonus += c.proficiency;
+			if (c.skill_expertise[se] == "Acrobatics" and dex_prof) dex_bonus += c.proficiency;
+		}
+		// Jack of All Trades
+		if (c.jack_of_all_trades) {
+			if (!str_prof) str_bonus += c.proficiency / 2;
+			if (!dex_prof) dex_bonus += c.proficiency / 2;
+		}
+
+		int best_bonus = str_bonus > dex_bonus ? str_bonus : dex_bonus;
+		string check_type = str_bonus > dex_bonus ? "Athletics (STR)" : "Acrobatics (DEX)";
+
+		int check_roll = random(1, 20);
+		int check_total = check_roll + best_bonus;
+		bool escaped = check_total >= escape_dc;
+
+		broadcast_roll(c.name, check_type + " check to Escape Grapple (DC " + escape_dc + ")", check_roll, best_bonus, check_total, escaped ? "Escaped!" : "Still grappled!");
+
+		if (escaped) {
+			c.remove_condition(COND_GRAPPLED);
+			c.grapple_source_id = 0;
+			broadcast_to_battle({{"type", message_types::condition_removed}, {"target", c.name}, {"condition", "Grappled"}});
+			broadcast_announce(c.name + " breaks free from the grapple!");
+		} else {
+			broadcast_announce(c.name + " fails to escape the grapple.");
+		}
+		broadcast_state();
+	}
+
+	// PHB 2024 (para 4525): "With an action, you can use a Wisdom (Medicine) check
+	// to try to stabilize a creature that has 0 Hit Points and isn't stable. The DC
+	// is 10." On success, the creature becomes stable.
+	void handle_stabilize(user@ u, json_object@ msg) {
+		if (@combat == null or @u == null or @msg == null) return;
+		combatant@ c = combat.current_combatant();
+		if (@c == null or !c.is_player or c.player_username != u.username) return;
+		if (!c.has_action) {
+			u.send({{"type", message_types::error}, {"text", "You've already used your action this turn."}});
+			return;
+		}
+		if (c.is_incapacitated_check()) {
+			u.send({{"type", message_types::announce}, {"text", "You are incapacitated and cannot take actions."}, {"interrupt", true}});
+			return;
+		}
+
+		uint target_id = 0;
+		if (msg.exists("target_id")) target_id = uint(msg["target_id"]);
+		combatant@ target = combat.get_combatant(target_id);
+		if (@target == null or target.is_dead) {
+			u.send({{"type", message_types::error}, {"text", "Invalid target."}});
+			return;
+		}
+		if (target.current_hp > 0 or target.is_stable) {
+			u.send({{"type", message_types::error}, {"text", target.name + " is not dying."}});
+			return;
+		}
+		int dist = feet_distance(c.x, c.y, target.x, target.y);
+		if (dist > 5) {
+			u.send({{"type", message_types::error}, {"text", "You must be within 5 feet to stabilize " + target.name + ". Current distance: " + dist + " ft."}});
+			return;
+		}
+
+		c.has_action = false;
+		c.used_action = true;
+
+		// WIS (Medicine) check DC 10
+		int med_bonus = c.get_ability_mod(ABILITY_WIS);
+		bool prof = false;
+		for (uint sp = 0; sp < c.skill_proficiencies.length(); sp++) {
+			if (c.skill_proficiencies[sp] == "Medicine") { prof = true; break; }
+		}
+		if (prof) {
+			med_bonus += c.proficiency;
+			for (uint se = 0; se < c.skill_expertise.length(); se++) {
+				if (c.skill_expertise[se] == "Medicine") { med_bonus += c.proficiency; break; }
+			}
+		} else if (c.jack_of_all_trades) {
+			med_bonus += c.proficiency / 2;
+		}
+
+		int check_roll = random(1, 20);
+		int check_total = check_roll + med_bonus;
+		bool success = check_total >= 10;
+
+		broadcast_roll(c.name, "Medicine check to Stabilize " + target.name + " (DC 10)", check_roll, med_bonus, check_total, success ? "Stabilized!" : "Failed!");
+
+		if (success) {
+			target.is_stable = true;
+			target.death_save_successes = 0;
+			target.death_save_failures = 0;
+			broadcast_announce(c.name + " stabilizes " + target.name + "!", true);
+			broadcast_to_battle({{"type", message_types::creature_stabilized}, {"target", target.name}});
+		} else {
+			broadcast_announce(c.name + " fails to stabilize " + target.name + ".", false);
 		}
 		broadcast_state();
 	}
@@ -11152,6 +11361,7 @@ class battle_manager {
 					if (!saved and try_stroke_of_luck_save(t, save_dc, save_bonus + bless_bonus)) saved = true;
 					if (!saved) {
 						t.add_condition(COND_FRIGHTENED);
+						t.frightened_source_id = c.id;
 						broadcast_to_battle({{"type", message_types::condition_applied}, {"target", t.name}, {"condition", "Frightened"}});
 					}
 				}
@@ -11510,6 +11720,7 @@ class battle_manager {
 				if (!saved and try_stroke_of_luck_save(target, save_dc, save_bonus + bless_bonus)) saved = true;
 				if (!saved) {
 					target.add_condition(COND_FRIGHTENED);
+					target.frightened_source_id = c.id;
 					broadcast_announce(target.name + " awakens to their own mortality and is Frightened of " + c.name + "!", true);
 				}
 			}
@@ -12209,6 +12420,7 @@ class battle_manager {
 				if (!saved) {
 					combat.apply_damage(target, total_damage, DMG_PSYCHIC, c);
 					target.add_condition(COND_FRIGHTENED);
+					target.frightened_source_id = c.id;
 					broadcast_announce(c.name + "'s Phantasmal Killer terrifies " + target.name + " for " + total_damage + " psychic damage!", true);
 				}
 				broadcast_state();
@@ -12303,6 +12515,10 @@ class battle_manager {
 						target.baned = true; // closest existing flag
 						broadcast_announce(target.name + " can't drop the searing metal! Disadvantage on attacks and ability checks.", true);
 					}
+					// Track for BA re-damage on subsequent turns (concentration)
+					c.heat_metal_active = true;
+					c.heat_metal_target_id = target.id;
+					c.heat_metal_dice_count = dice_count;
 				}
 			}
 			else if (spell.id == "faerie_fire") {
@@ -12829,6 +13045,7 @@ class battle_manager {
 				if (!saved and try_stroke_of_luck_save(target, save_dc, save_bonus + bless_bonus)) saved = true;
 				if (!saved) {
 					target.add_condition(COND_FRIGHTENED);
+					target.frightened_source_id = c.id;
 					broadcast_announce(target.name + " is Panicked by " + c.name + "'s Eyebite!", true);
 				}
 			}
@@ -15546,6 +15763,7 @@ class battle_manager {
 					if (!saved) {
 						combat.apply_damage(t, dmg, DMG_PSYCHIC, c);
 						t.add_condition(COND_FRIGHTENED);
+						t.frightened_source_id = c.id;
 						broadcast_to_battle({{"type", message_types::condition_applied}, {"target", t.name}, {"condition", "Frightened"}});
 					}
 				}

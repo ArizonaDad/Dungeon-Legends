@@ -2712,6 +2712,40 @@ void handle_user_message(user@ u, json_object@ msg)
 			}
 			u.room.bm.broadcast_announce(c.name + " commands Spiritual Weapon to strike " + target.name + "!", true);
 		}
+		else if (feature == "heat_metal_redamage") {
+			// Basic Rules 2024 Heat Metal (para 13734-13735): "Until the spell ends,
+			// you can take a Bonus Action on each of your turns to cause this damage again."
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
+			if (!c.heat_metal_active or c.heat_metal_target_id == 0) {
+				u.send({{"type", message_types::announce}, {"text", "You don't have an active Heat Metal to re-trigger."}, {"interrupt", true}});
+				return;
+			}
+			combatant@ hm_target = u.room.bm.combat.get_combatant(c.heat_metal_target_id);
+			if (@hm_target == null or hm_target.is_dead) {
+				c.heat_metal_active = false;
+				c.heat_metal_target_id = 0;
+				u.send({{"type", message_types::announce}, {"text", "The Heat Metal target is no longer valid."}, {"interrupt", true}});
+				return;
+			}
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			int hm_dmg = 0;
+			for (int d = 0; d < c.heat_metal_dice_count; d++) hm_dmg += random(1, 8);
+			u.room.bm.combat.apply_damage(hm_target, hm_dmg, DMG_FIRE, c);
+			u.room.bm.broadcast_announce(c.name + "'s Heat Metal sears " + hm_target.name + " again for " + hm_dmg + " fire damage!", true);
+			// CON save or disadvantage (approximation via bane)
+			int hm_save_roll = random(1, 20);
+			int hm_save_bonus = hm_target.get_save_bonus(ABILITY_CON);
+			int hm_dc = spell_save_dc(c);
+			int hm_save_total = hm_save_roll + hm_save_bonus;
+			if (hm_save_total < hm_dc) {
+				hm_target.baned = true;
+				u.room.bm.broadcast_announce(hm_target.name + " can't drop the searing metal! Disadvantage on attacks and ability checks.", true);
+			}
+			u.room.bm.check_concentration(hm_target, hm_dmg, c);
+			u.room.bm.broadcast_state();
+			if (hm_target.is_dead) u.room.bm.check_battle_end();
+		}
 		else if (feature == "wild_shape") {
 			if (c.class_name != "Druid" or c.level < 2) {
 				u.send({{"type", message_types::announce}, {"text", "Your character cannot use Wild Shape yet."}, {"interrupt", true}});
@@ -3435,7 +3469,7 @@ void handle_user_message(user@ u, json_object@ msg)
 				int st = sr + sb;
 				bool saved = st >= cp_dc;
 				u.room.bm.broadcast_roll(t.name, "WIS save vs Conquering Presence", sr, sb, st, saved ? "Resists!" : "Frightened!");
-				if (!saved) { t.add_condition(COND_FRIGHTENED); cp_hit++; }
+				if (!saved) { t.add_condition(COND_FRIGHTENED); t.frightened_source_id = c.id; cp_hit++; }
 			}
 			u.room.bm.broadcast_announce(c.name + "'s Conquering Presence frightens " + cp_hit + " creature(s)!", true);
 		}
@@ -4038,6 +4072,7 @@ void handle_user_message(user@ u, json_object@ msg)
 				int save_roll = random(1, 20) + undead.get_save_bonus(ABILITY_WIS);
 				if (save_roll < turn_dc) {
 					undead.add_condition(COND_FRIGHTENED);
+					undead.frightened_source_id = c.id;
 					undead.add_condition(COND_INCAPACITATED);
 					turned++;
 					// L5 Sear Undead damage
@@ -5757,6 +5792,16 @@ void handle_user_message(user@ u, json_object@ msg)
 	else if (msg_type == message_types::action_grapple) {
 		if (@u.room != null and @u.room.bm != null) {
 			u.room.bm.handle_grapple(u, msg);
+		}
+	}
+	else if (msg_type == message_types::action_grapple_escape) {
+		if (@u.room != null and @u.room.bm != null) {
+			u.room.bm.handle_grapple_escape(u);
+		}
+	}
+	else if (msg_type == message_types::action_stabilize) {
+		if (@u.room != null and @u.room.bm != null) {
+			u.room.bm.handle_stabilize(u, msg);
 		}
 	}
 	else if (msg_type == message_types::set_target) {

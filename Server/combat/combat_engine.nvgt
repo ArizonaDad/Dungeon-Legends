@@ -960,8 +960,16 @@ class combatant {
 	string[] free_cast_spells;
 	int[] free_cast_uses_remaining;
 	uint grapple_source_id = 0;
+	// PHB 2024 Frightened (para 16222): "The creature can't willingly move closer
+	// to the source of its fear." Tracks who/what caused the Frightened condition.
+	uint frightened_source_id = 0;
 	bool ensnaring_strike_pending = false; // Next weapon hit restrains target
 	int ensnaring_strike_dc = 0;
+	// Basic Rules 2024 Heat Metal (para 13734-13735): concentration, BA each turn
+	// to re-deal damage to the target wearing the heated metal object.
+	bool heat_metal_active = false;
+	uint heat_metal_target_id = 0;
+	int heat_metal_dice_count = 0;
 	bool sanctuary_active = false;         // Attackers must WIS save to target
 	int sanctuary_dc = 0;
 	uint sanctuary_source_id = 0;
@@ -1132,6 +1140,12 @@ class combatant {
 		if (has_condition(COND_RESTRAINED) and ability_id == ABILITY_DEX) {
 			mod -= 5;
 		}
+		// PHB 2024 Dodge action (para 4584): "Until the start of your next turn,
+		// ... you have Advantage on Dexterity saving throws." Approximated as +5
+		// (matching Danger Sense pattern) so all 120+ save sites are covered.
+		if (is_dodging and ability_id == ABILITY_DEX and !has_condition(COND_INCAPACITATED)) {
+			mod += 5;
+		}
 		// PHB 2024 Paladin L6 Aura of Protection (para 5665-5669): "You and your allies
 		// have a bonus to saving throws equal to your Charisma modifier (min +1) while
 		// within 10 ft (30 ft at L18)." Received bonus refreshed by battle_manager on
@@ -1168,6 +1182,8 @@ class combatant {
 		for (int i = int(conditions.length()) - 1; i >= 0; i--) {
 			if (conditions[i] == cond_id) { conditions.remove_at(i); break; }
 		}
+		if (cond_id == COND_FRIGHTENED) frightened_source_id = 0;
+		if (cond_id == COND_GRAPPLED) grapple_source_id = 0;
 	}
 
 	bool is_alive() {
@@ -2141,6 +2157,7 @@ class battle {
 				state["my_has_reaction"] = c.has_reaction;
 				state["my_attacks_remaining"] = c.attacks_remaining_this_turn;
 				state["my_spiritual_weapon_active"] = c.spiritual_weapon_active;
+				state["my_heat_metal_active"] = c.heat_metal_active;
 				state["my_luck_points"] = c.luck_points;
 				state["my_luck_points_max"] = c.luck_points_max;
 				state["my_has_heroic_inspiration"] = c.has_heroic_inspiration;

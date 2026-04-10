@@ -330,6 +330,7 @@ bool my_has_bonus_action = false;
 bool my_has_reaction = false;
 int my_attacks_remaining = 0;
 bool my_spiritual_weapon_active = false;
+bool my_heat_metal_active = false;
 
 // Potion buff rounds remaining (synced from server)
 int my_potion_damage_rounds = 0;
@@ -858,6 +859,13 @@ void show_action_menu() {
 	int ready_opt = m.add_item("Ready attack. Spend your action to attack the selected target at the start of its next turn if it is in range.");
 	int shove_opt = m.add_item("Shove. Push or knock prone a creature.");
 	int grapple_opt = m.add_item("Grapple. Grab and restrain a creature.");
+	int grapple_escape_opt = -1;
+	int stabilize_opt = -1;
+	combat_entity@ action_me = get_entity(my_combatant_id);
+	if (@action_me != null and action_me.has_condition(COND_GRAPPLED)) {
+		grapple_escape_opt = m.add_item("Escape Grapple. Use your action to attempt an Athletics or Acrobatics check to break free.");
+	}
+	stabilize_opt = m.add_item("Stabilize. Make a DC 10 Medicine check to stabilize a dying ally within 5 feet.");
 	// Class-specific actions
 	int surge_opt = -1;
 	int smite_opt = -1;
@@ -932,6 +940,16 @@ void show_action_menu() {
 			return;
 		}
 		send({{"type", message_types::action_grapple}, {"target_id", current_target_id}});
+	} else if (grapple_escape_opt >= 0 and res == grapple_escape_opt) {
+		speak("You attempt to escape the grapple.", true);
+		send({{"type", message_types::action_grapple_escape}});
+	} else if (stabilize_opt >= 0 and res == stabilize_opt) {
+		if (current_target_id == 0) {
+			speak("No target selected. Scan with I J K L and press Enter to lock a target.", true);
+			return;
+		}
+		speak("You attempt to stabilize the dying creature.", true);
+		send({{"type", message_types::action_stabilize}, {"target_id", current_target_id}});
 	} else if (res == end_opt) {
 		send({{"type", message_types::turn_end}});
 		speak("Turn ended.", true);
@@ -980,6 +998,7 @@ void show_bonus_action_menu() {
 	int font_of_inspiration_opt = -1;
 	int wild_shape_opt = -1;
 	int spiritual_weapon_opt = -1;
+	int heat_metal_opt = -1;
 	// Subclass bonus action options
 	int trip_opt = -1;
 	int precision_opt = -1;
@@ -1316,6 +1335,7 @@ void show_bonus_action_menu() {
 		wild_resurgence_use_to_slot_opt = m.add_item("Wild Resurgence: Wild Shape to level 1 slot. No action. 1/long rest. Burn a Wild Shape use to recover a level 1 spell slot.");
 	}
 	if (my_spiritual_weapon_active) spiritual_weapon_opt = m.add_item("Spiritual Weapon. Strike a target within 60 feet with your summoned weapon.");
+	if (my_heat_metal_active) heat_metal_opt = m.add_item("Heat Metal. Use your bonus action to re-deal fire damage to the searing target.");
 
 	// Subclass-specific bonus actions
 	if (lc == "fighter") {
@@ -2068,6 +2088,10 @@ void show_bonus_action_menu() {
 			return;
 		}
 		send({{"type", message_types::bonus_action}, {"feature", "spiritual_weapon_attack"}, {"target_id", current_target_id}});
+	}
+	else if (heat_metal_opt >= 0 and res == heat_metal_opt) {
+		speak("You channel Heat Metal, searing the target again.", true);
+		send({{"type", message_types::bonus_action}, {"feature", "heat_metal_redamage"}});
 	}
 	// Subclass bonus action handlers
 	else if (trip_opt >= 0 and res == trip_opt) {
@@ -3994,6 +4018,7 @@ void parse_game_state(json_object@ msg) {
 	my_has_reaction = msg.exists("my_has_reaction") ? bool(msg["my_has_reaction"]) : false;
 	my_attacks_remaining = msg.exists("my_attacks_remaining") ? int(msg["my_attacks_remaining"]) : 0;
 	my_spiritual_weapon_active = msg.exists("my_spiritual_weapon_active") ? bool(msg["my_spiritual_weapon_active"]) : false;
+	my_heat_metal_active = msg.exists("my_heat_metal_active") ? bool(msg["my_heat_metal_active"]) : false;
 	my_potion_damage_rounds = msg.exists("my_potion_damage_rounds") ? int(msg["my_potion_damage_rounds"]) : 0;
 	my_potion_ac_rounds = msg.exists("my_potion_ac_rounds") ? int(msg["my_potion_ac_rounds"]) : 0;
 	my_potion_speed_rounds = msg.exists("my_potion_speed_rounds") ? int(msg["my_potion_speed_rounds"]) : 0;
@@ -4262,6 +4287,7 @@ void reset_combat_state() {
 	my_has_reaction = false;
 	my_attacks_remaining = 0;
 	my_spiritual_weapon_active = false;
+	my_heat_metal_active = false;
 	combat_focus = 0;
 	combat_history.resize(0);
 	combat_history_cursor = -1;
