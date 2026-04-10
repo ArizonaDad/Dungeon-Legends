@@ -2407,9 +2407,18 @@ class battle_manager {
 				}
 			}
 			int save_total = save_roll + save_bonus + bless_bonus - unsettling_penalty;
+			// PHB 2024 Indomitable Might (para 2351): floor STR saves at STR score
+			if (pr.spell_save_type == ABILITY_STR) save_total = t.apply_indomitable_might(save_total, ABILITY_STR);
 			bool saved = save_total >= pr.spell_save_dc;
 			string save_name = pr.spell_save_type >= 0 and pr.spell_save_type < int(ABILITY_SHORT.length()) ? ABILITY_SHORT[pr.spell_save_type] : "save";
 			if (bless_bonus > 0) broadcast_announce(t.name + "'s Bless adds " + bless_bonus + " to the save.", false);
+			// Save failure reaction chain for damage saves (mirrors condition save chain)
+			if (!saved and try_arcane_deflection_save(t, pr.spell_save_dc, save_total)) saved = true;
+			if (!saved) { int fg = try_flash_of_genius(t, pr.spell_save_dc, save_total, save_name + " save vs " + pr.spell_name); if (fg >= pr.spell_save_dc) { saved = true; save_total = fg; } }
+			if (!saved) { int mv = try_maverick_spirit(t, pr.spell_save_dc, save_total, save_name + " save vs " + pr.spell_name); if (mv >= pr.spell_save_dc) { saved = true; save_total = mv; } }
+			if (!saved and (pr.spell_save_type == ABILITY_INT or pr.spell_save_type == ABILITY_WIS or pr.spell_save_type == ABILITY_CHA) and try_mage_slayer_guarded_mind(t, pr.spell_save_type)) saved = true;
+			if (!saved) { int bf = try_boon_of_fate_bonus(t, save_total, pr.spell_save_dc); if (bf >= pr.spell_save_dc) { saved = true; save_total = bf; } }
+			if (!saved and try_stroke_of_luck_save(t, pr.spell_save_dc, save_bonus + bless_bonus)) saved = true;
 			broadcast_roll(t.name, save_name + " save vs " + pr.spell_name, save_roll, save_bonus + bless_bonus, save_total, saved ? "Save! Half damage." : "Failed!");
 
 			int damage = base_damage;
@@ -2440,6 +2449,17 @@ class battle_manager {
 				broadcast_announce(t.name + "'s Shield Master interposes their shield — no damage!", false);
 			}
 
+			// Xanathar's War Magic L6 Power Surge (para 2937-2940): "Once per turn when
+			// you deal damage to a creature with a spell, you can spend one Power Surge
+			// to deal extra Force damage equal to half your Wizard level."
+			if (damage > 0 and caster.class_name == "Wizard" and caster.subclass == "War Magic" and caster.level >= 6 and caster.power_surge_charges > 0 and !caster.power_surge_used_this_turn) {
+				int surge_dmg = caster.level / 2;
+				if (surge_dmg < 1) surge_dmg = 1;
+				damage += surge_dmg;
+				caster.power_surge_charges--;
+				caster.power_surge_used_this_turn = true;
+				broadcast_announce(caster.name + "'s Power Surge deals " + surge_dmg + " extra force damage! (" + caster.power_surge_charges + "/" + caster.power_surge_max + " surges remaining)", false);
+			}
 			bool aoe_target_was_full = (t.current_hp == t.max_hp);
 			bool aoe_caster_was_hidden = caster.is_hidden;
 			if (caster.is_player and caster.player_username != "" and progression_enabled) {
