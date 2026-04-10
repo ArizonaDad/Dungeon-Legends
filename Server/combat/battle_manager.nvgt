@@ -2329,6 +2329,11 @@ class battle_manager {
 		// target have advantage until the start of your next turn."
 		if (target.ambush_master_marked_by != 0) adv = true;
 
+		// Xanathar's Zealot L10 Zealous Presence (para 445-447): "Up to ten other
+		// creatures of your choice within 60 feet of you that can hear you gain advantage
+		// on attack rolls and saving throws until the start of your next turn."
+		if (attacker.zealous_presence_buff_active) adv = true;
+
 		// PHB 2024 Rogue L18 Elusive (para 6576-6577): "No attack roll can have
 		// Advantage against you unless you have the Incapacitated condition." Strip
 		// any advantage that would have been granted to the attacker against this
@@ -2970,6 +2975,22 @@ class battle_manager {
 			return new_saved;
 		}
 		return false;
+	}
+
+	// Xanathar's Zealot L6 Fanatical Focus (para 443-444): "If you fail a saving throw
+	// while you're raging, you can reroll it, and you must use the new roll. You can use
+	// this ability only once per rage."
+	// Returns the new total if the reroll succeeded, or the original total if not used.
+	int try_fanatical_focus(combatant@ target, int save_dc, int save_total, int save_bonus, string save_label) {
+		if (@target == null) return save_total;
+		if (target.class_name != "Barbarian" or target.subclass != "Zealot" or target.level < 6) return save_total;
+		if (!target.raging or target.fanatical_focus_used_this_rage) return save_total;
+		target.fanatical_focus_used_this_rage = true;
+		int reroll = random(1, 20);
+		int new_total = reroll + save_bonus;
+		bool new_saved = new_total >= save_dc;
+		broadcast_announce(target.name + "'s Fanatical Focus rerolls the " + save_label + ": " + new_total + (new_saved ? " — saved!" : " — still failed."), true);
+		return new_total;
 	}
 
 	// PHB 2024 Forge Artificer L7 Flash of Genius (paras 655-657): "When you or a
@@ -3729,7 +3750,13 @@ class battle_manager {
 				prev.cant_move_until_disengage = false;
 			}
 			if (prev.raging) {
-				if (prev.is_dead or prev.current_hp <= 0) {
+				if (prev.is_dead) {
+					prev.raging = false;
+					prev.rage_turns_remaining = 0;
+				}
+				// Xanathar's Zealot L14 Rage Beyond Death (para 448-450): don't end rage
+				// early due to 0 HP — let the timer run, then check for death on expiry
+				else if (prev.current_hp <= 0 and !prev.rage_beyond_death_active) {
 					prev.raging = false;
 					prev.rage_turns_remaining = 0;
 				}
@@ -3739,6 +3766,12 @@ class battle_manager {
 						prev.raging = false;
 						prev.rage_turns_remaining = 0;
 						broadcast_announce(prev.name + "'s Rage ends.", false);
+						// Zealot Rage Beyond Death: die if still at 0 HP when rage ends
+						if (prev.rage_beyond_death_active and prev.current_hp <= 0 and !prev.is_dead) {
+							prev.is_dead = true;
+							prev.add_condition(COND_UNCONSCIOUS);
+							broadcast_announce(prev.name + "'s rage fades and death claims them.", true);
+						}
 					}
 				}
 			}
@@ -3759,6 +3792,7 @@ class battle_manager {
 						int save_total = save_roll + save_bonus;
 						bool saved = save_total >= save_dc_val;
 						broadcast_roll(prev.name, "WIS save vs Hold Person (end of turn)", save_roll, save_bonus, save_total, saved ? "Freed!" : "Still paralyzed!");
+						if (!saved) { int ff_total = try_fanatical_focus(prev, save_dc_val, save_total, save_bonus, "WIS save vs Hold Person"); if (ff_total >= save_dc_val) saved = true; }
 						if (!saved) { int new_total = try_flash_of_genius(prev, save_dc_val, save_total, "WIS save vs Hold Person"); if (new_total >= save_dc_val) saved = true; }
 						if (!saved) { int ms_total = try_maverick_spirit(prev, save_dc_val, save_total, "WIS save vs Hold Person"); if (ms_total >= save_dc_val) saved = true; }
 						if (saved) {
@@ -3781,6 +3815,7 @@ class battle_manager {
 						int save_total = save_roll + save_bonus;
 						bool saved = save_total >= save_dc_val;
 						broadcast_roll(prev.name, "DEX save vs Web (end of turn)", save_roll, save_bonus, save_total, saved ? "Freed!" : "Still restrained!");
+						if (!saved) { int ff_total = try_fanatical_focus(prev, save_dc_val, save_total, save_bonus, "DEX save vs Web"); if (ff_total >= save_dc_val) saved = true; }
 						if (!saved) { int new_total = try_flash_of_genius(prev, save_dc_val, save_total, "DEX save vs Web"); if (new_total >= save_dc_val) saved = true; }
 						if (saved) {
 							prev.remove_condition(COND_RESTRAINED);
@@ -3802,6 +3837,7 @@ class battle_manager {
 						int save_total = save_roll + save_bonus;
 						bool saved = save_total >= save_dc_val;
 						broadcast_roll(prev.name, "CON save vs Blindness/Deafness (end of turn)", save_roll, save_bonus, save_total, saved ? "Recovered!" : "Still blinded!");
+						if (!saved) { int ff_total = try_fanatical_focus(prev, save_dc_val, save_total, save_bonus, "CON save vs Blindness/Deafness"); if (ff_total >= save_dc_val) saved = true; }
 						if (!saved) { int new_total = try_flash_of_genius(prev, save_dc_val, save_total, "CON save vs Blindness/Deafness"); if (new_total >= save_dc_val) saved = true; }
 						if (saved) {
 							prev.remove_condition(COND_BLINDED);
@@ -3825,6 +3861,7 @@ class battle_manager {
 						int save_total = save_roll + save_bonus;
 						bool saved = save_total >= save_dc_val;
 						broadcast_roll(prev.name, "WIS save vs Fear (end of turn)", save_roll, save_bonus, save_total, saved ? "Courage returns!" : "Still frightened!");
+						if (!saved) { int ff_total = try_fanatical_focus(prev, save_dc_val, save_total, save_bonus, "WIS save vs Fear"); if (ff_total >= save_dc_val) saved = true; }
 						if (!saved) { int new_total = try_flash_of_genius(prev, save_dc_val, save_total, "WIS save vs Fear"); if (new_total >= save_dc_val) saved = true; }
 						if (!saved) { int ms_total = try_maverick_spirit(prev, save_dc_val, save_total, "WIS save vs Fear"); if (ms_total >= save_dc_val) saved = true; }
 						if (saved) {
@@ -3847,6 +3884,7 @@ class battle_manager {
 						int save_total = save_roll + save_bonus;
 						bool saved = save_total >= save_dc_val;
 						broadcast_roll(prev.name, "WIS save vs Tasha's Hideous Laughter (end of turn)", save_roll, save_bonus, save_total, saved ? "Laughter fades!" : "Still laughing!");
+						if (!saved) { int ff_total = try_fanatical_focus(prev, save_dc_val, save_total, save_bonus, "WIS save vs Tasha's Hideous Laughter"); if (ff_total >= save_dc_val) saved = true; }
 						if (!saved) { int new_total = try_flash_of_genius(prev, save_dc_val, save_total, "WIS save vs Tasha's Hideous Laughter"); if (new_total >= save_dc_val) saved = true; }
 						if (!saved) { int ms_total = try_maverick_spirit(prev, save_dc_val, save_total, "WIS save vs Tasha's Hideous Laughter"); if (ms_total >= save_dc_val) saved = true; }
 						if (saved) {
@@ -3989,6 +4027,16 @@ class battle_manager {
 		if (c.class_name == "Rogue" and c.subclass == "Scout" and c.level >= 13) {
 			for (uint ami = 0; ami < combat.combatants.length(); ami++) {
 				if (combat.combatants[ami].ambush_master_marked_by == c.id) combat.combatants[ami].ambush_master_marked_by = 0;
+			}
+		}
+		// Xanathar's Zealot L10 Zealous Presence (para 445-447): buff "until the start
+		// of your next turn" — clear buffs granted by this Zealot.
+		if (c.class_name == "Barbarian" and c.subclass == "Zealot" and c.level >= 10) {
+			for (uint zpi = 0; zpi < combat.combatants.length(); zpi++) {
+				if (combat.combatants[zpi].zealous_presence_buff_active and combat.combatants[zpi].zealous_presence_source_id == c.id) {
+					combat.combatants[zpi].zealous_presence_buff_active = false;
+					combat.combatants[zpi].zealous_presence_source_id = 0;
+				}
 			}
 		}
 		// Reset first hit tracking for subclass on-hit effects
@@ -4935,9 +4983,11 @@ class battle_manager {
 		int bonus = 0;
 		if (@attacker == null or @target == null) return 0;
 
-		// Zealot: +1d6 radiant on first hit while raging
-		if (attacker.class_name == "Barbarian" and attacker.subclass == "Zealot" and attacker.raging and attacker.is_first_hit_this_turn) {
-			int zealot_dmg = random(1, 6);
+		// Xanathar's Zealot L3 Divine Fury (para 439-440): "While you're raging, the first
+		// creature you hit on each of your turns with a weapon attack takes extra damage equal
+		// to 1d6 + half your barbarian level. The extra damage is necrotic or radiant."
+		if (attacker.class_name == "Barbarian" and attacker.subclass == "Zealot" and attacker.raging and attacker.is_first_hit_this_turn and is_weapon_attack) {
+			int zealot_dmg = random(1, 6) + attacker.level / 2;
 			bonus += zealot_dmg;
 			broadcast_announce(attacker.name + "'s Divine Fury deals " + zealot_dmg + " extra radiant damage!", false);
 		}
@@ -6855,6 +6905,11 @@ class battle_manager {
 					total = reroll;
 					success = true;
 				}
+			}
+			// Xanathar's Zealot L6 Fanatical Focus (para 443-444)
+			if (!success) {
+				int ff_total = try_fanatical_focus(c, dc, total, pr.modifier + bless_bonus, "CON save (concentration)");
+				if (ff_total >= dc) { total = ff_total; success = true; }
 			}
 			string outcome = success ? "Maintains concentration!" : "Concentration broken!";
 			broadcast_roll(c.name, "Constitution save (DC " + dc + ")", natural_roll, reported_modifier, total, outcome);

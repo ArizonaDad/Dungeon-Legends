@@ -1426,6 +1426,13 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         }
         if (cs.subclass == "Zealot") {
             c.zealot_fury_used = 0;
+            c.fanatical_focus_used_this_rage = false;
+            // Xanathar's Zealot L10 Zealous Presence (para 445-447): BA, 10 creatures
+            // within 60ft gain advantage on attacks and saves until start of your next turn.
+            if (cs.level >= 10) c.zealous_presence_available = true;
+            // Xanathar's Zealot L14 Rage Beyond Death (para 448-450): while raging,
+            // 0 HP doesn't knock you unconscious; you don't die from death saves until rage ends.
+            if (cs.level >= 14) c.rage_beyond_death_active = true;
         }
     }
 

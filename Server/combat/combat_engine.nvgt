@@ -920,6 +920,11 @@ class combatant {
 	bool has_frenzy = false;
 	string wild_heart_choice = "";
 	int zealot_fury_used = 0;
+	bool fanatical_focus_used_this_rage = false; // Xanathar's Zealot L6 (para 443-444)
+	bool zealous_presence_available = false; // Xanathar's Zealot L10 (para 445-447)
+	bool zealous_presence_buff_active = false; // Buff from Zealous Presence (advantage attacks+saves)
+	uint zealous_presence_source_id = 0; // Who granted the buff
+	bool rage_beyond_death_active = false; // Xanathar's Zealot L14 (para 448-450)
 	int psionic_strike_uses = 0;
 	int superiority_dice = 0;
 	int superiority_dice_max = 0;
@@ -1736,10 +1741,21 @@ class battle {
 			}
 			target.current_hp = 0;
 			if (target.is_player) {
-				// Player falls unconscious, start death saves
-				target.add_condition(COND_UNCONSCIOUS);
-				target.death_save_successes = 0;
-				target.death_save_failures = 0;
+				// Xanathar's Zealot L14 Rage Beyond Death (para 448-450): "While you're
+				// raging, having 0 hit points doesn't knock you unconscious. You still must
+				// make death saving throws. However, if you would die due to failing death
+				// saving throws, you don't die until your rage ends."
+				if (target.rage_beyond_death_active and target.raging) {
+					// Stay conscious at 0 HP while raging — death saves still accumulate
+					// but death is deferred until rage ends
+					target.death_save_successes = 0;
+					target.death_save_failures = 0;
+				} else {
+					// Player falls unconscious, start death saves
+					target.add_condition(COND_UNCONSCIOUS);
+					target.death_save_successes = 0;
+					target.death_save_failures = 0;
+				}
 			} else {
 				// Monster dies instantly (standard D&D rule)
 				target.is_dead = true;
@@ -1799,7 +1815,13 @@ class battle {
 		}
 
 		if (c.death_save_failures >= DEATH_SAVE_FAILURES_NEEDED) {
-			c.is_dead = true;
+			// Xanathar's Zealot L14 Rage Beyond Death (para 448-450): "if you would die
+			// due to failing death saving throws, you don't die until your rage ends"
+			if (c.rage_beyond_death_active and c.raging) {
+				// Death deferred — rage keeps you fighting at 0 HP
+			} else {
+				c.is_dead = true;
+			}
 		}
 		if (c.death_save_successes >= DEATH_SAVE_SUCCESSES_NEEDED) {
 			c.is_stable = true;

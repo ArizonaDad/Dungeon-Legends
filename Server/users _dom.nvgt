@@ -1478,6 +1478,8 @@ void handle_user_message(user@ u, json_object@ msg)
 			c.used_bonus_action = true;
 			c.rage_uses_remaining--;
 			c.raging = true;
+			// Xanathar's Zealot L6 Fanatical Focus (para 443-444): reset per-rage reroll
+			c.fanatical_focus_used_this_rage = false;
 			// PHB 2024 Barbarian L15 Persistent Rage (para 2349-2351): "your Rage is so
 			// fierce that it now lasts for 10 minutes without you needing to do anything
 			// to extend it from round to round." 10 minutes ≈ 100 combat rounds.
@@ -3187,6 +3189,37 @@ void handle_user_message(user@ u, json_object@ msg)
 			c.y = new_y;
 			u.room.bm.broadcast_announce(c.name + " steps through Hidden Paths and teleports 60 feet! (" + c.hidden_paths_uses + " uses remaining)", true);
 			u.room.bm.broadcast_state();
+		}
+
+		else if (feature == "zealous_presence") {
+			// Xanathar's Zealot L10 Zealous Presence (para 445-447): "As a bonus action,
+			// you unleash a battle cry infused with divine energy. Up to ten other creatures
+			// of your choice within 60 feet of you that can hear you gain advantage on
+			// attack rolls and saving throws until the start of your next turn."
+			if (c.class_name != "Barbarian" or c.subclass != "Zealot" or c.level < 10) {
+				u.send({{"type", message_types::announce}, {"text", "Only Zealot Barbarians level 10+ can use Zealous Presence."}, {"interrupt", true}}); return;
+			}
+			if (!c.zealous_presence_available) {
+				u.send({{"type", message_types::announce}, {"text", "Zealous Presence already used (1/long rest)."}, {"interrupt", true}}); return;
+			}
+			if (!c.has_bonus_action) {
+				u.send({{"type", message_types::announce}, {"text", "No bonus action available."}, {"interrupt", true}}); return;
+			}
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.zealous_presence_available = false;
+			int zp_count = 0;
+			for (uint zpi = 0; zpi < u.room.bm.combat.combatants.length(); zpi++) {
+				combatant@ ally = u.room.bm.combat.combatants[zpi];
+				if (@ally == null or ally.is_dead or ally.id == c.id) continue;
+				if (ally.is_player != c.is_player) continue; // allies only
+				if (feet_distance(c.x, c.y, ally.x, ally.y) > 60) continue;
+				if (zp_count >= 10) break;
+				ally.zealous_presence_buff_active = true;
+				ally.zealous_presence_source_id = c.id;
+				zp_count++;
+			}
+			u.room.bm.broadcast_announce(c.name + "'s Zealous Presence inspires " + zp_count + " allies! Advantage on attacks and saves until the start of " + c.name + "'s next turn.", true);
 		}
 
 		else if (feature == "guided_strike") {

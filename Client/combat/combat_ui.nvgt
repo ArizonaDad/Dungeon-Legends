@@ -1053,6 +1053,7 @@ void show_bonus_action_menu() {
 	int summon_wildfire_spirit_opt = -1;
 	int create_eldritch_cannon_opt = -1;
 	int storm_aura_opt = -1;
+	int zealous_presence_opt = -1;
 	int reckless_attack_opt = -1;
 	int arcane_recovery_opt = -1;
 	int turn_undead_opt = -1;
@@ -1601,6 +1602,10 @@ void show_bonus_action_menu() {
 	// Xanathar's Storm Herald L3 Storm Aura (para 416-418): BA to reactivate aura each turn
 	if (lc == "barbarian" and subclass == "Storm Herald" and my_is_raging) {
 		storm_aura_opt = m.add_item("Storm Aura. Bonus action. Activate aura effect (desert: fire damage, sea: lightning, tundra: temp HP to allies).");
+	}
+	// Xanathar's Zealot L10 Zealous Presence (para 445-447): BA 1/LR, 10 allies gain adv on attacks+saves
+	if (lc == "barbarian" and subclass == "Zealot" and level >= 10) {
+		zealous_presence_opt = m.add_item("Zealous Presence. Bonus action, 1/long rest. Up to 10 allies within 60ft gain advantage on attacks and saves until start of your next turn.");
 	}
 	// Barbarian L2 Reckless Attack (PHB 2024 base class feature)
 	if (lc == "barbarian" and level >= 2) {
@@ -2362,6 +2367,10 @@ void show_bonus_action_menu() {
 	else if (create_eldritch_cannon_opt >= 0 and res == create_eldritch_cannon_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "create_eldritch_cannon"}});
 		speak("Creating Eldritch Cannon.", true);
+	}
+	else if (zealous_presence_opt >= 0 and res == zealous_presence_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "zealous_presence"}});
+		speak("Zealous Presence!", true);
 	}
 	else if (storm_aura_opt >= 0 and res == storm_aura_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "storm_aura"}});
