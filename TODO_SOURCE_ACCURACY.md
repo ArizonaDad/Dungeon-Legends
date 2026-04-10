@@ -984,9 +984,9 @@ Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 
 | Feature | Level | Source para | Status |
 |---------|-------|-------------|--------|
-| **Balm of the Summer Court** (BA: spend from pool of level d6s, heal 1d6 per die + temp HP = spent dice) | 2 | 883-888 | ✓ Done — `balm_of_summer_pool` field initialized to `c.level`. BA handler in `users _dom.nvgt` heals 1d6 per activation, pool decrements. Client menu entry wired. |
+| **Balm of the Summer Court** (BA: spend up to half-level d6s, heal total + 1 temp HP per die) | 2 | 883-886 | ✓ Done — `balm_of_summer_pool = cs.level`. BA handler rolls `dice_count` d6s (clamped to 1..level/2 and pool), heals total, grants temp HP = dice spent. `dice_count` param supported (default 1). |
 | **Hearth of Moonlight and Shadow** (rest in 30ft sphere: invisible to creatures outside, +5 Stealth/Perception) | 6 | 889-892 | DEFERRED — rest/camp system not yet implemented. No combat effect. |
-| **Hidden Paths** (BA: teleport self 60ft or willing creature within 30ft 30ft, WIS mod uses/LR) | 10 | 893-895 | DEFERRED — teleportation mechanics (non-Misty-Step) not yet implemented. |
+| **Hidden Paths** (BA: teleport self 60ft or willing creature within 30ft 30ft, WIS mod uses/LR) | 10 | 891-893 | ✓ Done — `hidden_paths_uses`/`_max` fields (WIS mod, min 1). BA handler teleports self 60ft toward target (12 tiles). Client menu entry wired at L10+. Touch-teleport-ally variant deferred. |
 | **Walker in Dreams** (after SR: cast Dream, Scrying, or Teleportation Circle for free) | 14 | 896-898 | DEFERRED — non-combat/exploration feature. |
 
 ### Circle of the Shepherd Druid Subclass Audit (2026-04-10) — Xanathar's paras 913-932
@@ -994,7 +994,7 @@ Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 | Feature | Level | Source para | Status |
 |---------|-------|-------------|--------|
 | **Speech of the Woods** (Sylvan language + communicate with beasts) | 2 | 913-915 | N/A — language/roleplay feature, no combat effect. |
-| **Spirit Totem** (BA: summon 60ft spirit aura for 1 min — Bear: temp HP 5+level; Hawk: advantage on attack rolls via reaction; Unicorn: healing spells also heal allies in aura) | 2 | 916-924 | PARTIAL — `shepherd_totem_type` field (0=bear/1=hawk/2=unicorn). BA handler in `users _dom.nvgt` with 3 options. Bear temp HP works. Hawk advantage-via-reaction and Unicorn heal-spread logic are stubs (announced but effect may not fully chain). |
+| **Spirit Totem** (BA: summon 60ft spirit aura for 1 min — Bear: temp HP 5+level + STR advantage; Hawk: reaction grant attack advantage; Unicorn: healing spells heal allies in aura) | 2 | 916-923 | PARTIAL — Bear: temp HP (5+level) + STR Athletics advantage now wired. Unicorn: `try_unicorn_totem_heal()` fires after Cure Wounds, Healing Word, Mass Healing Word, Heal — heals allies within 30ft for druid level HP. Hawk: reaction-to-grant-advantage deferred (needs reaction prompt extension). |
 | **Mighty Summoner** (summoned beasts/fey: +2 HP per HD + attacks count as magical) | 6 | 925-927 | DEFERRED — requires companion/summon HP scaling hooks. |
 | **Guardian Spirit** (beast/fey in Spirit Totem aura regain HP = half druid level at end of their turn) | 10 | 928-929 | DEFERRED — requires per-turn heal on summons within aura. |
 | **Faithful Summons** (when reduced to 0 HP: auto-cast Conjure Animals 8 beasts, no concentration, 1/LR) | 14 | 930-932 | DEFERRED — auto-cast trigger on death + mass summon. |

@@ -356,8 +356,9 @@ class combatant {
 	int ancestral_protector_target = 0; // who the barbarian marked this turn
 	uint ancestral_protector_marked_by = 0; // ON ANY: ID of Ancestral Guardian who marked this creature
 	bool ancestral_protector_hit_this_turn = false; // already applied mark this turn
-	int summer_court_healing = 0; // Circle of Dreams Druid
-	int balm_of_summer_pool = 0;
+	int balm_of_summer_pool = 0; // Circle of Dreams Druid (Xanathar's para 883-886)
+	int hidden_paths_uses = 0; // Circle of Dreams L10 (Xanathar's para 891-893)
+	int hidden_paths_uses_max = 0;
 	bool guided_strike_pending = false; // Oath of Conquest Paladin
 	bool empowered_healing_active = false; // Divine Soul Sorcerer
 	bool giants_might_active = false; // Rune Knight Fighter

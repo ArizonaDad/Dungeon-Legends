@@ -1498,9 +1498,18 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         if (cs.level >= 6) c.symbiotic_entity_uses = 3;
     }
 
-    // Circle of Dreams Druid: Balm of the Summer Court pool
-    if (cs.class_name == "Druid" and cs.subclass == "Circle of Dreams" and cs.level >= 2) {
-        c.balm_of_summer_pool = cs.level;
+    // Xanathar's Circle of Dreams Druid (paras 883-898)
+    if (cs.class_name == "Druid" and cs.subclass == "Circle of Dreams") {
+        // L2 Balm of the Summer Court (para 883): "pool of fey energy represented
+        // by a number of d6s equal to your druid level"
+        if (cs.level >= 2) c.balm_of_summer_pool = cs.level;
+        // L10 Hidden Paths (para 892-893): "a number of times equal to your
+        // Wisdom modifier (minimum of once)"
+        if (cs.level >= 10) {
+            int wis_mod = ability_modifier(cs.wisdom);
+            c.hidden_paths_uses_max = wis_mod > 1 ? wis_mod : 1;
+            c.hidden_paths_uses = c.hidden_paths_uses_max;
+        }
     }
 
     // Rune Knight Fighter: Giant's Might uses per rest (Prof times)

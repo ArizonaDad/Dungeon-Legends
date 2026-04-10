@@ -3118,19 +3118,70 @@ void handle_user_message(user@ u, json_object@ msg)
 		}
 
 		else if (feature == "balm_of_summer_court") {
-			// Circle of Dreams Druid: heal from the Balm pool
+			// Xanathar's Circle of Dreams L2 Balm of the Summer Court (paras 883-886):
+			// "spend a number of those dice equal to half your druid level or less.
+			// Roll the spent dice and add them together. The target regains a number of
+			// hit points equal to the total. The target also gains 1 temporary hit point
+			// per die spent."
 			if (c.class_name != "Druid" or c.subclass != "Circle of Dreams") { u.send({{"type", message_types::announce}, {"text", "Only Circle of Dreams druids can use Balm of the Summer Court."}, {"interrupt", true}}); return; }
 			if (c.balm_of_summer_pool <= 0) { u.send({{"type", message_types::announce}, {"text", "Your Balm pool is empty."}, {"interrupt", true}}); return; }
 			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
 			combatant@ tgt = target_id != 0 ? u.room.bm.combat.get_combatant(target_id) : c;
 			if (@tgt == null or tgt.is_dead) { u.send({{"type", message_types::announce}, {"text", "Invalid target."}, {"interrupt", true}}); return; }
+			int max_dice = c.level / 2;
+			if (max_dice < 1) max_dice = 1;
+			int dice_count = 1;
+			if (msg.exists("dice_count")) dice_count = int(msg["dice_count"]);
+			if (dice_count < 1) dice_count = 1;
+			if (dice_count > max_dice) dice_count = max_dice;
+			if (dice_count > c.balm_of_summer_pool) dice_count = c.balm_of_summer_pool;
 			c.has_bonus_action = false;
 			c.used_bonus_action = true;
-			c.balm_of_summer_pool--;
-			int heal = random(1, 6);
+			c.balm_of_summer_pool -= dice_count;
+			int heal = 0;
+			for (int bd = 0; bd < dice_count; bd++) heal += random(1, 6);
 			int effective = u.room.bm.combat.apply_healing(tgt, heal);
 			u.room.bm.record_effective_healing(c.player_username, effective);
-			u.room.bm.broadcast_announce(c.name + " channels Balm of the Summer Court! " + tgt.name + " healed for " + heal + ".", true);
+			// +1 temp HP per die spent
+			int balm_temp = dice_count;
+			if (tgt.temp_hp < balm_temp) tgt.temp_hp = balm_temp;
+			u.room.bm.broadcast_announce(c.name + " channels Balm of the Summer Court (" + dice_count + "d6)! " + tgt.name + " healed for " + heal + " and gains " + balm_temp + " temp HP.", true);
+		}
+
+		else if (feature == "hidden_paths") {
+			// Xanathar's Circle of Dreams L10 Hidden Paths (paras 891-893):
+			// "As a bonus action on your turn, you can teleport up to 60 feet to an
+			// unoccupied space you can see."
+			if (c.class_name != "Druid" or c.subclass != "Circle of Dreams") { u.send({{"type", message_types::announce}, {"text", "Only Circle of Dreams druids can use Hidden Paths."}, {"interrupt", true}}); return; }
+			if (c.level < 10) { u.send({{"type", message_types::announce}, {"text", "Hidden Paths requires level 10."}, {"interrupt", true}}); return; }
+			if (c.hidden_paths_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Hidden Paths uses remaining."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.hidden_paths_uses--;
+			// Teleport 60ft (12 tiles) toward current target or random direction
+			combatant@ tgt = target_id != 0 ? u.room.bm.combat.get_combatant(target_id) : null;
+			int new_x = c.x;
+			int new_y = c.y;
+			if (@tgt != null and !tgt.is_dead) {
+				int dx = tgt.x - c.x;
+				int dy = tgt.y - c.y;
+				if (dx != 0) dx = dx > 0 ? 1 : -1;
+				if (dy != 0) dy = dy > 0 ? 1 : -1;
+				new_x = c.x + dx * 12;
+				new_y = c.y + dy * 12;
+			} else {
+				new_x = c.x + random(-12, 12);
+				new_y = c.y + random(-12, 12);
+			}
+			if (new_x < 0) new_x = 0;
+			if (new_x >= u.room.bm.combat.map_width) new_x = u.room.bm.combat.map_width - 1;
+			if (new_y < 0) new_y = 0;
+			if (new_y >= u.room.bm.combat.map_height) new_y = u.room.bm.combat.map_height - 1;
+			c.x = new_x;
+			c.y = new_y;
+			u.room.bm.broadcast_announce(c.name + " steps through Hidden Paths and teleports 60 feet! (" + c.hidden_paths_uses + " uses remaining)", true);
+			u.room.bm.broadcast_state();
 		}
 
 		else if (feature == "guided_strike") {
@@ -5074,15 +5125,18 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.room.bm.broadcast_announce(c.name + " grants Blessing of the Trickster to " + ally.name + ". They have Advantage on Dexterity (Stealth) checks until long rest.", true);
 		}
 		else if (feature == "spirit_totem_bear" or feature == "spirit_totem_hawk" or feature == "spirit_totem_unicorn") {
-			// Circle of the Shepherd Druid: Spirit Totem (Bear/Hawk/Unicorn)
-			// Bonus action, 30ft aura (simplified to around druid; source has it around a summoned point within 60ft)
-			// 1 minute duration, recharges on short/long rest
+			// Xanathar's Circle of the Shepherd L2 Spirit Totem (paras 916-923):
+			// BA, 30ft aura (simplified to around druid), 1 min, 1/SR or LR
 			if (c.class_name != "Druid" or c.subclass != "Circle of the Shepherd") { u.send({{"type", message_types::announce}, {"text", "Only Shepherd Druids can summon spirit totems."}, {"interrupt", true}}); return; }
 			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
 			c.has_bonus_action = false;
 			c.used_bonus_action = true;
 			c.shepherd_circle_active = true;
 			if (feature == "spirit_totem_bear") {
+				// Para 921: "Each creature of your choice in the aura when the spirit
+				// appears gains temporary hit points equal to 5 + your druid level.
+				// In addition, you and your allies gain advantage on Strength checks
+				// and Strength saving throws while in the aura."
 				c.shepherd_totem_type = 0;
 				int bear_temp = 5 + c.level;
 				for (uint sti = 0; sti < u.room.bm.combat.combatants.length(); sti++) {
@@ -5090,14 +5144,25 @@ void handle_user_message(user@ u, json_object@ msg)
 					if (@ally == null or ally.is_dead or ally.is_player != c.is_player) continue;
 					if (feet_distance(c.x, c.y, ally.x, ally.y) > 30) continue;
 					if (ally.temp_hp < bear_temp) ally.temp_hp = bear_temp;
+					// STR check advantage
+					if (ally.has_skill_check_advantage("Athletics") == false) {
+						ally.skill_check_advantage.insert_last("Athletics");
+					}
 				}
 				u.room.bm.broadcast_announce(c.name + " summons the Bear Spirit Totem! Allies within 30ft gain " + bear_temp + " temp HP and advantage on STR checks.", true);
 			} else if (feature == "spirit_totem_hawk") {
+				// Para 922: "When a creature makes an attack roll against a target in
+				// the spirit's aura, you can use your reaction to grant advantage to
+				// that attack roll." Hawk reaction deferred — needs reaction prompt
+				// infrastructure.
 				c.shepherd_totem_type = 1;
 				u.room.bm.broadcast_announce(c.name + " summons the Hawk Spirit Totem! You can use a reaction to grant advantage on attacks against targets in the aura.", true);
 			} else {
+				// Para 923: "if you cast a spell using a spell slot that restores hit
+				// points to any creature [...] each creature of your choice in the aura
+				// also regains hit points equal to your druid level."
 				c.shepherd_totem_type = 2;
-				u.room.bm.broadcast_announce(c.name + " summons the Unicorn Spirit Totem! Healing spells also heal chosen creatures in the aura.", true);
+				u.room.bm.broadcast_announce(c.name + " summons the Unicorn Spirit Totem! Healing spells also heal chosen creatures in the aura for " + c.level + " HP.", true);
 			}
 		}
 		else if (feature == "polearm_master_attack") {

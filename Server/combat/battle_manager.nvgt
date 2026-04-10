@@ -1498,6 +1498,30 @@ class battle_manager {
 		return 2 + cast_slot_level;
 	}
 
+	// Xanathar's Circle of the Shepherd L2 Unicorn Spirit Totem (para 923):
+	// "if you cast a spell using a spell slot that restores hit points to any
+	// creature inside or outside the aura, each creature of your choice in
+	// the aura also regains hit points equal to your druid level."
+	void try_unicorn_totem_heal(combatant@ caster) {
+		if (@caster == null or @combat == null) return;
+		if (caster.class_name != "Druid" or caster.subclass != "Circle of the Shepherd") return;
+		if (!caster.shepherd_circle_active or caster.shepherd_totem_type != 2) return;
+		int heal_amt = caster.level;
+		if (heal_amt <= 0) return;
+		for (uint ui = 0; ui < combat.combatants.length(); ui++) {
+			combatant@ ally = combat.combatants[ui];
+			if (@ally == null or ally.is_dead) continue;
+			if (ally.is_player != caster.is_player) continue;
+			if (feet_distance(caster.x, caster.y, ally.x, ally.y) > 30) continue;
+			if (ally.current_hp >= ally.max_hp) continue;
+			int eff = combat.apply_healing(ally, heal_amt);
+			if (eff > 0) {
+				record_effective_healing(caster.player_username, eff);
+			}
+		}
+		broadcast_announce("The Unicorn Spirit heals allies in the aura for " + heal_amt + " HP!", false);
+	}
+
 	int spiritual_weapon_damage_count_for_slot(int slot_level) {
 		if (slot_level < 2) slot_level = 2;
 		return 1 + ((slot_level - 2) / 2);
@@ -8803,6 +8827,7 @@ class battle_manager {
 				broadcast_announce(c.name + "'s Life Domain adds " + healing_bonus + " extra healing.", false);
 			}
 			broadcast_announce(target.name + " healed for " + heal_amount + " HP! Now at " + target.current_hp + ".", true);
+			try_unicorn_totem_heal(c);
 		}
 		else if (spell.id == "spiritual_weapon") {
 			clear_spiritual_weapon_effect(c, false);
@@ -10013,6 +10038,7 @@ class battle_manager {
 				int effective = combat.apply_healing(target, heal);
 				record_effective_healing(c.player_username, effective);
 				broadcast_announce(c.name + " heals " + target.name + " for " + heal + " HP with Cure Wounds.", true);
+				try_unicorn_totem_heal(c);
 			}
 			else if (spell.id == "fireball") {
 				// Basic Rules para 13302: "Each creature in a 20-foot-radius Sphere
@@ -10675,6 +10701,7 @@ class battle_manager {
 				int effective = combat.apply_healing(target, heal);
 				record_effective_healing(c.player_username, effective);
 				broadcast_announce(c.name + " heals " + target.name + " for " + heal + " HP with Healing Word.", true);
+				try_unicorn_totem_heal(c);
 			}
 			else if (spell.id == "mass_healing_word") {
 				// Basic Rules para 14145: "Up to six creatures of your choice that you can
@@ -10696,6 +10723,7 @@ class battle_manager {
 					healed++;
 				}
 				broadcast_announce(c.name + " casts Mass Healing Word, healing " + healed + " ally" + (healed == 1 ? "" : "ies") + " for " + heal + " HP each.", true);
+				try_unicorn_totem_heal(c);
 			}
 			else if (spell.id == "feeblemind" and @target != null) {
 				// Basic Rules (not quoted — using the 2024 version): target INT save or

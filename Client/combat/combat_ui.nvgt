@@ -1000,6 +1000,7 @@ void show_bonus_action_menu() {
 	int psychic_blades_bard_opt = -1;
 	int cavalier_retaliation_opt = -1;
 	int balm_summer_opt = -1;
+	int hidden_paths_opt = -1;
 	int guided_strike_opt = -1;
 	int giants_might_opt = -1;
 	int empowered_healing_opt = -1;
@@ -1385,7 +1386,10 @@ void show_bonus_action_menu() {
 		cavalier_retaliation_opt = m.add_item("Unwavering Mark Retaliation. Bonus action. Attack marked creature with advantage and +" + (level / 2) + " bonus damage. (" + my_unwavering_mark_ba_uses + "/" + my_unwavering_mark_ba_uses_max + " uses)");
 	}
 	if (lc == "druid" and subclass == "Circle of Dreams") {
-		balm_summer_opt = m.add_item("Balm of the Summer Court. Bonus action. Heal a target from your pool.");
+		balm_summer_opt = m.add_item("Balm of the Summer Court. Bonus action. Heal target with d6s from fey pool.");
+		if (level >= 10) {
+			hidden_paths_opt = m.add_item("Hidden Paths. Bonus action. Teleport up to 60 feet.");
+		}
 	}
 	if (lc == "paladin" and subclass == "Oath of Conquest") {
 		guided_strike_opt = m.add_item("Guided Strike. Channel Divinity. Add +10 to next attack roll.");
@@ -2113,8 +2117,12 @@ void show_bonus_action_menu() {
 		speak("Unwavering Mark retaliation attack!", true);
 	}
 	else if (balm_summer_opt >= 0 and res == balm_summer_opt) {
-		send({{"type", message_types::bonus_action}, {"feature", "balm_of_summer_court"}, {"target_id", current_target_id}});
+		send({{"type", message_types::bonus_action}, {"feature", "balm_of_summer_court"}, {"target_id", current_target_id}, {"dice_count", 1}});
 		speak("Balm of the Summer Court. Channeling healing energy.", true);
+	}
+	else if (hidden_paths_opt >= 0 and res == hidden_paths_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "hidden_paths"}, {"target_id", current_target_id}});
+		speak("Hidden Paths. Teleporting through fey pathways!", true);
 	}
 	else if (guided_strike_opt >= 0 and res == guided_strike_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "guided_strike"}});
