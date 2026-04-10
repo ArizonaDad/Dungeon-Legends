@@ -538,6 +538,37 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 | **Armor of Hexes** (reaction: d6, 4+ forces cursed attacker to miss) | 10 | 2295-2298 | ✓ Done — reaction prompt option when cursed target attacks warlock. Resolution: `random(1,6) >= 4` → `rp.attack_total = 0`. |
 | **Master of Hexes** (auto-transfer curse to nearest enemy within 30ft on cursed target death) | 14 | 2302-2306 | ✓ Done — wired into `maybe_apply_on_kill_features`. Scans for nearest living enemy within 30ft and transfers `hexblade_curse_target`. |
 
+### Samurai Fighter Subclass Audit (2026-04-10) — Xanathar's paras 1685-1714
+
+| Feature | Level | Source para | Status |
+|---------|-------|-------------|--------|
+| **Bonus Proficiency** (History/Insight/Performance/Persuasion or language) | 3 | 1700-1701 | DEFERRED — skill proficiency grant at init not yet wired. |
+| **Fighting Spirit** (BA: advantage on weapon attacks this turn + 5/10/15 temp HP; 3 uses/LR) | 3 | 1702-1704 | ✓ Done — FIXED uses from proficiency_bonus to correct 3/LR. Temp HP scaling 5/10/15 at L3/10/15 already correct. |
+| **Elegant Courtier** (+WIS mod to Persuasion checks; WIS save proficiency) | 7 | 1705-1707 | PARTIAL — WIS save proficiency added at init. Persuasion +WIS mod requires extending the skill check modifier system (deferred). |
+| **Tireless Spirit** (regain 1 Fighting Spirit on initiative if at 0 uses) | 10 | 1708-1709 | ✓ Done — wired in `request_next_initiative`. |
+| **Rapid Strike** (forgo advantage on one attack to gain an extra attack; 1/turn) | 15 | 1710-1711 | DEFERRED — needs an attack-time prompt to choose between advantage and extra attack. Complex interaction with Extra Attack system. |
+| **Strength before Death** (reaction on dropping to 0 HP: take extra turn immediately; 1/LR) | 18 | 1712-1714 | DEFERRED — needs turn interruption / insertion system. Very complex interaction with initiative order. |
+
+### Arcane Archer Fighter Subclass Audit (2026-04-10) — Xanathar's paras 1599-1646
+
+| Feature | Level | Source para | Status |
+|---------|-------|-------------|--------|
+| **Arcane Archer Lore** (Arcana or Nature proficiency + prestidigitation or druidcraft cantrip) | 3 | 1616-1617 | DEFERRED — skill/cantrip grants at init not wired. |
+| **Arcane Shot** (2 uses/SR, apply shot effect on ranged hit, 1/turn; 8 shot options) | 3 | 1618-1621 | SKELETON — uses tracked (2/rest), pending flag set via BA menu. Shot effects NOT applied in battle_manager (flag never read). Shot type selection menu hardcoded to one type. Full 8-shot implementation pending. |
+| **Magic Arrow** (nonmagical arrows become magical to overcome resistance/immunity) | 7 | 1622-1623 | DEFERRED — no weapon-magic-damage system exists. |
+| **Curving Shot** (BA: reroll missed arrow attack vs different target within 60ft) | 7 | 1624-1625 | DEFERRED — needs miss-redirect mechanic. |
+| **Ever-Ready Shot** (regain 1 Arcane Shot use on initiative if at 0 uses) | 15 | 1626-1627 | ✓ Done — wired in `request_next_initiative`. |
+| **Arcane Shot Options** (Banishing, Beguiling, Bursting, Enfeebling, Grasping, Piercing, Seeking, Shadow) | 3-18 | 1628-1646 | NOT IMPLEMENTED — 8 shot types with unique effects, saves, and L18 damage upgrades. Requires dedicated implementation batch. |
+
+### Ancestral Guardian Barbarian Subclass Audit (2026-04-10) — Xanathar's paras 371-398
+
+| Feature | Level | Source para | Status |
+|---------|-------|-------------|--------|
+| **Ancestral Protectors** (first creature hit per turn while raging: disadvantage on attacks not targeting you; allies hit by marked creature have resistance) | 3 | 389-390 | ✓ Done — auto-mark on first hit per turn while raging. `ancestral_protector_marked_by` on target, disadvantage in `apply_attack_advantage_state`, resistance halving in ROLL_DAMAGE path. Mark cleared at start of barbarian's next turn. |
+| **Spirit Shield** (reaction: reduce damage to creature within 30ft by 2d6/3d6/4d6) | 6 | 391-393 | ✓ Done — reaction prompt option, `spirit_shield_reduction` consumed in `apply_damage`. Source-quoted dice scaling at L6/10/14. |
+| **Consult the Spirits** (cast augury or clairvoyance without slot, 1/SR) | 10 | 394-396 | DEFERRED — augury/clairvoyance not implemented as spells. Utility, not combat. |
+| **Vengeful Ancestors** (Spirit Shield deals equal force damage to attacker) | 14 | 397-398 | ✓ Done — wired in Spirit Shield reaction handler. `apply_damage` to attacker for the reduction amount as force damage. |
+
 ### Cavalier Fighter Subclass Audit (2026-04-10) — Xanathar's paras 1649-1682
 
 | Feature | Level | Source para | Status |
