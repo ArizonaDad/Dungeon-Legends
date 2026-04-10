@@ -4262,6 +4262,9 @@ class battle_manager {
 		c.mastery_sap_active = false;
 		c.mastery_vex_active = false;
 		c.mastery_vex_target_id = 0;
+		// Eldritch Invocations per-turn resets
+		c.eldritch_smite_used_this_turn = false;
+		c.lifedrinker_used_this_turn = false;
 		// PHB 2024 Cleric L7 Divine Strike (para 3619): "Once on each of your turns" — reset.
 		c.divine_strike_used_this_turn = false;
 		// PHB 2024 Druid L7 Primal Strike (para 4433): "Once on each of your turns" — reset.
@@ -6004,6 +6007,52 @@ class battle_manager {
 			broadcast_announce(attacker.name + "'s Ambush Master marks " + target.name + "! All attacks have advantage against them.", false);
 		}
 
+		// PHB 2024 Eldritch Invocation: Lifedrinker (para 7801-7803): "Once per turn
+		// when you hit a creature with your pact weapon, you can deal an extra 1d6
+		// Necrotic damage to the creature, and you can expend one of your Hit Point
+		// Dice to roll it and regain HP equal to roll + CON mod (min 1)."
+		if (attacker.lifedrinker and attacker.pact_of_the_blade and is_weapon_attack
+			and !attacker.lifedrinker_used_this_turn and !target.is_dead) {
+			attacker.lifedrinker_used_this_turn = true;
+			int ld_dmg = random(1, 6);
+			bonus += ld_dmg;
+			// HP recovery: expend a Hit Die (d8 for Warlock) + CON mod
+			int con_mod = attacker.get_ability_mod(ABILITY_CON);
+			int ld_heal = random(1, 8) + con_mod;
+			if (ld_heal < 1) ld_heal = 1;
+			attacker.current_hp += ld_heal;
+			if (attacker.current_hp > attacker.max_hp) attacker.current_hp = attacker.max_hp;
+			broadcast_announce(attacker.name + "'s Lifedrinker deals " + ld_dmg + " necrotic damage and heals " + ld_heal + " HP!", false);
+		}
+
+		// PHB 2024 Eldritch Invocation: Eldritch Smite (para 7766-7768): "Once per turn
+		// when you hit a creature with your pact weapon, you can expend a Pact Magic spell
+		// slot to deal an extra 1d8 Force damage, plus 1d8 per level of the spell slot,
+		// and give the target the Prone condition if Huge or smaller."
+		// Auto-applied for bots. Player prompt deferred (TODO: add smite-style prompt).
+		if (attacker.eldritch_smite and attacker.pact_of_the_blade and is_weapon_attack
+			and !attacker.eldritch_smite_used_this_turn and !target.is_dead) {
+			// Find highest available spell slot (Pact Magic)
+			int smite_slot = -1;
+			for (int sl = 5; sl >= 1; sl--) {
+				if (attacker.spell_slots_current[sl] > 0) { smite_slot = sl; break; }
+			}
+			// Bots auto-smite; players auto-smite (prompt deferred until smite prompt system extended)
+			if (smite_slot > 0) {
+				attacker.eldritch_smite_used_this_turn = true;
+				attacker.spell_slots_current[smite_slot]--;
+				int smite_dice = 1 + smite_slot; // 1d8 base + 1d8 per slot level
+				int smite_dmg = 0;
+				for (int sd = 0; sd < smite_dice; sd++) smite_dmg += random(1, 8);
+				bonus += smite_dmg;
+				broadcast_announce(attacker.name + "'s Eldritch Smite deals " + smite_dmg + " force damage! (slot level " + smite_slot + ")", true);
+				if (target.size <= SIZE_HUGE and !target.has_condition(COND_PRONE)) {
+					target.add_condition(COND_PRONE);
+					broadcast_announce(target.name + " is knocked prone by the Eldritch Smite!", true);
+				}
+			}
+		}
+
 		// Mark first hit used
 		if (bonus > 0 or is_weapon_attack) {
 			attacker.is_first_hit_this_turn = false;
@@ -7126,6 +7175,16 @@ class battle_manager {
 			int subclass_damage = apply_subclass_on_hit_damage(c, target, pr.is_weapon_attack, pr.has_advantage, pr.has_disadvantage);
 			if (subclass_damage > 0) total_damage += subclass_damage;
 
+			// PHB 2024 Eldritch Invocation: Agonizing Blast (para 7749-7752): "You can add
+			// your Charisma modifier to that spell's damage rolls." Applied to each EB beam.
+			if (c.agonizing_blast and pr.spell_id == "eldritch_blast") {
+				int cha_mod = c.get_ability_mod(ABILITY_CHA);
+				if (cha_mod > 0) {
+					total_damage += cha_mod;
+					broadcast_announce(c.name + "'s Agonizing Blast adds " + cha_mod + " damage!", false);
+				}
+			}
+
 			// PHB 2024 Cleric L7 Blessed Strikes — Divine Strike (para 3619): "Once on
 			// each of your turns when you hit a creature with an attack roll using a
 			// weapon, you can cause the target to take an extra 1d8 Necrotic or Radiant
@@ -7451,6 +7510,21 @@ class battle_manager {
 							broadcast_announce(c.name + "'s Cleave at " + cleave_target.name + " misses (roll " + cleave_total + " vs AC " + cleave_target.armor_class + ").", false);
 						}
 					}
+				}
+			}
+
+			// PHB 2024 Eldritch Invocation: Repelling Blast (para 7831-7834): "When you hit
+			// a Large or smaller creature with that cantrip, you can push the creature up to
+			// 10 feet straight away from you." Applied per-beam for Eldritch Blast.
+			if (c.repelling_blast and pr.spell_id == "eldritch_blast" and !target.is_dead and target.size <= SIZE_LARGE) {
+				int rb_dir_x = 0; int rb_dir_y = 0;
+				if (target.x > c.x) rb_dir_x = 1;
+				else if (target.x < c.x) rb_dir_x = -1;
+				if (target.y > c.y) rb_dir_y = 1;
+				else if (target.y < c.y) rb_dir_y = -1;
+				if (rb_dir_x != 0 or rb_dir_y != 0) {
+					target.x += rb_dir_x * 2; target.y += rb_dir_y * 2; // 10 ft = 2 tiles
+					broadcast_announce(c.name + "'s Repelling Blast pushes " + target.name + " 10 feet away!", false);
 				}
 			}
 

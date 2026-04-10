@@ -246,6 +246,17 @@ class combatant {
 	// passive — Magical Cunning handler reads class+level instead of a separate field,
 	// but tracking here keeps state symmetric for the broadcast.)
 	bool eldritch_master_active = false;
+	// Eldritch Invocations — individual combat-relevant invocations (PHB 2024 paras 7749-7837)
+	// NOTE: Defaulted based on level+pact until an invocation selection prompt exists.
+	bool agonizing_blast = false;          // L2+: +CHA mod to chosen cantrip damage (para 7749-7752)
+	bool repelling_blast = false;          // L2+: push Large or smaller 10ft on cantrip hit (para 7831-7834)
+	bool devils_sight = false;             // L2+: see in magical/nonmagical darkness 120ft (para 7758-7760)
+	bool thirsting_blade = false;          // L5+, Pact of Blade: Extra Attack with pact weapon (para 7835-7837)
+	bool eldritch_smite = false;           // L5+, Pact of Blade: expend slot for force dmg + prone (para 7766-7768)
+	bool eldritch_smite_used_this_turn = false;
+	bool lifedrinker = false;              // L9+, Pact of Blade: +1d6 necrotic on pact weapon hit (para 7801-7803)
+	bool lifedrinker_used_this_turn = false;
+	bool devouring_blade = false;          // L12+, Thirsting Blade: 3 attacks instead of 2 (para 7761-7763)
 	// --- Companion / Summon System (TODO §7C) ---
 	// Companions are full combatants tracked in combat.combatants with their own initiative,
 	// HP, AC, attacks, and conditions. They're owned by another combatant via owner_id and

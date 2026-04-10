@@ -3171,6 +3171,25 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         // PHB 2024 Warlock L20 Eldritch Master (paras 7798-7799): Magical Cunning regains
         // all expended Pact Magic spell slots. Flag is read by the Magical Cunning handler.
         if (cs.level >= 20) c.eldritch_master_active = true;
+		// Eldritch Invocations: default combat-relevant invocations by level + pact.
+		// TODO: Build invocation selection prompt so players can choose their own set.
+		if (cs.level >= 2) {
+			c.agonizing_blast = true;  // +CHA to EB damage (para 7749-7752)
+			c.repelling_blast = true;  // Push 10ft on EB hit (para 7831-7834)
+			c.devils_sight = true;     // See in darkness 120ft (para 7758-7760)
+		}
+		if (c.pact_of_the_blade) {
+			if (cs.level >= 5) {
+				c.thirsting_blade = true;  // Extra Attack with pact weapon (para 7835-7837)
+				c.extra_attacks = 1;
+				c.eldritch_smite = true;   // Force damage + prone on pact hit (para 7766-7768)
+			}
+			if (cs.level >= 9) c.lifedrinker = true; // +1d6 necrotic on pact hit (para 7801-7803)
+			if (cs.level >= 12) {
+				c.devouring_blade = true;  // 3 attacks instead of 2 (para 7761-7763)
+				c.extra_attacks = 2;
+			}
+		}
     }
 
     // Ranger subclasses
