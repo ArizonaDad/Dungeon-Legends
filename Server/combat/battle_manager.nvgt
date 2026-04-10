@@ -7152,6 +7152,16 @@ class battle_manager {
 				broadcast_announce(c.name + "'s Slasher reduces " + target.name + "'s speed by 10 feet!", false);
 			}
 
+			// PHB 2024 Charger feat (para 1394-1403): Charge Attack — after Dash + 10+ ft
+			// move, next melee attack deals +1d8 damage. Approximated as +1d8 on next
+			// melee hit after Dash (straight-line tracking deferred).
+			if (c.charger_dash_active and pr.is_weapon_attack and !pr.is_spell_effect and !c.main_hand_is_ranged) {
+				int charge_dmg = random(1, 8);
+				total_damage += charge_dmg;
+				c.charger_dash_active = false;
+				broadcast_announce(c.name + "'s Charger feat deals " + charge_dmg + " extra damage on the charge!", false);
+			}
+
 			// PHB 2024 Barbarian L9 Brutal Strike (para 2338-2341): on hit after forgoing
 			// Reckless Attack advantage, +1d10 damage (2d10 at L17) + chosen effect(s).
 			if (c.brutal_strike_active and !c.brutal_strike_used_this_turn and pr.is_weapon_attack
@@ -9064,7 +9074,10 @@ class battle_manager {
 		int dash_speed = c.speed;
 		// Charger feat (PHB para 7557) - Improved Dash: "When you take the Dash action,
 		// your Speed increases by 10 feet for that action."
-		if (c.has_feat("charger")) dash_speed += 10;
+		if (c.has_feat("charger")) {
+			dash_speed += 10;
+			c.charger_dash_active = true; // Charge Attack: +1d8 on next melee hit
+		}
 		c.movement_remaining += dash_speed;
 		broadcast_announce(c.name + " takes the Dash action. " + c.movement_remaining + " feet of movement remaining.");
 		broadcast_state();

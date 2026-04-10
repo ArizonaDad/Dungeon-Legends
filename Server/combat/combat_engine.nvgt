@@ -956,6 +956,11 @@ class combatant {
 	bool combat_prowess_used = false;
 	bool tavern_brawler_push_used = false;
 	bool hunter_colossus_used = false;
+	// PHB 2024 Charger feat (para 1394-1403): +10ft on Dash, +1d8 melee after moving 10+ ft
+	bool charger_dash_active = false;
+	// PHB 2024 Fey Touched / Shadow Touched free casts (paras 1793-1800, 3563-3570)
+	bool fey_touched_free_cast_used = false;
+	bool shadow_touched_free_cast_used = false;
 
 	// Subclass tracking
 	bool has_frenzy = false;

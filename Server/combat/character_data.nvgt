@@ -966,6 +966,11 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         bool has_bless = false;
         for (uint si = 0; si < c.prepared_spells.length(); si++) if (c.prepared_spells[si] == "bless") { has_bless = true; break; }
         if (!has_bless) c.prepared_spells.insert_last("bless");
+        // PHB 2024 Fey Touched (para 1793-1800): "You can cast each of these spells
+        // without expending a spell slot. Once you cast either of these spells in this
+        // way, you can't cast that spell in this way again until you finish a Long Rest."
+        c.grant_free_cast("misty_step", 1);
+        c.grant_free_cast("bless", 1);
     }
     // Feat: Actor (PHB para 7542) - "While you're disguised as a real or fictional person,
     // you have Advantage on Charisma (Deception or Performance) checks to convince others
@@ -1042,6 +1047,9 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         bool has_blindness = false;
         for (uint si = 0; si < c.prepared_spells.length(); si++) if (c.prepared_spells[si] == "blindness_deafness") { has_blindness = true; break; }
         if (!has_blindness) c.prepared_spells.insert_last("blindness_deafness"); // L2 necromancy as the default
+        // PHB 2024 Shadow Touched (para 3563-3570): free cast 1/LR each
+        c.grant_free_cast("invisibility", 1);
+        c.grant_free_cast("blindness_deafness", 1);
     }
     // Epic Boon: Night Spirit (Darkvision 300ft)
     if (character_sheet_has_feat(cs, "boon_of_the_night_spirit")) { c.darkvision = true; c.darkvision_range = 300; }
