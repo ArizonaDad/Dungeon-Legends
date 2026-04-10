@@ -167,11 +167,11 @@ Audited against Basic Rules 2024 paras 2301-2359 (full Barbarian class entry).
 | **Fast Movement** (+10 ft speed when not in heavy armor) | 5 | 2332-2333 | ✓ Done 2026-04-09 — `apply_class_defaults` Barbarian block adds `cs.speed += 10` at L5+ |
 | **Feral Instinct** (advantage on Initiative rolls) | 7 | 2334-2335 | ✓ Done 2026-04-09 — `request_next_initiative` sets `pr.has_advantage = true`; `handle_roll_result` and the bot/auto-roll path both honor advantage on `ROLL_INITIATIVE` |
 | **Instinctive Pounce** (move half speed as part of rage entry) | 7 | 2336-2337 | ✓ Done 2026-04-09 — rage handler in `users _dom.nvgt` adds `c.movement_remaining += c.speed / 2` at L7+ |
-| **Brutal Strike** (forgo advantage for +1d10 + Forceful/Hamstring effect) | 9 | 2338-2341 | ✗ DEFERRED — needs a player-choice prompt similar to `pending_smite_prompt` (declared via bonus action, drops Reckless Attack advantage, prompts for effect on hit). Not yet wired. |
+| **Brutal Strike** (forgo advantage for +1d10 + Forceful/Hamstring effect) | 9 | 2338-2341 | ✓ Done 2026-04-10 — Bonus action toggle + damage + effects wired. Forceful Blow (push 15ft + half speed move), Hamstring (-15ft speed). |
 | Relentless Rage (DC 10 CON save when dropped to 0 HP, +5 each use) | 11 | 2342-2344 | ✓ Done |
-| **Improved Brutal Strike** (Staggering/Sundering effects) | 13 | 2345-2348 | ✗ DEFERRED — depends on Brutal Strike infrastructure |
+| **Improved Brutal Strike** (Staggering/Sundering effects) | 13 | 2345-2348 | ✓ Done 2026-04-10 — Staggering Blow (disadvantage on next save, wired into 6 save sites) + Sundering Blow (+5 to next ally attack). |
 | **Persistent Rage** (rage lasts 10 minutes / 100 rounds without needing to extend) | 15 | 2349-2351 | ✓ Done 2026-04-09 — rage handler sets `rage_turns_remaining = 100` and `persistent_rage_active = true` at L15+ |
-| **Improved Brutal Strike** (2d10 + 2 effects) | 17 | 2352-2353 | ✗ DEFERRED — depends on Brutal Strike infrastructure |
+| **Improved Brutal Strike** (2d10 + 2 effects) | 17 | 2352-2353 | ✓ Done 2026-04-10 — 2d10 damage + two different effects from full menu. |
 | **Indomitable Might** (STR check/save total ≥ STR score) | 18 | 2354-2355 | ✓ Done 2026-04-09 — new `combatant.apply_indomitable_might(total, ability_id)` helper. Wired into `finalize_roll_result` for STR ability checks via the new `pr.ability_id` field, plus inline at the trip attack / hobbling strike / shield master / shove / grapple sites. Not yet wired into all spell-handler STR saves (Storm Sphere, etc.) — those are rare and queued for a later pass. |
 | **Primal Champion** (+4 STR/CON, max 25) | 20 | 2358-2359 | ✓ Done 2026-04-09 — `apply_class_defaults` adds the bonus with the cap |
 
@@ -240,7 +240,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 |---|---|---|---|
 | Fighting Style (feat selection from list) | 1 | 5100-5102 | ✓ Done — chooses a Fighting Style feat at creation; feat data has the styles. |
 | **Second Wind** (BA, heal 1d10+lvl, scaling uses) | 1 | 5103-5106 | ✓ Done 2026-04-09 — was a single bool; now `second_wind_uses_remaining` / `second_wind_uses_max` int pair. 2 uses L1-3, 3 uses L4-9, 4 uses L10+. Bonus action handler decrements properly and announces remaining. |
-| **Weapon Mastery** (3/4/5/6 weapons by level) | 1 | 5107-5109 | PARTIAL — character creation tracks the choice; the property effects themselves (Push/Sap/Slow/Vex/etc.) are NOT yet wired into attack resolution. The local `mastery` variable in `apply_weapon` is set then discarded — needs a follow-up to plumb mastery IDs through to the combatant and the attack pipeline. |
+| **Weapon Mastery** (3/4/5/6 weapons by level) | 1 | 5107-5109 | ✓ Done 2026-04-10 — All 7 mastery properties (Push/Sap/Slow/Topple/Vex/Cleave/Graze) wired into attack resolution. `main_hand_mastery` field plumbed from `character_data.nvgt` weapon table through `character_sheet` to `combatant`. Nick deferred (requires Light property TWF system). |
 | **Action Surge** (1 use L2, 2 uses L17) | 2 | 5110-5112 | ✓ Done — properly tracked and handled. |
 | **Tactical Mind** (spend Second Wind on failed ability check, refund on still-fail) | 2 | 5113-5114 | ✓ Done 2026-04-09 — new prompt chain entry after Lucky/Heroic. `pending_tactical_mind_prompt` struct + `maybe_prompt_tactical_mind` + `handle_tactical_mind_response` server-side. New `tactical_mind_prompt`/`tactical_mind_response` message types. Client `prompt_tactical_mind_choice` + `check_tactical_mind_prompt_input` (T to use, Escape to skip). Use is refunded if the +1d10 still fails to clear the DC, per source. Bots auto-use when `failure_margin <= 5` (1d10 average). |
 | Fighter Subclass | 3 | 5115-5116 | ✓ Done — Champion + many extra subclasses. |
@@ -248,7 +248,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 | Extra Attack | 5 | 5119-5120 | ✓ Done. |
 | **Tactical Shift** (Second Wind also grants half-Speed OA-free move) | 5 | 5121-5122 | ✓ Done 2026-04-09 — `tactical_shift_feet_remaining` field on combatant. When Second Wind is activated at L5+, that pool is set to half speed and `movement_remaining` is bumped. `check_opportunity_attacks` consumes pool greedily and suppresses OA while feet remain. Cleared at start of turn. |
 | **Indomitable** (failed save reroll, +Fighter level) | 9 | 5123-5125 | ✓ Done — 1/2/3 uses at L9/13/17, properly hooked in `handle_save_result`. |
-| **Tactical Master** (replace weapon mastery with Push/Sap/Slow) | 9 | 5126-5127 | ✗ DEFERRED — depends on Weapon Mastery property application system being wired first. Stubbed in audit notes. |
+| **Tactical Master** (replace weapon mastery with Push/Sap/Slow) | 9 | 5126-5127 | PARTIAL 2026-04-10 — Weapon Mastery system now wired. Tactical Master swap itself needs a bonus action toggle to replace the weapon's property with Push/Sap/Slow for the next attack. |
 | Two Extra Attacks | 11 | 5128-5129 | ✓ Done. |
 | **Studied Attacks** (advantage on next attack vs creature you missed) | 13 | 5130-5131 | ✓ Done — `studied_attacks_active` flag + `studied_attacks_target_id`. Set on miss, granted as advantage and consumed on next attack against the same target. |
 | Action Surge (two uses) | 17 | 5082 | ✓ Done — `action_surge_uses` upgrades at L17. |
