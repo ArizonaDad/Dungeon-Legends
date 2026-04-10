@@ -980,6 +980,77 @@ Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 | **Mantle of Whispers** (reaction: capture dead humanoid's shadow, use as disguise) | 6 | 619-624 | DEFERRED — non-combat espionage feature. |
 | **Shadow Lore** (action: WIS save or charmed 8 hours, obeys commands) | 14 | 625-631 | DEFERRED — non-combat social feature. |
 
+### Circle of Dreams Druid Subclass Audit (2026-04-10) — Xanathar's paras 883-898
+
+| Feature | Level | Source para | Status |
+|---------|-------|-------------|--------|
+| **Balm of the Summer Court** (BA: spend from pool of level d6s, heal 1d6 per die + temp HP = spent dice) | 2 | 883-888 | ✓ Done — `balm_of_summer_pool` field initialized to `c.level`. BA handler in `users _dom.nvgt` heals 1d6 per activation, pool decrements. Client menu entry wired. |
+| **Hearth of Moonlight and Shadow** (rest in 30ft sphere: invisible to creatures outside, +5 Stealth/Perception) | 6 | 889-892 | DEFERRED — rest/camp system not yet implemented. No combat effect. |
+| **Hidden Paths** (BA: teleport self 60ft or willing creature within 30ft 30ft, WIS mod uses/LR) | 10 | 893-895 | DEFERRED — teleportation mechanics (non-Misty-Step) not yet implemented. |
+| **Walker in Dreams** (after SR: cast Dream, Scrying, or Teleportation Circle for free) | 14 | 896-898 | DEFERRED — non-combat/exploration feature. |
+
+### Circle of the Shepherd Druid Subclass Audit (2026-04-10) — Xanathar's paras 913-932
+
+| Feature | Level | Source para | Status |
+|---------|-------|-------------|--------|
+| **Speech of the Woods** (Sylvan language + communicate with beasts) | 2 | 913-915 | N/A — language/roleplay feature, no combat effect. |
+| **Spirit Totem** (BA: summon 60ft spirit aura for 1 min — Bear: temp HP 5+level; Hawk: advantage on attack rolls via reaction; Unicorn: healing spells also heal allies in aura) | 2 | 916-924 | PARTIAL — `shepherd_totem_type` field (0=bear/1=hawk/2=unicorn). BA handler in `users _dom.nvgt` with 3 options. Bear temp HP works. Hawk advantage-via-reaction and Unicorn heal-spread logic are stubs (announced but effect may not fully chain). |
+| **Mighty Summoner** (summoned beasts/fey: +2 HP per HD + attacks count as magical) | 6 | 925-927 | DEFERRED — requires companion/summon HP scaling hooks. |
+| **Guardian Spirit** (beast/fey in Spirit Totem aura regain HP = half druid level at end of their turn) | 10 | 928-929 | DEFERRED — requires per-turn heal on summons within aura. |
+| **Faithful Summons** (when reduced to 0 HP: auto-cast Conjure Animals 8 beasts, no concentration, 1/LR) | 14 | 930-932 | DEFERRED — auto-cast trigger on death + mass summon. |
+
+### Inquisitive Rogue Subclass Audit (2026-04-10) — Xanathar's paras 2332-2345
+
+| Feature | Level | Source para | Status |
+|---------|-------|-------------|--------|
+| **Ear for Deceit** (minimum roll on Insight to detect lies = 8 + WIS mod) | 3 | 2332-2333 | DEFERRED — non-combat social feature. Could wire via skill_check clamp like Silver Tongue. |
+| **Eye for Detail** (BA: Perception check to find hidden creature or Investigation check to find clues) | 3 | 2334-2335 | DEFERRED — BA skill check not wired. |
+| **Insightful Fighting** (BA: Insight vs target's Deception; success = SA without advantage for 1 min) | 3 | 2336-2339 | ✓ Done — `inquisitive_target` field. BA handler in `users _dom.nvgt` sets target. Sneak Attack bonus in `apply_subclass_on_hit_damage` applies SA dice to `inquisitive_target` without needing advantage. |
+| **Steady Eye** (advantage on Perception and Investigation if move ≤ half speed) | 9 | 2340-2341 | DEFERRED — non-combat, requires movement tracking per turn for conditional advantage. |
+| **Unerring Eye** (action: sense illusion/shapechanger/deception within 30ft, WIS mod uses/LR) | 13 | 2342-2343 | DEFERRED — detection/utility feature, no direct combat effect. |
+| **Eye for Weakness** (+3d6 SA against Insightful Fighting target) | 17 | 2344-2345 | DEFERRED — additional SA dice on top of base SA. Needs to add 3d6 in `apply_subclass_on_hit_damage` when `inquisitive_target` matched and level >= 17. |
+
+### Mastermind Rogue Subclass Audit (2026-04-10) — Xanathar's paras 2361-2377
+
+| Feature | Level | Source para | Status |
+|---------|-------|-------------|--------|
+| **Master of Intrigue** (disguise kit, forgery kit, 2 languages, mimic speech/writing) | 3 | 2361-2365 | N/A — proficiency/roleplay feature, no combat effect. |
+| **Master of Tactics** (Help as BA at 30ft range instead of action at 5ft) | 3 | 2366-2369 | ✓ Done — `mastermind_help` flag. BA handler in `users _dom.nvgt` sets help target with 30ft range validation. |
+| **Insightful Manipulator** (study creature for 1 min: learn 2 stats relative to self) | 9 | 2370-2372 | DEFERRED — non-combat information-gathering feature. |
+| **Misdirection** (reaction: redirect attack targeting you to another creature within 5ft providing cover) | 13 | 2373-2375 | DEFERRED — requires cover system + attack-redirect reaction. |
+| **Soul of Deceit** (immune to telepathy, always appear truthful to lies-detection magic, CHA vs WIS on zone of truth) | 17 | 2376-2377 | DEFERRED — non-combat / anti-magic detection feature. |
+
+### Scout Rogue Subclass Audit (2026-04-10) — Xanathar's paras 2391-2401
+
+| Feature | Level | Source para | Status |
+|---------|-------|-------------|--------|
+| **Skirmisher** (reaction: move half speed when enemy ends turn within 5ft, no OA) | 3 | 2391-2393 | PARTIAL — `scout_skirmisher` flag set on init. Manual BA activation exists but automatic end-of-enemy-turn trigger not implemented (needs per-movement event hooks). |
+| **Survivalist** (proficiency + expertise in Nature and Survival) | 3 | 2394-2395 | DEFERRED — skill proficiency/expertise auto-grant at init needed. |
+| **Superior Mobility** (+10ft speed to walk/climb/swim) | 9 | 2396-2397 | DEFERRED — simple `c.speed += 10` at init. |
+| **Ambush Master** (advantage on initiative; first creature hit in first turn grants all allies advantage vs it until start of next turn) | 13 | 2398-2399 | DEFERRED — initiative advantage + team-wide advantage marker. |
+| **Sudden Strike** (if take Attack action, can make extra attack as BA against different creature with SA) | 17 | 2400-2401 | DEFERRED — extra attack via BA with SA on different target. |
+
+### Swashbuckler Rogue Subclass Audit (2026-04-10) — Xanathar's paras 2418-2430
+
+| Feature | Level | Source para | Status |
+|---------|-------|-------------|--------|
+| **Fancy Footwork** (after melee attack vs creature, it can't make OA against you for rest of turn) | 3 | 2418-2420 | ✓ Done — `swashbuckler_attacked_this_turn` flag. Set on attack in battle_manager. OA suppression logic checks flag. Reset in `advance_turn`. |
+| **Rakish Audacity** (+CHA to initiative; SA without advantage if no creature other than target within 5ft of you) | 3 | 2421-2423 | DEFERRED — initiative CHA bonus + solo-engagement SA condition. Two distinct mechanics need wiring. |
+| **Panache** (action: Persuasion vs Insight; hostile = disadvantage on attacks vs others and no OA for 1 min; friendly = charmed for 1 min) | 9 | 2424-2426 | DEFERRED — non-combat social feature (hostile version has combat use but needs contested check system). |
+| **Elegant Maneuver** (BA: advantage on next Acrobatics or Athletics check this turn) | 13 | 2427-2428 | DEFERRED — BA skill check advantage grant. |
+| **Master Duelist** (1/SR: miss → reroll with advantage) | 17 | 2429-2430 | DEFERRED — attack-miss reroll, similar to Unerring Accuracy pattern. |
+
+### Celestial Warlock Subclass Audit (2026-04-10) — Xanathar's paras 2720-2747
+
+| Feature | Level | Source para | Status |
+|---------|-------|-------------|--------|
+| **Expanded Spell List** (Cure Wounds, Flaming Sphere, Lesser Restoration, Daylight, Revivify, Guardian of Faith, Wall of Fire, Flame Strike, Greater Restoration) | 1-9 | 2720-2726 | DEFERRED — auto-prepared spell system not yet wired for Warlock patron spells. |
+| **Bonus Cantrips** (Light, Sacred Flame) | 1 | 2727-2728 | DEFERRED — auto-grant cantrips at subclass selection. |
+| **Healing Light** (BA: pool of 1+level d6s, spend 1-CHA mod dice to heal creature within 60ft) | 1 | 2729-2735 | ✓ Done — `healing_light_dice` field initialized to `1 + cs.level`. BA handler in `users _dom.nvgt` with dice spending. Client menu entry wired. |
+| **Radiant Soul** (resistance to radiant damage; when casting fire/radiant spell, add CHA to one damage roll) | 6 | 2736-2739 | DEFERRED — radiant resistance auto-grant + spell damage CHA rider. |
+| **Celestial Resilience** (temp HP = Warlock level + CHA at end of SR/LR; 5 allies get half Warlock level + CHA) | 10 | 2740-2743 | DEFERRED — rest-triggered temp HP distribution. |
+| **Searing Vengeance** (at start of turn while dying: regain half max HP + stand + 2d8+CHA radiant to chosen creatures within 30ft, blinding on fail, 1/LR) | 14 | 2744-2747 | DEFERRED — death save replacement trigger + AoE radiant burst. |
+
 ---
 
 ## Working Rule Going Forward
