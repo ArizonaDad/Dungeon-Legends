@@ -357,6 +357,14 @@ Companions are full combatants tracked in `combat.combatants` with their own HP,
 
 **B/P/S Nonmagical Resistance** (`resist_bps_nonmagical`): In `apply_damage`, B/P/S damage is halved unless the source has `magic_weapon_bonus > 0`. Used by: Lich, Pit Fiend, Wraith, Wight.
 
+**Ranged Monster Kiting**: Monsters with ranged primary attacks (range > 5ft) who find themselves in melee (5ft) will move AWAY from the target before attacking, avoiding disadvantage on ranged attacks. Executed before the normal approach loop.
+
+**Troll Undeath** (`regen_amount > 0`): Trolls do NOT die at 0 HP unless `regen_blocked_this_round` is true (fire/acid damage was taken). Instead they fall unconscious at 0 HP. At turn start, regeneration brings them back. If regen is blocked when at 0 HP, they die permanently.
+
+**Petrifying Gaze** (`petrify_dc`): On weapon hit, target CON save or Petrified. Applied after damage in `finalize_roll_result`. Used by: Basilisk (DC 12), Medusa (DC 14).
+
+**Frightful Presence** (`frightful_presence_dc/range`): Fires once per combat on the dragon's first turn in `execute_monster_turn`. All players within range make WIS save (with full failure chain: Arcane Deflection, Countercharm, Flash of Genius) or become Frightened. Used by: Adult Black Dragon (DC 16, 120ft), Adult Red Dragon (DC 19, 120ft).
+
 ### Skill Check System
 
 Skill checks (Stealth, Persuasion, Investigation, etc.) flow through the standard `pending_roll` pipeline so they get reroll prompts (Bardic, Lucky, Heroic), advantage/disadvantage handling, and Silver Tongue clamping for free.

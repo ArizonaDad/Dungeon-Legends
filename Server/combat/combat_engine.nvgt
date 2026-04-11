@@ -733,6 +733,12 @@ class combatant {
 	int knockdown_dc = 0;
 	// On-hit riders: CON save or Paralyzed (Ghoul)
 	int paralyze_dc = 0;
+	// On-hit riders: CON save or Petrified (Basilisk, Medusa)
+	int petrify_dc = 0;
+	// Frightful Presence: WIS save or Frightened (Adult Dragons)
+	int frightful_presence_dc = 0;
+	int frightful_presence_range = 0;
+	bool frightful_presence_used = false; // Only fires once per combat
 	// Breath weapon tracking
 	bool breath_available = true;      // Whether breath weapon is charged
 	string breath_name = "";
@@ -2136,8 +2142,16 @@ class battle {
 					target.death_save_failures = 0;
 				}
 			} else {
-				// Monster dies instantly (standard D&D rule)
-				target.is_dead = true;
+				// SRD Troll Regeneration: Troll doesn't die at 0 HP unless fire/acid
+				// was the killing blow (regen_blocked_this_round). It stays at 0 HP
+				// and regeneration at turn start will revive it.
+				if (target.regen_amount > 0 and !target.regen_blocked_this_round) {
+					// Troll is "down" but not dead — regeneration will bring it back
+					target.add_condition(COND_UNCONSCIOUS);
+				} else {
+					// Monster dies instantly (standard D&D rule)
+					target.is_dead = true;
+				}
 			}
 			return;
 		}

@@ -5596,18 +5596,34 @@ class battle_manager {
 
 		// SRD Monster Regeneration: heal at start of turn (Troll, etc.)
 		// Blocked if fire or acid damage was taken since last turn.
-		if (c.regen_amount > 0 and c.is_alive() and !c.is_dead) {
+		// Trolls at 0 HP who weren't killed by fire/acid also regenerate back.
+		if (c.regen_amount > 0 and !c.is_dead) {
 			if (c.regen_blocked_this_round) {
-				broadcast_announce(c.name + "'s regeneration is blocked this turn!", false);
+				// Regen blocked — if at 0 HP, NOW the troll actually dies
+				if (c.current_hp <= 0) {
+					c.is_dead = true;
+					c.remove_condition(COND_UNCONSCIOUS);
+					broadcast_announce(c.name + "'s regeneration was stopped by fire or acid — it dies!", true);
+					check_battle_end();
+					if (!combat.battle_active) return;
+				} else {
+					broadcast_announce(c.name + "'s regeneration is blocked this turn!", false);
+				}
 				c.regen_blocked_this_round = false;
-			} else {
+			} else if (c.current_hp >= 0) {
 				int heal = c.regen_amount;
 				int old_hp = c.current_hp;
 				c.current_hp += heal;
 				if (c.current_hp > c.max_hp) c.current_hp = c.max_hp;
 				int healed = c.current_hp - old_hp;
 				if (healed > 0) {
-					broadcast_announce(c.name + " regenerates " + healed + " HP! (" + c.current_hp + "/" + c.max_hp + ")", false);
+					// If monster was at 0 HP and regenerated, wake it up
+					if (old_hp == 0 and c.current_hp > 0) {
+						c.remove_condition(COND_UNCONSCIOUS);
+						broadcast_announce(c.name + " regenerates " + healed + " HP and gets back up! (" + c.current_hp + "/" + c.max_hp + ")", true);
+					} else {
+						broadcast_announce(c.name + " regenerates " + healed + " HP! (" + c.current_hp + "/" + c.max_hp + ")", false);
+					}
 				}
 			}
 		}
@@ -6453,6 +6469,35 @@ class battle_manager {
 		}
 		monster_turn_start_time = ticks();
 
+		// SRD Frightful Presence (Adult Dragons): WIS save or Frightened for 1 minute.
+		// Fires once per combat on the dragon's first turn.
+		if (monster.frightful_presence_dc > 0 and !monster.frightful_presence_used) {
+			monster.frightful_presence_used = true;
+			broadcast_announce(monster.name + " unleashes a terrifying presence!", true);
+			for (uint fpi = 0; fpi < combat.combatants.length(); fpi++) {
+				combatant@ fp_target = combat.combatants[fpi];
+				if (@fp_target == null or fp_target.is_dead or !fp_target.is_player or fp_target.current_hp <= 0) continue;
+				if (feet_distance(monster.x, monster.y, fp_target.x, fp_target.y) > monster.frightful_presence_range) continue;
+				if (fp_target.has_condition(COND_FRIGHTENED)) continue; // Already frightened
+				int fp_roll = random(1, 20);
+				int fp_bonus = fp_target.get_save_bonus(ABILITY_WIS);
+				int fp_bless = roll_bless_bonus(fp_target);
+				int fp_total = fp_roll + fp_bonus + fp_bless;
+				bool fp_saved = fp_total >= monster.frightful_presence_dc;
+				if (!fp_saved and try_arcane_deflection_save(fp_target, monster.frightful_presence_dc, fp_total)) fp_saved = true;
+				if (!fp_saved) { if (try_countercharm_reroll(fp_target, monster.frightful_presence_dc, fp_bonus + fp_bless, "WIS save vs Frightful Presence")) fp_saved = true; }
+				if (!fp_saved) { int fg = try_flash_of_genius(fp_target, monster.frightful_presence_dc, fp_total, "WIS save vs Frightful Presence"); if (fg >= monster.frightful_presence_dc) fp_saved = true; }
+				broadcast_roll(fp_target.name, "WIS save vs Frightful Presence", fp_roll, fp_bonus + fp_bless, fp_total, fp_saved ? "Unafraid!" : "Frightened!");
+				if (!fp_saved) {
+					fp_target.add_condition(COND_FRIGHTENED);
+					fp_target.frightened_source_id = monster.id;
+					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", fp_target.name}, {"condition", "Frightened"}});
+					broadcast_announce(fp_target.name + " is frightened by " + monster.name + "'s terrible presence!", true);
+				}
+			}
+			broadcast_state();
+		}
+
 		combatant@ nearest = find_nearest_target_for_monster(monster);
 		int nearest_dist = @nearest != null ? feet_distance(monster.x, monster.y, nearest.x, nearest.y) : 9999;
 
@@ -6473,14 +6518,47 @@ class battle_manager {
 			}
 		}
 
-		// Step 1: Move toward the nearest player until one of the monster's attacks is in range.
-		// PHB 2024 Frightened (para 16222): can't willingly move closer to fear source.
+		// Step 1: Move — toward target if out of range, AWAY if ranged-only and too close.
+		// Ranged kiting: if monster has a ranged attack and target is within 5ft (melee zone),
+		// the monster backs away to use its ranged attack without disadvantage.
 		bool monster_frightened_blocked = false;
 		if (monster.has_condition(COND_FRIGHTENED) and monster.frightened_source_id > 0) {
 			combatant@ fear_src = combat.get_combatant(monster.frightened_source_id);
 			if (@fear_src != null and !fear_src.is_dead and @nearest == fear_src) {
 				monster_frightened_blocked = true;
 			}
+		}
+		// Determine if this monster should kite (back away when target too close):
+		// Kite if: has ranged attack, primary range > 5, and target is within melee (5ft)
+		bool should_kite = false;
+		int kite_range = 0;
+		if (monster.main_hand_range > 5 and nearest_dist <= 5 and !monster_frightened_blocked) {
+			should_kite = true;
+			kite_range = monster.main_hand_range;
+		} else if (monster_has_secondary_attack(monster) and monster_secondary_is_ranged(monster) and monster.main_hand_range <= 5 and nearest_dist <= 5 and !monster_frightened_blocked) {
+			// Monster has melee primary + ranged secondary — don't kite, prefer melee
+			should_kite = false;
+		}
+		// Execute kiting: move away from target
+		if (should_kite) {
+			while (monster.movement_remaining >= FEET_PER_TILE and nearest_dist < 15) {
+				int old_x = monster.x;
+				int old_y = monster.y;
+				int dx = 0;
+				int dy = 0;
+				// Move AWAY from target
+				if (nearest.x > monster.x) dx = -1;
+				else if (nearest.x < monster.x) dx = 1;
+				if (nearest.y > monster.y) dy = -1;
+				else if (nearest.y < monster.y) dy = 1;
+				if (dx != 0) { monster.x += dx; monster.movement_remaining -= FEET_PER_TILE; }
+				else if (dy != 0) { monster.y += dy; monster.movement_remaining -= FEET_PER_TILE; }
+				else break;
+				check_opportunity_attacks(monster, old_x, old_y, monster.x, monster.y);
+				if (@current_roll != null or monster.is_dead or monster.current_hp == 0) { broadcast_state(); return; }
+				nearest_dist = feet_distance(monster.x, monster.y, nearest.x, nearest.y);
+			}
+			broadcast_state();
 		}
 		int desired_attack_range = get_monster_desired_attack_range(monster, nearest_dist);
 		while (monster.movement_remaining >= FEET_PER_TILE and nearest_dist > desired_attack_range and !monster_frightened_blocked) {
@@ -9307,6 +9385,19 @@ class battle_manager {
 						target.add_condition(COND_PRONE);
 						broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Prone"}});
 						broadcast_announce(c.name + " knocks " + target.name + " prone!", true);
+					}
+				}
+				// SRD Basilisk/Medusa: Petrifying Gaze (CON save or Petrified on hit)
+				if (c.petrify_dc > 0 and !target.has_condition(COND_PETRIFIED)) {
+					int pet_roll = random(1, 20);
+					int pet_bonus = target.get_save_bonus(ABILITY_CON);
+					int pet_total = pet_roll + pet_bonus;
+					bool pet_saved = pet_total >= c.petrify_dc;
+					broadcast_roll(target.name, "CON save vs Petrifying Gaze", pet_roll, pet_bonus, pet_total, pet_saved ? "Resists!" : "Petrified!");
+					if (!pet_saved) {
+						target.add_condition(COND_PETRIFIED);
+						broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Petrified"}});
+						broadcast_announce(c.name + "'s gaze turns " + target.name + " to stone!", true);
 					}
 				}
 				// SRD Ghoul: Claws paralyze target (CON save or Paralyzed, 1 minute).

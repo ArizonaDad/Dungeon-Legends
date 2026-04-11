@@ -44,6 +44,11 @@ class monster_def {
     int knockdown_dc = 0;
     // Paralyze: target CON save or Paralyzed on hit (Ghoul)
     int paralyze_dc = 0;
+    // Petrify: target CON save or Petrified on hit (Basilisk, Medusa)
+    int petrify_dc = 0;
+    // Frightful Presence: WIS save or Frightened at start of combat (Adult Dragons)
+    int frightful_presence_dc = 0;
+    int frightful_presence_range = 0;
     // Breath weapon (Dragon, etc.)
     string breath_name = "";
     int breath_save_type = 0;     // ABILITY_DEX, ABILITY_CON
@@ -460,6 +465,7 @@ void init_monster_defs() {
         d.attack_range = 5;
         d.xp = 700;
         d.description = "An eight-legged reptile whose gaze turns flesh to stone.";
+        d.petrify_dc = 12; // SRD: Basilisk Petrifying Gaze DC 12 CON
         MONSTER_DEFS.insert_last(d);
     }
 
@@ -569,6 +575,7 @@ void init_monster_defs() {
         d.multiattack_count = 3;
         d.xp = 2300;
         d.description = "A cursed creature whose gaze petrifies the unwary.";
+        d.petrify_dc = 14; // SRD: Medusa Petrifying Gaze DC 14 CON
         MONSTER_DEFS.insert_last(d);
     }
 
@@ -720,7 +727,9 @@ void init_monster_defs() {
         d.breath_range = 60;
         d.breath_recharge_min = 5;
         d.immune_acid = true;
-        d.immune_frightened = true; // Adult dragons: Frightful Presence
+        d.immune_frightened = true;
+        d.frightful_presence_dc = 16; // SRD: Adult Black Dragon DC 16 WIS
+        d.frightful_presence_range = 120;
         MONSTER_DEFS.insert_last(d);
     }
 
@@ -764,6 +773,8 @@ void init_monster_defs() {
         d.breath_recharge_min = 5;
         d.immune_fire = true;
         d.immune_frightened = true;
+        d.frightful_presence_dc = 19; // SRD: Adult Red Dragon DC 19 WIS
+        d.frightful_presence_range = 120;
         MONSTER_DEFS.insert_last(d);
     }
 
@@ -1255,6 +1266,9 @@ combatant@ create_monster_combatant(monster_def@ def, int x, int y) {
     c.regen_needs_no_acid = def.regen_needs_no_acid;
     c.knockdown_dc = def.knockdown_dc;
     c.paralyze_dc = def.paralyze_dc;
+    c.petrify_dc = def.petrify_dc;
+    c.frightful_presence_dc = def.frightful_presence_dc;
+    c.frightful_presence_range = def.frightful_presence_range;
     // Breath weapon
     c.breath_name = def.breath_name;
     c.breath_save_type = def.breath_save_type;
