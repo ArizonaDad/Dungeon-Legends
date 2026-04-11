@@ -365,6 +365,22 @@ Companions are full combatants tracked in `combat.combatants` with their own HP,
 
 **Frightful Presence** (`frightful_presence_dc/range`): Fires once per combat on the dragon's first turn in `execute_monster_turn`. All players within range make WIS save (with full failure chain: Arcane Deflection, Countercharm, Flash of Genius) or become Frightened. Used by: Adult Black Dragon (DC 16, 120ft), Adult Red Dragon (DC 19, 120ft).
 
+### Concentration Cleanup System (2026-04-10)
+
+When a caster's concentration breaks, `clear_concentration_effects()` must remove all conditions that spell applied to targets. Per-caster tracking fields on `combatant` prevent removing conditions from a different caster's spell:
+
+| Tracking field | Condition removed | Spells using it |
+|---|---|---|
+| `charm_spell_caster_id` | COND_CHARMED (+ COND_INCAPACITATED for Hypnotic Pattern) | Charm Person, Charm Monster, Dominate Person, Dominate Monster, Dominate Beast, Hypnotic Pattern, Enthrall |
+| `hold_spell_caster_id` | COND_PARALYZED | Hold Person, Hold Monster |
+| `laughter_spell_caster_id` | COND_INCAPACITATED + COND_PRONE | Tasha's Hideous Laughter |
+| `frightened_source_id` (existing) | COND_FRIGHTENED | Fear, Phantasmal Killer, Eyebite |
+| `restrained_spell_caster_id` | COND_RESTRAINED | Web, Entangle, Flesh to Stone |
+| `incap_spell_caster_id` | COND_INCAPACITATED (+ COND_UNCONSCIOUS for Sleep) | Sleep, Confusion, Otto's Irresistible Dance |
+| `blinded_spell_caster_id` | COND_BLINDED | Sunbeam |
+
+**Pattern for new concentration spells:** In the spell handler, set the tracking field on the target (`target.xxx_caster_id = c.id`). In `clear_concentration_effects()`, add a name-matched block that loops combatants and removes the condition where the tracking ID matches. Compulsion uses blanket-clear (no per-target tracking) as a fallback.
+
 ### Skill Check System
 
 Skill checks (Stealth, Persuasion, Investigation, etc.) flow through the standard `pending_roll` pipeline so they get reroll prompts (Bardic, Lucky, Heroic), advantage/disadvantage handling, and Silver Tongue clamping for free.
