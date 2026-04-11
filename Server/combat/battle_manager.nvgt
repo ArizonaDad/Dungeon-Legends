@@ -1302,6 +1302,8 @@ class battle_manager {
 		bool disadv = extra_disadvantage or c.has_skill_check_disadvantage(skill_name);
 		// Tasha's Rune Knight L3 Giant's Might: advantage on STR checks while active.
 		if (c.giants_might_active and ability_id == ABILITY_STR) adv = true;
+		// Basic Rules 2024 Enhance Ability (para 13068): advantage on all ability checks.
+		if (c.enhance_ability_active) adv = true;
 		// PHB 2024 Frightened (para 16222): "The creature has Disadvantage on ability
 		// checks and attack rolls." PHB 2024 Poisoned (para 16237): same wording.
 		if (c.has_condition(COND_FRIGHTENED) or c.has_condition(COND_POISONED)) disadv = true;
@@ -2624,6 +2626,10 @@ class battle_manager {
 		// "has Disadvantage on attack rolls" until it dislodges or 1 minute passes.
 		if (attacker.gut_shot_rounds_remaining > 0) disadv = true;
 		if (target.is_dodging and !attacker.has_condition(COND_BLINDED)) disadv = true;
+		// PHB 2024 Blur (Level 2, Concentration): "any creature that can see you has
+		// Disadvantage on attack rolls against you." Blinded attackers can't see the
+		// target, so Blur has no effect on them.
+		if (target.blur_active and !attacker.has_condition(COND_BLINDED)) disadv = true;
 		if (target.has_condition(COND_INVISIBLE) and !can_ignore_invisible) disadv = true;
 		// PHB 2024 Invisible condition (para 16219): "Attack rolls against the creature
 		// have Disadvantage, and the creature's attack rolls have Advantage." The defender
@@ -3830,6 +3836,8 @@ class battle_manager {
 		// be handled separately if positional tracking is added later).
 		caster.fog_cloud_active = false;
 		caster.darkness_active = false;
+		// Blur: disadvantage on attacks against caster (concentration)
+		caster.blur_active = false;
 		// Conjure Minor Elementals cleanup
 		caster.conjure_minor_elementals_active = false;
 		caster.conjure_minor_elementals_slot_level = 0;
@@ -3868,6 +3876,41 @@ class battle_manager {
 		caster.flaming_sphere_dice_count = 0;
 		// Extended Spell: advantage on concentration saves ends with concentration
 		caster.extended_spell_concentration = false;
+		// Enhance Ability: clear on all combatants where this caster was the source
+		for (uint eai = 0; eai < combat.combatants.length(); eai++) {
+			combatant@ ea_target = combat.combatants[eai];
+			if (@ea_target != null and ea_target.enhance_ability_active and ea_target.enhance_ability_caster_id == caster.id) {
+				ea_target.enhance_ability_active = false;
+				ea_target.enhance_ability_caster_id = 0;
+			}
+		}
+		// Basic Rules 2024 Guidance (para 13659): concentration cantrip — clear on
+		// the caster's concentration breaking. Since we don't track source on the
+		// target, blanket-clear all guidance flags when the caster had guidance as
+		// their concentration spell.
+		if (caster.concentration_spell == "Guidance") {
+			for (uint gi = 0; gi < combat.combatants.length(); gi++) {
+				if (@combat.combatants[gi] != null) combat.combatants[gi].guidance_active = false;
+			}
+		}
+		// Basic Rules 2024 Resistance (para 14772): concentration cantrip — same
+		// blanket-clear pattern as Guidance.
+		if (caster.concentration_spell == "Resistance") {
+			for (uint ri = 0; ri < combat.combatants.length(); ri++) {
+				if (@combat.combatants[ri] != null) combat.combatants[ri].resistance_active = false;
+			}
+		}
+		// Basic Rules 2024 Protection from Energy (para 14707): concentration
+		// spell — clear protection on the target when caster's concentration breaks.
+		// No source tracking, so blanket-clear when caster had this spell.
+		if (caster.concentration_spell == "Protection from Energy") {
+			for (uint pei = 0; pei < combat.combatants.length(); pei++) {
+				if (@combat.combatants[pei] != null and combat.combatants[pei].protection_from_energy_active) {
+					combat.combatants[pei].protection_from_energy_active = false;
+					combat.combatants[pei].protection_from_energy_type = 0;
+				}
+			}
+		}
 	}
 
 	// ---- Swarming Modifier Helper ----
@@ -5133,6 +5176,8 @@ class battle_manager {
 		// PHB 2024 Rogue L3 Steady Aim (para 6550-6551): pending advantage flag clears
 		// each new turn — only valid for one attack on the turn it was activated.
 		c.steady_aim_pending = false;
+		// PHB 2024 Blade Ward (cantrip): resistance expires at the start of the caster's next turn.
+		c.blade_ward_active = false;
 		// Reset Shield Master once-per-turn shove
 		c.shield_bash_used_this_turn = false;
 		// PHB 2024 Weapon Mastery per-turn resets
@@ -7381,6 +7426,17 @@ class battle_manager {
 		if (natural_roll == 20 and c.is_player and !c.has_heroic_inspiration and pr.roll_type != ROLL_DAMAGE) {
 			c.has_heroic_inspiration = true;
 			broadcast_announce(c.name + " earns Heroic Inspiration!", false);
+		}
+
+		// Basic Rules 2024 Guidance (para 13659): "Once before the spell ends, the
+		// target can add 1d4 to one ability check. The spell then ends."
+		// Single-use: adds 1d4 and immediately clears the flag.
+		if (c.guidance_active and pr.roll_type == ROLL_ABILITY_CHECK) {
+			int guidance_bonus = random(1, 4);
+			total += guidance_bonus;
+			reported_modifier += guidance_bonus;
+			c.guidance_active = false;
+			broadcast_announce(c.name + "'s Guidance adds +" + guidance_bonus + " to the ability check.", false);
 		}
 
 		// Silver Tongue (College of Eloquence Bard L3, Tasha's para 1696):
@@ -10300,6 +10356,23 @@ class battle_manager {
 				tgt.adjust_density_speed_delta = -reduce;
 				broadcast_announce(c.name + " doubles " + tgt.name + "'s density. Speed decreases by " + reduce + " feet; advantage on Strength checks and saves.", true);
 			}
+		}
+		else if (sc.spell_id == "protection_from_energy") {
+			// Basic Rules 2024 Protection from Energy (para 14707): "the willing
+			// creature you touch has Resistance to one damage type of your choice:
+			// Acid, Cold, Fire, Lightning, or Thunder." Concentration, level 3.
+			combatant@ tgt = combat.get_combatant(sc.primary_target_id);
+			if (@tgt == null or tgt.is_dead) return;
+			int dmg_type = DMG_FIRE; // default
+			string type_name = "Fire";
+			if (choice == "acid") { dmg_type = DMG_ACID; type_name = "Acid"; }
+			else if (choice == "cold") { dmg_type = DMG_COLD; type_name = "Cold"; }
+			else if (choice == "fire") { dmg_type = DMG_FIRE; type_name = "Fire"; }
+			else if (choice == "lightning") { dmg_type = DMG_LIGHTNING; type_name = "Lightning"; }
+			else if (choice == "thunder") { dmg_type = DMG_THUNDER; type_name = "Thunder"; }
+			tgt.protection_from_energy_active = true;
+			tgt.protection_from_energy_type = dmg_type;
+			broadcast_announce(c.name + " grants " + tgt.name + " resistance to " + type_name + " damage with Protection from Energy!", true);
 		}
 	}
 
@@ -14965,7 +15038,10 @@ class battle_manager {
 			// ==== UTILITY / BUFF SPELL HANDLERS (batch) ====
 			// Cantrips
 			else if (spell.id == "blade_ward") {
-				broadcast_announce(c.name + " casts Blade Ward, gaining resistance to bludgeoning, piercing, and slashing until the end of their next turn.", true);
+				// PHB 2024 Blade Ward (cantrip): "Until the start of your next turn, you have
+				// Resistance to Bludgeoning, Piercing, and Slashing damage."
+				c.blade_ward_active = true;
+				broadcast_announce(c.name + " casts Blade Ward, gaining resistance to Bludgeoning, Piercing, and Slashing damage until the start of their next turn.", true);
 			}
 			else if (spell.id == "dancing_lights") {
 				broadcast_announce(c.name + " conjures Dancing Lights, creating up to four torch-sized lights.", true);
@@ -14977,10 +15053,17 @@ class battle_manager {
 				broadcast_announce(c.name + " casts Friends, gaining advantage on Charisma checks for 1 minute.", true);
 			}
 			else if (spell.id == "guidance" and @target != null) {
+				// Basic Rules 2024 Guidance (para 13659): "Once before the spell ends,
+				// the target can add 1d4 to one ability check. The spell then ends."
+				// Concentration cantrip. Sets guidance_active on target; consumed in
+				// finalize_roll_result on next ROLL_ABILITY_CHECK.
+				target.guidance_active = true;
 				broadcast_announce(c.name + " casts Guidance on " + target.name + ". They gain 1d4 to their next ability check.", true);
 			}
 			else if (spell.id == "guidance") {
-				broadcast_announce(c.name + " casts Guidance, granting 1d4 to the next ability check.", true);
+				// Self-cast variant
+				c.guidance_active = true;
+				broadcast_announce(c.name + " casts Guidance, gaining 1d4 to the next ability check.", true);
 			}
 			else if (spell.id == "light") {
 				broadcast_announce(c.name + " casts Light, causing an object to shed bright light in a 20-foot radius.", true);
@@ -15001,10 +15084,17 @@ class battle_manager {
 				broadcast_announce(c.name + " casts Prestidigitation, producing a minor magical effect.", true);
 			}
 			else if (spell.id == "resistance" and @target != null) {
+				// Basic Rules 2024 Resistance (para 14772): "Once before the spell ends,
+				// the target can add 1d4 to one saving throw. The spell then ends."
+				// Concentration cantrip. Sets resistance_active on target; consumed in
+				// get_save_bonus on next saving throw.
+				target.resistance_active = true;
 				broadcast_announce(c.name + " casts Resistance on " + target.name + ". They gain 1d4 to their next saving throw.", true);
 			}
 			else if (spell.id == "resistance") {
-				broadcast_announce(c.name + " casts Resistance, granting 1d4 to the next saving throw.", true);
+				// Self-cast variant
+				c.resistance_active = true;
+				broadcast_announce(c.name + " casts Resistance, gaining 1d4 to the next saving throw.", true);
 			}
 			else if (spell.id == "spare_the_dying" and @target != null) {
 				// Stabilizes a creature at 0 HP
@@ -15165,9 +15255,11 @@ class battle_manager {
 				broadcast_announce(c.name + " casts Barkskin, their skin hardening like bark.", true);
 			}
 			else if (spell.id == "blur") {
-				// Concentration, attackers have disadvantage
-				c.mirror_images += 0; // No-op — flag pattern, but use existing obscuring mechanic via announcement
-				broadcast_announce(c.name + " casts Blur. Their form wavers, imposing disadvantage on attacks against them.", true);
+				// PHB 2024 Blur (Level 2, Concentration): "Your body becomes blurred. For
+				// the duration, any creature that can see you has Disadvantage on attack
+				// rolls against you."
+				c.blur_active = true;
+				broadcast_announce(c.name + " casts Blur. Their form wavers, imposing Disadvantage on attacks against them.", true);
 			}
 			else if (spell.id == "continual_flame") {
 				broadcast_announce(c.name + " casts Continual Flame, creating a flame that needs no fuel.", true);
@@ -15183,10 +15275,20 @@ class battle_manager {
 				broadcast_announce(c.name + " casts Darkvision, gaining 60 feet of darkvision.", true);
 			}
 			else if (spell.id == "enhance_ability" and @target != null) {
-				broadcast_announce(c.name + " casts Enhance Ability on " + target.name + ", granting advantage on chosen ability checks for 1 hour.", true);
+				target.enhance_ability_active = true;
+				target.enhance_ability_caster_id = c.id;
+				c.is_concentrating = true;
+				c.concentration_spell = "Enhance Ability";
+				c.add_condition(COND_CONCENTRATING);
+				broadcast_announce(c.name + " casts Enhance Ability on " + target.name + ", granting advantage on all ability checks.", true);
 			}
 			else if (spell.id == "enhance_ability") {
-				broadcast_announce(c.name + " casts Enhance Ability, gaining advantage on a chosen ability for 1 hour.", true);
+				c.enhance_ability_active = true;
+				c.enhance_ability_caster_id = c.id;
+				c.is_concentrating = true;
+				c.concentration_spell = "Enhance Ability";
+				c.add_condition(COND_CONCENTRATING);
+				broadcast_announce(c.name + " casts Enhance Ability on themselves, gaining advantage on all ability checks.", true);
 			}
 			else if (spell.id == "find_steed") {
 				broadcast_announce(c.name + " casts Find Steed, summoning a spirit mount.", true);
@@ -15275,10 +15377,33 @@ class battle_manager {
 				broadcast_announce(c.name + " casts Phantom Steed.", true);
 			}
 			else if (spell.id == "protection_from_energy" and @target != null) {
-				broadcast_announce(c.name + " casts Protection from Energy on " + target.name + ", granting resistance to a chosen damage type for 1 hour.", true);
+				// Basic Rules 2024 Protection from Energy (para 14707): "the willing
+				// creature you touch has Resistance to one damage type of your choice:
+				// Acid, Cold, Fire, Lightning, or Thunder." Concentration, level 3.
+				// Prompt the caster to choose the damage type via the spell choice system.
+				pending_spell_choice sc;
+				sc.player_username = c.player_username;
+				sc.caster_id = c.id;
+				sc.spell_id = "protection_from_energy";
+				sc.cast_slot_level = cast_slot_level;
+				sc.primary_target_id = target.id;
+				sc.option_keys = {"acid", "cold", "fire", "lightning", "thunder"};
+				sc.option_labels = {"Acid", "Cold", "Fire", "Lightning", "Thunder"};
+				sc.prompt_text = "Protection from Energy: choose a damage type. Press 1 for Acid, 2 for Cold, 3 for Fire, 4 for Lightning, or 5 for Thunder.";
+				send_spell_choice_prompt(c, sc);
 			}
 			else if (spell.id == "protection_from_energy") {
-				broadcast_announce(c.name + " casts Protection from Energy, gaining resistance to a chosen damage type for 1 hour.", true);
+				// Self-cast variant
+				pending_spell_choice sc;
+				sc.player_username = c.player_username;
+				sc.caster_id = c.id;
+				sc.spell_id = "protection_from_energy";
+				sc.cast_slot_level = cast_slot_level;
+				sc.primary_target_id = c.id;
+				sc.option_keys = {"acid", "cold", "fire", "lightning", "thunder"};
+				sc.option_labels = {"Acid", "Cold", "Fire", "Lightning", "Thunder"};
+				sc.prompt_text = "Protection from Energy: choose a damage type. Press 1 for Acid, 2 for Cold, 3 for Fire, 4 for Lightning, or 5 for Thunder.";
+				send_spell_choice_prompt(c, sc);
 			}
 			else if (spell.id == "remove_curse") {
 				broadcast_announce(c.name + " casts Remove Curse.", true);
@@ -15342,10 +15467,17 @@ class battle_manager {
 				broadcast_announce(c.name + " casts Divination.", true);
 			}
 			else if (spell.id == "freedom_of_movement" and @target != null) {
-				broadcast_announce(c.name + " casts Freedom of Movement on " + target.name + ". They ignore difficult terrain and are immune to grapples and restraints.", true);
+				// PHB 2024 Freedom of Movement (Level 4, non-concentration): "the target's
+				// movement is unaffected by Difficult Terrain, and spells and other magical
+				// effects can neither reduce the target's Speed nor cause the target to have
+				// the Paralyzed or Restrained condition."
+				target.freedom_of_movement_active = true;
+				broadcast_announce(c.name + " casts Freedom of Movement on " + target.name + ". They are immune to Paralyzed and Restrained conditions and ignore speed reductions.", true);
 			}
 			else if (spell.id == "freedom_of_movement") {
-				broadcast_announce(c.name + " casts Freedom of Movement.", true);
+				// Self-cast variant
+				c.freedom_of_movement_active = true;
+				broadcast_announce(c.name + " casts Freedom of Movement. They are immune to Paralyzed and Restrained conditions and ignore speed reductions.", true);
 			}
 			else if (spell.id == "locate_creature") {
 				broadcast_announce(c.name + " casts Locate Creature.", true);

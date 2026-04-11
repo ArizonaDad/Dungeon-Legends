@@ -167,6 +167,7 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 - **Resistance System**: Species and feats grant resistances to fire, cold, necrotic, psychic, acid, lightning, piercing, poison (+ immunity) — half damage on applicable types. Elemental Adept bypasses resistance for chosen damage type via `ea_bypass` flag.
 - **Wild Magic Surge**: Wild Magic Sorcerers roll d20 on 1+ level spell cast. On natural 1, a random surge effect triggers (fire burst, temp HP, healing, invisibility, spell slot recovery, etc.)
 - **Divine Smite**: Dual mode — bonus action pre-cast OR auto-prompt on melee hit (keys 1-5 for slot level, Escape to skip)
+- **Eldritch Smite**: Player prompt system (same UI pattern as Divine Smite). After weapon hit with pact weapon, Warlock is prompted to expend Pact Magic slot for (1+slot_level)d8 force damage + Prone. Bots auto-fire. Paladin/Warlock multiclass chains both prompts. `pending_smite_prompt.smite_type` distinguishes "divine" vs "eldritch".
 - **Grapple/Shove**: 2024 rules — target makes STR or DEX saving throw (DC 8 + STR mod + Prof), not contested checks
 - **Weapon Mastery** (PHB 2024 paras 10335-10352): All 8 properties wired to attack resolution. Push (10ft shove if Large or smaller), Sap (disadvantage on target's next attack), Slow (-10ft speed until attacker's next turn), Topple (CON save or Prone, DC 8+ability mod+prof), Vex (advantage on next attack vs same target), Cleave (free attack vs adjacent creature within 5ft of target, weapon damage no ability mod, once/turn), Graze (ability mod damage on miss), Nick (free off-hand attack as part of Attack action via TWF system). `main_hand_mastery` field on combatant, set from `character_data.nvgt` weapon table.
 - **Two-Weapon Fighting** (PHB 2024 paras 10335-10352): Light weapon property on 7 weapons. Auto-equip off-hand when main weapon is Light melee or Dual Wielder feat. Bonus action off-hand attack (no ability mod to damage unless TWF fighting style or negative). Nick mastery triggers free off-hand attack after all extra attacks complete. Off-hand fields: `off_hand_damage_dice/count/type/range/finesse/is_light/mastery` on combatant.
@@ -261,7 +262,17 @@ Companions are full combatants tracked in `combat.combatants` with their own HP,
 **Spells with companion-style spawns:**
 - **Bigby's Hand** — spawned as a Large hand entity, HP=caster max, AC=20, 4d8 force (Clenched Fist mode)
 - **Animate Dead** — pre-existing skeleton minion spawn
-- **Insect Plague**, **Cloudkill** etc. — area effects, NOT companions
+- **Animate Objects** — spawns spellcasting-ability-mod animated object companions (AC 14, HP 20, 1d4+4 bludgeoning)
+- **Giant Insect** — spawns scaled companion (AC 14+PB, HP 10*slot_level+20, multiattack 2, 1d6+3+PB piercing)
+- **Conjure Animals/Fey/Celestial/Elemental** — full companion spawns with source-scaled stats
+- **Create Undead** — ghoul companion spawn (2d6+spell_mod piercing, multiattack)
+- **Summon Dragon** — draconic spirit (3d8 fire, multiattack, HP 80+10*level)
+- **Guardian of Faith** — invulnerable sentinel (HP 9999, AC 20, stationary, 20 radiant aura)
+- **Mordenkainen's Faithful Hound** — magical hound (4d8 force, 60 HP, AC 18)
+
+**Caster-centered emanation spells (NOT companions):**
+- **Conjure Minor Elementals** — 15ft emanation, +2d8 elemental damage on attack hits (+2d8/upcast), concentration
+- **Conjure Woodland Beings** — 10ft emanation, WIS save or 5d8 force per turn (+1d8/upcast), concentration
 
 **Deferred:**
 - Beast Master Sea/Sky variants (need a creature selection prompt)

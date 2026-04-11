@@ -5952,6 +5952,21 @@ void handle_user_message(user@ u, json_object@ msg)
 		}
 
 		// PHB 2024 Two-Weapon Fighting: off-hand attack as Bonus Action
+		else if (feature == "cwb_disengage") {
+			if (!c.conjure_woodland_disengage) {
+				u.send({{"type", message_types::error}, {"text", "CWB Disengage not available."}});
+				return;
+			}
+			if (!c.has_bonus_action) {
+				u.send({{"type", message_types::error}, {"text", "No bonus action available."}});
+				return;
+			}
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.took_disengage = true;
+			u.room.bm.broadcast_announce(c.name + " uses a bonus action to Disengage (Conjure Woodland Beings)!", false);
+			u.room.bm.broadcast_state();
+		}
 		else if (feature == "twf_offhand") {
 			if (!c.has_bonus_action) {
 				u.send({{"type", message_types::error}, {"text", "No bonus action available."}});

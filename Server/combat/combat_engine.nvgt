@@ -126,6 +126,19 @@ class combatant {
 	bool beacon_of_hope_active = false; // Beacon of Hope spell: max healing + adv on WIS/death saves
 	bool death_ward_active = false; // Death Ward spell: first 0 HP becomes 1 HP and ends spell
 	bool holy_weapon_active = false; // Xanathar's Holy Weapon: +2d8 radiant on weapon hits
+	// Basic Rules 2024 Guidance (para 13659): "Once before the spell ends, the target
+	// can add 1d4 to one ability check using the chosen ability. The spell then ends."
+	// Simplified: single-use 1d4 on next ability check, cleared on use.
+	bool guidance_active = false;
+	// Basic Rules 2024 Resistance (para 14772): "Once before the spell ends, the target
+	// can add 1d4 to one saving throw of the chosen type. The spell then ends."
+	// Simplified: single-use 1d4 on next saving throw, cleared on use.
+	bool resistance_active = false;
+	// Basic Rules 2024 Protection from Energy (para 14707): "the willing creature you
+	// touch has Resistance to one damage type: Acid, Cold, Fire, Lightning, or Thunder."
+	// Concentration, halves matching damage type in apply_damage.
+	bool protection_from_energy_active = false;
+	int protection_from_energy_type = 0; // DMG_ACID/COLD/FIRE/LIGHTNING/THUNDER
 	// Barbarian PHB 2024 base class features
 	bool reckless_attack_active = false; // Set on the turn the barbarian declares Reckless Attack
 	bool danger_sense_active = false;    // Always-on if Barbarian level 2+ (advantage on DEX saves)
@@ -658,8 +671,16 @@ class combatant {
 	bool conjure_woodland_active = false;
 	int conjure_woodland_slot_level = 0;
 	bool conjure_woodland_disengage = false; // Caster can Disengage as BA
+	bool enhance_ability_active = false; // Enhance Ability: advantage on all ability checks
+	int enhance_ability_caster_id = 0; // Track who cast it for concentration cleanup
 	bool fog_cloud_active = false;
 	bool darkness_active = false;
+	// Blade Ward: B/P/S resistance until start of caster's next turn
+	bool blade_ward_active = false;
+	// Blur: attackers have disadvantage (concentration)
+	bool blur_active = false;
+	// Freedom of Movement: immune to Paralyzed/Restrained, ignore difficult terrain/speed reduction
+	bool freedom_of_movement_active = false;
 	// Fire Shield variant
 	bool fire_shield_active = false;
 	bool fire_shield_warm = true; // true=warm (cold resist, reflects fire), false=chill (fire resist, reflects cold)
@@ -1213,6 +1234,14 @@ class combatant {
 		// any Dexterity saving throw you make against a spell or other harmful
 		// effect that targets only you." Shield grants +2 AC.
 		if (has_feat("shield_master") and has_shield and ability_id == ABILITY_DEX) mod += 2;
+		// Basic Rules 2024 Resistance (para 14772): "Once before the spell ends,
+		// the target can add 1d4 to one saving throw of the chosen type."
+		// Simplified: adds 1d4 to any single saving throw and then expires.
+		if (resistance_active) {
+			int resistance_bonus = random(1, 4);
+			mod += resistance_bonus;
+			resistance_active = false;
+		}
 		return mod;
 	}
 
@@ -1232,6 +1261,10 @@ class combatant {
 		// PHB 2024 Petrified (para 16234): "The creature is immune to the Poisoned
 		// condition." Also immune to disease but no disease system exists yet.
 		if (cond_id == COND_POISONED and has_condition(COND_PETRIFIED)) return;
+		// PHB 2024 Freedom of Movement (Level 4): "spells and other magical effects
+		// can neither reduce the target's Speed nor cause the target to have the
+		// Paralyzed or Restrained condition."
+		if (freedom_of_movement_active and (cond_id == COND_PARALYZED or cond_id == COND_RESTRAINED)) return;
 		if (!has_condition(cond_id)) conditions.insert_last(cond_id);
 	}
 
@@ -1668,6 +1701,12 @@ class battle {
 			amount = (amount + 1) / 2;
 		}
 
+		// PHB 2024 Blade Ward (cantrip): "Until the start of your next turn, you have
+		// Resistance to Bludgeoning, Piercing, and Slashing damage."
+		if (target.blade_ward_active and (damage_type == DMG_BLUDGEONING or damage_type == DMG_PIERCING or damage_type == DMG_SLASHING)) {
+			amount = (amount + 1) / 2;
+		}
+
 		// Ancestral Guardian Barbarian: Spirit Shield damage reduction (used reaction)
 		if (target.spirit_shield_reduction > 0) {
 			amount -= target.spirit_shield_reduction;
@@ -1806,6 +1845,13 @@ class battle {
 		if (target.has_condition(COND_PETRIFIED)) {
 			if (damage_type == DMG_POISON) amount = 0;
 			else amount = (amount + 1) / 2;
+		}
+
+		// Basic Rules 2024 Protection from Energy (para 14707): "the willing creature
+		// you touch has Resistance to one damage type: Acid, Cold, Fire, Lightning, or
+		// Thunder." Concentration spell, halves matching damage type.
+		if (target.protection_from_energy_active and damage_type == target.protection_from_energy_type and !ea_bypass) {
+			amount = (amount + 1) / 2;
 		}
 
 		// Tasha's Circle of Stars L14 Full of Stars (para 2179-2181): "While in your
@@ -2238,6 +2284,7 @@ class battle {
 				state["my_heat_metal_active"] = c.heat_metal_active;
 				state["my_call_lightning_active"] = c.call_lightning_active;
 				state["my_flaming_sphere_active"] = c.flaming_sphere_active;
+				state["my_conjure_woodland_disengage"] = c.conjure_woodland_disengage;
 				state["my_luck_points"] = c.luck_points;
 				state["my_luck_points_max"] = c.luck_points_max;
 				state["my_has_heroic_inspiration"] = c.has_heroic_inspiration;
