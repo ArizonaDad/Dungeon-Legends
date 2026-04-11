@@ -1126,6 +1126,8 @@ void show_bonus_action_menu() {
 	int mastermind_help_opt = -1;
 	int fast_hands_opt = -1;
 	int sun_bolt_opt = -1;
+	int searing_arc_opt = -1;
+	int searing_sunburst_opt = -1;
 	int kensei_weapon_opt = -1;
 	int kensei_shot_opt = -1;
 	int sharpen_blade_1_opt = -1;
@@ -1577,6 +1579,14 @@ void show_bonus_action_menu() {
 	}
 	if (lc == "monk" and subclass == "Way of the Sun Soul") {
 		sun_bolt_opt = m.add_item("Radiant Sun Bolt. Bonus action ranged attack for radiant damage.");
+		if (level >= 6 and my_focus_points >= 2) {
+			searing_arc_opt = m.add_item("Searing Arc Strike. Bonus action. 2+ Focus Points. 15ft cone of fire (Burning Hands). Focus: " + my_focus_points + ".");
+		}
+		if (level >= 11) {
+			string sb_desc = "Searing Sunburst. Action. 150ft range, 20ft radius, 2d6 radiant.";
+			if (my_focus_points > 0) sb_desc += " Spend up to 3 Focus Points for +2d6 each. Focus: " + my_focus_points + ".";
+			searing_sunburst_opt = m.add_item(sb_desc);
+		}
 	}
 	if (lc == "monk" and subclass == "Way of the Kensei") {
 		kensei_weapon_opt = m.add_item("Kensei Weapon. Choose your kensei weapon for this battle.");
@@ -2502,6 +2512,50 @@ void show_bonus_action_menu() {
 		}
 		send({{"type", message_types::bonus_action}, {"feature", "radiant_sun_bolt"}, {"target_id", current_target_id}});
 		speak("Radiant Sun Bolt. Firing radiant energy at target.", true);
+	}
+	else if (searing_arc_opt >= 0 and res == searing_arc_opt) {
+		// Xanathar's Sun Soul L6 Searing Arc Strike: 2+ ki for Burning Hands cone
+		int max_ki = level / 2;
+		if (max_ki < 2) max_ki = 2;
+		int ki_amt = 2;
+		if (max_ki > 2 and my_focus_points > 2) {
+			menu@ ki_menu = setup_sub_menu("How many Focus Points to spend? (2 base, each extra increases damage)");
+			int[] ki_opts;
+			for (int k = 2; k <= max_ki and k <= my_focus_points; k++) {
+				int opt = ki_menu.add_item(k + " Focus Points (" + (k - 2 + 3) + "d6 fire damage).");
+				ki_opts.insert_last(opt);
+			}
+			int ki_res = ki_menu.run();
+			if (ki_res < 0) return;
+			for (uint ki = 0; ki < ki_opts.length(); ki++) {
+				if (ki_res == ki_opts[ki]) { ki_amt = int(ki) + 2; break; }
+			}
+		}
+		send({{"type", message_types::bonus_action}, {"feature", "searing_arc_strike"}, {"ki_amount", ki_amt}});
+		speak("Searing Arc Strike! Unleashing a 15-foot cone of fire!", true);
+	}
+	else if (searing_sunburst_opt >= 0 and res == searing_sunburst_opt) {
+		if (current_target_id == 0) {
+			speak("No target selected. Scan with I J K L and press Enter to lock a target for the burst center.", true);
+			return;
+		}
+		// Xanathar's Sun Soul L11 Searing Sunburst: 0-3 ki for 20ft radiant burst
+		int ki_amt = 0;
+		if (my_focus_points > 0) {
+			menu@ ki_menu = setup_sub_menu("Spend Focus Points to increase damage? (0-3, +2d6 each)");
+			int opt_0 = ki_menu.add_item("0 Focus Points (2d6 radiant).");
+			int opt_1 = -1; int opt_2 = -1; int opt_3 = -1;
+			if (my_focus_points >= 1) opt_1 = ki_menu.add_item("1 Focus Point (4d6 radiant).");
+			if (my_focus_points >= 2) opt_2 = ki_menu.add_item("2 Focus Points (6d6 radiant).");
+			if (my_focus_points >= 3) opt_3 = ki_menu.add_item("3 Focus Points (8d6 radiant).");
+			int ki_res = ki_menu.run();
+			if (ki_res < 0) return;
+			if (ki_res == opt_1) ki_amt = 1;
+			else if (ki_res == opt_2) ki_amt = 2;
+			else if (ki_res == opt_3) ki_amt = 3;
+		}
+		send({{"type", message_types::bonus_action}, {"feature", "searing_sunburst"}, {"target_id", current_target_id}, {"ki_amount", ki_amt}});
+		speak("Searing Sunburst! Hurling an orb of radiant light!", true);
 	}
 	else if (kensei_weapon_opt >= 0 and res == kensei_weapon_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "kensei_weapon"}});

@@ -9325,6 +9325,41 @@ class battle_manager {
 				broadcast_announce(c.name + "'s Agile Parry grants +2 AC until the start of their next turn.", false);
 			}
 
+			// Xanathar's Drunken Master L6 Redirect Attack (para 1798-1800): "When a
+			// creature misses you with a melee attack roll, you can use your reaction
+			// and spend 1 ki point to cause that attack to hit one creature of your
+			// choice, other than the attacker, that you can see within 5 feet of you."
+			// Ki + reaction already consumed in users_dom handler when flag was set.
+			if (!hit and !is_fumble and pr.is_weapon_attack and !c.main_hand_is_ranged
+				and target.drunken_master_opportunity and !target.is_dead and @combat != null) {
+				combatant@ redirect_target = null;
+				int best_rt_dist = 999;
+				for (uint rti = 0; rti < combat.combatants.length(); rti++) {
+					combatant@ rt = combat.combatants[rti];
+					if (@rt == null or rt.is_dead or !rt.is_alive() or rt.id == c.id or rt.id == target.id) continue;
+					if (!combat.are_hostile(target, rt)) continue;
+					int rt_dist = feet_distance(target.x, target.y, rt.x, rt.y);
+					if (rt_dist <= 5 and rt_dist < best_rt_dist) {
+						best_rt_dist = rt_dist;
+						@redirect_target = rt;
+					}
+				}
+				if (@redirect_target != null) {
+					target.drunken_master_opportunity = false;
+					// Redirected attack auto-hits with the attacker's weapon damage
+					int rd_dmg = 0;
+					for (int rdi = 0; rdi < c.main_hand_damage_count; rdi++) rd_dmg += random(1, c.main_hand_damage_dice);
+					rd_dmg += get_weapon_attack_ability_mod(c);
+					if (rd_dmg < 1) rd_dmg = 1;
+					combat.apply_damage(redirect_target, rd_dmg, c.main_hand_damage_type, c);
+					broadcast_announce(target.name + " redirects the attack! " + c.name + "'s blow strikes " + redirect_target.name + " for " + rd_dmg + " damage! (Redirect Attack)", true);
+				} else {
+					// No valid target within 5ft to redirect to — flag wasted
+					target.drunken_master_opportunity = false;
+					broadcast_announce(target.name + " tries to Redirect Attack but no creature is within 5 feet!", false);
+				}
+			}
+
 			// Valda's Spire Gunslinger maneuver Grazing Shot (paras 213-214): on miss with a
 			// ranged weapon attack, expend one Risk Die for risk_die + DEX mod weapon-type damage.
 			// "no action required" + "once per turn" — helper handles per-turn flag and Risk Die.
@@ -12794,6 +12829,10 @@ class battle_manager {
 		// PHB 2024 Athlete (para 7557): standing from prone costs 0 movement.
 		if (c.has_condition(COND_PRONE)) {
 			int stand_cost = c.has_feat("athlete") ? 0 : c.speed / 2;
+			// Xanathar's Drunken Master L6 Leap to Your Feet (para 1798): "When
+			// you're prone, you can stand up by spending only 5 feet of movement,
+			// rather than half your speed."
+			if (stand_cost > 5 and c.class_name == "Monk" and c.subclass == "Way of the Drunken Master" and c.level >= 6) stand_cost = 5;
 			if (c.movement_remaining < stand_cost + 5) {
 				u.send({{"type", message_types::error}, {"text", "You need " + (stand_cost + 5) + " feet of movement to stand up and move (" + stand_cost + " to stand, 5 to move). " + c.movement_remaining + " feet remaining."}});
 				return;
@@ -12801,8 +12840,9 @@ class battle_manager {
 			if (stand_cost > 0) c.movement_remaining -= stand_cost;
 			c.remove_condition(COND_PRONE);
 			string stand_msg = c.name + " stands up";
-			if (stand_cost > 0) stand_msg += " (" + stand_cost + " ft used)";
-			else stand_msg += " instantly (Athlete)";
+			if (stand_cost == 0) stand_msg += " instantly (Athlete)";
+			else if (c.class_name == "Monk" and c.subclass == "Way of the Drunken Master" and c.level >= 6) stand_msg += " nimbly (5 ft — Leap to Your Feet)";
+			else stand_msg += " (" + stand_cost + " ft used)";
 			broadcast_announce(stand_msg + ".", false);
 		}
 

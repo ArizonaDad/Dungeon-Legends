@@ -2587,6 +2587,12 @@ void handle_user_message(user@ u, json_object@ msg)
 			c.has_bonus_action = false;
 			c.used_bonus_action = true;
 			int flurry_chain = c.heightened_focus_active ? 2 : 1;
+			// Xanathar's Drunken Master L17 Intoxicated Frenzy (para 1801-1805):
+			// "When you use Flurry of Blows, you can make up to three additional
+			// attacks with it (up to a total of five), provided that each targets
+			// a different creature this turn." Different-creature constraint is
+			// approximated — all strikes currently chain against the same target.
+			if (c.subclass == "Way of the Drunken Master" and c.level >= 17) flurry_chain = 4;
 			if (!u.room.bm.start_flurry_strike(c, target, flurry_chain)) {
 				c.has_bonus_action = true;
 				c.used_bonus_action = false;
@@ -2602,9 +2608,13 @@ void handle_user_message(user@ u, json_object@ msg)
 				c.took_disengage = true;
 				c.movement_remaining += 10;
 			}
-			string flurry_msg = c.heightened_focus_active
-				? c.name + " spends 1 Focus Point and unleashes Flurry of Blows for three strikes (Heightened Focus)!"
-				: c.name + " spends 1 Focus Point and unleashes Flurry of Blows!";
+			string flurry_msg = "";
+			if (c.subclass == "Way of the Drunken Master" and c.level >= 17)
+				flurry_msg = c.name + " spends 1 Focus Point and unleashes Flurry of Blows for five strikes (Intoxicated Frenzy)!";
+			else if (c.heightened_focus_active)
+				flurry_msg = c.name + " spends 1 Focus Point and unleashes Flurry of Blows for three strikes (Heightened Focus)!";
+			else
+				flurry_msg = c.name + " spends 1 Focus Point and unleashes Flurry of Blows!";
 			if (c.drunken_technique_active) flurry_msg += " Drunken Technique: Disengage + 10 ft speed!";
 			u.room.bm.broadcast_announce(flurry_msg, true);
 		}
@@ -3782,6 +3792,120 @@ void handle_user_message(user@ u, json_object@ msg)
 			} else {
 				u.room.bm.broadcast_announce(c.name + "'s Radiant Sun Bolt misses. (Rolled " + roll + " needed " + tgt.armor_class + ")", false);
 			}
+		}
+
+		else if (feature == "searing_arc_strike") {
+			// Xanathar's Sun Soul L6 Searing Arc Strike (para 1848-1855):
+			// "Immediately after you take the Attack action on your turn, you can
+			// spend 2 ki points to cast the burning hands spell as a bonus action.
+			// You can spend additional ki points to cast burning hands as a
+			// higher-level spell. Each additional ki point you spend increases the
+			// spell's level by 1. The maximum number of ki points (2 plus any
+			// additional points) that you can spend on the spell equals half your
+			// monk level (round down)."
+			if (c.class_name != "Monk" or c.subclass != "Way of the Sun Soul") { u.send({{"type", message_types::announce}, {"text", "Only Way of the Sun Soul monks can use Searing Arc Strike."}, {"interrupt", true}}); return; }
+			if (c.level < 6) { u.send({{"type", message_types::announce}, {"text", "Searing Arc Strike requires level 6."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			if (c.focus_points < 2) { u.send({{"type", message_types::announce}, {"text", "You need at least 2 Focus Points for Searing Arc Strike."}, {"interrupt", true}}); return; }
+			int max_ki = c.level / 2;
+			int ki_to_spend = msg.exists("ki_amount") ? int(msg["ki_amount"]) : 2;
+			if (ki_to_spend < 2) ki_to_spend = 2;
+			if (ki_to_spend > max_ki) ki_to_spend = max_ki;
+			if (ki_to_spend > c.focus_points) ki_to_spend = c.focus_points;
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.focus_points -= ki_to_spend;
+			// Burning Hands: 15ft cone, DEX save. 3d6 fire at spell level 1,
+			// +1d6 per extra ki (each extra ki raises spell level by 1).
+			int spell_level = 1 + (ki_to_spend - 2);
+			int dice_count = 2 + spell_level; // 3d6 at L1, 4d6 at L2, etc.
+			int dc = 8 + c.proficiency + c.get_ability_mod(ABILITY_WIS);
+			int total_damage = 0;
+			for (int d = 0; d < dice_count; d++) total_damage += random(1, 6);
+			u.room.bm.broadcast_announce(c.name + " unleashes Searing Arc Strike — a 15-foot cone of fire! (" + ki_to_spend + " Focus Points, " + dice_count + "d6 fire)", true);
+			for (uint sti = 0; sti < u.room.bm.combat.combatants.length(); sti++) {
+				combatant@ t = u.room.bm.combat.combatants[sti];
+				if (@t == null or t.is_dead or t.id == c.id) continue;
+				if (!u.room.bm.combat.are_hostile(c, t)) continue;
+				if (feet_distance(c.x, c.y, t.x, t.y) > 15) continue;
+				int save_roll = random(1, 20);
+				int save_bonus = t.get_save_bonus(ABILITY_DEX);
+				int bless_bonus = u.room.bm.roll_bless_bonus(t);
+				int save_total = save_roll + save_bonus + bless_bonus;
+				// Save failure chain (Arcane Deflection, Flash of Genius, etc.)
+				if (save_total < dc) {
+					save_total = u.room.bm.try_flash_of_genius(t, dc, save_total, "DEX save vs Searing Arc Strike");
+				}
+				if (save_total < dc) {
+					save_total = u.room.bm.try_maverick_spirit(t, dc, save_total, "DEX save vs Searing Arc Strike");
+				}
+				if (save_total < dc) {
+					save_total = u.room.bm.try_boon_of_fate_bonus(t, save_total, dc);
+				}
+				bool saved = save_total >= dc;
+				int dmg = saved ? total_damage / 2 : total_damage;
+				if (dmg < 1) dmg = 1;
+				u.room.bm.broadcast_roll(t.name, "DEX save vs Searing Arc Strike", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+				u.room.bm.combat.apply_damage(t, dmg, DMG_FIRE, c);
+			}
+			u.room.bm.broadcast_state();
+			u.room.bm.check_battle_end();
+		}
+
+		else if (feature == "searing_sunburst") {
+			// Xanathar's Sun Soul L11 Searing Sunburst (para 1856-1860):
+			// "As an action, you create an orb and hurl it at a point you choose
+			// within 150 feet, where it erupts into a sphere of radiant light for
+			// a brief but deadly instant. Each creature in that 20-foot-radius
+			// sphere must succeed on a Constitution saving throw or take 2d6
+			// radiant damage. You can increase the sphere's damage by spending ki
+			// points. Each point you spend, to a maximum of 3, increases the
+			// damage by 2d6."
+			if (c.class_name != "Monk" or c.subclass != "Way of the Sun Soul") { u.send({{"type", message_types::announce}, {"text", "Only Way of the Sun Soul monks can use Searing Sunburst."}, {"interrupt", true}}); return; }
+			if (c.level < 11) { u.send({{"type", message_types::announce}, {"text", "Searing Sunburst requires level 11."}, {"interrupt", true}}); return; }
+			if (!c.has_action) { u.send({{"type", message_types::announce}, {"text", "No action remaining."}, {"interrupt", true}}); return; }
+			int ki_to_spend = msg.exists("ki_amount") ? int(msg["ki_amount"]) : 0;
+			if (ki_to_spend > 3) ki_to_spend = 3;
+			if (ki_to_spend > c.focus_points) ki_to_spend = c.focus_points;
+			c.has_action = false;
+			c.used_action = true;
+			if (ki_to_spend > 0) c.focus_points -= ki_to_spend;
+			int dice_count = 2 + (ki_to_spend * 2); // 2d6 base + 2d6 per ki
+			int dc = 8 + c.proficiency + c.get_ability_mod(ABILITY_WIS);
+			int total_damage = 0;
+			for (int d = 0; d < dice_count; d++) total_damage += random(1, 6);
+			// Center on targeted enemy's position (150ft range)
+			combatant@ burst_center = target_id != 0 ? u.room.bm.combat.get_combatant(target_id) : null;
+			int cx = c.x; int cy = c.y;
+			if (@burst_center != null) { cx = burst_center.x; cy = burst_center.y; }
+			string ki_msg = ki_to_spend > 0 ? " (" + ki_to_spend + " Focus Points, " + dice_count + "d6 radiant)" : " (2d6 radiant)";
+			u.room.bm.broadcast_announce(c.name + " hurls a Searing Sunburst!" + ki_msg, true);
+			for (uint sbi = 0; sbi < u.room.bm.combat.combatants.length(); sbi++) {
+				combatant@ t = u.room.bm.combat.combatants[sbi];
+				if (@t == null or t.is_dead or t.id == c.id) continue;
+				if (!u.room.bm.combat.are_hostile(c, t)) continue;
+				if (feet_distance(cx, cy, t.x, t.y) > 20) continue;
+				int save_roll = random(1, 20);
+				int save_bonus = t.get_save_bonus(ABILITY_CON);
+				int bless_bonus = u.room.bm.roll_bless_bonus(t);
+				int save_total = save_roll + save_bonus + bless_bonus;
+				if (save_total < dc) {
+					save_total = u.room.bm.try_flash_of_genius(t, dc, save_total, "CON save vs Searing Sunburst");
+				}
+				if (save_total < dc) {
+					save_total = u.room.bm.try_maverick_spirit(t, dc, save_total, "CON save vs Searing Sunburst");
+				}
+				if (save_total < dc) {
+					save_total = u.room.bm.try_boon_of_fate_bonus(t, save_total, dc);
+				}
+				bool saved = save_total >= dc;
+				int dmg = saved ? total_damage / 2 : total_damage;
+				if (dmg < 1) dmg = 1;
+				u.room.bm.broadcast_roll(t.name, "CON save vs Searing Sunburst", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+				u.room.bm.combat.apply_damage(t, dmg, DMG_RADIANT, c);
+			}
+			u.room.bm.broadcast_state();
+			u.room.bm.check_battle_end();
 		}
 
 		else if (feature == "kensei_weapon") {
