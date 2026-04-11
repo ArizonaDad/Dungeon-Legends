@@ -2226,6 +2226,28 @@ class battle_manager {
 			if (target.y >= combat.map_height) target.y = combat.map_height - 1;
 			broadcast_announce(caster.name + " pulls " + target.name + " 10 feet closer with Thorn Whip.", false);
 		}
+		else if (pr.spell_id == "chill_touch") {
+			// Basic Rules 2024 Chill Touch (para 12055-12062): "it can't regain
+			// Hit Points until the end of your next turn."
+			target.chill_touch_source_id = caster.id;
+			target.chill_touch_caster_turns = 2;
+			broadcast_announce(target.name + " is chilled by necrotic energy — can't regain Hit Points until end of " + caster.name + "'s next turn.", false);
+		}
+		else if (pr.spell_id == "starry_wisp") {
+			// Basic Rules 2024 Starry Wisp (para 14595-14602): "until the end of
+			// your next turn, it emits Dim Light in a 10-foot radius and can't
+			// benefit from the Invisible condition."
+			if (target.has_condition(COND_INVISIBLE)) {
+				target.remove_condition(COND_INVISIBLE);
+				target.is_hidden = false;
+				target.greater_invisibility_active = false;
+				broadcast_announce(target.name + "'s invisibility is stripped by Starry Wisp!", false);
+			}
+			target.starry_wisp_no_invis = true;
+			target.starry_wisp_source_id = caster.id;
+			target.starry_wisp_caster_turns = 2;
+			broadcast_announce(target.name + " is illuminated by Starry Wisp — can't benefit from the Invisible condition.", false);
+		}
 	}
 
 	void resolve_spell_save_damage_roll(combatant@ caster, pending_roll@ pr, int natural_roll) {
@@ -4858,6 +4880,25 @@ class battle_manager {
 					prev.remove_condition(COND_INVISIBLE);
 					broadcast_to_battle({{"type", message_types::condition_removed}, {"target", prev.name}, {"condition", "Invisible"}});
 					broadcast_announce(prev.name + "'s Nature's Veil fades.", false);
+				}
+			}
+			// Basic Rules 2024 Chill Touch (para 12055-12062) + Starry Wisp (para
+			// 14595-14602): "until the end of your next turn" — tick down on each
+			// of the caster's turn-ends across all affected targets.
+			for (uint cti = 0; cti < combat.combatants.length(); cti++) {
+				combatant@ ct = combat.combatants[cti];
+				if (ct.chill_touch_source_id == prev.id and ct.chill_touch_caster_turns > 0) {
+					ct.chill_touch_caster_turns--;
+					if (ct.chill_touch_caster_turns <= 0) {
+						ct.chill_touch_source_id = 0;
+					}
+				}
+				if (ct.starry_wisp_source_id == prev.id and ct.starry_wisp_caster_turns > 0) {
+					ct.starry_wisp_caster_turns--;
+					if (ct.starry_wisp_caster_turns <= 0) {
+						ct.starry_wisp_no_invis = false;
+						ct.starry_wisp_source_id = 0;
+					}
 				}
 			}
 			// PHB 2024 Sorcerer L1 Innate Sorcery (para 6963-6967): "for 1 minute" — 10

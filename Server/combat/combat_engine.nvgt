@@ -1312,6 +1312,14 @@ class combatant {
 	// Heroic Inspiration
 	bool has_heroic_inspiration = false;
 
+	// Basic Rules 2024 Chill Touch (para 12055-12062): healing prevention
+	uint chill_touch_source_id = 0;
+	int chill_touch_caster_turns = 0;
+	// Basic Rules 2024 Starry Wisp (para 14595-14602): invisibility block
+	bool starry_wisp_no_invis = false;
+	uint starry_wisp_source_id = 0;
+	int starry_wisp_caster_turns = 0;
+
 	// Helpers
 	int get_ability_mod(int ability_id) {
 		return ability_modifier(ability_scores[ability_id]);
@@ -1444,6 +1452,9 @@ class combatant {
 		if (immune_frightened and cond_id == COND_FRIGHTENED) return;
 		if (immune_charmed and cond_id == COND_CHARMED) return;
 		if (immune_paralyzed and cond_id == COND_PARALYZED) return;
+		// Basic Rules 2024 Starry Wisp (para 14595-14602): "can't benefit
+		// from the Invisible condition" until end of caster's next turn.
+		if (cond_id == COND_INVISIBLE and starry_wisp_no_invis) return;
 		if (!has_condition(cond_id)) conditions.insert_last(cond_id);
 	}
 
@@ -2367,6 +2378,9 @@ class battle {
 	int apply_healing(combatant@ target, int amount) {
 		if (@target == null or target.is_dead) return 0;
 		if (amount <= 0) return 0;
+		// Basic Rules 2024 Chill Touch (para 12055-12062): "it can't regain
+		// Hit Points until the end of your next turn."
+		if (target.chill_touch_source_id != 0) return 0;
 
 		bool was_unconscious = target.current_hp == 0;
 		int before = target.current_hp;

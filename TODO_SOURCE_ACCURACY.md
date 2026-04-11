@@ -499,14 +499,14 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 |---------|-------|-------------|--------|
 | **Arcane Deflection** (reaction: +2 AC vs attack OR +4 to failed save; can't cast non-cantrip until end of next turn) | 2 | 2932-2934 | ✓ Done — AC reaction in prompt system (+2 AC). Save variant `try_arcane_deflection_save` (+4 save) wired into 28+ save failure sites (smart-spend). Non-cantrip restriction enforced via `arcane_deflection_no_spell_turns = 2` checked in `handle_cast`. L14 Deflecting Shroud fires on both AC and save uses. |
 | **Tactical Wit** (+INT mod to initiative rolls) | 2 | 2935-2936 | ✓ Done — `tactical_wit_active` flag set on init; `request_next_initiative` adds `c.get_ability_mod(ABILITY_INT)` to initiative modifier. |
-| **Power Surge** (store surges max=INT mod, gain from dispel_magic/counterspell success, spend 1/turn for half-level force damage on wizard spell hit) | 6 | 2937-2940 | PARTIAL — Charges init'd at INT mod, auto-spend on spell attack hit for `level/2` force damage (1/turn), gain from `dispel_magic` success. Save-based spell damage rider wired to central AoE path 2026-04-10. SR floor wired in `apply_short_rest`: if charges < 1, set to 1. Deferred: gain from `counterspell` (interception not fully resolved). |
+| **Power Surge** (store surges max=INT mod, gain from dispel_magic/counterspell success, spend 1/turn for half-level force damage on wizard spell hit) | 6 | 2937-2940 | ✓ Done 2026-04-10 — Charges init'd at INT mod, auto-spend on spell attack hit for `level/2` force damage (1/turn), gain from `dispel_magic` success. Save-based spell damage rider wired to central AoE path. SR floor wired in `apply_short_rest`. Counterspell gain wired in counterspell success path (War Magic L6+ check fires on successful counter). |
 | **Durable Magic** (+2 AC and +2 all saving throws while concentrating) | 10 | 2941-2942 | ✓ Done — `durable_magic_active` flag; AC dynamically added/removed at concentration start/`clear_concentration_effects`; +2 saves in `get_save_bonus` when `durable_magic_active and is_concentrating`. |
 | **Deflecting Shroud** (when Arcane Deflection used, up to 3 enemies within 60ft take half-wizard-level force damage) | 14 | 2943-2944 | ✓ Done — `deflecting_shroud_active` flag; damage loop in Arcane Deflection reaction handler, iterates combatants, skips allies/dead, distance check ≤60ft, caps at 3 targets. |
 
 **Pending War Magic follow-ups:**
 - ~~Arcane Deflection +4 save variant~~ RESOLVED 2026-04-10 — `try_arcane_deflection_save` wired into 28+ save failure sites.
 - ~~Arcane Deflection non-cantrip casting restriction~~ RESOLVED 2026-04-10 — `arcane_deflection_no_spell_turns` enforced in `handle_cast`.
-- Power Surge: counterspell gain (depends on counterspell interception being fully resolved). ~~Short-rest 0→1 recovery~~ RESOLVED 2026-04-10 — wired in `apply_short_rest`. Save-based spell damage rider wired to central AoE path 2026-04-10.
+- ~~Power Surge: counterspell gain~~ RESOLVED 2026-04-10 — gain fires in counterspell success path. ~~Short-rest 0→1 recovery~~ RESOLVED 2026-04-10 — wired in `apply_short_rest`. Save-based spell damage rider wired to central AoE path 2026-04-10.
 
 ### Grave Domain Cleric Subclass Audit (2026-04-10) — Xanathar's paras 794-832
 
