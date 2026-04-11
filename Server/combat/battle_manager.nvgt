@@ -4380,6 +4380,15 @@ class battle_manager {
 		caster.holy_aura_active = false;
 		// Basic Rules 2024 Alter Self: clear Natural Weapons when concentration breaks
 		caster.alter_self_natural_weapons = false;
+		// Basic Rules 2024 Telekinesis: release restrained targets when concentration breaks
+		for (uint tki = 0; tki < combat.combatants.length(); tki++) {
+			combatant@ tk_t = combat.combatants[tki];
+			if (@tk_t != null and tk_t.telekinesis_source_id == caster.id) {
+				tk_t.remove_condition(COND_RESTRAINED);
+				tk_t.telekinesis_source_id = 0;
+				tk_t.restrained_spell_caster_id = 0;
+			}
+		}
 		// Basic Rules 2024 Aura of Life (para 12166-12168): clear aura when concentration breaks.
 		// Remove aura-granted necrotic resistance from all allies who got it from this caster.
 		if (caster.aura_of_life_active) {
@@ -6259,6 +6268,12 @@ class battle_manager {
 				cr_t.speed += 10;
 				cr_t.slasher_hamstring_active = false;
 				cr_t.slasher_hamstring_source_id = 0;
+			}
+			// Basic Rules 2024 Telekinesis: restrained expires at start of caster's next turn
+			if (@cr_t != null and cr_t.telekinesis_source_id == c.id) {
+				cr_t.remove_condition(COND_RESTRAINED);
+				cr_t.telekinesis_source_id = 0;
+				cr_t.restrained_spell_caster_id = 0;
 			}
 			// Xanathar's Arcane Archer: clear shot debuffs that expire "at start of your next turn"
 			if (@cr_t != null and cr_t.arcane_enfeeble_source == c.id) {
@@ -12289,6 +12304,18 @@ class battle_manager {
 			}
 		}
 
+		// Basic Rules 2024 Geas (para 13062-13072): "the creature takes 5d10 Psychic
+		// damage each time it acts in a manner directly counter to your instructions."
+		// Attacking while charmed by Geas triggers the punishment damage.
+		if (c.geas_source_id != 0 and !c.is_dead) {
+			int geas_dmg = 0;
+			for (int gdi = 0; gdi < 5; gdi++) geas_dmg += random(1, 10);
+			combatant@ geas_caster = combat.get_combatant(c.geas_source_id);
+			combat.apply_damage(c, geas_dmg, DMG_PSYCHIC, @geas_caster != null ? geas_caster : c);
+			broadcast_announce(c.name + " defies the Geas and takes " + geas_dmg + " psychic damage!", true);
+			if (c.is_dead) { broadcast_state(); check_battle_end(); return; }
+		}
+
 		// Range check.
 		int dist = feet_distance(c.x, c.y, target.x, target.y);
 		if (dist > c.main_hand_range) {
@@ -17513,7 +17540,24 @@ class battle_manager {
 				broadcast_announce(c.name + " casts Daylight, illuminating a 60-foot radius.", true);
 			}
 			else if (spell.id == "feign_death") {
-				broadcast_announce(c.name + " casts Feign Death.", true);
+				// Basic Rules 2024 Feign Death (para 13203-13212): "You touch a willing
+				// creature and put it into a cataleptic state that is indistinguishable
+				// from death. The target is Blinded and Incapacitated, and its Speed
+				// becomes 0. The target has Resistance to all damage except Psychic damage."
+				// NOT concentration. Ritual. 1 hour duration (effectively full combat).
+				combatant@ fd_target = @target != null ? target : c;
+				if (feet_distance(c.x, c.y, fd_target.x, fd_target.y) > 5) {
+					user@ fu = find_user_for_combatant(c);
+					if (@fu != null) fu.send({{"type", message_types::error}, {"text", "Feign Death requires touch range (5 feet). Target is " + feet_distance(c.x, c.y, fd_target.x, fd_target.y) + " feet away."}});
+					return;
+				}
+				fd_target.feign_death_active = true;
+				fd_target.feign_death_original_speed = fd_target.speed;
+				fd_target.speed = 0;
+				fd_target.movement_remaining = 0;
+				fd_target.add_condition(COND_BLINDED);
+				fd_target.add_condition(COND_INCAPACITATED);
+				broadcast_announce(c.name + " casts Feign Death on " + fd_target.name + "! They appear dead — Blinded, Incapacitated, Speed 0, resistant to all damage except Psychic.", true);
 			}
 			else if (spell.id == "glyph_of_warding") {
 				broadcast_announce(c.name + " casts Glyph of Warding.", true);
@@ -17810,8 +17854,38 @@ class battle_manager {
 			else if (spell.id == "dream") {
 				broadcast_announce(c.name + " casts Dream.", true);
 			}
-			else if (spell.id == "geas") {
-				broadcast_announce(c.name + " casts Geas.", true);
+			else if (spell.id == "geas" and @target != null) {
+				// Basic Rules 2024 Geas (para 13062-13072): "If the target fails a Wisdom
+				// saving throw, it becomes Charmed by you for the Duration. While Charmed,
+				// the creature takes 5d10 Psychic damage each time it acts in a manner
+				// directly counter to your instructions." WIS save, 30 days, NOT concentration.
+				if (target.id == c.id) {
+					user@ gu = find_user_for_combatant(c);
+					if (@gu != null) gu.send({{"type", message_types::error}, {"text", "Geas must target another creature."}});
+					return;
+				}
+				int geas_bonus = target.get_save_bonus(ABILITY_WIS);
+				int geas_natural = random(1, 20);
+				int geas_save = geas_natural + geas_bonus;
+				int geas_dc = spell_save_dc(c, "geas");
+				bool geas_saved = geas_save >= geas_dc;
+				broadcast_roll(target.name, "WIS save vs Geas", geas_natural, geas_bonus, geas_save, geas_saved ? "Saved!" : "Failed! Charmed.");
+				if (!geas_saved) {
+					if (try_arcane_deflection_save(target, geas_dc, geas_save)) geas_saved = true;
+					if (!geas_saved and try_countercharm_reroll(target, geas_dc, geas_bonus, "WIS save vs Geas")) geas_saved = true;
+					if (!geas_saved) { int ds = try_disciplined_survivor_reroll(target, geas_dc, geas_save, geas_bonus, "WIS save vs Geas"); if (ds >= geas_dc) geas_saved = true; }
+					if (!geas_saved) { int fg = try_flash_of_genius(target, geas_dc, geas_save, "WIS save vs Geas"); if (fg >= geas_dc) { geas_saved = true; geas_save = fg; } }
+					if (!geas_saved) { int mv = try_maverick_spirit(target, geas_dc, geas_save, "WIS save vs Geas"); if (mv >= geas_dc) { geas_saved = true; geas_save = mv; } }
+					if (!geas_saved and try_mage_slayer_guarded_mind(target, ABILITY_WIS)) geas_saved = true;
+					if (!geas_saved) { int bf = try_boon_of_fate_bonus(target, geas_save, geas_dc); if (bf >= geas_dc) { geas_saved = true; geas_save = bf; } }
+					if (!geas_saved and try_stroke_of_luck_save(target, geas_dc, geas_bonus)) geas_saved = true;
+					if (!geas_saved) {
+						target.add_condition(COND_CHARMED);
+						target.charm_spell_caster_id = c.id;
+						target.geas_source_id = c.id;
+						broadcast_announce(target.name + " is bound by Geas! Charmed, and will take 5d10 psychic damage for acting against the command.", true);
+					}
+				}
 			}
 			else if (spell.id == "legend_lore") {
 				broadcast_announce(c.name + " casts Legend Lore.", true);
@@ -17850,8 +17924,64 @@ class battle_manager {
 					broadcast_announce(c.name + " casts Swift Quiver! Endless ammunition flows from their quiver. Bonus action for 2 ranged attacks each turn.", true);
 				}
 			}
-			else if (spell.id == "telekinesis") {
-				broadcast_announce(c.name + " casts Telekinesis.", true);
+			else if (spell.id == "telekinesis" and @target != null) {
+				// Basic Rules 2024 Telekinesis (para 14871-14879): "You can try to move a
+				// Huge or smaller creature. Make an ability check with your spellcasting
+				// ability contested by the creature's Strength check. If you win the contest,
+				// you move the creature up to 30 feet in any direction... Until the end of
+				// your next turn, the creature is Restrained in your telekinetic grip."
+				// Concentration. Approximated as STR save vs spell DC.
+				if (target.size > SIZE_HUGE) {
+					user@ tu = find_user_for_combatant(c);
+					if (@tu != null) tu.send({{"type", message_types::error}, {"text", "Telekinesis can only affect Huge or smaller creatures."}});
+					return;
+				}
+				int tk_bonus = target.get_save_bonus(ABILITY_STR);
+				int tk_natural = random(1, 20);
+				int tk_save = tk_natural + tk_bonus;
+				int tk_dc = spell_save_dc(c, "telekinesis");
+				bool tk_saved = tk_save >= tk_dc;
+				broadcast_roll(target.name, "STR save vs Telekinesis", tk_natural, tk_bonus, tk_save, tk_saved ? "Resists!" : "Grabbed!");
+				if (!tk_saved) {
+					if (try_arcane_deflection_save(target, tk_dc, tk_save)) tk_saved = true;
+					if (!tk_saved) { int fg = try_flash_of_genius(target, tk_dc, tk_save, "STR save vs Telekinesis"); if (fg >= tk_dc) { tk_saved = true; tk_save = fg; } }
+					if (!tk_saved) { int bf = try_boon_of_fate_bonus(target, tk_save, tk_dc); if (bf >= tk_dc) { tk_saved = true; tk_save = bf; } }
+					if (!tk_saved and try_stroke_of_luck_save(target, tk_dc, tk_bonus)) tk_saved = true;
+					if (!tk_saved) {
+						// Move target 30ft away from caster
+						int tk_push_dist = 6; // 30ft = 6 tiles
+						int tk_dx = target.x - c.x;
+						int tk_dy = target.y - c.y;
+						// Normalize to direction
+						if (tk_dx > 0) tk_dx = 1;
+						else if (tk_dx < 0) tk_dx = -1;
+						if (tk_dy > 0) tk_dy = 1;
+						else if (tk_dy < 0) tk_dy = -1;
+						if (tk_dx == 0 and tk_dy == 0) tk_dx = 1; // Default push direction
+						int tk_moved = 0;
+						for (int tki = 0; tki < tk_push_dist; tki++) {
+							int nx = target.x + tk_dx;
+							int ny = target.y + tk_dy;
+							if (nx < 0 or nx >= combat.map_width or ny < 0 or ny >= combat.map_height) break;
+							target.x = nx;
+							target.y = ny;
+							tk_moved++;
+						}
+						target.add_condition(COND_RESTRAINED);
+						target.restrained_spell_caster_id = c.id;
+						target.telekinesis_source_id = c.id;
+						c.is_concentrating = true;
+						c.add_condition(COND_CONCENTRATING);
+						c.concentration_spell = spell.name;
+						broadcast_announce(c.name + " seizes " + target.name + " with Telekinesis! Moved " + (tk_moved * 5) + " feet and Restrained in telekinetic grip.", true);
+					}
+				} else {
+					// Still set concentration even on save — caster can retry next turn
+					c.is_concentrating = true;
+					c.add_condition(COND_CONCENTRATING);
+					c.concentration_spell = spell.name;
+					broadcast_announce(c.name + " casts Telekinesis on " + target.name + " but they resist the grip!", true);
+				}
 			}
 			else if (spell.id == "teleportation_circle") {
 				broadcast_announce(c.name + " casts Teleportation Circle.", true);
@@ -17929,8 +18059,45 @@ class battle_manager {
 			else if (spell.id == "mirage_arcane") {
 				broadcast_announce(c.name + " casts Mirage Arcane.", true);
 			}
-			else if (spell.id == "plane_shift") {
-				broadcast_announce(c.name + " casts Plane Shift.", true);
+			else if (spell.id == "plane_shift" and @target != null) {
+				// Basic Rules 2024 Plane Shift (para 14601-14608): Unwilling target:
+				// "Choose a creature within your reach and make a melee spell attack
+				// against it. On a hit, the creature must make a CHA saving throw.
+				// On a failed save, the creature is transported to a random location
+				// on the plane you specify." Touch range (5ft). Instantaneous.
+				if (feet_distance(c.x, c.y, target.x, target.y) > 5) {
+					user@ psu = find_user_for_combatant(c);
+					if (@psu != null) psu.send({{"type", message_types::error}, {"text", "Plane Shift requires touch range (5 feet). Target is " + feet_distance(c.x, c.y, target.x, target.y) + " feet away."}});
+					return;
+				}
+				// Melee spell attack
+				int ps_attack = random(1, 20) + spell_attack_bonus(c);
+				bool ps_hit = ps_attack >= target.armor_class;
+				broadcast_roll(c.name, "spell attack vs " + target.name, ps_attack - spell_attack_bonus(c), spell_attack_bonus(c), ps_attack, ps_hit ? "Hit!" : "Miss!");
+				if (ps_hit) {
+					int ps_bonus = target.get_save_bonus(ABILITY_CHA);
+					int ps_natural = random(1, 20);
+					int ps_save = ps_natural + ps_bonus;
+					int ps_dc = spell_save_dc(c, "plane_shift");
+					bool ps_saved = ps_save >= ps_dc;
+					broadcast_roll(target.name, "CHA save vs Plane Shift", ps_natural, ps_bonus, ps_save, ps_saved ? "Resists!" : "Banished!");
+					if (!ps_saved) {
+						if (try_arcane_deflection_save(target, ps_dc, ps_save)) ps_saved = true;
+						if (!ps_saved) { int fg = try_flash_of_genius(target, ps_dc, ps_save, "CHA save vs Plane Shift"); if (fg >= ps_dc) { ps_saved = true; ps_save = fg; } }
+						if (!ps_saved) { int bf = try_boon_of_fate_bonus(target, ps_save, ps_dc); if (bf >= ps_dc) { ps_saved = true; ps_save = bf; } }
+						if (!ps_saved and try_stroke_of_luck_save(target, ps_dc, ps_bonus)) ps_saved = true;
+						if (!ps_saved) {
+							broadcast_announce(target.name + " is transported to another plane by Plane Shift! Removed from combat!", true);
+							target.current_hp = 0;
+							target.is_dead = true;
+							check_battle_end();
+						}
+					}
+				}
+			}
+			else if (spell.id == "plane_shift" and @target == null) {
+				// Self/willing cast — transport caster and allies out of combat
+				broadcast_announce(c.name + " casts Plane Shift, transporting themselves to another plane!", true);
 			}
 			else if (spell.id == "project_image") {
 				broadcast_announce(c.name + " casts Project Image.", true);

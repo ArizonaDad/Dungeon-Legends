@@ -128,6 +128,16 @@ class combatant {
 	// Basic Rules 2024 Antilife Shell (para 11796-11803): 10ft emanation prevents
 	// non-Construct/non-Undead from passing or reaching through. Concentration.
 	bool antilife_shell_active = false;
+	// Basic Rules 2024 Feign Death (para 13203-13212): target appears dead, blinded,
+	// incapacitated, speed 0, resistance to all damage except psychic.
+	bool feign_death_active = false;
+	int feign_death_original_speed = 0;
+	// Basic Rules 2024 Geas (para 13062-13072): charmed, 5d10 psychic when acting
+	// against the command. Tracks caster for punishment damage.
+	uint geas_source_id = 0;
+	// Basic Rules 2024 Telekinesis (para 14871-14879): restrained by telekinetic grip
+	// until end of caster's next turn. Concentration.
+	uint telekinesis_source_id = 0;
 	bool searing_smite_pending = false;  // Searing Smite rider on next weapon hit
 	int searing_smite_dice = 0;          // Number of d6 to roll for Searing Smite damage
 	// Basic Rules 2024 Searing Smite (para 14881): repeating fire damage at turn start
@@ -2076,6 +2086,9 @@ class battle {
 			amount = (amount + 1) / 2;
 		}
 
+		// Basic Rules 2024 Feign Death (para 13203-13212): "The target has Resistance
+		// to all damage except Psychic damage."
+		if (target.feign_death_active and damage_type != DMG_PSYCHIC) amount = (amount + 1) / 2;
 		// PHB 2024 Elemental Adept (para 7610): "Spells you cast ignore Resistance
 		// to damage of the chosen type." Bypass resistance for the 5 eligible types.
 		bool ea_bypass = false;
