@@ -337,7 +337,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 | **Roving** (+10 ft speed, climb/swim speed = speed) | 5 | 6174-6175 | ✓ Done 2026-04-09 — applied at init; +10 ft speed with matching climb/swim. |
 | **Extra Attack** (2 attacks) | 5 | 6176-6177 | ✓ Done — `cs.extra_attacks=1` set in init. |
 | **Expertise** (2 more skills) | 9 | 6177 | DEFERRED — needs player choice prompt at L9. |
-| **Tireless** (Magic action 1d8+WIS temp HP, WIS-mod uses/LR; halve exhaustion on SR) | 10 | 6178-6180 | PARTIAL 2026-04-09 — temp HP grant via bonus action menu, WIS mod uses tracked, server enforces action consumption. Exhaustion halving on SR deferred (no exhaustion subsystem yet). |
+| **Tireless** (Magic action 1d8+WIS temp HP, WIS-mod uses/LR; halve exhaustion on SR) | 10 | 6178-6180 | ✓ Done 2026-04-10 — temp HP grant via bonus action menu, WIS mod uses tracked, server enforces action consumption. Exhaustion halving on SR wired in `apply_short_rest`: Ranger L10+ decrements `exhaustion_level` by 1 with broadcast. |
 | **Nature's Veil** (Bonus Action self-Invisible until end of next turn, WIS-mod uses/LR) | 14 | 6184-6186 | ✓ Done 2026-04-09 — full implementation: bonus action handler, condition application, 2-tick rounds_remaining, end-of-turn cleanup in `advance_turn`. |
 | **Relentless Hunter** (Hunter's Mark concentration cannot be broken by damage) | 13 | 6182-6183 | ✓ Done 2026-04-09 — short-circuit at top of `check_concentration` when target is L13+ Ranger and concentration spell is "Hunter's Mark". |
 | **Precise Hunter** (advantage on attack rolls vs your Hunter's Mark target) | 17 | 6187-6188 | ✓ Done 2026-04-09 — advantage flag set in `apply_attack_advantage_state` after Vow of Enmity check. |
@@ -349,7 +349,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 - Deft Explorer L2 Expertise player choice (Skill Expertise selection prompt at character creation/level-up).
 - Expertise L9 (2 more skills player choice).
 - Fighting Style L2 (Archery / Defense / Druidic Warrior / Two-Weapon Fighting / Thrown Weapon Fighting / Blind Fighting). Druidic Warrior also requires a druid-cantrip selection prompt.
-- Tireless L10 exhaustion-halving on Short Rest (deferred until exhaustion subsystem exists).
+- ~~Tireless L10 exhaustion-halving on Short Rest~~ RESOLVED 2026-04-10 — wired in `apply_short_rest`, decrements `exhaustion_level` by 1.
 - ~~Weapon Mastery property application~~ RESOLVED 2026-04-10.
 
 ### Rogue Audit (2026-04-09) — Basic Rules 2024 paras 6443-6605
@@ -484,7 +484,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 | **Memorize Spell** (swap one prepared spell on short rest) | 5 | 8627-8628 | DEFERRED — needs short rest subsystem and prepared-spell-list mutator UI. |
 | **Spell Mastery** (chosen L1+L2 spells castable at base level without slot) | 18 | 8629-8631 | PARTIAL 2026-04-09 — `spell_mastery_active` flag set on init. Slot bypass wired into `cast_spell` pipeline in battle_manager.nvgt: if `spell.id == c.spell_mastery_l1_spell_id` (or l2), the cast skips slot consumption with announcement "casts X through Spell Mastery — no spell slot consumed!". `spell_mastery_l1_spell_id` and `spell_mastery_l2_spell_id` strings default to empty; the player must designate (level-up choice prompt deferred). |
 | **Epic Boon** | 19 | 8632-8633 | ✓ Done — Epic Boon feat catalog. |
-| **Signature Spells** (two L3 spells castable at L3 without slot, 1/short rest each) | 20 | 8634-8635 | PARTIAL 2026-04-09 — `signature_spells_charges_max = 2` and `signature_spells_charges_remaining = 2` set on L20 init. Slot bypass wired in cast pipeline for `signature_spell_a_id` and `signature_spell_b_id` (separate `_used_this_rest` flags per spell). The two designation strings default to empty; the player must designate. Short rest reset deferred (currently only long rest). |
+| **Signature Spells** (two L3 spells castable at L3 without slot, 1/short rest each) | 20 | 8634-8635 | ✓ Done 2026-04-10 — `signature_spells_charges_max = 2` and `signature_spells_charges_remaining = 2` set on L20 init. Slot bypass wired in cast pipeline for `signature_spell_a_id` and `signature_spell_b_id` (separate `_used_this_rest` flags per spell). Designation via Shift+P menu (RESOLVED 2026-04-10). Short rest reset wired in `apply_short_rest`: restores charges + clears per-spell used flags. |
 
 **Pending follow-up Wizard batches:**
 - ~~Spell Mastery designation prompt at L18~~ RESOLVED 2026-04-10 — Shift+P menu lets Wizard designate L1+L2 spells. Server validates, persists to account, restores on reconnect.
@@ -499,14 +499,14 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 |---------|-------|-------------|--------|
 | **Arcane Deflection** (reaction: +2 AC vs attack OR +4 to failed save; can't cast non-cantrip until end of next turn) | 2 | 2932-2934 | ✓ Done — AC reaction in prompt system (+2 AC). Save variant `try_arcane_deflection_save` (+4 save) wired into 28+ save failure sites (smart-spend). Non-cantrip restriction enforced via `arcane_deflection_no_spell_turns = 2` checked in `handle_cast`. L14 Deflecting Shroud fires on both AC and save uses. |
 | **Tactical Wit** (+INT mod to initiative rolls) | 2 | 2935-2936 | ✓ Done — `tactical_wit_active` flag set on init; `request_next_initiative` adds `c.get_ability_mod(ABILITY_INT)` to initiative modifier. |
-| **Power Surge** (store surges max=INT mod, gain from dispel_magic/counterspell success, spend 1/turn for half-level force damage on wizard spell hit) | 6 | 2937-2940 | PARTIAL — Charges init'd at INT mod, auto-spend on spell attack hit for `level/2` force damage (1/turn), gain from `dispel_magic` success. Save-based spell damage rider wired to central AoE path 2026-04-10. Deferred: gain from `counterspell` (interception not fully resolved), short-rest "if 0 surges, gain 1" recovery. |
+| **Power Surge** (store surges max=INT mod, gain from dispel_magic/counterspell success, spend 1/turn for half-level force damage on wizard spell hit) | 6 | 2937-2940 | PARTIAL — Charges init'd at INT mod, auto-spend on spell attack hit for `level/2` force damage (1/turn), gain from `dispel_magic` success. Save-based spell damage rider wired to central AoE path 2026-04-10. SR floor wired in `apply_short_rest`: if charges < 1, set to 1. Deferred: gain from `counterspell` (interception not fully resolved). |
 | **Durable Magic** (+2 AC and +2 all saving throws while concentrating) | 10 | 2941-2942 | ✓ Done — `durable_magic_active` flag; AC dynamically added/removed at concentration start/`clear_concentration_effects`; +2 saves in `get_save_bonus` when `durable_magic_active and is_concentrating`. |
 | **Deflecting Shroud** (when Arcane Deflection used, up to 3 enemies within 60ft take half-wizard-level force damage) | 14 | 2943-2944 | ✓ Done — `deflecting_shroud_active` flag; damage loop in Arcane Deflection reaction handler, iterates combatants, skips allies/dead, distance check ≤60ft, caps at 3 targets. |
 
 **Pending War Magic follow-ups:**
 - ~~Arcane Deflection +4 save variant~~ RESOLVED 2026-04-10 — `try_arcane_deflection_save` wired into 28+ save failure sites.
 - ~~Arcane Deflection non-cantrip casting restriction~~ RESOLVED 2026-04-10 — `arcane_deflection_no_spell_turns` enforced in `handle_cast`.
-- Power Surge: counterspell gain (depends on counterspell interception being fully resolved), short-rest 0→1 recovery. Save-based spell damage rider wired to central AoE path 2026-04-10.
+- Power Surge: counterspell gain (depends on counterspell interception being fully resolved). ~~Short-rest 0→1 recovery~~ RESOLVED 2026-04-10 — wired in `apply_short_rest`. Save-based spell damage rider wired to central AoE path 2026-04-10.
 
 ### Grave Domain Cleric Subclass Audit (2026-04-10) — Xanathar's paras 794-832
 
@@ -587,17 +587,17 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 | **Magic Item Adept** (4 attunements) | 10 | 658-659 | ✓ Done 2026-04-09 — `magic_item_attunement_max = 4` set on init at L10+. |
 | **Spell-Storing Item** (LR-store 1 L1-3 Artificer spell in object, 2×INT mod uses) | 11 | 660-663 | DEFERRED — `spell_storing_item_known` flag set for client awareness. Full implementation requires per-item spell-storage state on the inventory item objects, plus a Magic action handler that anyone holding the item can trigger. Item infrastructure not present. |
 | **Advanced Artifice — Magic Item Savant** (5 attunements) | 14 | 664-666 | ✓ Done 2026-04-09 — `magic_item_attunement_max = 5` overrides the L10 cap. |
-| **Advanced Artifice — Refreshed Genius** (regain 1 Flash of Genius use on Short Rest) | 14 | 664-667 | PARTIAL 2026-04-09 — `refreshed_genius_active` flag set on init at L14+. Actual SR regen requires the short rest subsystem. Currently combat sessions only have long rests, which already restore all uses. The flag is in place so when SR is added it will hook in correctly. |
+| **Advanced Artifice — Refreshed Genius** (regain 1 Flash of Genius use on Short Rest) | 14 | 664-667 | ✓ Done 2026-04-10 — `refreshed_genius_active` flag set on init at L14+. SR regen wired in `apply_short_rest`: increments `flash_of_genius_uses_current` by 1 (capped at max). |
 | **Magic Item Master** (6 attunements) | 18 | 668-669 | ✓ Done 2026-04-09 — `magic_item_attunement_max = 6` overrides L14 cap. |
 | **Epic Boon** | 19 | 670-671 | ✓ Done — Epic Boon feat catalog. |
 | **Soul of Artifice — Cheat Death** (disintegrate Uncommon/Rare items for 20 HP each when reduced to 0 HP) | 20 | 672-674 | DEFERRED — depends on Replicate Magic Item infrastructure. Without a per-character registry of items created via Replicate Magic Item there is nothing to disintegrate. |
-| **Soul of Artifice — Magical Guidance** (Flash of Genius full regen on Short Rest if attuned to ≥1 magic item) | 20 | 672-675 | PARTIAL 2026-04-09 — `magical_guidance_active` flag set on init at L20+. Same SR-subsystem dependency as Refreshed Genius. Flag is in place for the eventual SR hook. |
+| **Soul of Artifice — Magical Guidance** (Flash of Genius full regen on Short Rest if attuned to ≥1 magic item) | 20 | 672-675 | ✓ Done 2026-04-10 — `magical_guidance_active` flag set on init at L20+. SR full regen wired in `apply_short_rest`: restores `flash_of_genius_uses_current` to max (takes priority over Refreshed Genius +1). |
 
 **Pending follow-up Artificer batches:**
 - Replicate Magic Item L2 — needs DMG magic item plan tables (Levels 2/6/10/14 from source paras 517-645), a long-rest crafting subsystem, attunement-from-this-feature tracking, and per-item vanish timers. Bag of Holding, Cap of Water Breathing, Sending Stones, Wand of the War Mage are recommended starting plans.
 - Magic Item Tinker L6 — Charge/Drain/Transmute Bonus/Magic actions on Replicate Magic Items. Requires the Replicate registry above.
 - Spell-Storing Item L11 — store an Artificer L1-3 spell in an object during Long Rest, anyone holding can use Magic action to cast (`2*INT mod` uses).
-- Refreshed Genius L14 + Magical Guidance L20 — Short Rest subsystem dependency.
+- ~~Refreshed Genius L14 + Magical Guidance L20~~ RESOLVED 2026-04-10 — both wired in `apply_short_rest`.
 - Cheat Death L20 — depends on Replicate Magic Item infrastructure.
 - ~~Flash of Genius coverage extension~~ RESOLVED 2026-04-10: `try_flash_of_genius` now wired into central AoE save path + 46+ individual spell handler save sites (all spell save sites covered, including cantrips and damage-only saves).
 - Tinker's Magic L1 Magic action — needs a hazards system for ball bearings/caltrops in adjacent tiles.

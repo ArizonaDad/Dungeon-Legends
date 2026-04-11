@@ -3931,6 +3931,12 @@ class battle_manager {
 		// Holy Weapon: +2d8 radiant on weapon hits (concentration)
 		caster.holy_weapon_active = false;
 		// Fire Shield: warm/chill shield (concentration)
+		// Basic Rules 2024 Fire Shield (para 13322): clears resistance on break.
+		// Warm shield grants cold resistance; chill shield grants fire resistance.
+		if (caster.fire_shield_active) {
+			if (caster.fire_shield_warm) caster.cold_resistance = false;
+			else caster.fire_resistance = false;
+		}
 		caster.fire_shield_active = false;
 		// Stoneskin: B/P/S resistance (concentration)
 		// Basic Rules 2024 Stoneskin (para 15008): clears B/P/S resistance on break.
