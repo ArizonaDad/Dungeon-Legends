@@ -1709,7 +1709,7 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
             if (c.skill_expertise.find("Survival") < 0) c.skill_expertise.insert_last("Survival");
         }
         // L3 Skirmisher (para 2392-2393): reaction move half speed on enemy end adj
-        // (wired in advance_turn / end-of-turn enemy check — no init needed, always available)
+        if (cs.level >= 3) c.skirmisher_active = true;
         // L9 Superior Mobility (para 2396-2397): "+10 feet to your walking speed"
         if (cs.level >= 9) c.speed += 10;
         // L13 Ambush Master already wired in battle_manager initiative + on-hit marking

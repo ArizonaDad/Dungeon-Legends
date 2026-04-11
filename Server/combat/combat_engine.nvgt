@@ -582,6 +582,7 @@ class combatant {
 	bool swashbuckler_attacked_this_turn = false; // Track for Fancy Footwork
 	uint inquisitive_target = 0; // Inquisitive Rogue
 	bool scout_skirmisher = false; // Scout Rogue
+	bool skirmisher_active = false; // Scout Rogue L3 — eligible for auto-reaction move
 	bool master_duelist_active = false; // Swashbuckler L17
 	bool master_duelist_used = false; // 1/SR reroll
 	// Xanathar's Swashbuckler L9 Panache (paras 2423-2426)

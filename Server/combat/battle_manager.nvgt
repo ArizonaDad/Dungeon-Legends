@@ -1340,6 +1340,13 @@ class battle_manager {
 		// Basic Rules 2024 Heat Metal (para 13734): "disadvantage on attack rolls
 		// and ability checks until the start of your next turn."
 		if (c.heat_metal_disadv) disadv = true;
+		// PHB 2024 Swashbuckler L13 Elegant Maneuver (para 6599): "As a Bonus
+		// Action, you can give yourself Advantage on the next Acrobatics or
+		// Athletics check you make during the current turn."
+		if (c.elegant_maneuver_active and (skill_name == "Acrobatics" or skill_name == "Athletics")) {
+			adv = true;
+			c.elegant_maneuver_active = false;
+		}
 		// Pass Without Trace stacks +10 onto Stealth checks (also Dexterity (Stealth)).
 		if (skill_name == "Stealth") mod += c.pass_without_trace_bonus;
 		string tag = custom_tag != "" ? custom_tag : skill_resolution_tag(skill_name);
@@ -1803,6 +1810,42 @@ class battle_manager {
 			}
 		}
 		broadcast_announce("The Unicorn Spirit heals allies in the aura for " + heal_amt + " HP!", false);
+	}
+
+	// Xanathar's Divine Soul Sorcerer L6 Empowered Healing (paras 2611-2620):
+	// "whenever you or an ally within 5 feet of you rolls dice to determine the
+	// number of hit points a spell restores, you can spend 1 sorcery point to
+	// reroll any number of those dice once."
+	// Helper: given a raw heal total from dice_count dice of die_size, simulate
+	// rerolling dice that rolled below average, deduct 1 SP, and return the
+	// potentially improved total.
+	int apply_empowered_healing(combatant@ caster, int heal_amount, int dice_count, int die_size) {
+		if (@caster == null) return heal_amount;
+		if (!caster.empowered_healing_active) return heal_amount;
+		if (caster.sorcery_points <= 0) return heal_amount;
+		// Calculate average threshold (below which we reroll)
+		int avg = (die_size + 1) / 2;  // e.g., d8 → 4, d4 → 2
+		// Simulate: for each die, if it "would have" rolled below average, reroll.
+		// Since we only have the total, we reconstruct approximate per-die values.
+		// Deduct the old total and rebuild with rerolls for dice below average.
+		int improved = 0;
+		int rerolled_any = 0;
+		for (int d = 0; d < dice_count; d++) {
+			int roll = random(1, die_size);
+			if (roll < avg) {
+				int reroll = random(1, die_size);
+				improved += reroll;
+				rerolled_any++;
+			} else {
+				improved += roll;
+			}
+		}
+		if (rerolled_any > 0) {
+			caster.sorcery_points -= 1;
+			broadcast_announce(caster.name + " uses Empowered Healing (1 SP) to reroll " + rerolled_any + " healing di" + (rerolled_any == 1 ? "e" : "ce") + "!", false);
+			return improved;
+		}
+		return heal_amount;
 	}
 
 	int spiritual_weapon_damage_count_for_slot(int slot_level) {
@@ -5720,6 +5763,38 @@ class battle_manager {
 			if (!prev.is_player) execute_monster_turn(prev);
 			else if (combatant_is_controlled_by_bot(prev)) execute_player_bot_turn(prev);
 			return;
+		}
+
+		// Xanathar's Scout Rogue L3 Skirmisher (paras 2391-2393): "If an enemy ends
+		// its turn within 5 feet of you, you can use your reaction to move up to half
+		// your speed. This movement doesn't provoke opportunity attacks."
+		if (@prev != null and prev.is_alive()) {
+			for (uint ski = 0; ski < combat.combatants.length(); ski++) {
+				combatant@ sk = combat.combatants[ski];
+				if (@sk == null or sk.is_dead or sk.id == prev.id) continue;
+				if (!sk.skirmisher_active or !sk.has_reaction) continue;
+				// Must be an enemy of the combatant whose turn just ended
+				if (sk.is_player == prev.is_player) continue;
+				// Must be within 5ft (1 tile) of the prev combatant
+				if (feet_distance(sk.x, sk.y, prev.x, prev.y) > 5) continue;
+				// Move up to half speed away from the enemy
+				int tiles_to_move = sk.speed / 2 / FEET_PER_TILE;
+				if (tiles_to_move < 1) tiles_to_move = 1;
+				// Calculate direction away from enemy
+				int dx = sk.x - prev.x;
+				int dy = sk.y - prev.y;
+				// Normalise to -1/0/+1 for tile-by-tile movement
+				if (dx > 0) dx = 1; else if (dx < 0) dx = -1;
+				if (dy > 0) dy = 1; else if (dy < 0) dy = -1;
+				// If on the same tile, pick a default direction (away = +x)
+				if (dx == 0 and dy == 0) dx = 1;
+				for (int step = 0; step < tiles_to_move; step++) {
+					sk.x += dx;
+					sk.y += dy;
+				}
+				sk.has_reaction = false;
+				broadcast_announce(sk.name + " uses Skirmisher to dart away (" + (tiles_to_move * FEET_PER_TILE) + " ft)!", false);
+			}
 		}
 
 		combat.advance_turn();
@@ -16369,6 +16444,7 @@ class battle_manager {
 					heal = dice_count * 8;
 				} else {
 					for (int d = 0; d < dice_count; d++) heal += random(1, 8);
+					heal = apply_empowered_healing(c, heal, dice_count, 8);
 				}
 				heal += get_spellcasting_ability_mod(c);
 				heal += get_life_domain_healing_bonus(c, spell, cast_slot_level);
@@ -17139,6 +17215,7 @@ class battle_manager {
 					heal = dice_count * 4;
 				} else {
 					for (int d = 0; d < dice_count; d++) heal += random(1, 4);
+					heal = apply_empowered_healing(c, heal, dice_count, 4);
 				}
 				heal += get_spellcasting_ability_mod(c);
 				if (heal < 1) heal = 1;
@@ -17154,6 +17231,7 @@ class battle_manager {
 				int dice_count = 2 + (upcast_levels > 0 ? upcast_levels : 0);
 				int heal = 0;
 				for (int d = 0; d < dice_count; d++) heal += random(1, 4);
+				heal = apply_empowered_healing(c, heal, dice_count, 4);
 				heal += get_spellcasting_ability_mod(c);
 				if (heal < 1) heal = 1;
 				// Basic Rules 2024 Beacon of Hope (para 12201): per-target max healing
@@ -20520,6 +20598,7 @@ class battle_manager {
 				int dice_count = 2 + upcast_levels;
 				int heal = 0;
 				for (int d = 0; d < dice_count; d++) heal += random(1, 8);
+				heal = apply_empowered_healing(c, heal, dice_count, 8);
 				heal += get_spellcasting_ability_mod(c);
 				heal += get_life_domain_healing_bonus(c, spell, cast_slot_level);
 				if (heal < 1) heal = 1;
@@ -20735,6 +20814,7 @@ class battle_manager {
 				int dice_count = 3 + upcast_levels;
 				int heal = 0;
 				for (int d = 0; d < dice_count; d++) heal += random(1, 8);
+				heal = apply_empowered_healing(c, heal, dice_count, 8);
 				heal += get_spellcasting_ability_mod(c);
 				heal += get_life_domain_healing_bonus(c, spell, cast_slot_level);
 				if (heal < 1) heal = 1;

@@ -577,9 +577,9 @@ Adding a new prompted spell or feature: in `handle_cast` (or the relevant action
 
 - **Barbarian**: Rage + Berserker Frenzy (bonus melee attack while raging) + Storm Aura (Storm Herald BA, desert/sea/tundra) + Brutal Strike (L9+ toggle: Forceful/Hamstring/Staggering/Sundering)
 
-- **Fighter**: Action Surge, Second Wind + Battle Master Maneuvers (Trip/Precision/Riposte) + Psi Warrior Strike
+- **Fighter**: Action Surge, Second Wind + Battle Master Maneuvers (Trip Attack, Precision Attack, Riposte, Menacing Attack, Goading Attack, Pushing Attack, Disarming Attack, Distracting Strike, Sweeping Attack, Parry, Rally) + Psi Warrior Strike
 
-- **Rogue**: Cunning Action + Soulknife Psychic Blades + Cunning Strike (L5+ toggle: Poison/Trip/Withdraw + L14 Daze/KnockOut/Obscure)
+- **Rogue**: Cunning Action + Soulknife Psychic Blades + Cunning Strike (L5+ toggle: Poison/Trip/Withdraw + L14 Daze/KnockOut/Obscure) + Panache (Swashbuckler L9) + Elegant Maneuver (Swashbuckler L13) + Sudden Strike (Scout L17) + Ghost Walk (Phantom L13)
 
 - **Sorcerer**: Innate Sorcery, Font of Magic (SP↔Slot), Metamagic (10 options: Careful/Distant/Empowered/Extended/Heightened/Quickened/Seeking/Subtle/Transmuted/Twinned)
 
@@ -819,6 +819,27 @@ Epic Boon feats: combat_prowess, dimensional_travel, energy_resistance, fate, fo
 - **Wizard Spell Mastery + Signature Spells designation** (PHB 2024 paras 8629-8635): Full Shift+P menu flow — L18 Wizards pick L1+L2 spells for at-will casting, L20 Wizards pick two L3 spells for 1/SR free casts. Server validates spell level, persists to account JSON, restores on reconnect via character_sheet fields. Client filters SPELL_CATALOG by level+class for the selection menus.
 - **Order's Demand duration tracking** (Tasha's Order Domain): Charm now properly expires at end of caster's next turn via 2-tick counter in advance_turn. Also breaks on damage via apply_damage check. Previously charmed indefinitely.
 - **Monk Deflect Attacks Redirect** (PHB 2024 para 5339): When Deflect Attacks reduces damage to 0, Monk auto-spends 1 Focus Point to redirect 2d8+DEX force damage at the attacker (DEX save negates). Uses existing deflect_attacks_reduced_to_zero flag as gate.
+
+**Batch 3 subclass features (2026-04-11):**
+- **Battle Master Maneuvers** (8 new, added to existing Trip Attack + Precision Attack + Riposte):
+  - Menacing Attack — WIS save or Frightened, consumes superiority die
+  - Goading Attack — WIS save or disadvantage on attacks vs others for 2 turns
+  - Pushing Attack — STR save or push 15ft, consumes superiority die
+  - Disarming Attack — STR save or weapon_jammed (must use Utilize action to unjam)
+  - Distracting Strike — marks target, next ally attack has advantage
+  - Sweeping Attack — on hit, deals die damage to adjacent creature
+  - Parry — reaction, reduce melee damage by d8 + higher of STR/DEX mod, consumes superiority die
+  - Rally — BA, nearest ally within 30ft gains temp HP = d8 + half Fighter level
+- **Swashbuckler Panache** (L9): Action, contested CHA(Persuasion) vs WIS(Insight), on success target has disadvantage on attacks vs others + can't make OAs against panache source for 10 rounds
+- **Swashbuckler Elegant Maneuver** (L13): BA, advantage on next Acrobatics/Athletics check this turn
+- **Scout Sudden Strike** (L17): BA, make extra attack via flurry pattern, can benefit from SA even if already used this turn (but not vs same target)
+- **Phantom Tokens of the Departed** (L9): Gain soul trinket when creature within 30ft dies (costs reaction). Trinkets grant: advantage on CON saves (+5 approx), advantage on death saves. Max trinkets = proficiency bonus.
+- **Phantom Ghost Walk** (L13): BA toggle, fly 10ft + disadvantage on attacks against you. Activate costs ghost_walk_available OR consumes 1 soul trinket.
+- **Storm Herald Shielding Storm** (L10): Allies within 10ft aura gain Storm Soul resistance type (desert=fire, sea=lightning, tundra=cold). Auto-applied/removed based on proximity.
+- **Storm Herald Raging Storm** (L14): Auto-triggers per environment:
+  - Desert: When hit by creature in aura, deals half-level fire damage (DEX save for half)
+  - Sea: On weapon hit while target in aura, STR save or Prone
+  - Tundra: On aura activation, nearest enemy STR save or speed=0
 
 **Previously implemented:** combat_prowess (+1d6 weapon miss → hit 1/turn), fortitude (+40 HP), irresistible_offense (+2d10 force 1/turn), skill (+1d10 ability check 1/turn), speed (+30ft), the_night_spirit (300ft darkvision + see invisible), truesight (Truesight 60ft)
 
