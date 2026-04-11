@@ -447,6 +447,8 @@ class combatant {
 	bool master_of_hexes_active = false; // Xanathar's Hexblade L14 (para 2794-2795)
 	bool fighting_spirit_active = false; // Samurai Fighter
 	int fighting_spirit_uses = 0; // Samurai
+	bool rapid_strike_active = false; // Samurai L15: forgo advantage for extra attack
+	bool rapid_strike_used_this_turn = false; // 1/turn limit
 	// Cavalier Fighter (Xanathar's paras 1669-1682)
 	uint marked_by_cavalier_id = 0; // ON ANY COMBATANT: ID of Cavalier who marked this creature
 	bool cavalier_mark_turn_flag = false; // expiry: true = marks placed this turn, false = clear next turn start
@@ -500,9 +502,12 @@ class combatant {
 	bool wrath_of_storms_available = false; // Storm Sorcerer
 	bool emboldening_bond_active = false; // Peace Domain Cleric
 	bool drunken_master_opportunity = false; // Way of the Drunken Master
+	bool drunkards_luck_active = false; // Drunken Master L11: spend 1 ki to cancel save disadvantage
 	bool arcane_shot_pending = false; // Arcane Archer Fighter
 	string arcane_shot_type = "";
 	int arcane_shot_uses = 0;
+	bool magic_arrow_active = false; // Arcane Archer L7: arrows count as magical (bypass BPS nonmagical resist)
+	bool curving_shot_active = false; // Arcane Archer L7: BA redirect missed ranged attack
 	// Xanathar's Arcane Archer Shot Effects (paras 1618-1646): tracking fields
 	// for shot debuffs that expire "until the start of your next turn."
 	uint arcane_enfeeble_source = 0;   // Enfeebling Arrow: weapon damage halved
@@ -2125,9 +2130,14 @@ class battle {
 		// a magic weapon flag; spell-sourced B/P/S bypasses this resistance.
 		if (target.resist_bps_nonmagical and !target.piercing_resistance and !target.bludgeoning_resistance and !target.slashing_resistance) {
 			if (damage_type == DMG_BLUDGEONING or damage_type == DMG_PIERCING or damage_type == DMG_SLASHING) {
-				// If source has Magic Weapon spell (+1/+2/+3), bypass this resistance
+				// If source has Magic Weapon spell (+1/+2/+3) or Arcane Archer Magic Arrow, bypass this resistance
 				bool magic_weapon = false;
 				if (@source != null and source.magic_weapon_bonus > 0) magic_weapon = true;
+				// Xanathar's Arcane Archer L7 Magic Arrow (para 1622-1623):
+				// "Whenever you fire a nonmagical arrow from a shortbow or longbow,
+				// you can make it magical for the purpose of overcoming resistance
+				// and immunity to nonmagical attacks and damage."
+				if (@source != null and source.magic_arrow_active) magic_weapon = true;
 				if (!magic_weapon) amount = (amount + 1) / 2;
 			}
 		}

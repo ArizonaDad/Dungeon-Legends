@@ -1605,6 +1605,20 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         else if (!c.has_skill_proficiency("Nature")) c.skill_proficiencies.insert_last("Nature");
         if (!c.knows_spell("prestidigitation")) c.prepared_spells.insert_last("prestidigitation");
         c.arcane_shot_uses = 2;
+        // L7 Magic Arrow (para 1622-1623): arrows become magical for overcoming resistance/immunity
+        if (cs.level >= 7) {
+            c.magic_arrow_active = true;
+            c.curving_shot_active = true; // L7 Curving Shot (para 1624-1625): redirect missed ranged attacks
+        }
+        // L15 Ever-Ready Shot (para 1626-1627): regain 1 arcane shot use on initiative if at 0
+        // (wired in request_next_initiative)
+        // L18 damage scaling (2d6→4d6) handled in arcane_shot block of finalize_roll_result
+    }
+
+    // Xanathar's Samurai L15 Rapid Strike (paras 1710-1711): forgo advantage on one attack
+    // to gain an extra weapon attack that turn. 1/turn.
+    if (cs.class_name == "Fighter" and cs.subclass == "Samurai" and cs.level >= 15) {
+        c.rapid_strike_active = true;
     }
 
     // Tasha's Clockwork Soul (paras 3953-4011)
@@ -2504,7 +2518,8 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
             // L3 Drunken Technique (para 1796-1797): Disengage + 10ft on Flurry
             if (cs.level >= 3) c.drunken_technique_active = true;
             // L6 Tipsy Sway — Redirect Attack: handled via existing drunken_master_opportunity
-            // L11 Drunkard's Luck: deferred (needs disadvantage-cancel prompt system)
+            // L11 Drunkard's Luck (para 1798-1800): spend 1 FP to cancel save disadvantage
+            if (cs.level >= 11) c.drunkards_luck_active = true;
             // L17 Intoxicated Frenzy: deferred (needs flurry multi-target extension)
         }
         // Xanathar's Way of the Kensei (paras 1806-1835)

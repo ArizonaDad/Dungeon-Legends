@@ -3708,6 +3708,14 @@ class battle_manager {
 			if (!h.is_companion or h.owner_id != caster_id) continue;
 			if (h.companion_subclass != "hound_of_ill_omen") continue;
 			if (feet_distance(h.x, h.y, target.x, target.y) <= 5) {
+				// Xanathar's Drunken Master L11 Drunkard's Luck (para 1798-1800): "Whenever
+				// you make an ability check, an attack roll, or a saving throw and have
+				// disadvantage, you can spend 2 ki points to cancel the disadvantage."
+				if (target.drunkards_luck_active and target.focus_points >= 2) {
+					target.focus_points -= 2;
+					broadcast_announce(target.name + " spends 2 Focus Points — Drunkard's Luck cancels the disadvantage!", false);
+					return false;
+				}
 				int hound_roll = random(1, 20);
 				if (hound_roll < save_roll) save_roll = hound_roll;
 				broadcast_announce(target.name + " has disadvantage — Hound of Ill Omen!", false);
@@ -6400,6 +6408,7 @@ class battle_manager {
 		// Valda's Spire Gunslinger maneuvers (paras 213-216): per-turn use flags reset.
 		c.grazing_shot_used_this_turn = false;
 		c.maverick_spirit_used_this_turn = false;
+		c.rapid_strike_used_this_turn = false;
 		// Valda's Spire Gunslinger Blindfire (paras 209-210): "until the end of the current
 		// turn." Cleared at start of next turn so the buff doesn't bleed across rounds.
 		c.blindfire_active = false;
@@ -7246,12 +7255,17 @@ class battle_manager {
 			int new_dist = feet_distance(new_x, new_y, enemy.x, enemy.y);
 			int reach = enemy.main_hand_range;
 			if (reach < 5) reach = 5;
-			// Opportunity attack triggers when leaving reach OR entering reach (Polearm Master).
+			// Opportunity attack triggers when leaving reach OR entering reach (Polearm Master)
+			// OR moving within reach (Cavalier Hold the Line).
 			// PHB 2024 Polearm Master (para 7714): "Other creatures provoke Opportunity
 			// Attacks from you when they enter your reach."
+			// Xanathar's Cavalier L10 Hold the Line (para 1677-1678): "Creatures provoke
+			// an opportunity attack from you when they move 5 feet or more while within
+			// your reach." On hit: target's speed becomes 0 for the rest of the turn.
 			bool leaving_reach = (old_dist <= reach and new_dist > reach);
 			bool entering_reach = (old_dist > reach and new_dist <= reach and enemy.has_feat("polearm_master") and !enemy.main_hand_is_ranged);
-			if (leaving_reach or entering_reach) {
+			bool moving_in_reach = (old_dist <= reach and new_dist <= reach and enemy.hold_the_line_active);
+			if (leaving_reach or entering_reach or moving_in_reach) {
 				if (enemy.main_hand_is_ranged) continue;
 				// Swashbuckler Rogue: Fancy Footwork — enemies attacked by Swashbuckler can't make OA
 				if (mover.class_name == "Rogue" and mover.subclass == "Swashbuckler" and enemy.swashbuckler_attacked_this_turn) continue;
@@ -7321,6 +7335,13 @@ class battle_manager {
 						if (enemy.has_feat("sentinel")) {
 							mover.movement_remaining = 0;
 							broadcast_announce(enemy.name + "'s Sentinel stops " + mover.name + " in their tracks!", false);
+						}
+						// Xanathar's Cavalier L10 Hold the Line (para 1677-1678):
+						// "the creature's speed becomes 0 until the end of the current turn."
+						if (enemy.hold_the_line_active) {
+							mover.movement_remaining = 0;
+							if (!enemy.has_feat("sentinel")) // Avoid double announce
+								broadcast_announce(enemy.name + " holds the line! " + mover.name + "'s speed drops to 0!", false);
 						}
 						maybe_apply_on_kill_features(enemy, mover);
 						check_concentration(mover, total_damage, enemy);
@@ -9233,6 +9254,65 @@ class battle_manager {
 						send_roll_request(sf_user, sf_pr);
 					}
 					return;
+				}
+			}
+
+			// Xanathar's Arcane Archer L7 Curving Shot (para 1624-1625): "When you
+			// make an attack roll with a magic arrow and miss, you can use a bonus
+			// action to reroll the attack roll against a different target within 60
+			// feet of the original target."
+			if (!hit and !is_fumble and pr.is_weapon_attack and c.curving_shot_active and c.has_bonus_action and c.main_hand_is_ranged and !target.is_dead) {
+				// Find a different hostile target within 60ft of the original target
+				combatant@ curve_target = null;
+				int best_curve_dist = 999;
+				for (uint csi = 0; csi < combat.combatants.length(); csi++) {
+					combatant@ ct = combat.combatants[csi];
+					if (@ct == null or ct.is_dead or !ct.is_alive() or ct.id == target.id or ct.id == c.id) continue;
+					if (!combat.are_hostile(c, ct)) continue;
+					int cdist = feet_distance(target.x, target.y, ct.x, ct.y);
+					if (cdist <= 60 and cdist < best_curve_dist) {
+						best_curve_dist = cdist;
+						@curve_target = ct;
+					}
+				}
+				if (@curve_target != null) {
+					c.has_bonus_action = false; // Costs bonus action
+					int cs_roll = random(1, 20);
+					bool cs_adv = false;
+					bool cs_disadv = false;
+					int cs_dist = feet_distance(c.x, c.y, curve_target.x, curve_target.y);
+					apply_attack_advantage_state(c, curve_target, cs_dist, true, cs_adv, cs_disadv, false);
+					if (cs_adv and !cs_disadv) { int r2 = random(1, 20); if (r2 > cs_roll) cs_roll = r2; }
+					if (cs_disadv and !cs_adv) { int r2 = random(1, 20); if (r2 < cs_roll) cs_roll = r2; }
+					int cs_total = cs_roll + pr.modifier;
+					bool cs_hit = cs_total >= curve_target.armor_class and cs_roll != 1;
+					if (cs_roll == 20) cs_hit = true;
+					string cs_outcome = cs_hit ? "hits!" : "misses.";
+					broadcast_announce(c.name + "'s arrow curves toward " + curve_target.name + "!", false);
+					broadcast_roll(c.name, "Curving Shot vs " + curve_target.name, cs_roll, pr.modifier, cs_total, cs_outcome);
+					if (cs_hit) {
+						pending_roll cs_pr;
+						cs_pr.combatant_id = c.id;
+						cs_pr.player_username = c.is_player ? c.player_username : c.name;
+						cs_pr.roll_type = ROLL_DAMAGE;
+						cs_pr.target_id = curve_target.id;
+						cs_pr.damage_dice_count = pr.damage_dice_count;
+						cs_pr.damage_dice_sides = pr.damage_dice_sides;
+						cs_pr.damage_modifier = pr.damage_modifier;
+						cs_pr.damage_type = pr.damage_type;
+						cs_pr.is_weapon_attack = true;
+						cs_pr.is_crit = (cs_roll == 20);
+						cs_pr.attack_name = "Curving Shot";
+						@current_roll = cs_pr;
+						user@ cs_user = find_user_for_combatant(c);
+						if (@cs_user == null or cs_user.is_bot or !c.is_player) {
+							int cs_natural = random(1, cs_pr.damage_dice_sides);
+							process_roll_result(cs_natural);
+						} else {
+							send_roll_request(cs_user, cs_pr);
+						}
+						return;
+					}
 				}
 			}
 
@@ -12445,6 +12525,16 @@ class battle_manager {
 		bool adv = false;
 		bool disadv = false;
 		apply_attack_advantage_state(c, target, dist, c.main_hand_is_ranged, adv, disadv);
+		// Xanathar's Samurai L15 Rapid Strike (paras 1710-1711): "If you take the Attack
+		// action on your turn and have advantage on an attack roll against one of the targets,
+		// you can forgo the advantage for that attack to make one additional weapon attack
+		// against that target, as part of the same action. You can do so no more than once per turn."
+		if (c.rapid_strike_active and !c.rapid_strike_used_this_turn and adv and !disadv) {
+			c.rapid_strike_used_this_turn = true;
+			adv = false; // Forgo advantage
+			c.attacks_remaining_this_turn++; // Gain one extra attack
+			broadcast_announce(c.name + " uses Rapid Strike — forgoing advantage for an extra attack!", false);
+		}
 		// Can't attack what you can't see
 		if (!combat.can_see(c, target)) {
 			u.send({{"type", message_types::announce}, {"text", "You cannot see that target."}, {"interrupt", true}});
