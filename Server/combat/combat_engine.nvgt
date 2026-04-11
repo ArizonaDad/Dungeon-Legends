@@ -636,6 +636,16 @@ class combatant {
 	// attack disadv vs caster, forced dodge, or extra 1d8 necrotic on caster's attacks.
 	string bestow_curse_type = "";        // "extra_damage","attack_disadv","forced_dodge","ability_X"
 	uint bestow_curse_source_id = 0;      // Caster ID for cleanup + attack targeting
+	// Basic Rules 2024 Warding Bond (para 15561): +1 AC, +1 saves, resistance to all,
+	// damage sharing. Non-concentration, 1 hour, ends if caster drops to 0 HP.
+	bool warding_bond_active = false;     // On TARGET: bonded and protected
+	uint warding_bond_source_id = 0;      // On TARGET: who cast the bond on me
+	uint warding_bond_target_id = 0;      // On CASTER: who am I protecting
+	// Basic Rules 2024 Vicious Mockery (para 15527): "Disadvantage on the next attack
+	// roll it makes before the end of its next turn." Consumed on first attack.
+	bool vicious_mockery_disadv = false;
+	// Basic Rules 2024 Bane (para 12032): per-caster tracking for concentration cleanup
+	uint bane_source_id = 0;
 	bool wizardly_quill_active = false; // Order of Scribes Wizard
 	int awakened_spellbook_changes = 0; // Order of Scribes - replace damage type
 	// Gunslinger subclasses (Valda's Spire of Secrets paras 229-490)
@@ -1348,6 +1358,8 @@ class combatant {
 		if (paladin_aura_received_bonus > 0) {
 			mod += paladin_aura_received_bonus;
 		}
+		// Basic Rules 2024 Warding Bond (para 15561): "it gains a +1 bonus to AC and saving throws"
+		if (warding_bond_active) mod += 1;
 		// Xanathar's War Magic L10 Durable Magic (para 2941-2942): "While you maintain
 		// concentration on a spell, you have a +2 bonus to... all saving throws."
 		if (durable_magic_active and is_concentrating) mod += 2;
@@ -1641,6 +1653,7 @@ class battle {
 	int current_turn_index = -1;   // index into initiative_order
 	int round_number = 0;
 	bool battle_active = false;
+	bool warding_bond_sharing = false; // Recursion guard for Warding Bond damage sharing
 	string mode = "pvp";           // "pvp", "wave", "boss"
 	int wave_number = 0;
 
@@ -2040,6 +2053,14 @@ class battle {
 		if (target.superior_defense_active and damage_type != DMG_FORCE) {
 			amount = (amount + 1) / 2;
 		}
+		// Basic Rules 2024 Warding Bond (para 15561): "it has Resistance to all damage."
+		// Also: "each time it takes damage, you take the same amount of damage."
+		// Recursion guard prevents infinite chain if two creatures bond each other.
+		int warding_bond_shared_amount = 0;
+		if (target.warding_bond_active and !warding_bond_sharing) {
+			amount = (amount + 1) / 2;
+			warding_bond_shared_amount = amount; // source takes post-resistance amount
+		}
 
 		// Death Ward (Basic Rules para 12784): "The first time the target would drop to
 		// 0 Hit Points before the spell ends, the target instead drops to 1 Hit Point,
@@ -2072,6 +2093,23 @@ class battle {
 		}
 
 		target.current_hp -= amount;
+
+		// Warding Bond: share damage to the bond source after applying to the target.
+		if (warding_bond_shared_amount > 0 and target.warding_bond_source_id != 0) {
+			combatant@ wb_src = get_combatant(target.warding_bond_source_id);
+			if (@wb_src != null and !wb_src.is_dead) {
+				warding_bond_sharing = true;
+				apply_damage(wb_src, warding_bond_shared_amount, damage_type, source);
+				warding_bond_sharing = false;
+				// Bond ends if source drops to 0 HP (Basic Rules 2024 para 15561)
+				if (wb_src.current_hp <= 0) {
+					target.warding_bond_active = false;
+					target.armor_class -= 1;
+					target.warding_bond_source_id = 0;
+					wb_src.warding_bond_target_id = 0;
+				}
+			}
+		}
 
 		// Tasha's Order Domain Order's Demand: charm ends when charmed creature takes damage.
 		if (amount > 0 and target.orders_demand_charmed_by != 0 and target.has_condition(COND_CHARMED)) {

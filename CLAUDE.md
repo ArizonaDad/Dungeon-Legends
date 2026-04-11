@@ -240,6 +240,12 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 
 - **Blur** (L2, concentration): Sets `blur_active`. Attackers who can see the target have disadvantage in `apply_attack_advantage_state`. Cleared in `clear_concentration_effects`.
 
+- **Warding Bond** (L2, non-concentration, 1 hour): Basic Rules 2024 para 15561. Touch range (5ft), ally only. Target gains +1 AC, +1 to all saving throws (in `get_save_bonus`), and resistance to ALL damage (in `apply_damage`). When target takes damage, caster takes the same amount (post-resistance). Tracked via `warding_bond_active`, `warding_bond_source_id` (on target), `warding_bond_target_id` (on caster). Recursion-safe via `warding_bond_sharing` flag on the `battle` class. Bond ends if caster drops to 0 HP (cleared in `apply_damage` after sharing). Casting again on either creature ends the old bond. No concentration cleanup needed — duration-based only.
+
+- **Vicious Mockery** (cantrip): Basic Rules 2024 para 15527. WIS save, 1d6 psychic (scales). On failed save, `vicious_mockery_disadv` flag set on target — grants disadvantage on next attack roll (consumed in `apply_attack_advantage_state`). No longer incorrectly reuses the `baned` flag.
+
+- **Bane** (L1, concentration): Now uses per-caster tracking via `bane_source_id` field on targets. Concentration cleanup in `clear_concentration_effects` only clears targets where `bane_source_id == caster.id` (was blanket-clear).
+
 - **Guidance** (cantrip, concentration): Sets `guidance_active` on target. +1d4 on next ability check in `finalize_roll_result` for `ROLL_ABILITY_CHECK`, auto-cleared after use.
 
 - **Resistance** (cantrip, concentration): Sets `resistance_active` on target. +1d4 on next saving throw in `get_save_bonus`, auto-cleared after use.

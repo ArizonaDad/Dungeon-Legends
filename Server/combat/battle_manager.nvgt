@@ -2684,6 +2684,12 @@ class battle_manager {
 		if (attacker.bestow_curse_type == "attack_disadv" and attacker.bestow_curse_source_id == target.id) {
 			disadv = true;
 		}
+		// Basic Rules 2024 Vicious Mockery (para 15527): "Disadvantage on the next
+		// attack roll it makes before the end of its next turn." Consumed on first attack.
+		if (attacker.vicious_mockery_disadv) {
+			disadv = true;
+			attacker.vicious_mockery_disadv = false;
+		}
 		// PHB 2024 Invisible condition (para 16219): "Attack rolls against the creature
 		// have Disadvantage, and the creature's attack rolls have Advantage." The defender
 		// Disadvantage is above; the attacker Advantage is here.
@@ -3873,13 +3879,14 @@ class battle_manager {
 		if (caster.durable_magic_active and caster.is_concentrating) {
 			caster.armor_class -= 2;
 		}
-		// Bane is a concentration spell but we don't currently track the source per target,
-		// so we blanket-clear all baned flags when the caster had bane as their concentration.
-		// This is an approximation — if two bards cast Bane on the same target and one drops,
-		// the bane is cleared. In practice Bane is rarely stacked so this is acceptable.
-		if (caster.concentration_spell == "bane") {
+		// Bane: per-caster cleanup — only clear baned flag on targets cursed by THIS caster.
+		if (caster.concentration_spell == "Bane" or caster.concentration_spell == "bane") {
 			for (uint bi = 0; bi < combat.combatants.length(); bi++) {
-				if (@combat.combatants[bi] != null) combat.combatants[bi].baned = false;
+				combatant@ b_t = combat.combatants[bi];
+				if (@b_t != null and b_t.baned and b_t.bane_source_id == caster.id) {
+					b_t.baned = false;
+					b_t.bane_source_id = 0;
+				}
 			}
 		}
 		for (uint i = 0; i < combat.combatants.length(); i++) {
@@ -14351,8 +14358,8 @@ class battle_manager {
 				broadcast_roll(target.name, "WIS save vs Vicious Mockery", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Mocked!");
 				if (!saved) {
 					combat.apply_damage(target, total_damage, DMG_PSYCHIC, c);
-					// Approximation: bane effect (-2 to next attack roll) for "disadvantage on the next attack roll"
-					target.baned = true;
+					// Basic Rules 2024 Vicious Mockery: "Disadvantage on the next attack roll"
+					target.vicious_mockery_disadv = true;
 					broadcast_announce(c.name + "'s Vicious Mockery cuts " + target.name + " for " + total_damage + " psychic damage and shakes their composure!", true);
 				}
 				broadcast_state();
@@ -15293,6 +15300,7 @@ class battle_manager {
 					broadcast_roll(t.name, "CHA save vs Bane", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Baned!");
 					if (!saved) {
 						t.baned = true;
+						t.bane_source_id = c.id;
 						banned++;
 					}
 				}
@@ -17422,8 +17430,46 @@ class battle_manager {
 			else if (spell.id == "shining_smite") {
 				broadcast_announce(c.name + " casts Shining Smite. Their next strike will radiate light and deal radiant damage.", true);
 			}
-			else if (spell.id == "warding_bond") {
-				broadcast_announce(c.name + " casts Warding Bond, linking with an ally to share damage and grant +1 AC.", true);
+			else if (spell.id == "warding_bond" and @target != null) {
+				// Basic Rules 2024 Warding Bond (para 15561): touch range, 1 hour, non-conc.
+				// Target gains +1 AC, +1 to all saves, resistance to all damage.
+				// When target takes damage, caster takes the same amount.
+				int dist = feet_distance(c.x, c.y, target.x, target.y);
+				if (dist > 5) {
+					u.send({{"type", message_types::announce}, {"text", "Warding Bond requires a target within 5 feet."}, {"interrupt", true}});
+					return;
+				}
+				if (c.id == target.id) {
+					u.send({{"type", message_types::announce}, {"text", "Warding Bond targets another creature, not yourself."}, {"interrupt", true}});
+					return;
+				}
+				// Clear any existing bond the caster is providing
+				if (c.warding_bond_target_id != 0) {
+					combatant@ old_tgt = combat.get_combatant(c.warding_bond_target_id);
+					if (@old_tgt != null and old_tgt.warding_bond_active and old_tgt.warding_bond_source_id == c.id) {
+						old_tgt.armor_class -= 1;
+						old_tgt.warding_bond_active = false;
+						old_tgt.warding_bond_source_id = 0;
+						broadcast_announce(old_tgt.name + "'s Warding Bond fades as a new one is cast.", false);
+					}
+					c.warding_bond_target_id = 0;
+				}
+				// Clear any existing bond on the target
+				if (target.warding_bond_active) {
+					combatant@ old_src = combat.get_combatant(target.warding_bond_source_id);
+					if (@old_src != null) old_src.warding_bond_target_id = 0;
+					target.armor_class -= 1;
+					target.warding_bond_active = false;
+					target.warding_bond_source_id = 0;
+					broadcast_announce(target.name + "'s previous Warding Bond fades.", false);
+				}
+				target.warding_bond_active = true;
+				target.warding_bond_source_id = c.id;
+				c.warding_bond_target_id = target.id;
+				target.armor_class += 1;
+				broadcast_announce(c.name + " casts Warding Bond on " + target.name + "! +1 AC, +1 to all saves, resistance to all damage. " + c.name + " shares the damage.", true);
+				broadcast_state();
+				return;
 			}
 			// Level 3
 			else if (spell.id == "conjure_cannonball") {
