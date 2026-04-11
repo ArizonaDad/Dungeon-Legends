@@ -6395,6 +6395,13 @@ class battle_manager {
 		c.remove_condition(COND_FRIGHTENED);
 		c.remove_condition(COND_CHARMED);
 		c.remove_condition(COND_POISONED);
+		// Call clear_concentration_effects BEFORE clearing state to properly
+		// remove per-target spell flags (heat_metal_disadv, greater_invisibility,
+		// bestow_curse, enlarge, shield_of_faith, beacon_of_hope, etc.)
+		if (c.is_concentrating) {
+			clear_concentration_effects(c);
+			c.remove_condition(COND_CONCENTRATING);
+		}
 		c.is_concentrating = false;
 		c.concentration_spell = "";
 
@@ -10278,6 +10285,14 @@ class battle_manager {
 
 		combatant@ c = combat.get_combatant(pr.combatant_id);
 		if (@c == null) return;
+		// Basic Rules 2024 Beacon of Hope (para 12201): "whenever a creature
+		// regains Hit Points ... also has Advantage on ... Death Saving Throws"
+		if (pr.roll_type == ROLL_DEATH_SAVE and c.beacon_of_hope_active) {
+			int beacon_second = random(1, 20);
+			int beacon_chosen = natural_roll > beacon_second ? natural_roll : beacon_second;
+			broadcast_announce(c.name + "'s Beacon of Hope grants advantage — rolled " + natural_roll + " and " + beacon_second + ", using " + beacon_chosen + ".", false);
+			natural_roll = beacon_chosen;
+		}
 		int bless_bonus = 0;
 		if (c.blessed and (pr.roll_type == ROLL_ATTACK or pr.roll_type == ROLL_CONCENTRATION or pr.roll_type == ROLL_DEATH_SAVE)) {
 			bless_bonus = roll_bless_bonus(c);
