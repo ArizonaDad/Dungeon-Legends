@@ -101,6 +101,18 @@ class combatant {
 	// Basic Rules 2024 Flame Blade (para 13334-13343): persistent melee spell attack
 	bool flame_blade_active = false;     // Fiery blade evoked, can attack with action
 	int flame_blade_dice = 3;            // 3d6 base, +1d6 per upcast above L2
+	// Basic Rules 2024 Aura of Life (para 12166-12168): 30ft emanation, concentration
+	// Allies have necrotic resistance, HP max can't be reduced, 0 HP ally regains 1 HP at turn start.
+	bool aura_of_life_active = false;       // Set on the CASTER
+	uint aura_of_life_necrotic_from = 0;    // On TARGETS: caster ID who granted necrotic resist via this aura
+	// Basic Rules 2024 Power Word Stun (para 14671-14673): Stunned condition with
+	// CON save at end of each turn to break free. Track caster for save DC.
+	uint power_word_stun_caster_id = 0;     // On TARGET: caster who stunned them (0 = not PW stunned)
+	bool power_word_stun_speed_zero = false; // >150 HP path: Speed = 0 until start of caster's next turn
+	uint power_word_stun_speed_source = 0;  // Caster who applied the speed reduction
+	// Gun Slinger Class Jam Weapon (para 736-738): weapon malfunction, can't attack
+	// until a Utilize action is taken to fix it.
+	bool weapon_jammed = false;
 	bool searing_smite_pending = false;  // Searing Smite rider on next weapon hit
 	int searing_smite_dice = 0;          // Number of d6 to roll for Searing Smite damage
 	// Basic Rules 2024 Searing Smite (para 14881): repeating fire damage at turn start
@@ -2646,6 +2658,7 @@ class battle {
 				state["my_heat_metal_active"] = c.heat_metal_active;
 				state["my_call_lightning_active"] = c.call_lightning_active;
 				state["my_flame_blade_active"] = c.flame_blade_active;
+				state["my_weapon_jammed"] = c.weapon_jammed;
 				state["my_swift_quiver_active"] = c.swift_quiver_active;
 				state["my_flaming_sphere_active"] = c.flaming_sphere_active;
 				state["my_conjure_woodland_disengage"] = c.conjure_woodland_disengage;

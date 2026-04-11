@@ -4354,6 +4354,19 @@ class battle_manager {
 		caster.globe_of_invulnerability_level = 5;
 		// Holy Aura: clear aura when concentration breaks
 		caster.holy_aura_active = false;
+		// Basic Rules 2024 Aura of Life (para 12166-12168): clear aura when concentration breaks.
+		// Remove aura-granted necrotic resistance from all allies who got it from this caster.
+		if (caster.aura_of_life_active) {
+			for (uint aoli = 0; aoli < combat.combatants.length(); aoli++) {
+				combatant@ aol_t = combat.combatants[aoli];
+				if (@aol_t == null) continue;
+				if (aol_t.aura_of_life_necrotic_from == caster.id) {
+					aol_t.necrotic_resistance = false;
+					aol_t.aura_of_life_necrotic_from = 0;
+				}
+			}
+		}
+		caster.aura_of_life_active = false;
 		// Bestow Curse: clear curse effects on all combatants cursed by this caster
 		for (uint bci = 0; bci < combat.combatants.length(); bci++) {
 			combatant@ bct = combat.combatants[bci];
@@ -5353,6 +5366,40 @@ class battle_manager {
 			}
 		}
 
+		// Basic Rules 2024 Power Word Stun (para 14671-14673): "The Stunned target makes
+		// a Constitution saving throw at the end of each of its turns, ending the condition
+		// on itself on a success." No concentration — the stun lasts until they save.
+		if (@prev != null and prev.is_alive() and prev.power_word_stun_caster_id != 0
+			and prev.has_condition(COND_STUNNED)) {
+			combatant@ pws_caster = combat.get_combatant(prev.power_word_stun_caster_id);
+			if (@pws_caster != null) {
+				int save_dc_val = spell_save_dc(pws_caster);
+				int save_roll = random(1, 20);
+				if (prev.staggering_blow_active) { int sb2 = random(1, 20); if (sb2 < save_roll) save_roll = sb2; prev.staggering_blow_active = false; broadcast_announce(prev.name + " has disadvantage from Staggering Blow!", false); }
+				int save_bonus = prev.get_save_bonus(ABILITY_CON);
+				int bless_bonus = roll_bless_bonus(prev);
+				int save_total = save_roll + save_bonus + bless_bonus;
+				bool saved = save_total >= save_dc_val;
+				broadcast_roll(prev.name, "CON save vs Power Word Stun (end of turn)", save_roll, save_bonus + bless_bonus, save_total, saved ? "Freed!" : "Still stunned!");
+				if (!saved and try_arcane_deflection_save(prev, save_dc_val, save_total)) saved = true;
+				if (!saved) { int ds = try_disciplined_survivor_reroll(prev, save_dc_val, save_total, save_bonus + bless_bonus, "CON save vs Power Word Stun"); if (ds >= save_dc_val) saved = true; }
+				if (!saved) { int fg = try_flash_of_genius(prev, save_dc_val, save_total, "CON save vs Power Word Stun"); if (fg >= save_dc_val) saved = true; }
+				if (!saved) { int bf = try_boon_of_fate_bonus(prev, save_total, save_dc_val); if (bf >= save_dc_val) saved = true; }
+				if (!saved and try_stroke_of_luck_save(prev, save_dc_val, save_bonus + bless_bonus)) saved = true;
+				if (saved) {
+					prev.remove_condition(COND_STUNNED);
+					prev.power_word_stun_caster_id = 0;
+					broadcast_to_battle({{"type", message_types::condition_removed}, {"target", prev.name}, {"condition", "Stunned"}});
+					broadcast_announce(prev.name + " breaks free from Power Word Stun!", true);
+				}
+			} else {
+				// Caster is dead/gone — free the stunned target
+				prev.remove_condition(COND_STUNNED);
+				prev.power_word_stun_caster_id = 0;
+				broadcast_announce(prev.name + " breaks free from Power Word Stun as the caster is gone!", true);
+			}
+		}
+
 		// Time Stop: if the combatant whose turn just ended has time_stop_turns_remaining,
 		// DON'T advance initiative — instead restart their turn immediately.
 		if (@prev != null and prev.time_stop_turns_remaining > 0 and prev.is_alive()) {
@@ -5391,6 +5438,16 @@ class battle_manager {
 		if (@c == null) return;
 		clear_shield_effect(c, false);
 		clear_help_effect(c, false);
+		// Basic Rules 2024 Power Word Stun (para 14671-14673): >150 HP path —
+		// "Speed is 0 until the start of your next turn." Clear at caster's turn start.
+		for (uint pwsi = 0; pwsi < combat.combatants.length(); pwsi++) {
+			combatant@ pws_t = combat.combatants[pwsi];
+			if (@pws_t != null and pws_t.power_word_stun_speed_zero and pws_t.power_word_stun_speed_source == c.id) {
+				pws_t.power_word_stun_speed_zero = false;
+				pws_t.power_word_stun_speed_source = 0;
+				broadcast_announce(pws_t.name + "'s speed is restored as the Power Word effect fades.", false);
+			}
+		}
 		// Basic Rules 2024 Heat Metal (para 13734): disadvantage lasts "until the
 		// start of your next turn" — clear on the CASTER's turn start.
 		if (c.heat_metal_active and c.heat_metal_target_id != 0) {
@@ -5598,6 +5655,44 @@ class battle_manager {
 		if (active_modifier == "blessed_grounds" and c.is_player and c.is_alive() and c.current_hp > 0) {
 			int healed = combat.apply_healing(c, 5);
 			if (healed > 0) broadcast_announce(c.name + " heals " + healed + " HP from Blessed Grounds.", false);
+		}
+
+		// Basic Rules 2024 Aura of Life (para 12166-12168): "While in the aura, you and
+		// your allies have Resistance to Necrotic damage, and your Hit Point maximums can't
+		// be reduced. If an ally with 0 Hit Points starts its turn in the aura, that ally
+		// regains 1 Hit Point."
+		// Check all living casters with aura_of_life_active. If this combatant is an ally
+		// within 30ft: grant necrotic resistance for the turn, and heal 1 HP if at 0.
+		{
+			bool in_any_aol = false;
+			for (uint aoli = 0; aoli < combat.combatants.length(); aoli++) {
+				combatant@ aol_caster = combat.combatants[aoli];
+				if (@aol_caster == null or aol_caster.is_dead or !aol_caster.aura_of_life_active) continue;
+				// Must be on the same side (allies), or the caster themselves
+				if (aol_caster.is_player != c.is_player and aol_caster.id != c.id) continue;
+				int aol_dist = feet_distance(aol_caster.x, aol_caster.y, c.x, c.y);
+				if (aol_dist <= 30) {
+					in_any_aol = true;
+					// Grant necrotic resistance while in aura (track source for cleanup)
+					if (!c.necrotic_resistance) {
+						c.necrotic_resistance = true;
+						c.aura_of_life_necrotic_from = aol_caster.id;
+					}
+					// Ally at 0 HP regains 1 HP (not the caster — source says "an ally")
+					if (c.id != aol_caster.id and c.current_hp == 0 and c.is_alive()) {
+						int aol_healed = combat.apply_healing(c, 1);
+						if (aol_healed > 0) {
+							broadcast_announce(c.name + " regains 1 HP from " + aol_caster.name + "'s Aura of Life!", true);
+						}
+					}
+					break; // Only need one aura source to apply
+				}
+			}
+			// If NOT in any Aura of Life but resistance was granted by one, remove it
+			if (!in_any_aol and c.aura_of_life_necrotic_from != 0) {
+				c.necrotic_resistance = false;
+				c.aura_of_life_necrotic_from = 0;
+			}
 		}
 
 		// Spirit Guardians: WIS save; enemies who start their turn inside the 15ft aura take damage.
@@ -7476,6 +7571,14 @@ class battle_manager {
 				}
 				broadcast_state();
 			}
+		}
+
+		// Gun Slinger Class Jam Weapon: monsters auto-unjam (spends their action)
+		if (monster.weapon_jammed and monster.has_action) {
+			monster.weapon_jammed = false;
+			monster.has_action = false;
+			monster.used_action = true;
+			broadcast_announce(monster.name + " spends its action to unjam its weapon!", true);
 		}
 
 		// Step 2b: Melee/ranged attack if breath was not used
@@ -11985,6 +12088,11 @@ class battle_manager {
 			u.send({{"type", message_types::announce}, {"text", "You are incapacitated and cannot take actions."}, {"interrupt", true}});
 			return;
 		}
+		// Gun Slinger Class Jam Weapon (para 736-738): jammed weapon can't attack.
+		if (c.weapon_jammed) {
+			u.send({{"type", message_types::error}, {"text", "Your weapon is jammed! Use your action to fix it (choose Unjam Weapon from the action menu)."}});
+			return;
+		}
 		// Allow attack if: has action (fresh), OR has remaining attacks from Extra Attack.
 		if (!c.has_action and c.attacks_remaining_this_turn <= 0) {
 			u.send({{"type", message_types::error}, {"text", "You've already used your action this turn. Press F and choose End Turn, or press B for a bonus action."}});
@@ -12693,6 +12801,25 @@ class battle_manager {
 	// Basic Rules 2024 Flame Blade (para 13334-13343): "As a Magic action, you can
 	// make a melee spell attack with the fiery blade. On a hit, the target takes
 	// Fire damage equal to 3d6 plus your spellcasting ability modifier."
+	void handle_unjam_weapon(user@ u) {
+		if (@combat == null or @u == null) return;
+		combatant@ c = combat.current_combatant();
+		if (@c == null or !c.is_player or c.player_username != u.username) return;
+		if (!c.weapon_jammed) {
+			u.send({{"type", message_types::error}, {"text", "Your weapon is not jammed."}});
+			return;
+		}
+		if (!c.has_action) {
+			u.send({{"type", message_types::error}, {"text", "You need an action to unjam your weapon."}});
+			return;
+		}
+		c.weapon_jammed = false;
+		c.has_action = false;
+		c.used_action = true;
+		broadcast_announce(c.name + " spends their action to unjam their weapon!", true);
+		broadcast_state();
+	}
+
 	void handle_flame_blade_attack(user@ u, json_object@ msg) {
 		if (@combat == null or @u == null or @msg == null) return;
 		combatant@ c = combat.current_combatant();
@@ -13663,14 +13790,22 @@ class battle_manager {
 			check_battle_end();
 			return;
 		}
-		// Power Word Stun: no save, stun if HP <= 150
+		// Basic Rules 2024 Power Word Stun (para 14671-14673): "If the target has
+		// 150 Hit Points or fewer, it has the Stunned condition. Otherwise, its Speed
+		// is 0 until the start of your next turn. The Stunned target makes a Constitution
+		// saving throw at the end of each of its turns, ending the condition on a success."
 		else if (spell.id == "power_word_stun" and @target != null and !target.is_dead) {
 			if (target.current_hp <= 150) {
 				target.add_condition(COND_STUNNED);
+				target.power_word_stun_caster_id = c.id;
 				broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Stunned"}});
-				broadcast_announce(target.name + " is stunned by Power Word Stun!", true);
+				broadcast_announce(c.name + " utters a Power Word! " + target.name + " is Stunned! (CON save at end of each turn to break free)", true);
 			} else {
-				broadcast_announce(target.name + " has too many hit points for Power Word Stun to take effect.", false);
+				// >150 HP: Speed = 0 until start of caster's next turn
+				target.power_word_stun_speed_zero = true;
+				target.power_word_stun_speed_source = c.id;
+				target.movement_remaining = 0;
+				broadcast_announce(c.name + " utters a Power Word! " + target.name + " resists the stun but their Speed is reduced to 0 until " + c.name + "'s next turn.", true);
 			}
 			broadcast_state();
 			return;
@@ -17190,8 +17325,63 @@ class battle_manager {
 				sc.prompt_text = "Protection from Energy: choose a damage type. Press 1 for Acid, 2 for Cold, 3 for Fire, 4 for Lightning, or 5 for Thunder.";
 				send_spell_choice_prompt(c, sc);
 			}
-			else if (spell.id == "remove_curse") {
-				broadcast_announce(c.name + " casts Remove Curse.", true);
+			else if (spell.id == "remove_curse" and @target != null and !target.is_dead) {
+				// Basic Rules 2024 Remove Curse (para 14774-14775): "At your touch, all
+				// curses affecting one creature or object end." Touch = 5ft range.
+				int rc_dist = feet_distance(c.x, c.y, target.x, target.y);
+				if (rc_dist > 5) {
+					broadcast_announce(target.name + " is too far away! Remove Curse requires touch (5 ft).", false);
+					return;
+				}
+				bool removed_any = false;
+				// Remove Bestow Curse
+				if (target.bestow_curse_type != "") {
+					// Find the caster of Bestow Curse and break their concentration
+					if (target.bestow_curse_source_id != 0) {
+						combatant@ bc_caster = combat.get_combatant(target.bestow_curse_source_id);
+						if (@bc_caster != null and bc_caster.is_concentrating and bc_caster.concentration_spell == "Bestow Curse") {
+							bc_caster.is_concentrating = false;
+							bc_caster.concentration_spell = "";
+						}
+					}
+					target.bestow_curse_type = "";
+					target.bestow_curse_source_id = 0;
+					broadcast_announce("Bestow Curse is lifted from " + target.name + "!", true);
+					removed_any = true;
+				}
+				// Remove Hex curse
+				for (uint rci = 0; rci < combat.combatants.length(); rci++) {
+					combatant@ hex_c = combat.combatants[rci];
+					if (@hex_c == null or hex_c.is_dead) continue;
+					if (hex_c.hex_target_id == target.id) {
+						hex_c.hex_target_id = 0;
+						hex_c.hex_cursed_ability = -1;
+						if (hex_c.is_concentrating and hex_c.concentration_spell == "Hex") {
+							hex_c.is_concentrating = false;
+							hex_c.concentration_spell = "";
+						}
+						broadcast_announce("Hex is lifted from " + target.name + "!", true);
+						removed_any = true;
+						break;
+					}
+				}
+				// Remove Hexblade's Curse
+				for (uint hbi = 0; hbi < combat.combatants.length(); hbi++) {
+					combatant@ hb_c = combat.combatants[hbi];
+					if (@hb_c == null or hb_c.is_dead) continue;
+					if (hb_c.hexblade_curse_target == target.id) {
+						hb_c.hexblade_curse_target = 0;
+						broadcast_announce("Hexblade's Curse is lifted from " + target.name + "!", true);
+						removed_any = true;
+						break;
+					}
+				}
+				if (!removed_any) {
+					broadcast_announce(c.name + " casts Remove Curse on " + target.name + ", but no curses were found.", true);
+				} else {
+					broadcast_announce(c.name + " casts Remove Curse, freeing " + target.name + " from all curses!", true);
+					broadcast_state();
+				}
 			}
 			else if (spell.id == "sending") {
 				broadcast_announce(c.name + " casts Sending, delivering a short telepathic message.", true);
@@ -17904,7 +18094,48 @@ class battle_manager {
 				broadcast_announce(c.name + " casts Illusory Script, weaving an illusion onto written words.", true);
 			}
 			else if (spell.id == "perforating_shot") {
-				broadcast_announce(c.name + " casts Perforating Shot, transforming their next attack into a piercing line of energy.", true);
+				// Gun Slinger Class (para 730-735): Bonus Action after hitting or missing
+				// with a ranged weapon attack. Transforms into a 5-foot-wide Line to weapon
+				// range. Each creature in Line makes DEX save for weapon damage (half on
+				// success). +1d8 per upcast. Implemented as an immediate line AoE from
+				// caster through all enemies in a line to weapon's normal range.
+				int ps_range = c.main_hand_range;
+				if (ps_range < 30) ps_range = 30; // Minimum useful range
+				int ps_base_dmg = 0;
+				int ps_dice = c.main_hand_damage_count;
+				int ps_die = c.main_hand_damage_dice;
+				for (int d = 0; d < ps_dice; d++) ps_base_dmg += random(1, ps_die);
+				// Upcast: +1d8 per slot level above 1
+				for (int u = 0; u < upcast_levels; u++) ps_base_dmg += random(1, 8);
+				int ps_dmg_type = c.main_hand_damage_type;
+				broadcast_announce(c.name + " casts Perforating Shot! A line of piercing energy extends " + ps_range + " feet!", true);
+				// Hit all enemies in range (line approximation: all hostiles within weapon range)
+				for (uint psi = 0; psi < combat.combatants.length(); psi++) {
+					combatant@ ps_t = combat.combatants[psi];
+					if (@ps_t == null or ps_t.is_dead or ps_t.id == c.id) continue;
+					if (ps_t.is_player == c.is_player and combat.mode != "pvp") continue;
+					int ps_dist = feet_distance(c.x, c.y, ps_t.x, ps_t.y);
+					if (ps_dist > ps_range) continue;
+					int ps_save_roll = random(1, 20);
+					apply_hound_save_disadvantage(ps_t, c.id, ps_save_roll);
+					int ps_save_bonus = ps_t.get_save_bonus(ABILITY_DEX);
+					int ps_bless = roll_bless_bonus(ps_t);
+					int ps_save_total = ps_t.apply_indomitable_might(ps_save_roll + ps_save_bonus + ps_bless, ABILITY_DEX);
+					bool ps_saved = ps_save_total >= save_dc;
+					int ps_dmg = ps_saved ? ps_base_dmg / 2 : ps_base_dmg;
+					if (ps_dmg < 1) ps_dmg = 1;
+					broadcast_roll(ps_t.name, "DEX save vs Perforating Shot", ps_save_roll, ps_save_bonus + ps_bless, ps_save_total, ps_saved ? "Half damage!" : "Full damage!");
+					if (!ps_saved and try_arcane_deflection_save(ps_t, save_dc, ps_save_total)) { ps_saved = true; ps_dmg = ps_base_dmg / 2; }
+					if (!ps_saved) { int fg = try_flash_of_genius(ps_t, save_dc, ps_save_total, "DEX save vs Perforating Shot"); if (fg >= save_dc) { ps_saved = true; ps_dmg = ps_base_dmg / 2; } }
+					if (!ps_saved) { int bf = try_boon_of_fate_bonus(ps_t, ps_save_total, save_dc); if (bf >= save_dc) { ps_saved = true; ps_dmg = ps_base_dmg / 2; } }
+					if (!ps_saved and try_stroke_of_luck_save(ps_t, save_dc, ps_save_bonus + ps_bless)) { ps_saved = true; ps_dmg = ps_base_dmg / 2; }
+					if (ps_dmg < 1) ps_dmg = 1;
+					combat.apply_damage(ps_t, ps_dmg, ps_dmg_type, c);
+					broadcast_announce(ps_t.name + " takes " + ps_dmg + " damage from the perforating energy!", true);
+				}
+				broadcast_state();
+				check_battle_end();
+				return;
 			}
 			// Level 2
 			else if (spell.id == "animal_messenger") {
@@ -17951,8 +18182,21 @@ class battle_manager {
 			else if (spell.id == "homunculus_servant") {
 				broadcast_announce(c.name + " casts Homunculus Servant, summoning a tiny construct ally.", true);
 			}
-			else if (spell.id == "jam_weapon") {
-				broadcast_announce(c.name + " casts Jam Weapon, causing the target's weapon to malfunction.", true);
+			else if (spell.id == "jam_weapon" and @target != null and !target.is_dead) {
+				// Gun Slinger Class (para 736-738): "The weapon you target suffers a
+				// malfunction and the attack fails. A malfunctioning weapon can't be used
+				// to make an attack until a creature takes the Utilize action to fix the
+				// weapon malfunction." Source is Reaction timing; approximated as a cast
+				// targeting a creature within 60ft. TODO: wire into reaction prompt on
+				// enemy ranged attack.
+				int jw_dist = feet_distance(c.x, c.y, target.x, target.y);
+				if (jw_dist > 60) {
+					broadcast_announce(target.name + " is too far away! Jam Weapon has a range of 60 feet.", false);
+					return;
+				}
+				target.weapon_jammed = true;
+				broadcast_announce(c.name + " casts Jam Weapon! " + target.name + "'s weapon malfunctions and can't be used to attack until fixed (costs an action)!", true);
+				broadcast_state();
 			}
 			else if (spell.id == "jethros_instant_reload") {
 				broadcast_announce(c.name + " casts Jethro's Instant Reload, enchanting a ranged weapon to reload itself.", true);
@@ -18085,7 +18329,13 @@ class battle_manager {
 			}
 			// Level 4
 			else if (spell.id == "aura_of_life") {
-				broadcast_announce(c.name + " casts Aura of Life. Allies in a 30-foot aura have necrotic resistance and can recover from 0 HP.", true);
+				// Basic Rules 2024 Aura of Life (para 12166-12168): L4 Abjuration,
+				// Concentration, 10 min. 30ft emanation: allies have Necrotic resistance,
+				// HP max can't be reduced, ally at 0 HP regains 1 HP at turn start.
+				c.aura_of_life_active = true;
+				c.is_concentrating = true;
+				c.concentration_spell = "Aura of Life";
+				broadcast_announce(c.name + " casts Aura of Life! A life-preserving aura radiates 30 feet. Allies gain Necrotic resistance and can recover from 0 HP.", true);
 			}
 			else if (spell.id == "charm_monster" and @target != null) {
 				int save_roll = random(1, 20);
