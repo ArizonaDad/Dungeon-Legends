@@ -7144,6 +7144,8 @@ class battle_manager {
 						combat.apply_damage(monster, sg_d, sg_dt, sg_caster);
 						broadcast_announce(monster.name + " enters Spirit Guardians and takes " + sg_d + " damage!", true);
 						monster.spirit_guardians_damaged_this_turn = true;
+						// Basic Rules 2024 Spirit Guardians (para 15126): "Speeds are halved in the Emanation."
+						monster.movement_remaining = monster.movement_remaining / 2;
 						if (monster.is_dead) { broadcast_state(); check_battle_end(); return; }
 						break;
 					}
@@ -11963,6 +11965,8 @@ class battle_manager {
 					combat.apply_damage(c, sg_dmg, sg_damage_type, sg_caster);
 					broadcast_announce(c.name + " enters " + sg_caster.name + "'s Spirit Guardians and takes " + sg_dmg + " " + sg_type_name + " damage!", true);
 					c.spirit_guardians_damaged_this_turn = true;
+					// Basic Rules 2024 Spirit Guardians (para 15126): "Speeds are halved in the Emanation."
+					c.movement_remaining = c.movement_remaining / 2;
 					check_concentration(c, sg_dmg, sg_caster);
 					if (c.is_dead) {
 						broadcast_state();
@@ -12800,6 +12804,7 @@ class battle_manager {
 		// Check spell slots (cantrips = level 0, free)
 		int cast_slot_level = spell.level;
 		bool used_free_cast = false;
+		bool slot_consumed = false; // tracks whether an actual spell slot was decremented
 		bool used_divine_intervention = false;
 		if (spell.level > 0) {
 			// PHB 2024 Cleric L10 Divine Intervention (para 3621-3622): "As part of the
@@ -12859,6 +12864,7 @@ class battle_manager {
 					return;
 				}
 				c.spell_slots_current[slot_used]--;
+				slot_consumed = true;
 				cast_slot_level = slot_used;
 			}
 			reveal_hidden_combatant(c, "casting a spell");
@@ -13032,8 +13038,15 @@ class battle_manager {
 				broadcast_announce(cs_caster.name + " unleashes Counterspell on " + c.name + "'s " + spell.name + "!", true);
 				broadcast_roll(c.name, "CON save vs Counterspell", save_roll, save_bonus, save_total, cs_saved ? "Spell goes through!" : "Spell countered!");
 				if (!cs_saved) {
-					// Spell is countered — action and slot already consumed, just return
+					// Spell is countered — action consumed, but slot is preserved per source
 					broadcast_announce(c.name + "'s " + spell.name + " fizzles!", true);
+					// Basic Rules 2024 Counterspell (para 12678): "If that spell was
+					// cast with a spell slot, the slot isn't expended."
+					if (slot_consumed) {
+						c.spell_slots_current[cast_slot_level]++;
+						slot_consumed = false;
+						broadcast_announce(c.name + "'s spell slot is preserved.", false);
+					}
 					// War Magic Power Surge on successful counterspell
 					if (cs_caster.class_name == "Wizard" and cs_caster.subclass == "War Magic" and cs_caster.level >= 6 and cs_caster.power_surge_charges < cs_caster.power_surge_max) {
 						cs_caster.power_surge_charges++;
@@ -14384,38 +14397,84 @@ class battle_manager {
 				broadcast_announce(c.name + " readies Counterspell. The next enemy spell within 60 feet may be interrupted.", true);
 			}
 			else if (spell.id == "dispel_magic" and @target != null) {
-				// Basic Rules para 12904: "Choose one creature, object, or magical effect
-				// within range. Any ongoing spell of level 3 or lower on the target ends.
-				// For each ongoing spell of level 4 or higher on the target, make an
-				// ability check using your spellcasting ability."
-				// Approximation: clears all buff/debuff flags up to level 3 on the target.
-				int max_dispel_level = 3 + upcast_levels;
+				// Basic Rules 2024 Dispel Magic (para 12905-12906):
+				// "Choose one creature, object, or magical effect within range.
+				// Any ongoing spell of level 3 or lower on the target ends.
+				// For each ongoing spell of level 4 or higher on the target,
+				// make an ability check using your spellcasting ability
+				// (DC 10 plus that spell's level). On a successful check, the spell ends.
+				// Using a Higher-Level Spell Slot. You automatically end a spell on the
+				// target if the spell's level is equal to or less than the level of the
+				// spell slot you use."
+				int max_auto = cast_slot_level; // auto-dispel threshold
+				int dm_spell_mod = spell_attack_bonus(c) - c.proficiency; // spellcasting ability mod
 				int dispelled = 0;
+
+				// L1 spells: Bless, Heroism, Bane, Shield — always auto-dispelled (L1 <= L3 base)
 				if (target.blessed) { clear_bless_effect(target, true); dispelled++; }
-				if (target.hasted) { clear_haste_effect(target, false, true); dispelled++; }
 				if (target.heroism_source_id != 0) { clear_heroism_effect(target, true); dispelled++; }
 				if (target.baned) { target.baned = false; dispelled++; }
 				if (target.shield_active) { clear_shield_effect(target, true); dispelled++; }
-				if (target.stoneskin_active) { target.stoneskin_active = false; dispelled++; }
+
+				// L3 spells: Haste, Fly — always auto-dispelled at base Dispel Magic L3
+				if (target.hasted) { clear_haste_effect(target, false, true); dispelled++; }
 				if (target.fly_active) { target.fly_active = false; target.flying_speed = 0; dispelled++; }
-				if (target.resilient_sphere_trapped and max_dispel_level >= 4) {
-					target.resilient_sphere_trapped = false;
-					target.resilient_sphere_source_id = 0;
-					target.resilient_sphere_rounds = 0;
-					target.remove_condition(COND_INCAPACITATED);
-					broadcast_to_battle({{"type", message_types::condition_removed}, {"target", target.name}, {"condition", "Incapacitated"}});
-					broadcast_announce(c.name + "'s Dispel Magic shatters " + target.name + "'s Resilient Sphere!", true);
-					dispelled++;
+
+				// L4 spells: Stoneskin, Resilient Sphere — need ability check at base L3
+				if (target.stoneskin_active) {
+					bool dispel_ok = (max_auto >= 4);
+					if (!dispel_ok) {
+						int dr = random(1, 20); int dt = dr + dm_spell_mod; int ddc = 14;
+						dispel_ok = dt >= ddc;
+						broadcast_roll(c.name, "dispel check vs Stoneskin (L4)", dr, dm_spell_mod, dt, dispel_ok ? "Dispelled!" : "Failed to dispel.");
+					}
+					if (dispel_ok) { target.stoneskin_active = false; dispelled++; }
 				}
-				if (target.is_concentrating) {
-					string ended = target.concentration_spell;
-					clear_concentration_effects(target);
-					target.is_concentrating = false;
-					target.remove_condition(COND_CONCENTRATING);
-					target.concentration_spell = "";
-					broadcast_announce(c.name + "'s Dispel Magic ends " + target.name + "'s concentration on " + ended + "!", true);
-					dispelled++;
+				if (target.resilient_sphere_trapped) {
+					bool dispel_ok = (max_auto >= 4);
+					if (!dispel_ok) {
+						int dr = random(1, 20); int dt = dr + dm_spell_mod; int ddc = 14;
+						dispel_ok = dt >= ddc;
+						broadcast_roll(c.name, "dispel check vs Resilient Sphere (L4)", dr, dm_spell_mod, dt, dispel_ok ? "Dispelled!" : "Failed to dispel.");
+					}
+					if (dispel_ok) {
+						target.resilient_sphere_trapped = false;
+						target.resilient_sphere_source_id = 0;
+						target.resilient_sphere_rounds = 0;
+						target.remove_condition(COND_INCAPACITATED);
+						broadcast_to_battle({{"type", message_types::condition_removed}, {"target", target.name}, {"condition", "Incapacitated"}});
+						broadcast_announce(c.name + "'s Dispel Magic shatters " + target.name + "'s Resilient Sphere!", true);
+						dispelled++;
+					}
 				}
+
+				// Concentration spell on the target — look up base level from spell catalog
+				if (target.is_concentrating and target.concentration_spell != "") {
+					int conc_level = 0;
+					for (uint dsi = 0; dsi < SPELL_DEFS.length(); dsi++) {
+						if (SPELL_DEFS[dsi].name == target.concentration_spell) {
+							conc_level = SPELL_DEFS[dsi].level;
+							break;
+						}
+					}
+					if (conc_level < 1) conc_level = 3; // fallback if not found
+					bool dispel_ok = (max_auto >= conc_level);
+					if (!dispel_ok) {
+						int dr = random(1, 20); int dt = dr + dm_spell_mod; int ddc = 10 + conc_level;
+						dispel_ok = dt >= ddc;
+						broadcast_roll(c.name, "dispel check vs " + target.concentration_spell + " (L" + conc_level + ")", dr, dm_spell_mod, dt, dispel_ok ? "Dispelled!" : "Failed to dispel.");
+					}
+					if (dispel_ok) {
+						string ended = target.concentration_spell;
+						clear_concentration_effects(target);
+						target.is_concentrating = false;
+						target.remove_condition(COND_CONCENTRATING);
+						target.concentration_spell = "";
+						broadcast_announce(c.name + "'s Dispel Magic ends " + target.name + "'s concentration on " + ended + "!", true);
+						dispelled++;
+					}
+				}
+
 				if (dispelled > 0) {
 					broadcast_announce(c.name + "'s Dispel Magic strips " + dispelled + " magical effect" + (dispelled == 1 ? "" : "s") + " from " + target.name + "!", true);
 					// Xanathar's War Magic L6 Power Surge (para 2939): "You gain one power surge
