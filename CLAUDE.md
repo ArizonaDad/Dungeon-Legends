@@ -200,7 +200,7 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 
 - Healing spells with scaling
 
-- Buff spells (Shield, Bless, Heroism, Aid, Stoneskin, Greater Invisibility, Fly, Fire Shield, Mage Armor, Haste)
+- Buff spells (Shield, Bless, Heroism, Aid, Stoneskin, Greater Invisibility, Fly, Fire Shield, Mage Armor, Haste). **Haste**: doubles speed, +2 AC, advantage on DEX saves (+5 approx in `get_save_bonus`), +1 extra weapon attack (approximation of "Attack one weapon only" extra action, wired into all 3 attack paths: player/bot/monster). Lethargy: skips action/bonus/movement on Haste end turn.
 
 - Utility spells (Hold Person, Banishment, Misty Step, Sleep, Polymorph, Web, Hypnotic Pattern, Sanctuary, Spirit Guardians)
 

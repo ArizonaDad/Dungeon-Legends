@@ -3179,6 +3179,8 @@ class battle_manager {
 			bot.has_action = false;
 			bot.used_action = true;
 			bot.attacks_remaining_this_turn = bot.extra_attacks;
+			// Basic Rules 2024 Haste (para 13688): +1 weapon attack (extra action approx)
+			if (bot.hasted) bot.attacks_remaining_this_turn += 1;
 			// PHB 2024 Sentinel Guardian — fire on first attack of the bot's Attack action
 			check_sentinel_guardian(bot, target);
 			if (bot.is_dead or @combat == null or !combat.battle_active) return false;
@@ -3922,6 +3924,13 @@ class battle_manager {
 		// Fire Shield: warm/chill shield (concentration)
 		caster.fire_shield_active = false;
 		// Stoneskin: B/P/S resistance (concentration)
+		// Basic Rules 2024 Stoneskin (para 15008): clears B/P/S resistance on break.
+		// Edge case: if creature had natural B/P/S resistance, it's lost until re-init.
+		if (caster.stoneskin_active) {
+			caster.piercing_resistance = false;
+			caster.bludgeoning_resistance = false;
+			caster.slashing_resistance = false;
+		}
 		caster.stoneskin_active = false;
 		// Fly: grant flying speed (concentration)
 		if (caster.fly_active) {
@@ -7196,7 +7205,10 @@ class battle_manager {
 		if (!used_breath and monster.has_action and nearest_dist <= desired_attack_range) {
 			monster.has_action = false;
 			monster.used_action = true;
-			if (start_monster_attack_sequence(monster, nearest, 0, monster.extra_attacks)) return;
+			int monster_attacks = monster.extra_attacks;
+				// Basic Rules 2024 Haste (para 13688): +1 weapon attack (extra action approx)
+				if (monster.hasted) monster_attacks += 1;
+				if (start_monster_attack_sequence(monster, nearest, 0, monster_attacks)) return;
 		}
 
 		// Step 3: End monster turn.
@@ -11701,6 +11713,10 @@ class battle_manager {
 			c.has_action = false;
 			c.used_action = true;
 			c.attacks_remaining_this_turn = c.extra_attacks; // e.g. Fighter lv5 = 1 extra
+			// Basic Rules 2024 Haste (para 13688): "it gains an additional action
+			// on each of its turns. That action can be used only to take the Attack
+			// (one weapon attack only)..." Approximated as +1 extra weapon attack.
+			if (c.hasted) c.attacks_remaining_this_turn += 1;
 			// PHB 2024 Boon of Dimensional Travel (para 7876): Blink Steps available
 			if (c.has_feat("boon_of_dimensional_travel")) c.blink_steps_available = true;
 			// Xanathar's Gloom Stalker L3 Dread Ambusher (para 2154): "If you take
@@ -18704,7 +18720,12 @@ class battle_manager {
 			else if (spell.id == "regenerate" and @target != null) {
 				// Basic Rules: heal 4d8 + 15, then 1 HP/round for 1 hour. Simplified: instant 4d8 + 15.
 				int heal = 15;
-				for (int d = 0; d < 4; d++) heal += random(1, 8);
+				// Basic Rules 2024 Beacon of Hope (para 12201): max healing
+				if (target.beacon_of_hope_active) {
+					heal += 4 * 8; // 4d8 maximized = 32
+				} else {
+					for (int d = 0; d < 4; d++) heal += random(1, 8);
+				}
 				heal += get_life_domain_healing_bonus(c, spell, cast_slot_level);
 				int effective = combat.apply_healing(target, heal);
 				record_effective_healing(c.player_username, effective);

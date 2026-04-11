@@ -1357,6 +1357,11 @@ class combatant {
 		if (is_dodging and ability_id == ABILITY_DEX and !has_condition(COND_INCAPACITATED)) {
 			mod += 5;
 		}
+		// Basic Rules 2024 Haste (para 13688): "it has Advantage on Dexterity
+		// saving throws." Approximated as +5 matching Dodge/Danger Sense pattern.
+		if (hasted and ability_id == ABILITY_DEX) {
+			mod += 5;
+		}
 		// PHB 2024 Paladin L6 Aura of Protection (para 5665-5669): "You and your allies
 		// have a bonus to saving throws equal to your Charisma modifier (min +1) while
 		// within 10 ft (30 ft at L18)." Received bonus refreshed by battle_manager on
