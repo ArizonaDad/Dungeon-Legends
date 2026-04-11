@@ -617,6 +617,13 @@ class combatant {
 	uint blinded_spell_caster_id = 0; // ID of caster who applied COND_BLINDED via Sunbeam
 	uint slow_spell_caster_id = 0;   // Slow spell: caster id for EOT saves + concentration cleanup
 	int slow_original_speed = 0;     // Slow spell: stored original speed to restore on end
+	// Basic Rules 2024 Enlarge/Reduce (para 12795-12800): concentration, caster chooses
+	// Enlarge (+1d4 weapon damage, advantage on STR checks/saves, size +1) or Reduce
+	// (-1d4 weapon damage, disadvantage on STR checks/saves, size -1). CON save for unwilling.
+	bool enlarge_active = false;           // Target is Enlarged
+	bool reduce_active = false;            // Target is Reduced
+	uint enlarge_reduce_caster_id = 0;     // Caster ID for concentration cleanup
+	int enlarge_original_size = SIZE_MEDIUM; // Original size to restore on spell end
 	bool wizardly_quill_active = false; // Order of Scribes Wizard
 	int awakened_spellbook_changes = 0; // Order of Scribes - replace damage type
 	// Gunslinger subclasses (Valda's Spire of Secrets paras 229-490)
@@ -1002,6 +1009,7 @@ class combatant {
 	// PHB 2024 Mobile feat (para 7635): track creatures attacked this turn for per-creature OA immunity.
 	uint[] mobile_attacked_ids;
 	uint hex_target_id = 0;
+	int hex_cursed_ability = -1;        // Basic Rules 2024 Hex (para 13730): chosen ability for disadvantage on checks
 	bool spiritual_weapon_active = false;
 	int spiritual_weapon_slot_level = 0;
 	bool wild_shape_active = false;
@@ -1316,6 +1324,10 @@ class combatant {
 		// Tasha's Rune Knight L3 Giant's Might (para 3125-3130): "You have Advantage
 		// on Strength checks and Strength saving throws." while active.
 		if (giants_might_active and ability_id == ABILITY_STR) mod += 5;
+		// Basic Rules 2024 Enlarge/Reduce (para 12795-12800): Enlarge grants Advantage
+		// on STR saves; Reduce grants Disadvantage on STR saves. Approximated as +/-5.
+		if (enlarge_active and ability_id == ABILITY_STR) mod += 5;
+		if (reduce_active and ability_id == ABILITY_STR) mod -= 5;
 		// PHB 2024 Shield Master (para 7796): "You add your Shield's AC Bonus to
 		// any Dexterity saving throw you make against a spell or other harmful
 		// effect that targets only you." Shield grants +2 AC.

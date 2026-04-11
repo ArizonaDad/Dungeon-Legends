@@ -1302,11 +1302,27 @@ class battle_manager {
 		bool disadv = extra_disadvantage or c.has_skill_check_disadvantage(skill_name);
 		// Tasha's Rune Knight L3 Giant's Might: advantage on STR checks while active.
 		if (c.giants_might_active and ability_id == ABILITY_STR) adv = true;
+		// Basic Rules 2024 Enlarge/Reduce (para 12795-12800): Enlarge grants Advantage
+		// on STR checks; Reduce grants Disadvantage on STR checks.
+		if (c.enlarge_active and ability_id == ABILITY_STR) adv = true;
+		if (c.reduce_active and ability_id == ABILITY_STR) disadv = true;
 		// Basic Rules 2024 Enhance Ability (para 13068): advantage on all ability checks.
 		if (c.enhance_ability_active) adv = true;
 		// PHB 2024 Frightened (para 16222): "The creature has Disadvantage on ability
 		// checks and attack rolls." PHB 2024 Poisoned (para 16237): same wording.
 		if (c.has_condition(COND_FRIGHTENED) or c.has_condition(COND_POISONED)) disadv = true;
+		// Basic Rules 2024 Hex (para 13730): "The target has Disadvantage on ability
+		// checks made with the chosen ability." Scan for any caster with hex on this target.
+		if (@combat != null) {
+			for (uint hxi = 0; hxi < combat.combatants.length(); hxi++) {
+				combatant@ hxc = combat.combatants[hxi];
+				if (@hxc == null or hxc.is_dead) continue;
+				if (hxc.hex_target_id == c.id and hxc.hex_cursed_ability == ability_id) {
+					disadv = true;
+					break;
+				}
+			}
+		}
 		// Pass Without Trace stacks +10 onto Stealth checks (also Dexterity (Stealth)).
 		if (skill_name == "Stealth") mod += c.pass_without_trace_bonus;
 		string tag = custom_tag != "" ? custom_tag : skill_resolution_tag(skill_name);
@@ -3855,6 +3871,7 @@ class battle_manager {
 		}
 		caster.hunters_mark_target_id = 0;
 		caster.hex_target_id = 0;
+		caster.hex_cursed_ability = -1;
 		// Spirit Guardians: 15ft aura concentration spell — must stop dealing damage
 		caster.spirit_guardians_active = false;
 		caster.spirit_guardians_slot_level = 0;
@@ -4157,6 +4174,21 @@ class battle_manager {
 					sl_t.slow_spell_caster_id = 0;
 					sl_t.slow_original_speed = 0;
 					broadcast_announce(sl_t.name + " is freed from the Slow effect!", true);
+				}
+			}
+		}
+		// Enlarge/Reduce: restore original size and clear buffs/debuffs when concentration breaks
+		if (conc == "Enlarge/Reduce") {
+			for (uint eri = 0; eri < combat.combatants.length(); eri++) {
+				combatant@ er_t = combat.combatants[eri];
+				if (@er_t == null or er_t.is_dead) continue;
+				if (er_t.enlarge_reduce_caster_id == caster.id) {
+					er_t.size = er_t.enlarge_original_size;
+					er_t.enlarge_active = false;
+					er_t.reduce_active = false;
+					er_t.enlarge_reduce_caster_id = 0;
+					er_t.enlarge_original_size = SIZE_MEDIUM;
+					broadcast_announce(er_t.name + " returns to normal size as Enlarge/Reduce ends!", true);
 				}
 			}
 		}
@@ -9069,6 +9101,19 @@ class battle_manager {
 				total_damage += hex_damage;
 				broadcast_announce(c.name + "'s Hex deals " + hex_damage + " extra necrotic damage to " + target.name + ".", false);
 			}
+			// Basic Rules 2024 Enlarge/Reduce (para 12795-12800): Enlarged weapons deal
+			// +1d4 extra damage; Reduced weapons deal -1d4 damage (min 1 total).
+			if (c.enlarge_active and !pr.is_spell_effect and pr.is_weapon_attack) {
+				int enlarge_dmg = random(1, 4);
+				total_damage += enlarge_dmg;
+				broadcast_announce(c.name + "'s enlarged weapons deal +" + enlarge_dmg + " extra damage.", false);
+			}
+			if (c.reduce_active and !pr.is_spell_effect and pr.is_weapon_attack) {
+				int reduce_penalty = random(1, 4);
+				total_damage -= reduce_penalty;
+				if (total_damage < 1) total_damage = 1;
+				broadcast_announce(c.name + "'s reduced weapons deal " + reduce_penalty + " less damage.", false);
+			}
 			// Xanathar's Holy Weapon (para 4936): "weapon attacks made with it deal an
 			// extra 2d8 radiant damage on a hit." Triggers on weapon attacks only.
 			if (c.holy_weapon_active and !pr.is_spell_effect and pr.is_weapon_attack) {
@@ -11107,6 +11152,71 @@ class battle_manager {
 			string form = c.spirit_guardians_necrotic ? "fiendish" : "angelic";
 			broadcast_announce(c.name + " is surrounded by " + form + " Spirit Guardians! Enemies within 15 feet take " + dtype + " damage and have their speed halved.", true);
 		}
+		else if (sc.spell_id == "enlarge_reduce") {
+			// Basic Rules 2024 Enlarge/Reduce (para 12795-12800): Unwilling targets get CON
+			// save. On success, no effect. On failure (or willing), apply Enlarge or Reduce.
+			combatant@ tgt = combat.get_combatant(sc.primary_target_id);
+			if (@tgt == null or tgt.is_dead) return;
+			bool hostile = (tgt.is_player != c.is_player) or combat.mode == "pvp";
+			// Unwilling targets make a CON save to resist
+			if (hostile) {
+				int save_dc = spell_save_dc(c);
+				int save_roll = random(1, 20);
+				apply_hound_save_disadvantage(tgt, c.id, save_roll);
+				int save_bonus = tgt.get_save_bonus(ABILITY_CON);
+				int bless_bonus = roll_bless_bonus(tgt);
+				int save_total = save_roll + save_bonus + bless_bonus;
+				bool saved = save_total >= save_dc;
+				string effect_label = (choice == "enlarge") ? "Enlarge" : "Reduce";
+				// Save failure chain (CON — condition, no Mage Slayer)
+				if (!saved and try_arcane_deflection_save(tgt, save_dc, save_total)) saved = true;
+				if (!saved) { int ds = try_disciplined_survivor_reroll(tgt, save_dc, save_total, save_bonus + bless_bonus, "CON save vs " + effect_label); if (ds >= save_dc) saved = true; }
+				if (!saved) { int fg = try_flash_of_genius(tgt, save_dc, save_total, "CON save vs " + effect_label); if (fg >= save_dc) { saved = true; save_total = fg; } }
+				if (!saved) { int mv = try_maverick_spirit(tgt, save_dc, save_total, "CON save vs " + effect_label); if (mv >= save_dc) { saved = true; save_total = mv; } }
+				if (!saved) { int bf = try_boon_of_fate_bonus(tgt, save_total, save_dc); if (bf >= save_dc) { saved = true; save_total = bf; } }
+				if (!saved and try_stroke_of_luck_save(tgt, save_dc, save_bonus + bless_bonus)) saved = true;
+				broadcast_roll(tgt.name, "CON save vs " + effect_label, save_roll, save_bonus + bless_bonus, save_total, saved ? "Resisted!" : effect_label + "d!");
+				if (saved) return; // Spell has no effect on successful save
+			}
+			// Apply the chosen effect
+			tgt.enlarge_reduce_caster_id = c.id;
+			tgt.enlarge_original_size = tgt.size;
+			if (choice == "enlarge") {
+				tgt.enlarge_active = true;
+				tgt.reduce_active = false;
+				tgt.size += 1;
+				broadcast_announce(c.name + " casts Enlarge on " + tgt.name + "! Size increases, weapons deal +1d4 damage, advantage on Strength.", true);
+			} else {
+				tgt.reduce_active = true;
+				tgt.enlarge_active = false;
+				tgt.size -= 1;
+				if (tgt.size < SIZE_TINY) tgt.size = SIZE_TINY;
+				broadcast_announce(c.name + " casts Reduce on " + tgt.name + "! Size decreases, weapons deal -1d4 damage, disadvantage on Strength.", true);
+			}
+		}
+		else if (sc.spell_id == "hex") {
+			// Basic Rules 2024 Hex (para 13730): "choose one ability when you cast the
+			// spell. The target has Disadvantage on ability checks made with the chosen
+			// ability." Store the chosen ability on the caster alongside hex_target_id.
+			combatant@ tgt = combat.get_combatant(sc.primary_target_id);
+			if (@tgt == null or tgt.is_dead) return;
+			c.hex_target_id = tgt.id;
+			// Map choice key to ability ID
+			if (choice == "str") c.hex_cursed_ability = ABILITY_STR;
+			else if (choice == "dex") c.hex_cursed_ability = ABILITY_DEX;
+			else if (choice == "con") c.hex_cursed_ability = ABILITY_CON;
+			else if (choice == "int") c.hex_cursed_ability = ABILITY_INT;
+			else if (choice == "wis") c.hex_cursed_ability = ABILITY_WIS;
+			else if (choice == "cha") c.hex_cursed_ability = ABILITY_CHA;
+			else c.hex_cursed_ability = ABILITY_STR; // fallback
+			string ability_name = "Strength";
+			if (c.hex_cursed_ability == ABILITY_DEX) ability_name = "Dexterity";
+			else if (c.hex_cursed_ability == ABILITY_CON) ability_name = "Constitution";
+			else if (c.hex_cursed_ability == ABILITY_INT) ability_name = "Intelligence";
+			else if (c.hex_cursed_ability == ABILITY_WIS) ability_name = "Wisdom";
+			else if (c.hex_cursed_ability == ABILITY_CHA) ability_name = "Charisma";
+			broadcast_announce(c.name + " curses " + tgt.name + " with Hex! Disadvantage on " + ability_name + " checks.", true);
+		}
 		else if (sc.spell_id == "adjust_density") {
 			// Wildemount p.5428: target's weight is halved (+10 ft speed, disadvantage on
 			// STR) or doubled (-10 ft speed, advantage on STR) for up to 1 minute or until
@@ -13142,8 +13252,19 @@ class battle_manager {
 				broadcast_announce(target.name + " is filled with Heroism and gains temporary hit points each turn.", true);
 			}
 			else if (spell.id == "hex" and @target != null) {
-				c.hex_target_id = target.id;
-				broadcast_announce(c.name + " curses " + target.name + " with Hex.", true);
+				// Basic Rules 2024 Hex (para 13730): "choose one ability when you cast the
+				// spell. The target has Disadvantage on ability checks made with the chosen
+				// ability." Prompt the caster for the ability choice.
+				pending_spell_choice sc;
+				sc.player_username = c.player_username;
+				sc.caster_id = c.id;
+				sc.spell_id = "hex";
+				sc.cast_slot_level = cast_slot_level;
+				sc.primary_target_id = target.id;
+				sc.option_keys = {"str", "dex", "con", "int", "wis", "cha"};
+				sc.option_labels = {"Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"};
+				sc.prompt_text = "Hex: choose an ability for disadvantage on checks. Press 1 for Strength, 2 for Dexterity, 3 for Constitution, 4 for Intelligence, 5 for Wisdom, or 6 for Charisma.";
+				send_spell_choice_prompt(c, sc);
 			}
 			else if (spell.id == "hunters_mark" and @target != null) {
 				c.hunters_mark_target_id = target.id;
@@ -17845,37 +17966,26 @@ class battle_manager {
 				return;
 			}
 			else if (spell.id == "enlarge_reduce" and @target != null) {
-				// Basic Rules: if hostile target fails CON save, shrink (disadvantage on STR, -1d4 damage).
-				// Simplified: hostile -> CON save or take 2d6 psychic (flavour debuff);
-				// ally -> flat announcement buff (+1d4 damage flavour).
+				// Basic Rules 2024 Enlarge/Reduce (para 12795-12800): caster chooses Enlarge
+				// or Reduce. Enlarge: size +1, advantage on STR checks/saves, +1d4 weapon damage.
+				// Reduce: size -1, disadvantage on STR checks/saves, -1d4 weapon damage (min 1).
+				// Unwilling targets get CON save to resist. Prompt caster for Enlarge vs Reduce.
+				pending_spell_choice sc;
+				sc.player_username = c.player_username;
+				sc.caster_id = c.id;
+				sc.spell_id = "enlarge_reduce";
+				sc.cast_slot_level = cast_slot_level;
+				sc.primary_target_id = target.id;
+				sc.option_keys = {"enlarge", "reduce"};
+				sc.option_labels = {"Enlarge (size +1, advantage on STR, +1d4 weapon damage)", "Reduce (size -1, disadvantage on STR, -1d4 weapon damage)"};
+				// Bot AI: auto-pick Enlarge for allies, Reduce for hostiles
 				bool hostile = (target.is_player != c.is_player) or combat.mode == "pvp";
 				if (hostile) {
-					int save_roll = random(1, 20);
-					apply_hound_save_disadvantage(target, c.id, save_roll);
-					int save_bonus = target.get_save_bonus(ABILITY_CON);
-					int bless_bonus = roll_bless_bonus(target);
-					int save_total = save_roll + save_bonus + bless_bonus;
-					bool saved = save_total >= save_dc;
-					// Save failure chain (CON — condition, no Mage Slayer)
-					if (!saved and try_arcane_deflection_save(target, save_dc, save_total)) saved = true;
-					if (!saved) { int ds = try_disciplined_survivor_reroll(target, save_dc, save_total, save_bonus + bless_bonus, "CON save vs Reduce"); if (ds >= save_dc) saved = true; }
-					if (!saved) { int fg = try_flash_of_genius(target, save_dc, save_total, "CON save vs Reduce"); if (fg >= save_dc) { saved = true; save_total = fg; } }
-					if (!saved) { int mv = try_maverick_spirit(target, save_dc, save_total, "CON save vs Reduce"); if (mv >= save_dc) { saved = true; save_total = mv; } }
-					if (!saved) { int bf = try_boon_of_fate_bonus(target, save_total, save_dc); if (bf >= save_dc) { saved = true; save_total = bf; } }
-					if (!saved and try_stroke_of_luck_save(target, save_dc, save_bonus + bless_bonus)) saved = true;
-					broadcast_roll(target.name, "CON save vs Reduce", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Shrunk!");
-					if (!saved) {
-						int dmg = 0;
-						for (int d = 0; d < 2; d++) dmg += random(1, 6);
-						combat.apply_damage(target, dmg, DMG_PSYCHIC, c);
-						broadcast_announce(target.name + " shrinks under the Reduce spell, taking " + dmg + " psychic damage.", true);
-					}
-				} else {
-					broadcast_announce(c.name + " enlarges " + target.name + " with Enlarge/Reduce. Their weapons hit harder!", true);
+					sc.option_keys = {"reduce", "enlarge"};
+					sc.option_labels = {"Reduce (size -1, disadvantage on STR, -1d4 weapon damage)", "Enlarge (size +1, advantage on STR, +1d4 weapon damage)"};
 				}
-				broadcast_state();
-				check_battle_end();
-				return;
+				sc.prompt_text = "Enlarge or Reduce " + target.name + "? Press 1 for " + sc.option_labels[0] + ", or 2 for " + sc.option_labels[1] + ".";
+				send_spell_choice_prompt(c, sc);
 			}
 			else if (spell.id == "prayer_of_healing") {
 				// Basic Rules: heals up to 6 creatures for 2d8 + spellcasting mod.

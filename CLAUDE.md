@@ -224,6 +224,10 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 
 - **Hunter's Mark target transfer** (PHB 2024 para 13825-13826): When marked target dies, Hunter's Mark auto-transfers to nearest hostile within 90ft (following Hexblade Curse pattern in `maybe_apply_on_kill_features`).
 
+- **Enlarge/Reduce** (Basic Rules 2024 para 12795-12800): L2 Transmutation, concentration. Full rewrite from broken damage-only implementation. Caster prompted via `pending_spell_choice` for Enlarge vs Reduce (bot AI: Reduce for hostiles, Enlarge for allies). Unwilling targets get CON save with full save failure chain. **Enlarge**: size +1, `enlarge_active` flag, +1d4 weapon damage (in `finalize_roll_result`), advantage on STR checks (`request_skill_check`) and STR saves (+5 approx in `get_save_bonus`). **Reduce**: size -1, `reduce_active` flag, -1d4 weapon damage (min 1), disadvantage on STR checks and STR saves (-5 approx). Tracking: `enlarge_reduce_caster_id` + `enlarge_original_size` on target. Concentration cleanup restores original size, clears all flags.
+
+- **Hex ability check disadvantage** (Basic Rules 2024 para 13730): Hex cast now prompts caster for ability choice (STR/DEX/CON/INT/WIS/CHA) via `pending_spell_choice`. `hex_cursed_ability` field on caster stores the chosen ability. In `request_skill_check`, scans all living casters to check if any have `hex_target_id == target` with matching `hex_cursed_ability == ability_id`, applies disadvantage. Choice persists through hex target transfer on death. Cleared in concentration cleanup.
+
 - **Stabilize action** (PHB 2024 para 4525): DC 10 Wisdom (Medicine) check to stabilize a dying creature at 0 HP within 5ft. Respects proficiency, expertise, Jack of All Trades. Consumes action. Client action menu entry.
 
 - Spell slot consumption (lowest available >= spell level)
@@ -382,6 +386,7 @@ When a caster's concentration breaks, `clear_concentration_effects()` must remov
 | `blinded_spell_caster_id` | COND_BLINDED | Sunbeam |
 | `faerie_fire_source_id` | `faerie_fire_outlined` (persistent advantage, NOT a condition) | Faerie Fire |
 | `slow_spell_caster_id` | Speed halved + AC −2 + no reactions (restores `slow_original_speed` + AC +2) | Slow |
+| `enlarge_reduce_caster_id` | Size change + STR adv/disadv + weapon damage modifier (restores `enlarge_original_size`, clears `enlarge_active`/`reduce_active`) | Enlarge/Reduce |
 
 **Pattern for new concentration spells:** In the spell handler, set the tracking field on the target (`target.xxx_caster_id = c.id`). In `clear_concentration_effects()`, add a name-matched block that loops combatants and removes the condition where the tracking ID matches. Compulsion uses blanket-clear (no per-target tracking) as a fallback.
 
@@ -444,6 +449,8 @@ Server-side `pending_spell_choice` state on `battle_manager` pauses spell finali
 - **Fire Shield** — warm shield (cold resistance, reflects 2d8 fire) vs chill shield (fire resistance, reflects 2d8 cold). Source: Basic Rules para 13322. Choice kind: `binary`.
 - **Spirit Guardians** — angelic/fey form (radiant damage) vs fiendish form (necrotic damage). Source: Basic Rules para 15123-15124. Choice kind: `binary`.
 - **Adjust Density** (Graviturgy Wizard L2 action) — halve density (+10 ft speed, disadvantage on Strength) vs double density (-10 ft speed, advantage on Strength). Source: Wildemount p.5428. Concentration; flags live on the AFFECTED creature with `adjust_density_caster_id` back-reference for cleanup. Choice kind: `binary`.
+- **Enlarge/Reduce** — Enlarge (size +1, +1d4 weapon damage, advantage STR) vs Reduce (size -1, -1d4 weapon damage, disadvantage STR). Bot AI auto-picks Reduce for hostiles, Enlarge for allies. CON save for unwilling targets with full chain. Source: Basic Rules para 12795-12800. Choice kind: `binary`.
+- **Hex** — choose cursed ability (STR/DEX/CON/INT/WIS/CHA) for disadvantage on ability checks. 6 options. Source: Basic Rules para 13730. Choice kind: `binary`.
 - **Magic Missile** — distribute N darts (3 base, +1 per upcast) among visible enemies; auto-hit, each dart deals 1d4+1 force damage independently per target. Source: Basic Rules para 14089. Choice kind: `distribution`.
 - **Scorching Ray** — distribute N rays (3 base, +1 per upcast) among visible enemies; each ray is a separate ranged spell attack for 2d6 fire damage. Source: Basic Rules para 14851. Choice kind: `distribution`.
 - **Eldritch Blast** — at L5+ distribute N beams (2 at L5, 3 at L11, 4 at L17) among visible enemies; each beam is a separate ranged spell attack for 1d10 force damage. Source: Basic Rules para 13047. Choice kind: `distribution` (only at L5+; L1-4 uses the standard single-target attack path).
