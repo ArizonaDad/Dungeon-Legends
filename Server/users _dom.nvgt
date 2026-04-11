@@ -5967,6 +5967,23 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.room.bm.broadcast_announce(c.name + " uses a bonus action to Disengage (Conjure Woodland Beings)!", false);
 			u.room.bm.broadcast_state();
 		}
+		else if (feature == "expeditious_retreat_dash") {
+			// Basic Rules 2024 Expeditious Retreat (para 13159): "you can take
+			// [the Dash] action again as a Bonus Action."
+			if (!c.expeditious_retreat_active) {
+				u.send({{"type", message_types::error}, {"text", "Expeditious Retreat not active."}});
+				return;
+			}
+			if (!c.has_bonus_action) {
+				u.send({{"type", message_types::error}, {"text", "No bonus action available."}});
+				return;
+			}
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.movement_remaining += c.speed;
+			u.room.bm.broadcast_announce(c.name + " dashes as a bonus action (Expeditious Retreat)! Movement increased by " + c.speed + " feet.", false);
+			u.room.bm.broadcast_state();
+		}
 		else if (feature == "twf_offhand") {
 			if (!c.has_bonus_action) {
 				u.send({{"type", message_types::error}, {"text", "No bonus action available."}});

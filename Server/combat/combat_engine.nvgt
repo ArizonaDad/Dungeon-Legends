@@ -687,6 +687,38 @@ class combatant {
 	bool blur_active = false;
 	// Freedom of Movement: immune to Paralyzed/Restrained, ignore difficult terrain/speed reduction
 	bool freedom_of_movement_active = false;
+	// Protection from Evil and Good (Basic Rules 2024 para 14688-14691): Concentration.
+	// Aberrations/Celestials/Elementals/Fey/Fiends/Undead have disadvantage on attacks
+	// against the target. Target can't be Charmed/Frightened by those types. Advantage
+	// on saves to end existing charm/fright from those types.
+	bool protection_from_evil_and_good_active = false;
+	uint pfeg_source_id = 0; // Who cast it (for concentration cleanup)
+	// See Invisibility (Basic Rules 2024 para 14864): NOT concentration.
+	// Caster sees Invisible creatures as if visible. Duration 1 hour.
+	bool see_invisibility_active = false;
+	// Expeditious Retreat (Basic Rules 2024 para 13159): Concentration.
+	// Caster can take Dash as bonus action each turn.
+	bool expeditious_retreat_active = false;
+	// Levitate (Basic Rules 2024 para 13989): Concentration.
+	// Target rises 20ft and can't move horizontally (unless pushing off surfaces).
+	bool levitate_active = false;
+	uint levitate_source_id = 0; // Who cast it
+	// Heroes' Feast (Basic Rules 2024 para 13760): NOT concentration. 24 hours.
+	// Resistance to Poison damage, Immunity to Frightened/Poisoned, +2d10 max HP.
+	bool heroes_feast_active = false;
+	int heroes_feast_hp_bonus = 0; // The 2d10 max HP increase
+	// Resilient Sphere: target enclosed in sphere, immune to outside damage/effects,
+	// can't damage anything outside. Approximated as damage immunity + Incapacitated.
+	bool resilient_sphere_trapped = false;
+	uint resilient_sphere_source_id = 0;
+	// Time Stop: caster gets 1d4+1 extra turns in a row.
+	int time_stop_turns_remaining = 0;
+	// Antimagic Field (Basic Rules 2024 para 11938): Concentration.
+	// 10ft Emanation around caster. No spellcasting inside the area.
+	bool antimagic_field_active = false;
+	// Creature type for PfEaG and similar creature-type-dependent effects.
+	// Players default to "humanoid"; monsters get their type from monster_def.
+	string creature_type = "humanoid";
 	// Fire Shield variant
 	bool fire_shield_active = false;
 	bool fire_shield_warm = true; // true=warm (cold resist, reflects fire), false=chill (fire resist, reflects cold)
@@ -1248,6 +1280,9 @@ class combatant {
 			mod += resistance_bonus;
 			resistance_active = false;
 		}
+		// Heroes' Feast (Basic Rules 2024 para 13760): "advantage on Wisdom
+		// saving throws" for 24 hours. Approximated as +5 (matching Danger Sense).
+		if (heroes_feast_active and ability_id == ABILITY_WIS) mod += 5;
 		return mod;
 	}
 
@@ -1271,6 +1306,9 @@ class combatant {
 		// can neither reduce the target's Speed nor cause the target to have the
 		// Paralyzed or Restrained condition."
 		if (freedom_of_movement_active and (cond_id == COND_PARALYZED or cond_id == COND_RESTRAINED)) return;
+		// Heroes' Feast (Basic Rules 2024 para 13760): "Immunity to the Frightened
+		// and Poisoned conditions" for 24 hours.
+		if (heroes_feast_active and (cond_id == COND_FRIGHTENED or cond_id == COND_POISONED)) return;
 		if (!has_condition(cond_id)) conditions.insert_last(cond_id);
 	}
 
@@ -1703,6 +1741,11 @@ class battle {
 		if (@target == null or target.is_dead) return;
 		if (amount <= 0) return;
 
+		// Resilient Sphere: target enclosed in sphere is immune to all damage
+		// from outside. Source inside the sphere (self-damage) is also blocked
+		// since "nothing can pass through the barrier."
+		if (target.resilient_sphere_trapped) return;
+
 		if (target.raging and (damage_type == DMG_BLUDGEONING or damage_type == DMG_PIERCING or damage_type == DMG_SLASHING)) {
 			amount = (amount + 1) / 2;
 		}
@@ -1857,6 +1900,11 @@ class battle {
 		// you touch has Resistance to one damage type: Acid, Cold, Fire, Lightning, or
 		// Thunder." Concentration spell, halves matching damage type.
 		if (target.protection_from_energy_active and damage_type == target.protection_from_energy_type and !ea_bypass) {
+			amount = (amount + 1) / 2;
+		}
+
+		// Heroes' Feast (Basic Rules 2024 para 13760): "Resistance to Poison damage"
+		if (target.heroes_feast_active and damage_type == DMG_POISON and !ea_bypass) {
 			amount = (amount + 1) / 2;
 		}
 
@@ -2159,6 +2207,9 @@ class battle {
 		bool has_truesight = viewer.has_feat("boon_of_truesight") and feet_distance(viewer.x, viewer.y, target.x, target.y) <= 60;
 		// True Seeing spell grants Truesight 120ft
 		if (!has_truesight and viewer.true_seeing_active and feet_distance(viewer.x, viewer.y, target.x, target.y) <= 120) has_truesight = true;
+		// See Invisibility (Basic Rules 2024 para 14864): see Invisible creatures
+		// and objects as if visible. No range limit.
+		if (!has_truesight and viewer.see_invisibility_active) has_truesight = true;
 		if (has_truesight) return true;
 		if (target.has_condition(COND_INVISIBLE)) return false;
 		if (target.is_hidden and are_hostile(viewer, target)) return false;
@@ -2294,6 +2345,7 @@ class battle {
 				state["my_swift_quiver_active"] = c.swift_quiver_active;
 				state["my_flaming_sphere_active"] = c.flaming_sphere_active;
 				state["my_conjure_woodland_disengage"] = c.conjure_woodland_disengage;
+				state["my_expeditious_retreat_active"] = c.expeditious_retreat_active;
 				state["my_luck_points"] = c.luck_points;
 				state["my_luck_points_max"] = c.luck_points_max;
 				state["my_has_heroic_inspiration"] = c.has_heroic_inspiration;

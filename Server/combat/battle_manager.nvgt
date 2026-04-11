@@ -2581,7 +2581,8 @@ class battle_manager {
 		// attack is a Sorcerer spell attack and the active Sorcerer has the buff up.
 		if (is_spell_attack and attacker.class_name == "Sorcerer" and attacker.innate_sorcery_active) adv = true;
 		bool can_ignore_invisible = (attacker.has_feat("boon_of_truesight") and dist <= 60)
-			or (attacker.true_seeing_active and dist <= 120);
+			or (attacker.true_seeing_active and dist <= 120)
+			or attacker.see_invisibility_active;
 		// Barbarian Reckless Attack (PHB 2024 para 2785): "When you make your first attack
 		// roll on your turn, you can decide to attack recklessly. Doing so gives you Advantage
 		// on attack rolls using Strength until the start of your next turn, and attack rolls
@@ -2632,6 +2633,9 @@ class battle_manager {
 		// target, so Blur has no effect on them.
 		if (target.blur_active and !attacker.has_condition(COND_BLINDED)) disadv = true;
 		if (target.has_condition(COND_INVISIBLE) and !can_ignore_invisible) disadv = true;
+		// Basic Rules 2024 Protection from Evil and Good (para 14688-14691):
+		// "Creatures of those types have Disadvantage on attack rolls against the target."
+		if (target.protection_from_evil_and_good_active and is_pfeg_creature_type(attacker.creature_type)) disadv = true;
 		// PHB 2024 Invisible condition (para 16219): "Attack rolls against the creature
 		// have Disadvantage, and the creature's attack rolls have Advantage." The defender
 		// Disadvantage is above; the attacker Advantage is here.
@@ -2796,6 +2800,14 @@ class battle_manager {
 			if (feet_distance(attacker.x, attacker.y, other.x, other.y) <= 5) return true;
 		}
 		return false;
+	}
+
+	// Protection from Evil and Good: check if a creature type is one of the six
+	// types affected by the spell (Aberration, Celestial, Elemental, Fey, Fiend, Undead).
+	bool is_pfeg_creature_type(string creature_type) {
+		return creature_type == "aberration" or creature_type == "celestial"
+			or creature_type == "elemental" or creature_type == "fey"
+			or creature_type == "fiend" or creature_type == "undead";
 	}
 
 	bool monster_has_secondary_attack(combatant@ monster) {
@@ -3930,6 +3942,36 @@ class battle_manager {
 				}
 			}
 		}
+		// Protection from Evil and Good: clear flag on all targets sourced by this caster
+		for (uint pfi = 0; pfi < combat.combatants.length(); pfi++) {
+			combatant@ pf_t = combat.combatants[pfi];
+			if (@pf_t != null and pf_t.protection_from_evil_and_good_active and pf_t.pfeg_source_id == caster.id) {
+				pf_t.protection_from_evil_and_good_active = false;
+				pf_t.pfeg_source_id = 0;
+			}
+		}
+		// Expeditious Retreat: clear flag when concentration breaks
+		caster.expeditious_retreat_active = false;
+		// Levitate: clear flag on all targets sourced by this caster
+		for (uint li = 0; li < combat.combatants.length(); li++) {
+			combatant@ lev_t = combat.combatants[li];
+			if (@lev_t != null and lev_t.levitate_active and lev_t.levitate_source_id == caster.id) {
+				lev_t.levitate_active = false;
+				lev_t.levitate_source_id = 0;
+			}
+		}
+		// Compulsion: clear Charmed from all targets when concentration breaks.
+		// Approximation — blanket-clear since we don't track per-target spell sources.
+		if (caster.concentration_spell == "Compulsion") {
+			for (uint cpi = 0; cpi < combat.combatants.length(); cpi++) {
+				combatant@ cp_t = combat.combatants[cpi];
+				if (@cp_t != null and cp_t.has_condition(COND_CHARMED)) {
+					cp_t.remove_condition(COND_CHARMED);
+				}
+			}
+		}
+		// Antimagic Field: clear flag when concentration breaks
+		caster.antimagic_field_active = false;
 	}
 
 	// ---- Swarming Modifier Helper ----
@@ -4745,6 +4787,72 @@ class battle_manager {
 					broadcast_announce(prev.name + " uses Self-Restoration to shake off the Poisoned condition.", false);
 				}
 			}
+
+			// Compulsion (Basic Rules 2024 para 12594-12597): "After moving in this
+			// way, a target repeats the save, ending the spell on itself on a success."
+			// End-of-turn WIS save to break free from Charmed (Compulsion only).
+			if (prev.has_condition(COND_CHARMED)) {
+				for (uint ci = 0; ci < combat.combatants.length(); ci++) {
+					combatant@ caster = combat.combatants[ci];
+					if (@caster == null or caster.is_dead) continue;
+					if (caster.concentration_spell == "Compulsion" and caster.is_concentrating) {
+						int save_roll = random(1, 20);
+						if (prev.staggering_blow_active) { int sb2 = random(1, 20); if (sb2 < save_roll) save_roll = sb2; prev.staggering_blow_active = false; }
+						apply_hound_save_disadvantage(prev, caster.id, save_roll);
+						int save_bonus = prev.get_save_bonus(ABILITY_WIS);
+						int save_dc_val = spell_save_dc(caster);
+						int save_total = save_roll + save_bonus;
+						bool saved = save_total >= save_dc_val;
+						broadcast_roll(prev.name, "WIS save vs Compulsion (end of turn)", save_roll, save_bonus, save_total, saved ? "Freed!" : "Still compelled!");
+						if (!saved and try_arcane_deflection_save(prev, save_dc_val, save_total)) saved = true;
+						if (!saved) { if (try_countercharm_reroll(prev, save_dc_val, save_bonus, "WIS save vs Compulsion")) saved = true; }
+						if (!saved) { int ds = try_disciplined_survivor_reroll(prev, save_dc_val, save_total, save_bonus, "WIS save vs Compulsion"); if (ds >= save_dc_val) saved = true; }
+						if (!saved) { int fg = try_flash_of_genius(prev, save_dc_val, save_total, "WIS save vs Compulsion"); if (fg >= save_dc_val) saved = true; }
+						if (!saved) { int mv = try_maverick_spirit(prev, save_dc_val, save_total, "WIS save vs Compulsion"); if (mv >= save_dc_val) saved = true; }
+						if (!saved and try_mage_slayer_guarded_mind(prev, ABILITY_WIS)) saved = true;
+						if (!saved) { int bf = try_boon_of_fate_bonus(prev, save_total, save_dc_val); if (bf > 0) saved = true; }
+						if (!saved and try_stroke_of_luck_save(prev, save_dc_val, save_bonus)) saved = true;
+						if (saved) {
+							prev.remove_condition(COND_CHARMED);
+							broadcast_to_battle({{"type", message_types::condition_removed}, {"target", prev.name}, {"condition", "Charmed"}});
+						}
+						break;
+					}
+				}
+			}
+		}
+
+		// Time Stop: if the combatant whose turn just ended has time_stop_turns_remaining,
+		// DON'T advance initiative — instead restart their turn immediately.
+		if (@prev != null and prev.time_stop_turns_remaining > 0 and prev.is_alive()) {
+			prev.time_stop_turns_remaining--;
+			prev.has_action = true;
+			prev.has_bonus_action = true;
+			prev.has_reaction = true;
+			prev.movement_remaining = prev.speed;
+			prev.has_moved = false;
+			prev.used_action = false;
+			prev.used_bonus_action = false;
+			prev.cast_ba_spell_this_turn = false;
+			prev.cast_leveled_spell_this_turn = false;
+			int ts_remaining = prev.time_stop_turns_remaining;
+			broadcast_announce("Time is frozen! " + prev.name + " takes another turn. (" + (ts_remaining + 1) + " turn" + (ts_remaining > 0 ? "s" : "") + " remaining)", true);
+			broadcast_to_battle({
+				{"type", message_types::turn_start},
+				{"combatant_id", prev.id},
+				{"name", prev.name},
+				{"hp", prev.current_hp},
+				{"max_hp", prev.max_hp},
+				{"has_action", prev.has_action},
+				{"has_bonus_action", prev.has_bonus_action},
+				{"round", combat.round_number},
+				{"turn_index", combat.current_turn_index}
+			});
+			broadcast_state();
+			// Start monster AI if it's a monster's time-stopped turn
+			if (!prev.is_player) execute_monster_turn(prev);
+			else if (combatant_is_controlled_by_bot(prev)) execute_player_bot_turn(prev);
+			return;
 		}
 
 		combat.advance_turn();
@@ -5197,6 +5305,8 @@ class battle_manager {
 		c.steady_aim_pending = false;
 		// PHB 2024 Blade Ward (cantrip): resistance expires at the start of the caster's next turn.
 		c.blade_ward_active = false;
+		// Levitate: levitated creatures cannot move horizontally. Zero out their movement.
+		if (c.levitate_active) c.movement_remaining = 0;
 		// Reset Shield Master once-per-turn shove
 		c.shield_bash_used_this_turn = false;
 		// PHB 2024 Weapon Mastery per-turn resets
@@ -10763,6 +10873,14 @@ class battle_manager {
 			return;
 		}
 
+		// Basic Rules 2024 Levitate (para 13989): "The target can move only by
+		// pushing or pulling against a fixed object or surface within reach."
+		// Block horizontal movement while levitated.
+		if (c.levitate_active) {
+			u.send({{"type", message_types::error}, {"text", "You are levitating and cannot move horizontally!"}});
+			return;
+		}
+
 		int dx = 0, dy = 0;
 		if (msg.exists("dx")) dx = int(msg["dx"]);
 		if (msg.exists("dy")) dy = int(msg["dy"]);
@@ -11570,6 +11688,27 @@ class battle_manager {
 			}
 			if (in_silence) {
 				u.send({{"type", message_types::announce}, {"text", "You are inside a Silence zone and cannot cast spells with verbal components!"}, {"interrupt", true}});
+				return;
+			}
+		}
+
+		// Basic Rules 2024 Antimagic Field (para 11938-11945): "No one can cast
+		// spells, take Magic actions, or create other magical effects inside the
+		// aura." Block spellcasting for anyone within 10ft of an antimagic field
+		// source. The caster's own field doesn't block themselves.
+		{
+			bool in_antimagic = false;
+			for (uint ami = 0; ami < combat.combatants.length(); ami++) {
+				combatant@ amc = combat.combatants[ami];
+				if (@amc == null or amc.is_dead or !amc.antimagic_field_active) continue;
+				if (amc.id == c.id) continue; // Own field doesn't block self
+				if (feet_distance(amc.x, amc.y, c.x, c.y) <= 10) {
+					in_antimagic = true;
+					break;
+				}
+			}
+			if (in_antimagic) {
+				u.send({{"type", message_types::announce}, {"text", "You are inside an Antimagic Field and cannot cast spells!"}, {"interrupt", true}});
 				return;
 			}
 		}
@@ -15264,7 +15403,15 @@ class battle_manager {
 				}
 			}
 			else if (spell.id == "expeditious_retreat") {
-				broadcast_announce(c.name + " casts Expeditious Retreat, doubling their speed for 10 minutes.", true);
+				// Basic Rules 2024 Expeditious Retreat (para 13159): "You take the Dash
+				// action, and until the spell ends, you can take that action again as a
+				// Bonus Action." Concentration.
+				c.expeditious_retreat_active = true;
+				c.is_concentrating = true;
+				c.concentration_spell = spell.name;
+				// Immediate Dash: double remaining movement this turn
+				c.movement_remaining += c.speed;
+				broadcast_announce(c.name + " casts Expeditious Retreat! They dash forward and can Dash as a bonus action each turn.", true);
 			}
 			else if (spell.id == "feather_fall") {
 				broadcast_announce(c.name + " casts Feather Fall, slowing the descent of up to 5 creatures.", true);
@@ -15273,7 +15420,20 @@ class battle_manager {
 				broadcast_announce(c.name + " casts Find Familiar, summoning a spirit companion.", true);
 			}
 			else if (spell.id == "goodberry") {
-				broadcast_announce(c.name + " casts Goodberry, creating 10 berries that each heal 1 HP.", true);
+				// Basic Rules 2024 Goodberry (para 13617): "Ten berries appear in your
+				// hand... A creature can take a Bonus Action to eat one berry. Eating a
+				// berry restores 1 Hit Point." In combat, instantly heal caster 10 HP
+				// as a practical approximation (no inventory system for individual berries).
+				int gb_heal = 10;
+				int old_hp = c.current_hp;
+				c.current_hp += gb_heal;
+				if (c.current_hp > c.max_hp) c.current_hp = c.max_hp;
+				int actual_heal = c.current_hp - old_hp;
+				if (actual_heal > 0) {
+					broadcast_announce(c.name + " casts Goodberry and eats the berries, healing " + actual_heal + " HP!", true);
+				} else {
+					broadcast_announce(c.name + " casts Goodberry, but is already at full health.", true);
+				}
 			}
 			else if (spell.id == "grease") {
 				// DEX save in 10 ft area, prone on fail
@@ -15309,11 +15469,19 @@ class battle_manager {
 			else if (spell.id == "jump") {
 				broadcast_announce(c.name + " casts Jump, tripling their jump distance.", true);
 			}
-			else if (spell.id == "protection_from_evil_and_good" and @target != null) {
-				broadcast_announce(c.name + " casts Protection from Evil and Good on " + target.name + ". They gain +1 on saves against aberrations, celestials, elementals, fey, fiends, and undead.", true);
-			}
 			else if (spell.id == "protection_from_evil_and_good") {
-				broadcast_announce(c.name + " casts Protection from Evil and Good.", true);
+				// Basic Rules 2024 Protection from Evil and Good (para 14688-14691):
+				// "one willing creature you touch is protected against Aberrations,
+				// Celestials, Elementals, Fey, Fiends, and Undead. Creatures of those
+				// types have Disadvantage on attack rolls against the target. The target
+				// also can't be possessed by or gain the Charmed or Frightened conditions
+				// from them." Concentration.
+				combatant@ pfeg_target = (@target != null) ? target : c;
+				pfeg_target.protection_from_evil_and_good_active = true;
+				pfeg_target.pfeg_source_id = c.id;
+				c.is_concentrating = true;
+				c.concentration_spell = spell.name;
+				broadcast_announce(c.name + " casts Protection from Evil and Good on " + pfeg_target.name + ". Aberrations, celestials, elementals, fey, fiends, and undead have disadvantage on attacks against them and cannot charm or frighten them.", true);
 			}
 			else if (spell.id == "purify_food_and_drink") {
 				broadcast_announce(c.name + " casts Purify Food and Drink.", true);
@@ -15416,7 +15584,36 @@ class battle_manager {
 				broadcast_announce(c.name + " casts Knock, magically unlocking a target.", true);
 			}
 			else if (spell.id == "levitate") {
-				broadcast_announce(c.name + " casts Levitate.", true);
+				// Basic Rules 2024 Levitate (para 13989-13992): "One creature or loose
+				// object of your choice that you can see within range rises vertically up
+				// to 20 feet and remains suspended there for the duration." CON save for
+				// unwilling targets. Target can't move horizontally. Concentration.
+				combatant@ lev_target = (@target != null) ? target : c;
+				bool lev_hostile = combat.are_hostile(c, lev_target);
+				bool lev_saved = false;
+				if (lev_hostile) {
+					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(lev_target, c.id, save_roll);
+					int save_bonus = lev_target.get_save_bonus(ABILITY_CON);
+					int bless_bonus = roll_bless_bonus(lev_target);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					lev_saved = save_total >= save_dc;
+					if (!lev_saved and try_arcane_deflection_save(lev_target, save_dc, save_total)) lev_saved = true;
+					if (!lev_saved) { int ds = try_disciplined_survivor_reroll(lev_target, save_dc, save_total, save_bonus + bless_bonus, "CON save vs Levitate"); if (ds >= save_dc) lev_saved = true; }
+					if (!lev_saved) { int fg = try_flash_of_genius(lev_target, save_dc, save_total, "CON save vs Levitate"); if (fg >= save_dc) lev_saved = true; }
+					if (!lev_saved) { int mv = try_maverick_spirit(lev_target, save_dc, save_total, "CON save vs Levitate"); if (mv >= save_dc) lev_saved = true; }
+					if (!lev_saved) { int bf = try_boon_of_fate_bonus(lev_target, save_total, save_dc); if (bf >= save_dc) lev_saved = true; }
+					if (!lev_saved and try_stroke_of_luck_save(lev_target, save_dc, save_bonus + bless_bonus)) lev_saved = true;
+					broadcast_roll(lev_target.name, "CON save vs Levitate", save_roll, save_bonus + bless_bonus, save_total, lev_saved ? "Saved!" : "Levitated!");
+				}
+				if (!lev_saved) {
+					lev_target.levitate_active = true;
+					lev_target.levitate_source_id = c.id;
+					lev_target.movement_remaining = 0; // Can't move horizontally
+					c.is_concentrating = true;
+					c.concentration_spell = spell.name;
+					broadcast_announce(c.name + " levitates " + lev_target.name + "! They rise 20 feet and cannot move horizontally.", true);
+				}
 			}
 			else if (spell.id == "locate_animals_or_plants") {
 				broadcast_announce(c.name + " casts Locate Animals or Plants.", true);
@@ -15436,7 +15633,11 @@ class battle_manager {
 				broadcast_announce(c.name + " casts Rope Trick.", true);
 			}
 			else if (spell.id == "see_invisibility") {
-				broadcast_announce(c.name + " casts See Invisibility.", true);
+				// Basic Rules 2024 See Invisibility (para 14864): "you see creatures and
+				// objects that have the Invisible condition as if they were visible."
+				// NOT concentration. Duration 1 hour.
+				c.see_invisibility_active = true;
+				broadcast_announce(c.name + " casts See Invisibility! They can now see invisible creatures.", true);
 			}
 			else if (spell.id == "silence") {
 				// Basic Rules 2024 Silence: 20ft sphere, blocks spellcasting (verbal component),
@@ -15548,7 +15749,46 @@ class battle_manager {
 				broadcast_announce(c.name + " casts Arcane Eye.", true);
 			}
 			else if (spell.id == "compulsion") {
-				broadcast_announce(c.name + " casts Compulsion.", true);
+				// Basic Rules 2024 Compulsion (para 12594-12597): "Each creature of your
+				// choice that you can see within range must succeed on a Wisdom saving throw
+				// or have the Charmed condition until the spell ends." WIS save, AoE,
+				// concentration. End-of-turn re-save.
+				c.is_concentrating = true;
+				c.concentration_spell = spell.name;
+				int compulsion_hits = 0;
+				for (uint ci = 0; ci < combat.combatants.length(); ci++) {
+					combatant@ ct = combat.combatants[ci];
+					if (@ct == null or ct.is_dead or ct.id == c.id) continue;
+					if (!combat.are_hostile(c, ct)) continue;
+					if (feet_distance(c.x, c.y, ct.x, ct.y) > 30) continue;
+					if (!combat.can_see(c, ct)) continue;
+					int save_roll = random(1, 20);
+					if (ct.staggering_blow_active) { int sb2 = random(1, 20); if (sb2 < save_roll) save_roll = sb2; ct.staggering_blow_active = false; }
+					apply_hound_save_disadvantage(ct, c.id, save_roll);
+					int save_bonus = ct.get_save_bonus(ABILITY_WIS);
+					int bless_bonus = roll_bless_bonus(ct);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= save_dc;
+					if (!saved and try_arcane_deflection_save(ct, save_dc, save_total)) saved = true;
+					if (!saved and try_countercharm_reroll(ct, save_dc, save_bonus + bless_bonus, "WIS save vs Compulsion")) saved = true;
+					if (!saved) { int ds = try_disciplined_survivor_reroll(ct, save_dc, save_total, save_bonus + bless_bonus, "WIS save vs Compulsion"); if (ds >= save_dc) saved = true; }
+					if (!saved) { int fg = try_flash_of_genius(ct, save_dc, save_total, "WIS save vs Compulsion"); if (fg >= save_dc) saved = true; }
+					if (!saved) { int mv = try_maverick_spirit(ct, save_dc, save_total, "WIS save vs Compulsion"); if (mv >= save_dc) saved = true; }
+					if (!saved and try_mage_slayer_guarded_mind(ct, ABILITY_WIS)) saved = true;
+					if (!saved) { int bf = try_boon_of_fate_bonus(ct, save_total, save_dc); if (bf >= save_dc) saved = true; }
+					if (!saved and try_stroke_of_luck_save(ct, save_dc, save_bonus + bless_bonus)) saved = true;
+					broadcast_roll(ct.name, "WIS save vs Compulsion", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Charmed!");
+					if (!saved) {
+						ct.add_condition(COND_CHARMED);
+						broadcast_to_battle({{"type", message_types::condition_applied}, {"target", ct.name}, {"condition", "Charmed"}});
+						compulsion_hits++;
+					}
+				}
+				if (compulsion_hits > 0) {
+					broadcast_announce(c.name + " casts Compulsion! " + compulsion_hits + " creature" + (compulsion_hits > 1 ? "s are" : " is") + " charmed and forced to move as directed.", true);
+				} else {
+					broadcast_announce(c.name + " casts Compulsion, but all targets resist!", true);
+				}
 			}
 			else if (spell.id == "confusion") {
 				// WIS save in 10 ft radius; on fail, target is incapacitated (confused)
@@ -15611,8 +15851,41 @@ class battle_manager {
 			else if (spell.id == "private_sanctum") {
 				broadcast_announce(c.name + " casts Private Sanctum.", true);
 			}
+			else if (spell.id == "resilient_sphere" and @target != null) {
+				// Basic Rules 2024 Resilient Sphere (para 14777-14779): "A shimmering
+				// sphere encloses a Large or smaller creature or object within range. An
+				// unwilling creature must succeed on a Dexterity saving throw or be enclosed
+				// for the duration. Nothing can pass through the barrier. The sphere is
+				// immune to all damage." NOT concentration. 1 minute duration.
+				bool rs_hostile = combat.are_hostile(c, target);
+				bool rs_saved = false;
+				if (rs_hostile) {
+					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(target, c.id, save_roll);
+					int save_bonus = target.get_save_bonus(ABILITY_DEX);
+					int bless_bonus = roll_bless_bonus(target);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					rs_saved = save_total >= save_dc;
+					if (!rs_saved and try_arcane_deflection_save(target, save_dc, save_total)) rs_saved = true;
+					if (!rs_saved) { int ds = try_disciplined_survivor_reroll(target, save_dc, save_total, save_bonus + bless_bonus, "DEX save vs Resilient Sphere"); if (ds >= save_dc) rs_saved = true; }
+					if (!rs_saved) { int fg = try_flash_of_genius(target, save_dc, save_total, "DEX save vs Resilient Sphere"); if (fg >= save_dc) rs_saved = true; }
+					if (!rs_saved) { int mv = try_maverick_spirit(target, save_dc, save_total, "DEX save vs Resilient Sphere"); if (mv >= save_dc) rs_saved = true; }
+					if (!rs_saved) { int bf = try_boon_of_fate_bonus(target, save_total, save_dc); if (bf >= save_dc) rs_saved = true; }
+					if (!rs_saved and try_stroke_of_luck_save(target, save_dc, save_bonus + bless_bonus)) rs_saved = true;
+					broadcast_roll(target.name, "DEX save vs Resilient Sphere", save_roll, save_bonus + bless_bonus, save_total, rs_saved ? "Saved!" : "Trapped!");
+				}
+				if (!rs_saved) {
+					target.resilient_sphere_trapped = true;
+					target.resilient_sphere_source_id = c.id;
+					target.add_condition(COND_INCAPACITATED);
+					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Incapacitated"}});
+					broadcast_announce(c.name + " traps " + target.name + " in a Resilient Sphere! They are immune to all damage but cannot act.", true);
+				}
+				broadcast_state();
+				return;
+			}
 			else if (spell.id == "resilient_sphere") {
-				broadcast_announce(c.name + " casts Resilient Sphere.", true);
+				broadcast_announce(c.name + " casts Resilient Sphere but has no target.", false);
 			}
 			else if (spell.id == "secret_chest") {
 				broadcast_announce(c.name + " casts Secret Chest.", true);
@@ -15710,7 +15983,30 @@ class battle_manager {
 				broadcast_announce(c.name + " casts Guards and Wards.", true);
 			}
 			else if (spell.id == "heroes_feast") {
-				broadcast_announce(c.name + " casts Heroes' Feast. Up to 12 creatures gain 2d10 HP, immunity to poison and fear, and advantage on Wisdom saves for 24 hours.", true);
+				// Basic Rules 2024 Heroes' Feast (para 13760-13763): "Up to twelve
+				// creatures can partake of the feast. A creature that partakes gains
+				// several benefits... Resistance to Poison damage, Immunity to the
+				// Frightened and Poisoned conditions. Its Hit Point maximum also
+				// increases by 2d10, and it gains the same number of Hit Points."
+				// NOT concentration. 24 hours. Apply to all allies in combat.
+				string feast_names = "";
+				for (uint fi = 0; fi < combat.combatants.length(); fi++) {
+					combatant@ fc = combat.combatants[fi];
+					if (@fc == null or fc.is_dead) continue;
+					if (combat.are_hostile(c, fc)) continue;
+					if (fc.heroes_feast_active) continue; // Already feasting
+					int feast_hp = random(1, 10) + random(1, 10);
+					fc.heroes_feast_active = true;
+					fc.heroes_feast_hp_bonus = feast_hp;
+					fc.max_hp += feast_hp;
+					fc.current_hp += feast_hp;
+					// Remove existing poisoned/frightened conditions
+					if (fc.has_condition(COND_POISONED)) fc.remove_condition(COND_POISONED);
+					if (fc.has_condition(COND_FRIGHTENED)) fc.remove_condition(COND_FRIGHTENED);
+					if (feast_names.length() > 0) feast_names += ", ";
+					feast_names += fc.name + " (+" + feast_hp + " HP)";
+				}
+				broadcast_announce(c.name + " casts Heroes' Feast! Allies gain max HP, poison resistance, and immunity to fear and poison: " + feast_names, true);
 			}
 			else if (spell.id == "magic_jar") {
 				broadcast_announce(c.name + " casts Magic Jar.", true);
@@ -15766,7 +16062,14 @@ class battle_manager {
 			}
 			// Level 8
 			else if (spell.id == "antimagic_field") {
-				broadcast_announce(c.name + " casts Antimagic Field.", true);
+				// Basic Rules 2024 Antimagic Field (para 11938-11945): "An aura of
+				// antimagic surrounds you in 10-foot Emanation. No one can cast spells,
+				// take Magic actions, or create other magical effects inside the aura."
+				// Concentration. Spellcasting block is enforced in handle_cast.
+				c.antimagic_field_active = true;
+				c.is_concentrating = true;
+				c.concentration_spell = spell.name;
+				broadcast_announce(c.name + " activates an Antimagic Field! All magic is suppressed within 10 feet.", true);
 			}
 			else if (spell.id == "antipathy_sympathy") {
 				broadcast_announce(c.name + " casts Antipathy/Sympathy.", true);
@@ -15835,7 +16138,13 @@ class battle_manager {
 				broadcast_announce(c.name + " casts Shapechange.", true);
 			}
 			else if (spell.id == "time_stop") {
-				broadcast_announce(c.name + " casts Time Stop.", true);
+				// Basic Rules 2024 Time Stop (para 15275-15277): "you take 1d4 + 1 turns
+				// in a row, during which you can use actions and move as normal." Instantaneous.
+				// Extra turns are granted by setting time_stop_turns_remaining and checking
+				// in advance_turn to repeat the caster's turn instead of advancing initiative.
+				int extra_turns = random(1, 4) + 1;
+				c.time_stop_turns_remaining = extra_turns;
+				broadcast_announce(c.name + " casts Time Stop! Time freezes for everyone else — " + c.name + " gains " + extra_turns + " extra turns!", true);
 			}
 			else if (spell.id == "true_polymorph") {
 				broadcast_announce(c.name + " casts True Polymorph.", true);

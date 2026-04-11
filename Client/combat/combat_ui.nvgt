@@ -348,6 +348,7 @@ bool my_call_lightning_active = false;
 bool my_flaming_sphere_active = false;
 bool my_conjure_woodland_disengage = false;
 bool my_swift_quiver_active = false;
+bool my_expeditious_retreat_active = false;
 
 // Potion buff rounds remaining (synced from server)
 int my_potion_damage_rounds = 0;
@@ -1385,6 +1386,8 @@ void show_bonus_action_menu() {
 	if (my_flaming_sphere_active) flaming_sphere_opt = m.add_item("Flaming Sphere. Move the sphere to a target and deal fire damage (DEX save).");
 	int cwb_disengage_opt = -1;
 	if (my_conjure_woodland_disengage) cwb_disengage_opt = m.add_item("Disengage (Conjure Woodland Beings). Bonus action.");
+	int exp_retreat_opt = -1;
+	if (my_expeditious_retreat_active) exp_retreat_opt = m.add_item("Dash (Expeditious Retreat). Bonus action. Double your movement.");
 
 	// Subclass-specific bonus actions
 	if (lc == "fighter") {
@@ -2189,6 +2192,9 @@ void show_bonus_action_menu() {
 	}
 	else if (cwb_disengage_opt >= 0 and res == cwb_disengage_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "cwb_disengage"}});
+	}
+	else if (exp_retreat_opt >= 0 and res == exp_retreat_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "expeditious_retreat_dash"}});
 	}
 	// Subclass bonus action handlers
 	else if (trip_opt >= 0 and res == trip_opt) {
@@ -4231,6 +4237,7 @@ void parse_game_state(json_object@ msg) {
 	my_flaming_sphere_active = msg.exists("my_flaming_sphere_active") ? bool(msg["my_flaming_sphere_active"]) : false;
 	my_conjure_woodland_disengage = msg.exists("my_conjure_woodland_disengage") ? bool(msg["my_conjure_woodland_disengage"]) : false;
 	my_swift_quiver_active = msg.exists("my_swift_quiver_active") ? bool(msg["my_swift_quiver_active"]) : false;
+	my_expeditious_retreat_active = msg.exists("my_expeditious_retreat_active") ? bool(msg["my_expeditious_retreat_active"]) : false;
 	my_potion_damage_rounds = msg.exists("my_potion_damage_rounds") ? int(msg["my_potion_damage_rounds"]) : 0;
 	my_potion_ac_rounds = msg.exists("my_potion_ac_rounds") ? int(msg["my_potion_ac_rounds"]) : 0;
 	my_potion_speed_rounds = msg.exists("my_potion_speed_rounds") ? int(msg["my_potion_speed_rounds"]) : 0;
@@ -4510,6 +4517,7 @@ void reset_combat_state() {
 	my_flaming_sphere_active = false;
 	my_conjure_woodland_disengage = false;
 	my_swift_quiver_active = false;
+	my_expeditious_retreat_active = false;
 	combat_focus = 0;
 	combat_history.resize(0);
 	combat_history_cursor = -1;
