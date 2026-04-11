@@ -1203,6 +1203,610 @@ void init_monster_defs() {
         d.description = "A powerful spellcaster wielding devastating arcane magic.";
         MONSTER_DEFS.insert_last(d);
     }
+
+    // === NEW MONSTERS (2026-04-10 expansion) ===
+
+    // --- CR 1/2 ---
+    {
+        monster_def d;
+        d.id = "hobgoblin";
+        d.name = "Hobgoblin";
+        d.type = "humanoid";
+        d.size = SIZE_MEDIUM;
+        d.ac = 18;
+        d.hp = 11;
+        d.speed = 30;
+        d.str = 13; d.dex = 12; d.con = 12;
+        d.intelligence = 10; d.wis = 10; d.cha = 9;
+        d.attack_name = "Longsword";
+        d.attack_bonus = 3;
+        d.damage_dice = 8;
+        d.damage_count = 1;
+        d.damage_mod = 1;
+        d.damage_type = DMG_SLASHING;
+        d.attack_range = 5;
+        d.xp = 100;
+        d.description = "A disciplined goblinoid warrior clad in heavy armor.";
+        MONSTER_DEFS.insert_last(d);
+    }
+    {
+        monster_def d;
+        d.id = "scout";
+        d.name = "Scout";
+        d.type = "humanoid";
+        d.size = SIZE_MEDIUM;
+        d.ac = 13;
+        d.hp = 16;
+        d.speed = 30;
+        d.str = 11; d.dex = 14; d.con = 12;
+        d.intelligence = 11; d.wis = 13; d.cha = 11;
+        d.attack_name = "Longbow";
+        d.attack_bonus = 4;
+        d.damage_dice = 8;
+        d.damage_count = 1;
+        d.damage_mod = 2;
+        d.damage_type = DMG_PIERCING;
+        d.attack_range = 80;
+        d.xp = 100;
+        d.description = "A skilled tracker and skirmisher who prefers to strike from range.";
+        MONSTER_DEFS.insert_last(d);
+    }
+    {
+        monster_def d;
+        d.id = "gnoll";
+        d.name = "Gnoll";
+        d.type = "humanoid";
+        d.size = SIZE_MEDIUM;
+        d.ac = 15;
+        d.hp = 22;
+        d.speed = 30;
+        d.str = 14; d.dex = 12; d.con = 11;
+        d.intelligence = 6; d.wis = 10; d.cha = 7;
+        d.attack_name = "Spear";
+        d.attack_bonus = 4;
+        d.damage_dice = 6;
+        d.damage_count = 1;
+        d.damage_mod = 2;
+        d.damage_type = DMG_PIERCING;
+        d.attack_range = 5;
+        d.xp = 100;
+        d.description = "A savage hyena-headed humanoid driven by insatiable hunger.";
+        MONSTER_DEFS.insert_last(d);
+    }
+
+    // --- CR 1 ---
+    {
+        monster_def d;
+        d.id = "bugbear";
+        d.name = "Bugbear";
+        d.type = "humanoid";
+        d.size = SIZE_MEDIUM;
+        d.ac = 16;
+        d.hp = 27;
+        d.speed = 30;
+        d.str = 15; d.dex = 14; d.con = 13;
+        d.intelligence = 8; d.wis = 11; d.cha = 9;
+        d.attack_name = "Morningstar";
+        d.attack_bonus = 4;
+        d.damage_dice = 8;
+        d.damage_count = 2;
+        d.damage_mod = 2;
+        d.damage_type = DMG_PIERCING;
+        d.attack_range = 5;
+        d.xp = 200;
+        d.description = "A hulking goblinoid that ambushes prey with brutal surprise attacks.";
+        MONSTER_DEFS.insert_last(d);
+    }
+    {
+        monster_def d;
+        d.id = "ghast";
+        d.name = "Ghast";
+        d.type = "undead";
+        d.size = SIZE_MEDIUM;
+        d.ac = 13;
+        d.hp = 36;
+        d.speed = 30;
+        d.str = 16; d.dex = 17; d.con = 10;
+        d.intelligence = 11; d.wis = 10; d.cha = 8;
+        d.attack_name = "Claws";
+        d.attack_bonus = 5;
+        d.damage_dice = 8;
+        d.damage_count = 2;
+        d.damage_mod = 3;
+        d.damage_type = DMG_SLASHING;
+        d.attack_range = 5;
+        d.paralyze_dc = 10; // SRD: DC 10 CON save or Paralyzed
+        d.xp = 450;
+        d.immune_poison = true;
+        d.immune_poisoned = true;
+        d.description = "A more powerful ghoul whose stench alone can sicken the living.";
+        MONSTER_DEFS.insert_last(d);
+    }
+    {
+        monster_def d;
+        d.id = "specter";
+        d.name = "Specter";
+        d.type = "undead";
+        d.size = SIZE_MEDIUM;
+        d.ac = 12;
+        d.hp = 22;
+        d.speed = 50;
+        d.str = 1; d.dex = 14; d.con = 11;
+        d.intelligence = 10; d.wis = 10; d.cha = 11;
+        d.attack_name = "Life Drain";
+        d.attack_bonus = 4;
+        d.damage_dice = 6;
+        d.damage_count = 3;
+        d.damage_mod = 0;
+        d.damage_type = DMG_NECROTIC;
+        d.attack_range = 5;
+        d.xp = 200;
+        d.resist_acid = true;
+        d.resist_cold = true;
+        d.resist_fire = true;
+        d.resist_lightning = true;
+        d.resist_thunder = true;
+        d.resist_bps_nonmagical = true;
+        d.immune_necrotic = true;
+        d.immune_poison = true;
+        d.immune_poisoned = true;
+        d.immune_charmed = true;
+        d.immune_paralyzed = true;
+        d.immune_exhaustion = true;
+        d.description = "A translucent shade that drains the life force from the living.";
+        MONSTER_DEFS.insert_last(d);
+    }
+
+    // --- CR 2 ---
+    {
+        monster_def d;
+        d.id = "gargoyle";
+        d.name = "Gargoyle";
+        d.type = "elemental";
+        d.size = SIZE_MEDIUM;
+        d.ac = 15;
+        d.hp = 52;
+        d.speed = 30;
+        d.str = 15; d.dex = 11; d.con = 16;
+        d.intelligence = 6; d.wis = 11; d.cha = 7;
+        d.attack_name = "Claw";
+        d.attack_bonus = 4;
+        d.damage_dice = 6;
+        d.damage_count = 1;
+        d.damage_mod = 2;
+        d.damage_type = DMG_SLASHING;
+        d.attack_range = 5;
+        d.has_multiattack = true;
+        d.multiattack_count = 2;
+        d.xp = 450;
+        d.resist_bps_nonmagical = true;
+        d.immune_poison = true;
+        d.immune_poisoned = true;
+        d.immune_exhaustion = true;
+        d.description = "A stone creature animated by elemental earth magic, lurking atop buildings.";
+        MONSTER_DEFS.insert_last(d);
+    }
+    {
+        monster_def d;
+        d.id = "mimic";
+        d.name = "Mimic";
+        d.type = "monstrosity";
+        d.size = SIZE_MEDIUM;
+        d.ac = 12;
+        d.hp = 58;
+        d.speed = 15;
+        d.str = 17; d.dex = 12; d.con = 15;
+        d.intelligence = 5; d.wis = 13; d.cha = 8;
+        d.attack_name = "Pseudopod";
+        d.attack_bonus = 5;
+        d.damage_dice = 8;
+        d.damage_count = 1;
+        d.damage_mod = 3;
+        d.damage_type = DMG_BLUDGEONING;
+        d.attack_range = 5;
+        d.xp = 450;
+        d.resist_acid = true;
+        d.description = "A shapeshifter that disguises itself as mundane objects to ambush prey.";
+        MONSTER_DEFS.insert_last(d);
+    }
+    {
+        monster_def d;
+        d.id = "ankheg";
+        d.name = "Ankheg";
+        d.type = "monstrosity";
+        d.size = SIZE_LARGE;
+        d.ac = 14;
+        d.hp = 39;
+        d.speed = 30;
+        d.str = 17; d.dex = 11; d.con = 13;
+        d.intelligence = 1; d.wis = 13; d.cha = 6;
+        d.attack_name = "Bite";
+        d.attack_bonus = 5;
+        d.damage_dice = 6;
+        d.damage_count = 2;
+        d.damage_mod = 6; // 2d6+3 slashing + 1d6 acid (approximated as higher mod)
+        d.damage_type = DMG_SLASHING;
+        d.attack_range = 5;
+        d.xp = 450;
+        d.description = "A burrowing insectoid that erupts from the earth to snatch prey in its mandibles.";
+        MONSTER_DEFS.insert_last(d);
+    }
+
+    // --- CR 3 ---
+    {
+        monster_def d;
+        d.id = "manticore";
+        d.name = "Manticore";
+        d.type = "monstrosity";
+        d.size = SIZE_LARGE;
+        d.ac = 14;
+        d.hp = 68;
+        d.speed = 30;
+        d.str = 17; d.dex = 16; d.con = 17;
+        d.intelligence = 7; d.wis = 12; d.cha = 8;
+        d.attack_name = "Claw";
+        d.attack_bonus = 5;
+        d.damage_dice = 8;
+        d.damage_count = 1;
+        d.damage_mod = 3;
+        d.damage_type = DMG_SLASHING;
+        d.attack_range = 5;
+        d.attack2_name = "Tail Spike";
+        d.attack2_bonus = 5;
+        d.attack2_dice = 8;
+        d.attack2_count = 1;
+        d.attack2_mod = 3;
+        d.attack2_type = DMG_PIERCING;
+        d.attack2_range = 100;
+        d.has_multiattack = true;
+        d.multiattack_count = 3;
+        d.xp = 700;
+        d.description = "A winged lion with a humanoid face and a tail bristling with deadly spikes.";
+        MONSTER_DEFS.insert_last(d);
+    }
+    {
+        monster_def d;
+        d.id = "minotaur";
+        d.name = "Minotaur";
+        d.type = "monstrosity";
+        d.size = SIZE_LARGE;
+        d.ac = 14;
+        d.hp = 76;
+        d.speed = 40;
+        d.str = 18; d.dex = 11; d.con = 16;
+        d.intelligence = 6; d.wis = 16; d.cha = 9;
+        d.attack_name = "Greataxe";
+        d.attack_bonus = 6;
+        d.damage_dice = 12;
+        d.damage_count = 2;
+        d.damage_mod = 4;
+        d.damage_type = DMG_SLASHING;
+        d.attack_range = 5;
+        d.xp = 700;
+        d.description = "A massive bull-headed brute that stalks labyrinthine dungeons.";
+        MONSTER_DEFS.insert_last(d);
+    }
+    {
+        monster_def d;
+        d.id = "hell_hound";
+        d.name = "Hell Hound";
+        d.type = "fiend";
+        d.size = SIZE_MEDIUM;
+        d.ac = 15;
+        d.hp = 45;
+        d.speed = 50;
+        d.str = 17; d.dex = 12; d.con = 14;
+        d.intelligence = 6; d.wis = 13; d.cha = 6;
+        d.attack_name = "Bite";
+        d.attack_bonus = 5;
+        d.damage_dice = 8;
+        d.damage_count = 1;
+        d.damage_mod = 3;
+        d.damage_type = DMG_PIERCING;
+        d.attack_range = 5;
+        d.pack_tactics = true;
+        d.breath_name = "Fire Breath";
+        d.breath_save_type = ABILITY_DEX;
+        d.breath_save_dc = 12;
+        d.breath_dice = 6;
+        d.breath_count = 6;
+        d.breath_damage_type = DMG_FIRE;
+        d.breath_range = 15;
+        d.breath_recharge_min = 5;
+        d.immune_fire = true;
+        d.xp = 700;
+        d.description = "A fiendish hound wreathed in brimstone that hunts in packs.";
+        MONSTER_DEFS.insert_last(d);
+    }
+
+    // --- CR 4 ---
+    {
+        monster_def d;
+        d.id = "ettin";
+        d.name = "Ettin";
+        d.type = "giant";
+        d.size = SIZE_LARGE;
+        d.ac = 12;
+        d.hp = 85;
+        d.speed = 40;
+        d.str = 21; d.dex = 8; d.con = 17;
+        d.intelligence = 6; d.wis = 10; d.cha = 8;
+        d.attack_name = "Battleaxe";
+        d.attack_bonus = 7;
+        d.damage_dice = 8;
+        d.damage_count = 2;
+        d.damage_mod = 5;
+        d.damage_type = DMG_SLASHING;
+        d.attack_range = 5;
+        d.has_multiattack = true;
+        d.multiattack_count = 2;
+        d.xp = 1100;
+        d.description = "A two-headed giant, each head bickering as it swings massive weapons.";
+        MONSTER_DEFS.insert_last(d);
+    }
+    {
+        monster_def d;
+        d.id = "ghost";
+        d.name = "Ghost";
+        d.type = "undead";
+        d.size = SIZE_MEDIUM;
+        d.ac = 11;
+        d.hp = 45;
+        d.speed = 40;
+        d.str = 7; d.dex = 13; d.con = 10;
+        d.intelligence = 10; d.wis = 12; d.cha = 17;
+        d.attack_name = "Withering Touch";
+        d.attack_bonus = 5;
+        d.damage_dice = 6;
+        d.damage_count = 4;
+        d.damage_mod = 3;
+        d.damage_type = DMG_NECROTIC;
+        d.attack_range = 5;
+        d.frightful_presence_dc = 13; // Horrifying Visage
+        d.frightful_presence_range = 60;
+        d.xp = 1100;
+        d.resist_acid = true;
+        d.resist_fire = true;
+        d.resist_lightning = true;
+        d.resist_thunder = true;
+        d.resist_bps_nonmagical = true;
+        d.immune_cold = true;
+        d.immune_necrotic = true;
+        d.immune_poison = true;
+        d.immune_poisoned = true;
+        d.immune_charmed = true;
+        d.immune_exhaustion = true;
+        d.description = "The restless spirit of a creature bound to the material world by unfinished business.";
+        MONSTER_DEFS.insert_last(d);
+    }
+
+    // --- CR 5 ---
+    {
+        monster_def d;
+        d.id = "hill_giant";
+        d.name = "Hill Giant";
+        d.type = "giant";
+        d.size = SIZE_HUGE;
+        d.ac = 13;
+        d.hp = 105;
+        d.speed = 40;
+        d.str = 21; d.dex = 8; d.con = 19;
+        d.intelligence = 5; d.wis = 9; d.cha = 6;
+        d.attack_name = "Greatclub";
+        d.attack_bonus = 8;
+        d.damage_dice = 8;
+        d.damage_count = 3;
+        d.damage_mod = 5;
+        d.damage_type = DMG_BLUDGEONING;
+        d.attack_range = 10;
+        d.has_multiattack = true;
+        d.multiattack_count = 2;
+        d.xp = 1800;
+        d.description = "A dim-witted giant of enormous bulk driven by an endless appetite.";
+        MONSTER_DEFS.insert_last(d);
+    }
+    {
+        monster_def d;
+        d.id = "air_elemental";
+        d.name = "Air Elemental";
+        d.type = "elemental";
+        d.size = SIZE_LARGE;
+        d.ac = 15;
+        d.hp = 90;
+        d.speed = 90;
+        d.str = 14; d.dex = 20; d.con = 14;
+        d.intelligence = 6; d.wis = 10; d.cha = 6;
+        d.attack_name = "Slam";
+        d.attack_bonus = 8;
+        d.damage_dice = 8;
+        d.damage_count = 2;
+        d.damage_mod = 5;
+        d.damage_type = DMG_BLUDGEONING;
+        d.attack_range = 5;
+        d.has_multiattack = true;
+        d.multiattack_count = 2;
+        d.xp = 1800;
+        d.resist_lightning = true;
+        d.resist_thunder = true;
+        d.resist_bps_nonmagical = true;
+        d.immune_poison = true;
+        d.immune_poisoned = true;
+        d.immune_exhaustion = true;
+        d.description = "A churning vortex of wind and fury given malevolent sentience.";
+        MONSTER_DEFS.insert_last(d);
+    }
+    {
+        monster_def d;
+        d.id = "earth_elemental";
+        d.name = "Earth Elemental";
+        d.type = "elemental";
+        d.size = SIZE_LARGE;
+        d.ac = 17;
+        d.hp = 126;
+        d.speed = 30;
+        d.str = 20; d.dex = 8; d.con = 20;
+        d.intelligence = 5; d.wis = 10; d.cha = 5;
+        d.attack_name = "Slam";
+        d.attack_bonus = 8;
+        d.damage_dice = 8;
+        d.damage_count = 2;
+        d.damage_mod = 5;
+        d.damage_type = DMG_BLUDGEONING;
+        d.attack_range = 10;
+        d.has_multiattack = true;
+        d.multiattack_count = 2;
+        d.xp = 1800;
+        d.resist_bps_nonmagical = true;
+        d.immune_poison = true;
+        d.immune_poisoned = true;
+        d.immune_exhaustion = true;
+        d.description = "A hulking mass of living rock and soil that reshapes the earth itself.";
+        MONSTER_DEFS.insert_last(d);
+    }
+    {
+        monster_def d;
+        d.id = "water_elemental";
+        d.name = "Water Elemental";
+        d.type = "elemental";
+        d.size = SIZE_LARGE;
+        d.ac = 14;
+        d.hp = 114;
+        d.speed = 30;
+        d.str = 18; d.dex = 14; d.con = 18;
+        d.intelligence = 5; d.wis = 10; d.cha = 8;
+        d.attack_name = "Slam";
+        d.attack_bonus = 7;
+        d.damage_dice = 8;
+        d.damage_count = 2;
+        d.damage_mod = 4;
+        d.damage_type = DMG_BLUDGEONING;
+        d.attack_range = 5;
+        d.has_multiattack = true;
+        d.multiattack_count = 2;
+        d.xp = 1800;
+        d.resist_acid = true;
+        d.resist_bps_nonmagical = true;
+        d.immune_poison = true;
+        d.immune_poisoned = true;
+        d.immune_exhaustion = true;
+        d.description = "A surging wave of sentient water that crashes over its foes.";
+        MONSTER_DEFS.insert_last(d);
+    }
+
+    // --- CR 6 ---
+    {
+        monster_def d;
+        d.id = "chimera";
+        d.name = "Chimera";
+        d.type = "monstrosity";
+        d.size = SIZE_LARGE;
+        d.ac = 14;
+        d.hp = 114;
+        d.speed = 30;
+        d.str = 19; d.dex = 11; d.con = 19;
+        d.intelligence = 3; d.wis = 14; d.cha = 10;
+        d.attack_name = "Bite";
+        d.attack_bonus = 7;
+        d.damage_dice = 6;
+        d.damage_count = 2;
+        d.damage_mod = 4;
+        d.damage_type = DMG_PIERCING;
+        d.attack_range = 5;
+        d.has_multiattack = true;
+        d.multiattack_count = 3;
+        d.breath_name = "Fire Breath";
+        d.breath_save_type = ABILITY_DEX;
+        d.breath_save_dc = 15;
+        d.breath_dice = 8;
+        d.breath_count = 7;
+        d.breath_damage_type = DMG_FIRE;
+        d.breath_range = 15;
+        d.breath_recharge_min = 5;
+        d.xp = 2300;
+        d.description = "A three-headed horror — lion, goat, and dragon — that terrorizes the wilds.";
+        MONSTER_DEFS.insert_last(d);
+    }
+
+    // --- CR 7 ---
+    {
+        monster_def d;
+        d.id = "oni";
+        d.name = "Oni";
+        d.type = "giant";
+        d.size = SIZE_LARGE;
+        d.ac = 16;
+        d.hp = 110;
+        d.speed = 30;
+        d.str = 19; d.dex = 11; d.con = 16;
+        d.intelligence = 14; d.wis = 12; d.cha = 15;
+        d.attack_name = "Glaive";
+        d.attack_bonus = 7;
+        d.damage_dice = 10;
+        d.damage_count = 2;
+        d.damage_mod = 4;
+        d.damage_type = DMG_SLASHING;
+        d.attack_range = 10;
+        d.has_multiattack = true;
+        d.multiattack_count = 2;
+        d.regen_amount = 10;
+        d.regen_needs_no_fire = false;
+        d.regen_needs_no_acid = false;
+        d.xp = 2900;
+        d.description = "A cunning ogre mage that shapeshifts and regenerates with dark magic.";
+        MONSTER_DEFS.insert_last(d);
+    }
+
+    // --- CR 8 ---
+    {
+        monster_def d;
+        d.id = "hydra";
+        d.name = "Hydra";
+        d.type = "monstrosity";
+        d.size = SIZE_HUGE;
+        d.ac = 15;
+        d.hp = 172;
+        d.speed = 30;
+        d.str = 20; d.dex = 12; d.con = 20;
+        d.intelligence = 2; d.wis = 10; d.cha = 7;
+        d.attack_name = "Bite";
+        d.attack_bonus = 8;
+        d.damage_dice = 10;
+        d.damage_count = 1;
+        d.damage_mod = 5;
+        d.damage_type = DMG_PIERCING;
+        d.attack_range = 10;
+        d.has_multiattack = true;
+        d.multiattack_count = 5; // Five heads
+        d.xp = 3900;
+        d.description = "A many-headed serpent — sever one head and two more grow back.";
+        MONSTER_DEFS.insert_last(d);
+    }
+
+    // --- CR 9 ---
+    {
+        monster_def d;
+        d.id = "cloud_giant";
+        d.name = "Cloud Giant";
+        d.type = "giant";
+        d.size = SIZE_HUGE;
+        d.ac = 14;
+        d.hp = 200;
+        d.speed = 40;
+        d.str = 27; d.dex = 10; d.con = 22;
+        d.intelligence = 12; d.wis = 16; d.cha = 16;
+        d.attack_name = "Morningstar";
+        d.attack_bonus = 12;
+        d.damage_dice = 8;
+        d.damage_count = 3;
+        d.damage_mod = 8;
+        d.damage_type = DMG_BLUDGEONING;
+        d.attack_range = 10;
+        d.has_multiattack = true;
+        d.multiattack_count = 2;
+        d.xp = 5000;
+        d.description = "A regal giant dwelling in cloud castles high above the world.";
+        MONSTER_DEFS.insert_last(d);
+    }
 }
 
 monster_def@ get_monster_def(string id) {

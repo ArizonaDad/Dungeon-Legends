@@ -331,7 +331,217 @@ void init_wave_scenarios() {
         WAVE_SCENARIOS.insert_last(s);
     }
 
-    // Scenario 10: Combat Tutorial (Level 1, solo)
+    // Scenario 10: Deep Caves (Level 3-5, 3 waves)
+    {
+        wave_scenario s;
+        s.id = "deep_caves";
+        s.name = "Deep Caves";
+        s.description = "The caves beneath the mountain teem with crawling horrors and lurking beasts.";
+        s.recommended_level = 3;
+        s.recommended_players = 2;
+
+        wave_encounter w1;
+        w1.wave_number = 1;
+        w1.monster_ids = {"giant_wolf_spider","giant_wolf_spider","giant_wolf_spider","giant_bat","giant_bat"};
+        w1.monster_counts = {1,1,1,1,1};
+        s.waves.insert_last(w1);
+
+        wave_encounter w2;
+        w2.wave_number = 2;
+        w2.monster_ids = {"ankheg","ankheg","bugbear","bugbear"};
+        w2.monster_counts = {1,1,1,1};
+        s.waves.insert_last(w2);
+
+        wave_encounter w3;
+        w3.wave_number = 3;
+        w3.monster_ids = {"basilisk","minotaur","bugbear"};
+        w3.monster_counts = {1,1,1};
+        s.waves.insert_last(w3);
+
+        WAVE_SCENARIOS.insert_last(s);
+    }
+
+    // Scenario 11: Pirate Cove (Level 2-4, 3 waves)
+    {
+        wave_scenario s;
+        s.id = "pirate_cove";
+        s.name = "Pirate Cove";
+        s.description = "A hidden cove of cutthroats and sea raiders — they won't surrender easily.";
+        s.recommended_level = 3;
+        s.recommended_players = 2;
+
+        wave_encounter w1;
+        w1.wave_number = 1;
+        w1.monster_ids = {"bandit","bandit","bandit","scout","scout"};
+        w1.monster_counts = {1,1,1,1,1};
+        s.waves.insert_last(w1);
+
+        wave_encounter w2;
+        w2.wave_number = 2;
+        w2.monster_ids = {"hobgoblin","hobgoblin","bandit_captain","scout"};
+        w2.monster_counts = {1,1,1,1};
+        s.waves.insert_last(w2);
+
+        wave_encounter w3;
+        w3.wave_number = 3;
+        w3.monster_ids = {"bandit_captain","bandit_captain","ogre","scout","scout"};
+        w3.monster_counts = {1,1,1,1,1};
+        s.waves.insert_last(w3);
+
+        WAVE_SCENARIOS.insert_last(s);
+    }
+
+    // Scenario 12: Haunted Manor (Level 4-6, 4 waves)
+    {
+        wave_scenario s;
+        s.id = "haunted_manor";
+        s.name = "Haunted Manor";
+        s.description = "The abandoned estate is home to restless spirits. Tread carefully.";
+        s.recommended_level = 5;
+        s.recommended_players = 2;
+
+        wave_encounter w1;
+        w1.wave_number = 1;
+        w1.monster_ids = {"specter","specter","specter","skeleton","skeleton"};
+        w1.monster_counts = {1,1,1,1,1};
+        s.waves.insert_last(w1);
+
+        wave_encounter w2;
+        w2.wave_number = 2;
+        w2.monster_ids = {"ghast","ghast","specter","wight"};
+        w2.monster_counts = {1,1,1,1};
+        s.waves.insert_last(w2);
+
+        wave_encounter w3;
+        w3.wave_number = 3;
+        w3.monster_ids = {"ghost","ghost","wraith"};
+        w3.monster_counts = {1,1,1};
+        s.waves.insert_last(w3);
+
+        wave_encounter w4;
+        w4.wave_number = 4;
+        w4.monster_ids = {"wraith","ghost","ghast","ghast","specter","specter"};
+        w4.monster_counts = {1,1,1,1,1,1};
+        s.waves.insert_last(w4);
+
+        WAVE_SCENARIOS.insert_last(s);
+    }
+
+    // Scenario 13: Giant's Lair (Level 5-7, 4 waves)
+    {
+        wave_scenario s;
+        s.id = "giants_lair";
+        s.name = "Giant's Lair";
+        s.description = "The mountain stronghold of a giant clan. The ground shakes with every footstep.";
+        s.recommended_level = 6;
+        s.recommended_players = 3;
+
+        wave_encounter w1;
+        w1.wave_number = 1;
+        w1.monster_ids = {"ogre","ogre","ettin"};
+        w1.monster_counts = {1,1,1};
+        s.waves.insert_last(w1);
+
+        wave_encounter w2;
+        w2.wave_number = 2;
+        w2.monster_ids = {"hill_giant","hill_giant","ogre"};
+        w2.monster_counts = {1,1,1};
+        s.waves.insert_last(w2);
+
+        wave_encounter w3;
+        w3.wave_number = 3;
+        w3.monster_ids = {"stone_giant","ettin","hill_giant"};
+        w3.monster_counts = {1,1,1};
+        s.waves.insert_last(w3);
+
+        wave_encounter w4;
+        w4.wave_number = 4;
+        w4.monster_ids = {"frost_giant","stone_giant","hill_giant"};
+        w4.monster_counts = {1,1,1};
+        s.waves.insert_last(w4);
+
+        WAVE_SCENARIOS.insert_last(s);
+    }
+
+    // Scenario 14: Elemental Chaos (Level 6-8, 4 waves)
+    {
+        wave_scenario s;
+        s.id = "elemental_chaos";
+        s.name = "Elemental Chaos";
+        s.description = "A rift between the elemental planes has torn open. Survive the onslaught.";
+        s.recommended_level = 7;
+        s.recommended_players = 3;
+
+        wave_encounter w1;
+        w1.wave_number = 1;
+        w1.monster_ids = {"air_elemental","earth_elemental"};
+        w1.monster_counts = {1,1};
+        s.waves.insert_last(w1);
+
+        wave_encounter w2;
+        w2.wave_number = 2;
+        w2.monster_ids = {"fire_elemental","water_elemental","gargoyle","gargoyle"};
+        w2.monster_counts = {1,1,1,1};
+        s.waves.insert_last(w2);
+
+        wave_encounter w3;
+        w3.wave_number = 3;
+        w3.monster_ids = {"air_elemental","earth_elemental","fire_elemental","water_elemental"};
+        w3.monster_counts = {1,1,1,1};
+        s.waves.insert_last(w3);
+
+        wave_encounter w4;
+        w4.wave_number = 4;
+        w4.monster_ids = {"earth_elemental","fire_elemental","fire_elemental","air_elemental","water_elemental"};
+        w4.monster_counts = {1,1,1,1,1};
+        s.waves.insert_last(w4);
+
+        WAVE_SCENARIOS.insert_last(s);
+    }
+
+    // Scenario 15: Fiendish Gate (Level 8-10, 5 waves)
+    {
+        wave_scenario s;
+        s.id = "fiendish_gate";
+        s.name = "Fiendish Gate";
+        s.description = "An infernal portal has opened. Demons and fiends pour through — close it or perish.";
+        s.recommended_level = 9;
+        s.recommended_players = 3;
+
+        wave_encounter w1;
+        w1.wave_number = 1;
+        w1.monster_ids = {"hell_hound","hell_hound","hell_hound"};
+        w1.monster_counts = {1,1,1};
+        s.waves.insert_last(w1);
+
+        wave_encounter w2;
+        w2.wave_number = 2;
+        w2.monster_ids = {"shadow_demon","shadow_demon","oni"};
+        w2.monster_counts = {1,1,1};
+        s.waves.insert_last(w2);
+
+        wave_encounter w3;
+        w3.wave_number = 3;
+        w3.monster_ids = {"chimera","chimera","hell_hound","hell_hound"};
+        w3.monster_counts = {1,1,1,1};
+        s.waves.insert_last(w3);
+
+        wave_encounter w4;
+        w4.wave_number = 4;
+        w4.monster_ids = {"oni","oni","shadow_demon"};
+        w4.monster_counts = {1,1,1};
+        s.waves.insert_last(w4);
+
+        wave_encounter w5;
+        w5.wave_number = 5;
+        w5.monster_ids = {"pit_fiend"};
+        w5.monster_counts = {1};
+        s.waves.insert_last(w5);
+
+        WAVE_SCENARIOS.insert_last(s);
+    }
+
+    // Scenario 16: Combat Tutorial (Level 1, solo)
     {
         wave_scenario@ tutorial_scenario = wave_scenario();
         tutorial_scenario.id = "tutorial";
@@ -354,34 +564,42 @@ wave_encounter@ generate_endless_wave(int wave_number) {
     wave_encounter wave;
     wave.wave_number = wave_number;
 
-    string[] tier1 = {"rat", "kobold", "goblin"};        // CR 0-1/4
-    string[] tier2 = {"skeleton", "wolf", "ogre"};        // CR 1/4-2
-    string[] tier3 = {"owlbear", "basilisk", "troll"};    // CR 3-5
-    string[] tier4 = {"wight", "fire_elemental", "frost_giant"};  // CR 5-8
-    string[] tier5 = {"aboleth", "remorhaz", "archmage"}; // CR 8-12
-    string[] tier6 = {"pit_fiend", "lich", "adult_black_dragon"}; // CR 13+
+    string[] tier1 = {"rat", "kobold", "goblin", "bandit"};                     // CR 0-1/4
+    string[] tier2 = {"skeleton", "wolf", "hobgoblin", "scout", "gnoll", "bugbear"};  // CR 1/2-1
+    string[] tier3 = {"ogre", "ghast", "gargoyle", "mimic", "ankheg", "dire_wolf"};   // CR 2
+    string[] tier4 = {"owlbear", "basilisk", "manticore", "minotaur", "hell_hound"};  // CR 3
+    string[] tier5 = {"troll", "fire_elemental", "hill_giant", "earth_elemental", "ettin", "ghost"};  // CR 4-5
+    string[] tier6 = {"wight", "chimera", "oni", "hydra", "frost_giant", "medusa"};    // CR 6-8
+    string[] tier7 = {"cloud_giant", "aboleth", "remorhaz", "archmage", "beholder"};   // CR 9-13
+    string[] tier8 = {"pit_fiend", "lich", "adult_black_dragon", "adult_red_dragon"};  // CR 15+
 
     string[] pool;
     int count = 3;
 
-    if (wave_number <= 3) {
+    if (wave_number <= 2) {
         pool = tier1;
         count = 2 + wave_number;
-    } else if (wave_number <= 6) {
+    } else if (wave_number <= 4) {
         pool = tier2;
-        count = 3 + (wave_number - 3);
-    } else if (wave_number <= 9) {
+        count = 3 + (wave_number - 2);
+    } else if (wave_number <= 6) {
         pool = tier3;
-        count = 3 + (wave_number - 6);
-    } else if (wave_number <= 12) {
+        count = 3 + (wave_number - 4);
+    } else if (wave_number <= 8) {
         pool = tier4;
-        count = 3 + (wave_number - 9);
-    } else if (wave_number <= 15) {
+        count = 3 + (wave_number - 6);
+    } else if (wave_number <= 11) {
         pool = tier5;
-        count = 3 + (wave_number - 12);
-    } else {
+        count = 3 + (wave_number - 8);
+    } else if (wave_number <= 14) {
         pool = tier6;
-        count = 2 + (wave_number - 15);
+        count = 3 + (wave_number - 11);
+    } else if (wave_number <= 18) {
+        pool = tier7;
+        count = 3 + (wave_number - 14);
+    } else {
+        pool = tier8;
+        count = 2 + (wave_number - 18);
         if (count > 6) count = 6;
     }
 
