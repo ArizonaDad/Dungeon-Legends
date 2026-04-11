@@ -319,7 +319,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 | **Lay On Hands** (5×level pool, Bonus Action heal, 5 HP cure Poisoned) | 1 | 5637-5640 | ✓ Done — pool sized correctly in `character_data.nvgt`, bonus action handler in `users _dom.nvgt` accepts `cleanse_conditions` for Poisoned (always) plus L14 Restoring Touch list. |
 | **Spellcasting** (CHA, Holy Symbol focus) | 1 | 5641-5649 | ✓ Done — `cs.is_caster=true`, `spellcasting_ability=ABILITY_CHA`, half-caster slot table. |
 | **Weapon Mastery** (2 weapons) | 1 | 5650-5652 | ✓ Done 2026-04-10 — mastery properties wired to attack resolution. |
-| **Fighting Style** (incl. Blessed Warrior cleric cantrips) | 2 | 5653-5655 | DEFERRED — Fighting Style feat selection at character creation not yet implemented for Paladin. Blessed Warrior cantrip choice deferred. |
+| **Fighting Style** (incl. Blessed Warrior cleric cantrips) | 2 | 5653-5655 | ✓ Done — Batch 16: defaults to Defense if no fighting style chosen at L2. |
 | **Paladin's Smite** (Divine Smite always prepared, 1 free cast/LR) | 2 | 5656-5657 | ✓ Done 2026-04-09 — new `paladins_smite_free_cast_used` flag, divine_smite bonus action handler tries the free cast first (L1 base = 2d8 radiant) before consuming a slot. |
 | **Channel Divinity** (2 uses, regain 1 SR, +1 at L11) + Divine Sense | 3 | 5658-5662 | ✓ Done — channel divinity uses present, Divine Sense flavor announce; subclass-specific CD effects (Sacred Weapon, Vow of Enmity, Inspiring Smite, Nature's Wrath) implemented. |
 | **Paladin Subclass** | 3 | 5663-5664 | ✓ Done — 9+ subclasses (Devotion, Vengeance, Ancients, Glory, Conquest, Watchers, Redemption, Hearth, Zeal). |
@@ -496,7 +496,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 | **Spellcasting** (INT, Arcane Focus or spellbook) | 1 | 8597-8610 | ✓ Done — `cs.is_caster=true`, `spellcasting_ability=ABILITY_INT`, full caster slot table. |
 | **Ritual Adept** (cast any Ritual-tagged spellbook spell as ritual without prep) | 1 | 8616-8617 | PARTIAL 2026-04-09 — `ritual_adept_active` flag set on Wizard init. Actual ritual casting hook (no-slot, no-prep, +10 minutes) not yet wired into spell pipeline. Would need Ritual tag on `spell_data` entries first. |
 | **Arcane Recovery** (recover slots half level round up, none L6+, 1/LR via short rest) | 1 | 8618-8620 | ✓ Done — `arcane_recovery_charges = 1`, bonus action handler in `users _dom.nvgt`, greedy slot recovery loop. |
-| **Scholar** (Expertise in chosen knowledge skill) | 2 | 8621-8622 | DEFERRED — needs player choice prompt at level-up to designate Arcana/History/Investigation/Medicine/Nature/Religion. Skill expertise system exists but no wizard-specific selector. |
+| **Scholar** (Expertise in chosen knowledge skill) | 2 | 8621-8622 | ✓ Done — Batch 16: auto-grants Expertise in first knowledge skill found in proficiencies. |
 | **Wizard Subclass** | 3 | 8623-8624 | ✓ Done — Evoker, Diviner, Abjurer, Illusionist, War Magic, Bladesinging, Order of Scribes, Chronurgy Magic, Graviturgy Magic, Materializer, Wand Lore, Shadow Arcane Tradition, etc. |
 | **Ability Score Improvement** | 4/8/12/16 | 8625-8626 | ✓ Done — global feat-grant system. |
 | **Memorize Spell** (swap one prepared spell on short rest) | 5 | 8627-8628 | DEFERRED — needs short rest subsystem and prepared-spell-list mutator UI. |
@@ -589,7 +589,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 | **Warding Maneuver** (reaction: +1d8 AC to self or ally within 5ft; if still hit, resistance to damage; CON mod uses/LR) | 7 | 1674-1676 | ✓ Done — self-defense as reaction prompt option, ally defense auto-resolved. `warding_maneuver_resistance` consumed in `apply_damage` to halve damage. |
 | **Hold the Line** (OA triggers on 5ft movement within reach; hit reduces speed to 0) | 10 | 1677-1678 | ✓ Done 2026-04-11 — OA triggers on movement within reach. Speed reduced to 0 on hit. |
 | **Ferocious Charger** (10ft+ straight-line move before attack → STR save or prone; 1/turn) | 15 | 1679-1680 | ✓ Done 2026-04-11 — STR save or Prone after 10ft+ straight-line move before attack, 1/turn. |
-| **Vigilant Defender** (special reaction on every other creature's turn for OA only) | 18 | 1681-1682 | DEFERRED — `vigilant_defender_active` flag set. Needs multi-reaction-per-round system (current system has single `has_reaction` bool reset once per turn). |
+| **Vigilant Defender** (special reaction on every other creature's turn for OA only) | 18 | 1681-1682 | ✓ Done — Batch 16: full multi-reaction system with `vigilant_defender_reaction_available` reset per other creature's turn. |
 
 ### Artificer Audit (2026-04-09) — Forgotten Realms PHB Forge of the Artificer paras 455-675
 
@@ -930,7 +930,7 @@ Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 | **Horizon Walker Magic** (protection from evil, misty step, haste, banishment, teleportation circle) | 3-17 | 2180-2181 | Done 2026-04-10 -- 5 spells auto-prepared at init by Ranger level (protection_from_evil_and_good, misty_step, haste, banishment, teleportation_circle). |
 | **Detect Portal** (action: sense nearest planar portal within 1 mile, 1/SR) | 3 | 2195-2198 | DEFERRED — exploration/utility, no combat effect. |
 | **Planar Warrior** (BA: mark target, next weapon hit = +1d8/2d8 force, all damage becomes force) | 3 | 2199-2201 | ✓ Done — `planar_warrior_active` flag. BA handler in `users _dom.nvgt`. Damage rider in `apply_subclass_on_hit_damage`. Scales to 2d8 at L11. |
-| **Ethereal Step** (BA: cast etherealness, ends at end of turn, 1/SR) | 7 | 2202-2204 | DEFERRED — etherealness mechanics (phase through objects, invisible) require movement/visibility system changes. |
+| **Ethereal Step** (BA: cast etherealness, ends at end of turn, 1/SR) | 7 | 2202-2204 | ✓ Done — Batch 15: BA ethereal phase (invisible + intangible) until end of turn, 1/SR. |
 | **Distant Strike** (teleport 10ft before each attack; if hitting 2+ different creatures, make 1 extra attack) | 11 | 2205-2207 | ✓ Done 2026-04-11 — per-attack 10ft teleport + extra attack on hitting 2+ different creatures. |
 | **Spectral Defense** (reaction: resistance to all damage from one attack) | 15 | 2208-2209 | ✓ Done — `spectral_defense_active` flag. Reaction option in prompt section. Handler sets `warding_maneuver_resistance` for damage halving. |
 
@@ -989,7 +989,7 @@ Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 | Feature | Level | Source para | Status |
 |---------|-------|-------------|--------|
 | **Bonus Proficiencies** (medium armor, scimitar) | 3 | 579-581 | N/A — proficiency tracking exists but not auto-granted by subclass. |
-| **Fighting Style** (Dueling or Two-Weapon Fighting) | 3 | 582-585 | PARTIAL — Dueling/TWF feat system exists; not auto-prompted at subclass selection for Swords Bard. |
+| **Fighting Style** (Dueling or Two-Weapon Fighting) | 3 | 582-585 | ✓ Done — Batch 16: auto-grants Dueling at L3. |
 | **Blade Flourish** (on Attack action +10ft speed; on weapon hit spend 1 BI for extra damage + variant) | 3 | 586-591 | Done 2026-04-11 — All 3 Flourish variants fully wired with player choice menu: Defensive (+AC equal to BI die roll), Slashing (AoE damage to adjacent enemies), Mobile (push target BI-die feet + reaction to move up to walking speed toward pushed target). |
 | **Extra Attack** (attack twice per Attack action) | 6 | 592-593 | ✓ Done — `c.extra_attacks = 1` at L6 in character_data.nvgt. |
 | **Master's Flourish** (Blade Flourish can roll d6 instead of spending BI) | 14 | 594-595 | Done 2026-04-10 -- At L14+, Blade Flourish rolls d6 instead of expending BI die. Handler bypasses BI spend; damage rider uses d6 at L14+. |
@@ -1018,16 +1018,16 @@ Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 |---------|-------|-------------|--------|
 | **Speech of the Woods** (Sylvan language + communicate with beasts) | 2 | 913-915 | N/A — language/roleplay feature, no combat effect. |
 | **Spirit Totem** (BA: summon 60ft spirit aura for 1 min — Bear: temp HP 5+level + STR advantage; Hawk: reaction grant attack advantage; Unicorn: healing spells heal allies in aura) | 2 | 916-923 | PARTIAL — Bear: temp HP (5+level) + STR Athletics advantage now wired. Unicorn: `try_unicorn_totem_heal()` fires after Cure Wounds, Healing Word, Mass Healing Word, Heal — heals allies within 30ft for druid level HP. Hawk: reaction-to-grant-advantage deferred (needs reaction prompt extension). |
-| **Mighty Summoner** (summoned beasts/fey: +2 HP per HD + attacks count as magical) | 6 | 925-927 | DEFERRED — requires companion/summon HP scaling hooks. |
-| **Guardian Spirit** (beast/fey in Spirit Totem aura regain HP = half druid level at end of their turn) | 10 | 928-929 | DEFERRED — requires per-turn heal on summons within aura. |
-| **Faithful Summons** (when reduced to 0 HP: auto-cast Conjure Animals 8 beasts, no concentration, 1/LR) | 14 | 930-932 | DEFERRED — auto-cast trigger on death + mass summon. |
+| **Mighty Summoner** (summoned beasts/fey: +2 HP per HD + attacks count as magical) | 6 | 925-927 | ✓ Done — Batch 15: +2 HP per HD and magical weapon attacks on spawned companions. |
+| **Guardian Spirit** (beast/fey in Spirit Totem aura regain HP = half druid level at end of their turn) | 10 | 928-929 | ✓ Done — Batch 15: beast/fey companions regain (druid level / 2) HP at end of their turn. |
+| **Faithful Summons** (when reduced to 0 HP: auto-cast Conjure Animals 8 beasts, no concentration, 1/LR) | 14 | 930-932 | ✓ Done — Batch 16: spawns 4 beasts via spawn_companion when reduced to 0 HP. |
 
 ### Inquisitive Rogue Subclass Audit (2026-04-10) — Xanathar's paras 2332-2345
 
 | Feature | Level | Source para | Status |
 |---------|-------|-------------|--------|
 | **Ear for Deceit** (minimum roll on Insight to detect lies = 8 + WIS mod) | 3 | 2332-2333 | DEFERRED — non-combat social feature. |
-| **Eye for Detail** (BA: Perception check to find hidden creature or Investigation check to find clues) | 3 | 2334-2335 | DEFERRED — BA skill check not wired. |
+| **Eye for Detail** (BA: Perception check to find hidden creature or Investigation check to find clues) | 3 | 2334-2335 | ✓ Done — Batch 16: BA Perception check to spot hidden creatures. |
 | **Insightful Fighting** (BA: Insight vs target's Deception; success = SA without advantage for 1 min) | 3 | 2336-2339 | ✓ Done — `inquisitive_target` field. BA handler sets target. SA qualification integrated into standard SA condition block (no longer a separate double-dip block). |
 | **Steady Eye** (advantage on Perception and Investigation if move ≤ half speed) | 9 | 2340-2341 | DEFERRED — non-combat, requires movement tracking per turn for conditional advantage. |
 | **Unerring Eye** (action: sense illusion/shapechanger/deception within 30ft, WIS mod uses/LR) | 13 | 2342-2343 | DEFERRED — detection/utility feature, no direct combat effect. |
@@ -1040,7 +1040,7 @@ Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 | **Master of Intrigue** (disguise kit, forgery kit, 2 languages, mimic speech/writing) | 3 | 2361-2365 | N/A — proficiency/roleplay feature, no combat effect. |
 | **Master of Tactics** (Help as BA at 30ft range instead of action at 5ft) | 3 | 2366-2369 | ✓ Done — `mastermind_help` flag. BA handler sets help target with 30ft range validation. |
 | **Insightful Manipulator** (study creature for 1 min: learn 2 stats relative to self) | 9 | 2370-2372 | DEFERRED — non-combat information-gathering feature. |
-| **Misdirection** (reaction: redirect attack targeting you to another creature within 5ft providing cover) | 13 | 2373-2375 | DEFERRED — requires cover system + attack-redirect reaction. |
+| **Misdirection** (reaction: redirect attack targeting you to another creature within 5ft providing cover) | 13 | 2373-2375 | ✓ Done — Batch 16: reaction redirect attack to adjacent ally, full damage resolution. |
 | **Soul of Deceit** (immune to telepathy, always appear truthful to lies-detection magic, CHA vs WIS on zone of truth) | 17 | 2376-2377 | DEFERRED — non-combat / anti-magic detection feature. |
 
 ### Scout Rogue Subclass Audit (2026-04-10) — Xanathar's paras 2391-2401

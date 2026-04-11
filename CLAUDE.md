@@ -709,7 +709,7 @@ Per-class audit of all 13 base class features against `basic_rules_full.txt` (Ba
 - **Barbarian**: Berserker, Wild Heart, World Tree, Zealot, Ancestral Guardian, Storm Herald, Shadow Gnawer, Path of the Carrion Raven, Path of the Glacier, Path of the Infernal
 - **Bard**: Glamour, Swords, Whispers, Creation, Lore, Valor, Eloquence, Spirits, Dance, Shadow, Dirge Singer
 - **Cleric**: Life, Light, War, Forge, Grave, Peace, Twilight, Order, Shadow Domain, Keeper, Festus, Inquisition, Astral
-- **Druid**: Moon, Spores, Dreams, Stars, Land, Wildfire, Shadows, Sea, Unbroken, Dragons
+- **Druid**: Moon, Spores, Dreams, Stars, Land, Wildfire, Shadows, Sea, Unbroken, Dragons, Shepherd
 - **Fighter**: Champion, Battle Master, Eldritch Knight, Psi Warrior, Samurai, Cavalier, Rune Knight, Arcane Archer, Echo Knight, Couatl Herald, Steel Hawk, Blade Breaker
 - **Monk**: Shadow, Mercy, Elements, Sun Soul, Kensei, Ascendant Dragon, Astral Self, Drunken Master, Open Hand, Prophet, Celestial, Aether
 - **Paladin**: Devotion, Glory, Ancients, Vengeance, Conquest, Watchers, Redemption, Hearth, Zeal
@@ -948,6 +948,21 @@ Epic Boon feats: combat_prowess, dimensional_travel, energy_resistance, fate, fo
 - **Slayer's Counter** (Monster Slayer L15): reaction weapon attack when prey forces save; hit auto-succeeds the save
 - **Deft Explorer Expertise** (Ranger L2): Expertise in one skill with player choice prompt
 - **Ferocious Charger** (Cavalier L15): STR save or Prone after 10ft+ straight-line move before attack, 1/turn
+
+**Batch 16 subclass features (2026-04-11, commit 30b5767):**
+- **Hold the Line** (Cavalier L10): OA triggers on 5ft+ movement within reach (not just leaving), speed set to 0 on hit
+- **Vigilant Defender** (Cavalier L18): special reaction on every other creature's turn for OA
+- **Misdirection** (Mastermind Rogue L13): reaction redirects attack to adjacent ally with full damage resolution
+- **Eye for Detail** (Inquisitive Rogue L3): BA Perception check to spot hidden creatures
+- **Psychic Emission** (Aberrant Mind Sorcerer L14): auto-frighten within 10ft on psychic damage
+- **Warping Implosion** (Aberrant Mind Sorcerer L18): rewritten — 9d10 force + CON save + Stunned 2 rounds + full save chain
+- **Revelation in Flesh** (Aberrant Mind Sorcerer L14): +10ft speed passive
+- **Trance of Order** (Clockwork Soul Sorcerer L14): rewritten — uses = proficiency bonus per LR instead of 1/LR boolean
+- **Form of Dread frighten** (Undead Warlock L10): frighten on hit with WIS save, once per turn, full save chain
+- **Faithful Summons** (Shepherd Druid L14): spawns 4 beast companions when reduced to 0 HP
+- **Scholar** (Wizard L2): auto-grants Expertise in first knowledge skill
+- **Default Defense** (Paladin L2): grants Defense fighting style when none chosen
+- **Default Dueling** (Swords Bard L3): grants Dueling fighting style when none chosen
 
 **Previously implemented:** combat_prowess (+1d6 weapon miss → hit 1/turn), fortitude (+40 HP), irresistible_offense (+2d10 force 1/turn), skill (+1d10 ability check 1/turn), speed (+30ft), the_night_spirit (300ft darkvision + see invisible), truesight (Truesight 60ft)
 
