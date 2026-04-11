@@ -174,7 +174,7 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 
 - **AC System**: Proper armor types (leather/studded/chain shirt/breastplate/half plate/chain mail/splint/plate) with correct AC calculations per 2024 PHB
 
-- **End-of-Turn Saves**: Hold Person, Web, Blindness/Deafness, Fear, Tasha's Hideous Laughter — affected creatures save at end of turn
+- **End-of-Turn Saves**: Hold Person/Monster, Web, Blindness/Deafness, Fear, Tasha's Hideous Laughter, Compulsion, Slow, Confusion — affected creatures save at end of turn with full save failure chains
 
 - Out-of-range attacks show distance and range info to the player
 
@@ -381,6 +381,7 @@ When a caster's concentration breaks, `clear_concentration_effects()` must remov
 | `incap_spell_caster_id` | COND_INCAPACITATED (+ COND_UNCONSCIOUS for Sleep) | Sleep, Confusion, Otto's Irresistible Dance |
 | `blinded_spell_caster_id` | COND_BLINDED | Sunbeam |
 | `faerie_fire_source_id` | `faerie_fire_outlined` (persistent advantage, NOT a condition) | Faerie Fire |
+| `slow_spell_caster_id` | Speed halved + AC −2 + no reactions (restores `slow_original_speed` + AC +2) | Slow |
 
 **Pattern for new concentration spells:** In the spell handler, set the tracking field on the target (`target.xxx_caster_id = c.id`). In `clear_concentration_effects()`, add a name-matched block that loops combatants and removes the condition where the tracking ID matches. Compulsion uses blanket-clear (no per-target tracking) as a fallback.
 
