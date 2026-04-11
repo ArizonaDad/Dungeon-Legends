@@ -117,6 +117,12 @@ class character_sheet {
     string elemental_adept_type = ""; // PHB 2024 Elemental Adept (para 7610)
     // Xanathar's Divine Soul L1 affinity: "good"/"evil"/"law"/"chaos"/"neutrality". Set via set_divine_soul_affinity.
     string divine_soul_affinity = "";
+    // PHB 2024 Wizard L18 Spell Mastery (para 8629-8631): designated spells.
+    string spell_mastery_l1_spell_id = "";
+    string spell_mastery_l2_spell_id = "";
+    // PHB 2024 Wizard L20 Signature Spells (para 8634-8635): designated spells.
+    string signature_spell_a_id = "";
+    string signature_spell_b_id = "";
 }
 
 int bardic_inspiration_die_for_level(int level) {
@@ -2672,12 +2678,18 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         c.ritual_adept_active = true;
         // PHB 2024 Wizard L18 Spell Mastery (paras 8629-8631): chosen L1+L2 spells
         // castable at will without expending slots.
-        if (cs.level >= 18) c.spell_mastery_active = true;
+        if (cs.level >= 18) {
+            c.spell_mastery_active = true;
+            c.spell_mastery_l1_spell_id = cs.spell_mastery_l1_spell_id;
+            c.spell_mastery_l2_spell_id = cs.spell_mastery_l2_spell_id;
+        }
         // PHB 2024 Wizard L20 Signature Spells (paras 8634-8635): two L3 spells
         // castable once each per Short Rest without a slot.
         if (cs.level >= 20) {
             c.signature_spells_charges_max = 2;
             c.signature_spells_charges_remaining = 2;
+            c.signature_spell_a_id = cs.signature_spell_a_id;
+            c.signature_spell_b_id = cs.signature_spell_b_id;
         }
         if (cs.subclass == "Materializer" and cs.level >= 2) {
             c.materializer_object = true;

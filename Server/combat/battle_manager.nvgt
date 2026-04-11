@@ -3895,6 +3895,11 @@ class battle_manager {
 					if (ch.exists("elemental_adept_type")) cs.elemental_adept_type = string(ch["elemental_adept_type"]);
 					// Xanathar's Divine Soul L1 Divine Magic affinity (para 2532-2546)
 					if (ch.exists("divine_soul_affinity")) cs.divine_soul_affinity = string(ch["divine_soul_affinity"]);
+					// PHB 2024 Wizard L18 Spell Mastery + L20 Signature Spells designation
+					if (ch.exists("spell_mastery_l1_spell_id")) cs.spell_mastery_l1_spell_id = string(ch["spell_mastery_l1_spell_id"]);
+					if (ch.exists("spell_mastery_l2_spell_id")) cs.spell_mastery_l2_spell_id = string(ch["spell_mastery_l2_spell_id"]);
+					if (ch.exists("signature_spell_a_id")) cs.signature_spell_a_id = string(ch["signature_spell_a_id"]);
+					if (ch.exists("signature_spell_b_id")) cs.signature_spell_b_id = string(ch["signature_spell_b_id"]);
 					has_char = true;
 				} else if (lobby_game_type == GAME_TYPE_SANDBOX and data.exists(ACCOUNT_KEY_LEGACY_CHARACTER)) {
 					json_object@ ch = data[ACCOUNT_KEY_LEGACY_CHARACTER];

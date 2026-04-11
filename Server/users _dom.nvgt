@@ -1461,7 +1461,8 @@ void handle_user_message(user@ u, json_object@ msg)
 			or feature == "set_primal_strike_damage_type"
 			or feature == "set_elemental_affinity"
 			or feature == "set_divine_soul_affinity"
-			or feature == "set_elemental_adept";
+			or feature == "set_elemental_adept"
+			or feature == "set_spell_mastery" or feature == "set_signature_spells";
 		combatant@ c = null;
 		if (is_phase1_config) {
 			@c = u.room.bm.find_player_combatant(u.username);
@@ -4498,6 +4499,63 @@ void handle_user_message(user@ u, json_object@ msg)
 				}
 			}
 			u.send({{"type", message_types::announce}, {"text", "Elemental Adept damage type set to " + ea_type + ". Your spells ignore " + ea_type + " resistance and treat 1s on damage dice as 2s."}, {"interrupt", true}});
+		}
+		// PHB 2024 Wizard L18 Spell Mastery (para 8629-8631): designate one L1 and one L2
+		// Wizard spell that can be cast at will without expending a spell slot.
+		else if (feature == "set_spell_mastery") {
+			if (c.class_name != "Wizard") { u.send({{"type", message_types::announce}, {"text", "Only Wizards can designate Spell Mastery spells."}, {"interrupt", true}}); return; }
+			if (c.level < 18) { u.send({{"type", message_types::announce}, {"text", "Spell Mastery unlocks at Wizard L18."}, {"interrupt", true}}); return; }
+			string l1_id = msg.exists("l1_spell") ? string(msg["l1_spell"]) : "";
+			string l2_id = msg.exists("l2_spell") ? string(msg["l2_spell"]) : "";
+			if (l1_id == "" or l2_id == "") { u.send({{"type", message_types::announce}, {"text", "You must designate both a level-1 and a level-2 spell."}, {"interrupt", true}}); return; }
+			// Validate spells exist and are correct level
+			spell_def@ s1 = get_spell(l1_id);
+			spell_def@ s2 = get_spell(l2_id);
+			if (@s1 == null or s1.level != 1) { u.send({{"type", message_types::announce}, {"text", "Invalid level-1 spell: " + l1_id + "."}, {"interrupt", true}}); return; }
+			if (@s2 == null or s2.level != 2) { u.send({{"type", message_types::announce}, {"text", "Invalid level-2 spell: " + l2_id + "."}, {"interrupt", true}}); return; }
+			c.spell_mastery_l1_spell_id = l1_id;
+			c.spell_mastery_l2_spell_id = l2_id;
+			if (@u.account != null) {
+				json_object@ data = u.account.data;
+				string ckey = get_character_storage_key(u.room.game_type);
+				if (data.exists(ckey)) {
+					json_object@ ch = data[ckey];
+					ch["spell_mastery_l1_spell_id"] = l1_id;
+					ch["spell_mastery_l2_spell_id"] = l2_id;
+					u.account.commit();
+				}
+			}
+			u.send({{"type", message_types::announce}, {"text", "Spell Mastery designated: " + s1.name + " (L1) and " + s2.name + " (L2). You can now cast these at will without a spell slot."}, {"interrupt", true}});
+		}
+		// PHB 2024 Wizard L20 Signature Spells (para 8634-8635): designate two L3 Wizard
+		// spells castable once each per Short Rest without a spell slot.
+		else if (feature == "set_signature_spells") {
+			if (c.class_name != "Wizard") { u.send({{"type", message_types::announce}, {"text", "Only Wizards can designate Signature Spells."}, {"interrupt", true}}); return; }
+			if (c.level < 20) { u.send({{"type", message_types::announce}, {"text", "Signature Spells unlock at Wizard L20."}, {"interrupt", true}}); return; }
+			string a_id = msg.exists("spell_a") ? string(msg["spell_a"]) : "";
+			string b_id = msg.exists("spell_b") ? string(msg["spell_b"]) : "";
+			if (a_id == "" or b_id == "") { u.send({{"type", message_types::announce}, {"text", "You must designate two level-3 spells."}, {"interrupt", true}}); return; }
+			if (a_id == b_id) { u.send({{"type", message_types::announce}, {"text", "Signature Spells must be two different spells."}, {"interrupt", true}}); return; }
+			spell_def@ sa = get_spell(a_id);
+			spell_def@ sb = get_spell(b_id);
+			if (@sa == null or sa.level != 3) { u.send({{"type", message_types::announce}, {"text", "Invalid level-3 spell: " + a_id + "."}, {"interrupt", true}}); return; }
+			if (@sb == null or sb.level != 3) { u.send({{"type", message_types::announce}, {"text", "Invalid level-3 spell: " + b_id + "."}, {"interrupt", true}}); return; }
+			c.signature_spell_a_id = a_id;
+			c.signature_spell_b_id = b_id;
+			c.signature_spell_a_used_this_rest = false;
+			c.signature_spell_b_used_this_rest = false;
+			c.signature_spells_charges_remaining = c.signature_spells_charges_max;
+			if (@u.account != null) {
+				json_object@ data = u.account.data;
+				string ckey = get_character_storage_key(u.room.game_type);
+				if (data.exists(ckey)) {
+					json_object@ ch = data[ckey];
+					ch["signature_spell_a_id"] = a_id;
+					ch["signature_spell_b_id"] = b_id;
+					u.account.commit();
+				}
+			}
+			u.send({{"type", message_types::announce}, {"text", "Signature Spells designated: " + sa.name + " and " + sb.name + ". Each can be cast once per Short Rest without a spell slot."}, {"interrupt", true}});
 		}
 		else if (feature == "wild_companion") {
 			// PHB 2024 Druid L2 Wild Companion (para 4420-4422): "As a Magic action, you

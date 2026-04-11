@@ -3104,6 +3104,15 @@ void show_phase1_menu() {
 	if (feat_selected("elemental_adept")) {
 		elemental_adept_opt = m.add_item("Set Elemental Adept damage type (current: " + (my_elemental_adept_type != "" ? my_elemental_adept_type : "Not set") + ").");
 	}
+	// PHB 2024 Wizard L18 Spell Mastery (para 8629-8631) + L20 Signature Spells (para 8634-8635)
+	int spell_mastery_opt = -1;
+	int signature_spells_opt = -1;
+	if (lc_class == "wizard" and current_character_level() >= 18) {
+		spell_mastery_opt = m.add_item("Designate Spell Mastery spells. Choose 1 level-1 and 1 level-2 Wizard spell to cast at will without a slot.");
+	}
+	if (lc_class == "wizard" and current_character_level() >= 20) {
+		signature_spells_opt = m.add_item("Designate Signature Spells. Choose 2 level-3 Wizard spells castable once each per Short Rest without a slot.");
+	}
 	int status_opt = m.add_item("Show full Phase 1 status.");
 	int cancel_opt = m.add_item("Cancel.");
 
@@ -3364,6 +3373,78 @@ void show_phase1_menu() {
 		else if (pick == ea_thunder) chosen = "thunder";
 		send({{"type", message_types::bonus_action}, {"feature", "set_elemental_adept"}, {"value", chosen}});
 		speak("Elemental Adept type set to " + chosen + ".", true);
+	}
+	// PHB 2024 Wizard L18 Spell Mastery designation (para 8629-8631)
+	else if (spell_mastery_opt >= 0 and res == spell_mastery_opt) {
+		ensure_client_spell_catalog();
+		// Pick L1 Wizard spell
+		menu@ sm1 = setup_sub_menu("Choose a level-1 Wizard spell for Spell Mastery (cast at will, no slot).");
+		string[] l1_ids;
+		for (uint i = 0; i < SPELL_CATALOG.length(); i++) {
+			if (SPELL_CATALOG[i].level == 1 and client_spell_has_class(SPELL_CATALOG[i], "wizard")) {
+				sm1.add_item(SPELL_CATALOG[i].name + ". " + SPELL_CATALOG[i].description);
+				l1_ids.insert_last(SPELL_CATALOG[i].id);
+			}
+		}
+		int cnc1 = sm1.add_item("Cancel.");
+		int pick1 = sm1.run();
+		if (pick1 < 0 or pick1 == cnc1 or uint(pick1) >= l1_ids.length()) { speak("Cancelled.", true); }
+		else {
+			string l1_spell = l1_ids[pick1];
+			// Pick L2 Wizard spell
+			menu@ sm2 = setup_sub_menu("Choose a level-2 Wizard spell for Spell Mastery (cast at will, no slot).");
+			string[] l2_ids;
+			for (uint i = 0; i < SPELL_CATALOG.length(); i++) {
+				if (SPELL_CATALOG[i].level == 2 and client_spell_has_class(SPELL_CATALOG[i], "wizard")) {
+					sm2.add_item(SPELL_CATALOG[i].name + ". " + SPELL_CATALOG[i].description);
+					l2_ids.insert_last(SPELL_CATALOG[i].id);
+				}
+			}
+			int cnc2 = sm2.add_item("Cancel.");
+			int pick2 = sm2.run();
+			if (pick2 < 0 or pick2 == cnc2 or uint(pick2) >= l2_ids.length()) { speak("Cancelled.", true); }
+			else {
+				string l2_spell = l2_ids[pick2];
+				send({{"type", message_types::bonus_action}, {"feature", "set_spell_mastery"}, {"l1_spell", l1_spell}, {"l2_spell", l2_spell}});
+				speak("Spell Mastery designated.", true);
+			}
+		}
+	}
+	// PHB 2024 Wizard L20 Signature Spells designation (para 8634-8635)
+	else if (signature_spells_opt >= 0 and res == signature_spells_opt) {
+		ensure_client_spell_catalog();
+		// Pick first L3 Wizard spell
+		menu@ ss1 = setup_sub_menu("Choose your first level-3 Wizard Signature Spell (free cast 1/SR, no slot).");
+		string[] l3_ids;
+		for (uint i = 0; i < SPELL_CATALOG.length(); i++) {
+			if (SPELL_CATALOG[i].level == 3 and client_spell_has_class(SPELL_CATALOG[i], "wizard")) {
+				ss1.add_item(SPELL_CATALOG[i].name + ". " + SPELL_CATALOG[i].description);
+				l3_ids.insert_last(SPELL_CATALOG[i].id);
+			}
+		}
+		int cnc1 = ss1.add_item("Cancel.");
+		int pick1 = ss1.run();
+		if (pick1 < 0 or pick1 == cnc1 or uint(pick1) >= l3_ids.length()) { speak("Cancelled.", true); }
+		else {
+			string first_spell = l3_ids[pick1];
+			// Pick second L3 Wizard spell (different from first)
+			menu@ ss2 = setup_sub_menu("Choose your second level-3 Wizard Signature Spell (must be different).");
+			string[] l3_ids2;
+			for (uint i = 0; i < SPELL_CATALOG.length(); i++) {
+				if (SPELL_CATALOG[i].level == 3 and client_spell_has_class(SPELL_CATALOG[i], "wizard") and SPELL_CATALOG[i].id != first_spell) {
+					ss2.add_item(SPELL_CATALOG[i].name + ". " + SPELL_CATALOG[i].description);
+					l3_ids2.insert_last(SPELL_CATALOG[i].id);
+				}
+			}
+			int cnc2 = ss2.add_item("Cancel.");
+			int pick2 = ss2.run();
+			if (pick2 < 0 or pick2 == cnc2 or uint(pick2) >= l3_ids2.length()) { speak("Cancelled.", true); }
+			else {
+				string second_spell = l3_ids2[pick2];
+				send({{"type", message_types::bonus_action}, {"feature", "set_signature_spells"}, {"spell_a", first_spell}, {"spell_b", second_spell}});
+				speak("Signature Spells designated.", true);
+			}
+		}
 	}
 	else if (res == status_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "query_phase1"}});

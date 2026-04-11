@@ -487,8 +487,8 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 | **Signature Spells** (two L3 spells castable at L3 without slot, 1/short rest each) | 20 | 8634-8635 | PARTIAL 2026-04-09 — `signature_spells_charges_max = 2` and `signature_spells_charges_remaining = 2` set on L20 init. Slot bypass wired in cast pipeline for `signature_spell_a_id` and `signature_spell_b_id` (separate `_used_this_rest` flags per spell). The two designation strings default to empty; the player must designate. Short rest reset deferred (currently only long rest). |
 
 **Pending follow-up Wizard batches:**
-- Spell Mastery designation prompt at L18 — player picks 1 L1 + 1 L2 spell from spellbook (the spell IDs are fields in `combatant`, just need a level-up UI flow to set them).
-- Signature Spells designation prompt at L20 — same as above for two L3 spells.
+- ~~Spell Mastery designation prompt at L18~~ RESOLVED 2026-04-10 — Shift+P menu lets Wizard designate L1+L2 spells. Server validates, persists to account, restores on reconnect.
+- ~~Signature Spells designation prompt at L20~~ RESOLVED 2026-04-10 — Shift+P menu lets Wizard designate two L3 spells. Same persistence flow.
 - Scholar L2 expertise prompt at L2 — knowledge skill picker.
 - Memorize Spell L5 — short rest subsystem dependency.
 - Ritual Adept L1 spell pipeline integration — needs `Ritual` tag on spell data entries and a separate ritual cast path that consumes 10 minutes (or 11 minutes per source) and skips slot/prep requirements for spellbook ritual spells.
