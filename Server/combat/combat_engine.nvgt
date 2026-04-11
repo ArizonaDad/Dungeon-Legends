@@ -155,6 +155,9 @@ class combatant {
 	bool ballistic_smite_pending = false;
 	int ballistic_smite_dice = 0;        // Number of d6 for Ballistic Smite (2+upcast)
 	bool investiture_flame_active = false; // Investiture of Flame: 1d10 fire to adjacent creatures
+	bool investiture_ice_active = false;   // Investiture of Ice: cold immune, fire resist, icy terrain
+	bool investiture_stone_active = false; // Investiture of Stone: B/P/S nonmagical resistance
+	bool investiture_wind_active = false;  // Investiture of Wind: ranged disadvantage, fly 60ft
 	uint bless_source_id = 0;
 	bool guiding_bolt_advantage = false;
 	uint guiding_bolt_source_id = 0;

@@ -2686,6 +2686,9 @@ class battle_manager {
 		if (attacker.slasher_crit_disadvantage) disadv = true;
 		if (target.has_condition(COND_PRONE) and !attack_is_ranged and dist <= 5) adv = true;
 		if (target.has_condition(COND_PRONE) and (attack_is_ranged or dist > 5)) disadv = true;
+		// Xanathar's Investiture of Wind: "Ranged weapon attacks made against you have
+		// disadvantage on the attack roll."
+		if (target.investiture_wind_active and attack_is_ranged) disadv = true;
 		if (target.has_condition(COND_PARALYZED) or target.has_condition(COND_STUNNED) or target.has_condition(COND_UNCONSCIOUS)) adv = true;
 		// PHB 2024 Blinded condition (para 16208): "Attack rolls against the creature
 		// have Advantage." Mirrors Invisible mechanic but for defender side.
@@ -4325,8 +4328,20 @@ class battle_manager {
 				}
 			}
 		}
-		// Investiture of Flame: clear per-turn damage flag when concentration breaks
+		// Investiture spells: clear all flags when concentration breaks
 		caster.investiture_flame_active = false;
+		caster.investiture_ice_active = false;
+		if (caster.investiture_stone_active) {
+			// Only clear B/P/S nonmagical resistance if no other source provides it
+			// (monsters might have it innately). Conservative: always clear for players.
+			if (caster.is_player) caster.resist_bps_nonmagical = false;
+		}
+		caster.investiture_stone_active = false;
+		if (caster.investiture_wind_active) {
+			caster.speed -= 30; // Remove fly speed boost
+			if (caster.speed < 0) caster.speed = 0;
+		}
+		caster.investiture_wind_active = false;
 		// Dismiss companions spawned by concentration spells when concentration breaks.
 		// Permanent companions (beast_master, steel_defender, drake_companion, etc.) are excluded.
 		for (uint dci = 0; dci < combat.combatants.length(); dci++) {
@@ -12505,6 +12520,21 @@ class battle_manager {
 			}
 		}
 
+		// Xanathar's Investiture of Ice: "The ground in a 10-foot radius around you
+		// is icy and is difficult terrain for creatures other than you."
+		// Doubles movement cost when entering the icy area.
+		if (@combat != null) {
+			for (uint ici = 0; ici < combat.combatants.length(); ici++) {
+				combatant@ ice_src = combat.combatants[ici];
+				if (@ice_src == null or ice_src.is_dead or !ice_src.investiture_ice_active) continue;
+				if (ice_src.id == c.id) continue; // Caster is not affected by own ice
+				if (feet_distance(new_x, new_y, ice_src.x, ice_src.y) <= 10) {
+					move_cost = 10; // Double movement cost in icy terrain (5ft -> 10ft)
+					break;
+				}
+			}
+		}
+
 		int old_x = c.x;
 		int old_y = c.y;
 		c.x = new_x;
@@ -14810,6 +14840,42 @@ class battle_manager {
 				c.cold_resistance = true;
 				c.investiture_flame_active = true;
 				broadcast_announce(c.name + " is wreathed in flame from Investiture of Flame! Fire immunity and cold resistance. Adjacent creatures take 1d10 fire damage.", true);
+			}
+			else if (spell.id == "investiture_of_ice") {
+				// Xanathar's Investiture of Ice: "You are immune to cold damage and have
+				// resistance to fire damage. The ground in a 10-foot radius around you is
+				// icy and is difficult terrain for creatures other than you."
+				// Concentration. Action ability (15ft cone 4d6 cold) deferred.
+				c.cold_resistance = true; // Approximating immunity as resistance
+				c.fire_resistance = true;
+				c.investiture_ice_active = true;
+				c.is_concentrating = true;
+				c.add_condition(COND_CONCENTRATING);
+				c.concentration_spell = spell.name;
+				broadcast_announce(c.name + " is wreathed in ice from Investiture of Ice! Cold immunity, fire resistance. 10ft icy difficult terrain around caster.", true);
+			}
+			else if (spell.id == "investiture_of_stone") {
+				// Xanathar's Investiture of Stone: "You have resistance to bludgeoning,
+				// piercing, and slashing damage from nonmagical attacks."
+				// Concentration. Action ability (15ft earthquake, DEX save or Prone) deferred.
+				c.resist_bps_nonmagical = true;
+				c.investiture_stone_active = true;
+				c.is_concentrating = true;
+				c.add_condition(COND_CONCENTRATING);
+				c.concentration_spell = spell.name;
+				broadcast_announce(c.name + " is armored in stone from Investiture of Stone! Resistance to nonmagical B/P/S damage.", true);
+			}
+			else if (spell.id == "investiture_of_wind") {
+				// Xanathar's Investiture of Wind: "Ranged weapon attacks made against you
+				// have disadvantage on the attack roll. You gain a flying speed of 60 feet."
+				// Concentration. Action ability (15ft cube 2d10 bludgeoning + push) deferred.
+				c.investiture_wind_active = true;
+				c.speed += 30; // Approximate fly speed boost (base + 30 extra)
+				c.movement_remaining += 30;
+				c.is_concentrating = true;
+				c.add_condition(COND_CONCENTRATING);
+				c.concentration_spell = spell.name;
+				broadcast_announce(c.name + " is surrounded by howling wind from Investiture of Wind! Ranged attacks have disadvantage, speed increased by 30ft.", true);
 			}
 			else if (spell.id == "cause_fear" and @target != null) {
 				// Xanathar's para 4655: "The target must succeed on a Wisdom saving throw
