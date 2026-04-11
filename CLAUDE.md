@@ -381,6 +381,18 @@ When a caster's concentration breaks, `clear_concentration_effects()` must remov
 
 **Pattern for new concentration spells:** In the spell handler, set the tracking field on the target (`target.xxx_caster_id = c.id`). In `clear_concentration_effects()`, add a name-matched block that loops combatants and removes the condition where the tracking ID matches. Compulsion uses blanket-clear (no per-target tracking) as a fallback.
 
+### Damage-Breaks-Charm Mechanics (2026-04-10)
+
+Implemented in `apply_damage()` in `combat_engine.nvgt`. Three categories of damage interaction with charm/dominate spells, each with distinct behavior per PHB:
+
+**1. Dominate Person / Dominate Monster / Dominate Beast** — When a dominated target takes damage, they get a new WIS saving throw against the caster's spell save DC. On success: `COND_CHARMED` removed, `charm_spell_caster_id` cleared, caster's concentration broken. On failure: the domination continues. Source: PHB "each time the target takes damage" for Dominate spells.
+
+**2. Charm Person / Charm Monster** — Any damage to the charmed target immediately ends the charm. `COND_CHARMED` removed, `charm_spell_caster_id` cleared, caster's concentration broken. No saving throw — damage is an automatic end condition. Source: PHB "The spell also ends if you or your companions deal damage to it."
+
+**3. Hypnotic Pattern** — Damage to a charmed+incapacitated target ends the effect on THAT TARGET ONLY. `COND_CHARMED` + `COND_INCAPACITATED` removed, `charm_spell_caster_id` cleared. Does NOT break the caster's concentration — other affected targets remain charmed and incapacitated. Source: PHB "The charm ends if the creature takes any damage."
+
+**Lookup order in `apply_damage()`:** The code checks `charm_spell_caster_id > 0` on the damaged target, then identifies which charm spell is active to select the correct branch (Dominate → save, Charm → instant end, Hypnotic Pattern → per-target end without concentration break).
+
 ### Skill Check System
 
 Skill checks (Stealth, Persuasion, Investigation, etc.) flow through the standard `pending_roll` pipeline so they get reroll prompts (Bardic, Lucky, Heroic), advantage/disadvantage handling, and Silver Tongue clamping for free.

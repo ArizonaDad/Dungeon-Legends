@@ -97,6 +97,8 @@ class combatant {
 	uint bless_source_id = 0;
 	bool guiding_bolt_advantage = false;
 	uint guiding_bolt_source_id = 0;
+	bool faerie_fire_outlined = false;   // Faerie Fire: persistent advantage on attacks (not consumed like Guiding Bolt)
+	uint faerie_fire_source_id = 0;      // Faerie Fire: caster id for concentration cleanup
 	int longstrider_bonus = 0;
 	int pass_without_trace_bonus = 0;
 	uint pass_without_trace_source_id = 0;

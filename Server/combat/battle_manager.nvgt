@@ -2653,6 +2653,11 @@ class battle_manager {
 			clear_guiding_bolt_effect(target, false);
 			broadcast_announce("Guiding light grants advantage against " + target.name + ".", false);
 		}
+		// Faerie Fire: persistent advantage on ALL attacks against outlined targets (not consumed)
+		// Basic Rules para 13167: "Attack rolls against an affected creature have Advantage"
+		if (target.faerie_fire_outlined) {
+			adv = true;
+		}
 		if (consume_help_advantage(attacker, target)) adv = true;
 		// Assassin: advantage on first round (Assassinate feature)
 		if (attacker.subclass == "Assassin" and attacker.assassinate_available and @combat != null and combat.round_number <= 1) {
@@ -4114,6 +4119,18 @@ class battle_manager {
 				}
 			}
 		}
+		// Faerie Fire: remove outlined effect from all targets when concentration breaks
+		if (conc == "Faerie Fire") {
+			for (uint ffi = 0; ffi < combat.combatants.length(); ffi++) {
+				combatant@ ff_t = combat.combatants[ffi];
+				if (@ff_t == null or ff_t.is_dead) continue;
+				if (ff_t.faerie_fire_outlined and ff_t.faerie_fire_source_id == caster.id) {
+					ff_t.faerie_fire_outlined = false;
+					ff_t.faerie_fire_source_id = 0;
+					broadcast_announce(ff_t.name + " is no longer outlined as Faerie Fire fades!", true);
+				}
+			}
+		}
 		// Antimagic Field: clear flag when concentration breaks
 		caster.antimagic_field_active = false;
 	}
@@ -5148,9 +5165,16 @@ class battle_manager {
 					if (ck_dice < 5) ck_dice = 5;
 					int ck_dc = spell_save_dc(ca_caster, "cloudkill");
 					int ck_roll = random(1, 20);
+					apply_hound_save_disadvantage(c, ca_caster.id, ck_roll);
 					int ck_bonus = c.get_save_bonus(ABILITY_CON);
-					bool ck_saved = (ck_roll + ck_bonus) >= ck_dc;
-					broadcast_roll(c.name, "CON save vs Cloudkill", ck_roll, ck_bonus, ck_roll + ck_bonus, ck_saved ? "Half damage!" : "Full damage!");
+					int ck_bless = roll_bless_bonus(c);
+					int ck_total = ck_roll + ck_bonus + ck_bless;
+					bool ck_saved = ck_total >= ck_dc;
+					broadcast_roll(c.name, "CON save vs Cloudkill", ck_roll, ck_bonus + ck_bless, ck_total, ck_saved ? "Half damage!" : "Full damage!");
+					if (!ck_saved and try_arcane_deflection_save(c, ck_dc, ck_total)) ck_saved = true;
+					if (!ck_saved) { int fg = try_flash_of_genius(c, ck_dc, ck_total, "CON save vs Cloudkill"); if (fg >= ck_dc) ck_saved = true; }
+					if (!ck_saved) { int bf = try_boon_of_fate_bonus(c, ck_total, ck_dc); if (bf >= ck_dc) ck_saved = true; }
+					if (!ck_saved and try_stroke_of_luck_save(c, ck_dc, ck_bonus + ck_bless)) ck_saved = true;
 					int ck_dmg = 0;
 					for (int d = 0; d < ck_dice; d++) ck_dmg += random(1, 8);
 					if (ck_saved) ck_dmg /= 2;
@@ -5168,9 +5192,16 @@ class battle_manager {
 					if (ip_dice < 4) ip_dice = 4;
 					int ip_dc = spell_save_dc(ca_caster, "insect_plague");
 					int ip_roll = random(1, 20);
+					apply_hound_save_disadvantage(c, ca_caster.id, ip_roll);
 					int ip_bonus = c.get_save_bonus(ABILITY_CON);
-					bool ip_saved = (ip_roll + ip_bonus) >= ip_dc;
-					broadcast_roll(c.name, "CON save vs Insect Plague", ip_roll, ip_bonus, ip_roll + ip_bonus, ip_saved ? "Half damage!" : "Full damage!");
+					int ip_bless = roll_bless_bonus(c);
+					int ip_total = ip_roll + ip_bonus + ip_bless;
+					bool ip_saved = ip_total >= ip_dc;
+					broadcast_roll(c.name, "CON save vs Insect Plague", ip_roll, ip_bonus + ip_bless, ip_total, ip_saved ? "Half damage!" : "Full damage!");
+					if (!ip_saved and try_arcane_deflection_save(c, ip_dc, ip_total)) ip_saved = true;
+					if (!ip_saved) { int fg = try_flash_of_genius(c, ip_dc, ip_total, "CON save vs Insect Plague"); if (fg >= ip_dc) ip_saved = true; }
+					if (!ip_saved) { int bf = try_boon_of_fate_bonus(c, ip_total, ip_dc); if (bf >= ip_dc) ip_saved = true; }
+					if (!ip_saved and try_stroke_of_luck_save(c, ip_dc, ip_bonus + ip_bless)) ip_saved = true;
 					int ip_dmg = 0;
 					for (int d = 0; d < ip_dice; d++) ip_dmg += random(1, 10);
 					if (ip_saved) ip_dmg /= 2;
@@ -5186,9 +5217,17 @@ class battle_manager {
 				if (feet_distance(ca_caster.conc_aoe_x, ca_caster.conc_aoe_y, c.x, c.y) <= 20) {
 					int sc_dc = spell_save_dc(ca_caster, "stinking_cloud");
 					int sc_roll = random(1, 20);
+					apply_hound_save_disadvantage(c, ca_caster.id, sc_roll);
 					int sc_bonus = c.get_save_bonus(ABILITY_CON);
-					bool sc_saved = (sc_roll + sc_bonus) >= sc_dc;
-					broadcast_roll(c.name, "CON save vs Stinking Cloud", sc_roll, sc_bonus, sc_roll + sc_bonus, sc_saved ? "Saved!" : "Poisoned!");
+					int sc_bless = roll_bless_bonus(c);
+					int sc_total = sc_roll + sc_bonus + sc_bless;
+					bool sc_saved = sc_total >= sc_dc;
+					broadcast_roll(c.name, "CON save vs Stinking Cloud", sc_roll, sc_bonus + sc_bless, sc_total, sc_saved ? "Saved!" : "Poisoned!");
+					if (!sc_saved and try_arcane_deflection_save(c, sc_dc, sc_total)) sc_saved = true;
+					if (!sc_saved) { int ds = try_disciplined_survivor_reroll(c, sc_dc, sc_total, sc_bonus + sc_bless, "CON save vs Stinking Cloud"); if (ds >= sc_dc) sc_saved = true; }
+					if (!sc_saved) { int fg = try_flash_of_genius(c, sc_dc, sc_total, "CON save vs Stinking Cloud"); if (fg >= sc_dc) sc_saved = true; }
+					if (!sc_saved) { int bf = try_boon_of_fate_bonus(c, sc_total, sc_dc); if (bf >= sc_dc) sc_saved = true; }
+					if (!sc_saved and try_stroke_of_luck_save(c, sc_dc, sc_bonus + sc_bless)) sc_saved = true;
 					if (!sc_saved) {
 						c.add_condition(COND_POISONED);
 						broadcast_to_battle({{"type", message_types::condition_applied}, {"target", c.name}, {"condition", "Poisoned"}});
@@ -5212,9 +5251,17 @@ class battle_manager {
 				if (feet_distance(ca_caster.conc_aoe_x, ca_caster.conc_aoe_y, c.x, c.y) <= 20) {
 					int bt_dc = spell_save_dc(ca_caster, "evards_black_tentacles");
 					int bt_roll = random(1, 20);
+					apply_hound_save_disadvantage(c, ca_caster.id, bt_roll);
 					int bt_bonus = c.get_save_bonus(ABILITY_STR);
-					bool bt_saved = (bt_roll + bt_bonus) >= bt_dc;
-					broadcast_roll(c.name, "STR save vs Black Tentacles", bt_roll, bt_bonus, bt_roll + bt_bonus, bt_saved ? "Saved!" : "Grabbed!");
+					int bt_bless = roll_bless_bonus(c);
+					int bt_total = bt_roll + bt_bonus + bt_bless;
+					bool bt_saved = bt_total >= bt_dc;
+					broadcast_roll(c.name, "STR save vs Black Tentacles", bt_roll, bt_bonus + bt_bless, bt_total, bt_saved ? "Saved!" : "Grabbed!");
+					if (!bt_saved and try_arcane_deflection_save(c, bt_dc, bt_total)) bt_saved = true;
+					if (!bt_saved) { int ds = try_disciplined_survivor_reroll(c, bt_dc, bt_total, bt_bonus + bt_bless, "STR save vs Black Tentacles"); if (ds >= bt_dc) bt_saved = true; }
+					if (!bt_saved) { int fg = try_flash_of_genius(c, bt_dc, bt_total, "STR save vs Black Tentacles"); if (fg >= bt_dc) bt_saved = true; }
+					if (!bt_saved) { int bf = try_boon_of_fate_bonus(c, bt_total, bt_dc); if (bf >= bt_dc) bt_saved = true; }
+					if (!bt_saved and try_stroke_of_luck_save(c, bt_dc, bt_bonus + bt_bless)) bt_saved = true;
 					int bt_dmg = 0;
 					for (int d = 0; d < 3; d++) bt_dmg += random(1, 6);
 					combat.apply_damage(c, bt_dmg, DMG_BLUDGEONING, ca_caster);
@@ -5235,9 +5282,16 @@ class battle_manager {
 					if (wf_dice < 5) wf_dice = 5;
 					int wf_dc = spell_save_dc(ca_caster, "wall_of_fire");
 					int wf_roll = random(1, 20);
+					apply_hound_save_disadvantage(c, ca_caster.id, wf_roll);
 					int wf_bonus = c.get_save_bonus(ABILITY_DEX);
-					bool wf_saved = (wf_roll + wf_bonus) >= wf_dc;
-					broadcast_roll(c.name, "DEX save vs Wall of Fire", wf_roll, wf_bonus, wf_roll + wf_bonus, wf_saved ? "Half damage!" : "Full damage!");
+					int wf_bless = roll_bless_bonus(c);
+					int wf_total = wf_roll + wf_bonus + wf_bless;
+					bool wf_saved = wf_total >= wf_dc;
+					broadcast_roll(c.name, "DEX save vs Wall of Fire", wf_roll, wf_bonus + wf_bless, wf_total, wf_saved ? "Half damage!" : "Full damage!");
+					if (!wf_saved and try_arcane_deflection_save(c, wf_dc, wf_total)) wf_saved = true;
+					if (!wf_saved) { int fg = try_flash_of_genius(c, wf_dc, wf_total, "DEX save vs Wall of Fire"); if (fg >= wf_dc) wf_saved = true; }
+					if (!wf_saved) { int bf = try_boon_of_fate_bonus(c, wf_total, wf_dc); if (bf >= wf_dc) wf_saved = true; }
+					if (!wf_saved and try_stroke_of_luck_save(c, wf_dc, wf_bonus + wf_bless)) wf_saved = true;
 					int wf_dmg = 0;
 					for (int d = 0; d < wf_dice; d++) wf_dmg += random(1, 8);
 					if (wf_saved) wf_dmg /= 2;
@@ -5254,9 +5308,17 @@ class battle_manager {
 				if (feet_distance(ca_caster.conc_aoe_x, ca_caster.conc_aoe_y, c.x, c.y) <= 20) {
 					int ss_dc = spell_save_dc(ca_caster, "sleet_storm");
 					int ss_roll = random(1, 20);
+					apply_hound_save_disadvantage(c, ca_caster.id, ss_roll);
 					int ss_bonus = c.get_save_bonus(ABILITY_DEX);
-					bool ss_saved = (ss_roll + ss_bonus) >= ss_dc;
-					broadcast_roll(c.name, "DEX save vs Sleet Storm", ss_roll, ss_bonus, ss_roll + ss_bonus, ss_saved ? "Saved!" : "Prone!");
+					int ss_bless = roll_bless_bonus(c);
+					int ss_total = ss_roll + ss_bonus + ss_bless;
+					bool ss_saved = ss_total >= ss_dc;
+					broadcast_roll(c.name, "DEX save vs Sleet Storm", ss_roll, ss_bonus + ss_bless, ss_total, ss_saved ? "Saved!" : "Prone!");
+					if (!ss_saved and try_arcane_deflection_save(c, ss_dc, ss_total)) ss_saved = true;
+					if (!ss_saved) { int ds = try_disciplined_survivor_reroll(c, ss_dc, ss_total, ss_bonus + ss_bless, "DEX save vs Sleet Storm"); if (ds >= ss_dc) ss_saved = true; }
+					if (!ss_saved) { int fg = try_flash_of_genius(c, ss_dc, ss_total, "DEX save vs Sleet Storm"); if (fg >= ss_dc) ss_saved = true; }
+					if (!ss_saved) { int bf = try_boon_of_fate_bonus(c, ss_total, ss_dc); if (bf >= ss_dc) ss_saved = true; }
+					if (!ss_saved and try_stroke_of_luck_save(c, ss_dc, ss_bonus + ss_bless)) ss_saved = true;
 					if (!ss_saved) {
 						c.add_condition(COND_PRONE);
 						if (c.is_concentrating) {
@@ -5279,9 +5341,16 @@ class battle_manager {
 					if (fs_dice < 2) fs_dice = 2;
 					int fs_dc = spell_save_dc(ca_caster, "flaming_sphere");
 					int fs_roll = random(1, 20);
+					apply_hound_save_disadvantage(c, ca_caster.id, fs_roll);
 					int fs_bonus = c.get_save_bonus(ABILITY_DEX);
-					bool fs_saved = (fs_roll + fs_bonus) >= fs_dc;
-					broadcast_roll(c.name, "DEX save vs Flaming Sphere", fs_roll, fs_bonus, fs_roll + fs_bonus, fs_saved ? "Half damage!" : "Full damage!");
+					int fs_bless = roll_bless_bonus(c);
+					int fs_total = fs_roll + fs_bonus + fs_bless;
+					bool fs_saved = fs_total >= fs_dc;
+					broadcast_roll(c.name, "DEX save vs Flaming Sphere", fs_roll, fs_bonus + fs_bless, fs_total, fs_saved ? "Half damage!" : "Full damage!");
+					if (!fs_saved and try_arcane_deflection_save(c, fs_dc, fs_total)) fs_saved = true;
+					if (!fs_saved) { int fg = try_flash_of_genius(c, fs_dc, fs_total, "DEX save vs Flaming Sphere"); if (fg >= fs_dc) fs_saved = true; }
+					if (!fs_saved) { int bf = try_boon_of_fate_bonus(c, fs_total, fs_dc); if (bf >= fs_dc) fs_saved = true; }
+					if (!fs_saved and try_stroke_of_luck_save(c, fs_dc, fs_bonus + fs_bless)) fs_saved = true;
 					int fs_dmg = 0;
 					for (int d = 0; d < fs_dice; d++) fs_dmg += random(1, 6);
 					if (fs_saved) fs_dmg /= 2;
@@ -5298,9 +5367,16 @@ class battle_manager {
 				if (feet_distance(ca_caster.conc_aoe_x, ca_caster.conc_aoe_y, c.x, c.y) <= 10) {
 					int bb_dc = spell_save_dc(ca_caster, "blade_barrier");
 					int bb_roll = random(1, 20);
+					apply_hound_save_disadvantage(c, ca_caster.id, bb_roll);
 					int bb_bonus = c.get_save_bonus(ABILITY_DEX);
-					bool bb_saved = (bb_roll + bb_bonus) >= bb_dc;
-					broadcast_roll(c.name, "DEX save vs Blade Barrier", bb_roll, bb_bonus, bb_roll + bb_bonus, bb_saved ? "Half damage!" : "Full damage!");
+					int bb_bless = roll_bless_bonus(c);
+					int bb_total = bb_roll + bb_bonus + bb_bless;
+					bool bb_saved = bb_total >= bb_dc;
+					broadcast_roll(c.name, "DEX save vs Blade Barrier", bb_roll, bb_bonus + bb_bless, bb_total, bb_saved ? "Half damage!" : "Full damage!");
+					if (!bb_saved and try_arcane_deflection_save(c, bb_dc, bb_total)) bb_saved = true;
+					if (!bb_saved) { int fg = try_flash_of_genius(c, bb_dc, bb_total, "DEX save vs Blade Barrier"); if (fg >= bb_dc) bb_saved = true; }
+					if (!bb_saved) { int bf = try_boon_of_fate_bonus(c, bb_total, bb_dc); if (bf >= bb_dc) bb_saved = true; }
+					if (!bb_saved and try_stroke_of_luck_save(c, bb_dc, bb_bonus + bb_bless)) bb_saved = true;
 					int bb_dmg = 0;
 					for (int d = 0; d < 6; d++) bb_dmg += random(1, 10);
 					if (bb_saved) bb_dmg /= 2;
@@ -5317,9 +5393,16 @@ class battle_manager {
 				if (feet_distance(ca_caster.conc_aoe_x, ca_caster.conc_aoe_y, c.x, c.y) <= 20) {
 					int ic_dc = spell_save_dc(ca_caster, "incendiary_cloud");
 					int ic_roll = random(1, 20);
+					apply_hound_save_disadvantage(c, ca_caster.id, ic_roll);
 					int ic_bonus = c.get_save_bonus(ABILITY_DEX);
-					bool ic_saved = (ic_roll + ic_bonus) >= ic_dc;
-					broadcast_roll(c.name, "DEX save vs Incendiary Cloud", ic_roll, ic_bonus, ic_roll + ic_bonus, ic_saved ? "Half damage!" : "Full damage!");
+					int ic_bless = roll_bless_bonus(c);
+					int ic_total = ic_roll + ic_bonus + ic_bless;
+					bool ic_saved = ic_total >= ic_dc;
+					broadcast_roll(c.name, "DEX save vs Incendiary Cloud", ic_roll, ic_bonus + ic_bless, ic_total, ic_saved ? "Half damage!" : "Full damage!");
+					if (!ic_saved and try_arcane_deflection_save(c, ic_dc, ic_total)) ic_saved = true;
+					if (!ic_saved) { int fg = try_flash_of_genius(c, ic_dc, ic_total, "DEX save vs Incendiary Cloud"); if (fg >= ic_dc) ic_saved = true; }
+					if (!ic_saved) { int bf = try_boon_of_fate_bonus(c, ic_total, ic_dc); if (bf >= ic_dc) ic_saved = true; }
+					if (!ic_saved and try_stroke_of_luck_save(c, ic_dc, ic_bonus + ic_bless)) ic_saved = true;
 					int ic_dmg = 0;
 					for (int d = 0; d < 10; d++) ic_dmg += random(1, 8);
 					if (ic_saved) ic_dmg /= 2;
@@ -5366,9 +5449,16 @@ class battle_manager {
 					if (mb_dice < 2) mb_dice = 2;
 					int mb_dc = spell_save_dc(ca_caster, "moonbeam");
 					int mb_roll = random(1, 20);
+					apply_hound_save_disadvantage(c, ca_caster.id, mb_roll);
 					int mb_bonus = c.get_save_bonus(ABILITY_CON);
-					bool mb_saved = (mb_roll + mb_bonus) >= mb_dc;
-					broadcast_roll(c.name, "CON save vs Moonbeam", mb_roll, mb_bonus, mb_roll + mb_bonus, mb_saved ? "Half damage!" : "Full damage!");
+					int mb_bless = roll_bless_bonus(c);
+					int mb_total = mb_roll + mb_bonus + mb_bless;
+					bool mb_saved = mb_total >= mb_dc;
+					broadcast_roll(c.name, "CON save vs Moonbeam", mb_roll, mb_bonus + mb_bless, mb_total, mb_saved ? "Half damage!" : "Full damage!");
+					if (!mb_saved and try_arcane_deflection_save(c, mb_dc, mb_total)) mb_saved = true;
+					if (!mb_saved) { int fg = try_flash_of_genius(c, mb_dc, mb_total, "CON save vs Moonbeam"); if (fg >= mb_dc) mb_saved = true; }
+					if (!mb_saved) { int bf = try_boon_of_fate_bonus(c, mb_total, mb_dc); if (bf >= mb_dc) mb_saved = true; }
+					if (!mb_saved and try_stroke_of_luck_save(c, mb_dc, mb_bonus + mb_bless)) mb_saved = true;
 					int mb_dmg = 0;
 					for (int d = 0; d < mb_dice; d++) mb_dmg += random(1, 10);
 					if (mb_saved) mb_dmg /= 2;
@@ -14312,9 +14402,10 @@ class battle_manager {
 					if (!saved and try_stroke_of_luck_save(t, save_dc, save_bonus + bless_bonus)) saved = true;
 					broadcast_roll(t.name, "DEX save vs Faerie Fire", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Outlined!");
 					if (!saved) {
-						// Use guiding_bolt_advantage flag as approximation - next attack vs them gets advantage
-						t.guiding_bolt_advantage = true;
-						t.guiding_bolt_source_id = c.id;
+						// Faerie Fire: persistent advantage on ALL attacks against outlined targets for duration
+						// (NOT single-use like Guiding Bolt — persists until concentration breaks)
+						t.faerie_fire_outlined = true;
+						t.faerie_fire_source_id = c.id;
 						t.remove_condition(COND_INVISIBLE);
 						affected++;
 					}
