@@ -590,6 +590,8 @@ Epic Boon feats: combat_prowess, dimensional_travel, energy_resistance, fate, fo
 - **Sharpshooter -5/+10 clarified**: PHB 2024 removed the -5/+10 trade (was 2014 only). TODO updated.
 - **Medium Armor Master confirmed**: Already fully implemented (+3 DEX cap + stealth advantage). TODO updated.
 - **Wizard Spell Mastery + Signature Spells designation** (PHB 2024 paras 8629-8635): Full Shift+P menu flow — L18 Wizards pick L1+L2 spells for at-will casting, L20 Wizards pick two L3 spells for 1/SR free casts. Server validates spell level, persists to account JSON, restores on reconnect via character_sheet fields. Client filters SPELL_CATALOG by level+class for the selection menus.
+- **Order's Demand duration tracking** (Tasha's Order Domain): Charm now properly expires at end of caster's next turn via 2-tick counter in advance_turn. Also breaks on damage via apply_damage check. Previously charmed indefinitely.
+- **Monk Deflect Attacks Redirect** (PHB 2024 para 5339): When Deflect Attacks reduces damage to 0, Monk auto-spends 1 Focus Point to redirect 2d8+DEX force damage at the attacker (DEX save negates). Uses existing deflect_attacks_reduced_to_zero flag as gate.
 
 **Previously implemented:** combat_prowess (+1d6 weapon miss → hit 1/turn), fortitude (+40 HP), irresistible_offense (+2d10 force 1/turn), skill (+1d10 ability check 1/turn), speed (+30ft), the_night_spirit (300ft darkvision + see invisible), truesight (Truesight 60ft)
 

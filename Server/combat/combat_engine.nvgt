@@ -589,6 +589,8 @@ class combatant {
 	bool voice_of_authority_active = false; // Order Domain Cleric - ally bonus attack on spell target
 	uint voice_of_authority_ally = 0;
 	bool orders_demand_used = false; // Order Domain Cleric Channel Divinity
+	uint orders_demand_charmed_by = 0; // ID of cleric who charmed this target via Order's Demand
+	int orders_demand_turns_left = 0; // turns remaining until charm expires (2 when set, decrements at caster's turn end)
 	bool wizardly_quill_active = false; // Order of Scribes Wizard
 	int awakened_spellbook_changes = 0; // Order of Scribes - replace damage type
 	// Gunslinger subclasses (Valda's Spire of Secrets paras 229-490)
@@ -1834,6 +1836,13 @@ class battle {
 		}
 
 		target.current_hp -= amount;
+
+		// Tasha's Order Domain Order's Demand: charm ends when charmed creature takes damage.
+		if (amount > 0 and target.orders_demand_charmed_by != 0 and target.has_condition(COND_CHARMED)) {
+			target.remove_condition(COND_CHARMED);
+			target.orders_demand_charmed_by = 0;
+			target.orders_demand_turns_left = 0;
+		}
 
 		// Xanathar's Oath of Redemption L20 Emissary of Redemption retaliation (para 2054):
 		// "whenever a creature damages you, it takes radiant damage equal to half the

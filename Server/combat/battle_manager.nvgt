@@ -4877,6 +4877,20 @@ class battle_manager {
 				ss_target.stunning_strike_source_id = 0;
 			}
 		}
+		// Tasha's Order Domain Order's Demand: charm expires at end of caster's next turn.
+		// Decrement counter for all targets charmed by this combatant; remove at 0.
+		for (uint odi = 0; odi < combat.combatants.length(); odi++) {
+			combatant@ od_target = combat.combatants[odi];
+			if (@od_target == null or od_target.orders_demand_charmed_by != c.id) continue;
+			if (od_target.orders_demand_turns_left > 0) od_target.orders_demand_turns_left--;
+			if (od_target.orders_demand_turns_left <= 0) {
+				od_target.orders_demand_charmed_by = 0;
+				if (od_target.has_condition(COND_CHARMED)) {
+					od_target.remove_condition(COND_CHARMED);
+					broadcast_announce(od_target.name + "'s Order's Demand charm expires.", false);
+				}
+			}
+		}
 		// PHB 2024 Monk L18 Superior Defense (para 5372-5373): "At the start of your
 		// turn, you can expend 3 Focus Points to bolster yourself against harm for 1
 		// minute or until you have the Incapacitated condition. During that time, you
@@ -8328,6 +8342,26 @@ class battle_manager {
 			// PHB 2024 Skulker: reveal on hit (deferred from attack declaration)
 			if (c.is_hidden) reveal_hidden_combatant(c, "hitting with an attack");
 			combat.apply_damage(target, total_damage, pr.damage_type, c, pr.is_crit);
+
+			// PHB 2024 Monk L3 Deflect Attacks — Redirect (para 5339): If damage was
+			// reduced to 0 by Deflect Attacks, Monk can spend 1 Focus Point to redirect
+			// force at the attacker. DEX save or 2d8 + DEX mod Force damage.
+			if (target.deflect_attacks_reduced_to_zero and target.focus_points > 0 and !c.is_dead) {
+				target.deflect_attacks_reduced_to_zero = false;
+				target.focus_points--;
+				int redirect_dmg = random(1, 8) + random(1, 8) + target.get_ability_mod(ABILITY_DEX);
+				if (redirect_dmg < 1) redirect_dmg = 1;
+				int redirect_dc = 8 + target.proficiency + target.get_ability_mod(ABILITY_DEX);
+				int redirect_save = random(1, 20) + c.get_save_bonus(ABILITY_DEX);
+				if (redirect_save >= redirect_dc) {
+					broadcast_announce(target.name + " redirects the deflected force at " + c.name + ", but they dodge! (DEX save " + redirect_save + " vs DC " + redirect_dc + ")", false);
+				} else {
+					combat.apply_damage(c, redirect_dmg, DMG_FORCE, target);
+					broadcast_announce(target.name + " deflects and redirects " + redirect_dmg + " force damage at " + c.name + "! (DEX save " + redirect_save + " vs DC " + redirect_dc + ")", true);
+				}
+			} else if (target.deflect_attacks_reduced_to_zero) {
+				target.deflect_attacks_reduced_to_zero = false; // Clear flag if no FP to redirect
+			}
 
 			// Mirror Image (Basic Rules para 14260): "Each time a creature hits you with
 			// an attack roll during the spell's duration, roll a d6 for each of your

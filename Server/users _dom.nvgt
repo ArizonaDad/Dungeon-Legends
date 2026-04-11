@@ -5873,8 +5873,9 @@ void handle_user_message(user@ u, json_object@ msg)
 				int save = random(1, 20) + tgt.get_save_bonus(ABILITY_WIS);
 				if (save < dc) {
 					tgt.add_condition(COND_CHARMED);
-					// Note: Charmed condition will end automatically on damage via normal condition handling,
-					// and at the end of the cleric's next turn (duration tracking TODO)
+					// Charm ends on damage (handled in apply_damage) or at end of caster's next turn
+					tgt.orders_demand_charmed_by = c.id;
+					tgt.orders_demand_turns_left = 2; // 2 = survives this turn-end, expires at next turn-end
 					u.room.bm.broadcast_announce(c.name + " issues an Order's Demand! " + tgt.name + " is charmed (save " + save + " vs DC " + dc + ").", true);
 					affected++;
 				} else {
