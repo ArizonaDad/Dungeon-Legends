@@ -4061,6 +4061,25 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.room.bm.broadcast_announce(c.name + " invokes the Hill Rune! Resistance to bludgeoning, piercing, and slashing damage for 1 minute.", true);
 		}
 
+		else if (feature == "storm_rune") {
+			// Tasha's Rune Knight Storm Rune invoke (para 2594): "you can invoke the rune
+			// as a bonus action to enter a prophetic state for 1 minute or until you're
+			// incapacitated. Until the state ends, when you or another creature you can see
+			// within 60 feet of you makes an attack roll, a saving throw, or an ability check,
+			// you can use your reaction to cause the roll to have advantage or disadvantage."
+			if (c.class_name != "Fighter" or c.subclass != "Rune Knight") { u.send({{"type", message_types::announce}, {"text", "Only Rune Knights can invoke runes."}, {"interrupt", true}}); return; }
+			if (!c.storm_rune_known) { u.send({{"type", message_types::announce}, {"text", "You don't know the Storm Rune."}, {"interrupt", true}}); return; }
+			if (c.rune_invoke_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No rune invocations remaining."}, {"interrupt", true}}); return; }
+			if (c.storm_rune_prophetic_active) { u.send({{"type", message_types::announce}, {"text", "Storm Rune prophetic state is already active."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.rune_invoke_uses--;
+			c.storm_rune_prophetic_active = true;
+			c.storm_rune_prophetic_rounds = 10; // 1 minute = 10 rounds
+			u.room.bm.broadcast_announce(c.name + " invokes the Storm Rune and enters a prophetic state! Can force advantage or disadvantage on d20 rolls within 60 feet for 1 minute.", true);
+		}
+
 		else if (feature == "emboldening_bond") {
 			// Peace Domain Cleric: Emboldening Bond channel divinity (allies get +1d4 to rolls)
 			if (c.class_name != "Cleric" or c.subclass != "Peace Domain") { u.send({{"type", message_types::announce}, {"text", "Only Peace Domain clerics can use Emboldening Bond."}, {"interrupt", true}}); return; }
@@ -6766,6 +6785,21 @@ void handle_user_message(user@ u, json_object@ msg)
 	}
 	else if (msg_type == message_types::spell_choice_response) {
 		if (@u.room != null and @u.room.bm != null) u.room.bm.handle_spell_choice_response(u, msg);
+	}
+	else if (msg_type == message_types::twinkling_constellations_response) {
+		// Tasha's Circle of Stars L10 Twinkling Constellations (para 2291-2294)
+		if (@u.room != null and @u.room.bm != null and @u.room.bm.combat != null) {
+			combatant@ c = u.room.bm.combat.current_combatant();
+			if (@c != null and c.is_player and c.player_username == u.username and c.starry_form_active) {
+				string form = msg.exists("form") ? string(msg["form"]) : "";
+				if (form == "Archer" or form == "Chalice" or form == "Dragon") {
+					if (form != c.starry_form_type) {
+						c.starry_form_type = form;
+						u.room.bm.broadcast_announce(c.name + "'s constellation shifts to " + form + ".", true);
+					}
+				}
+			}
+		}
 	}
 	else if (msg_type == message_types::action_cast) {
 		if (@u.room != null and @u.room.bm != null) {

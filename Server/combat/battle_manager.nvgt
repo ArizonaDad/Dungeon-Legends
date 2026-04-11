@@ -3085,6 +3085,40 @@ class battle_manager {
 			broadcast_announce(attacker.name + " spends 2 Focus Points — Drunkard's Luck cancels the attack disadvantage!", false);
 		}
 
+		// Tasha's Rune Knight Storm Rune prophetic (para 2594): "when you or another
+		// creature you can see within 60 feet of you makes an attack roll, a saving
+		// throw, or an ability check, you can use your reaction to cause the roll to
+		// have advantage or disadvantage." Auto-fire for bots: impose disadvantage on
+		// enemy attacks, grant advantage on ally attacks.
+		if (@combat != null) {
+			for (uint srp = 0; srp < combat.combatants.length(); srp++) {
+				combatant@ prophet = combat.combatants[srp];
+				if (@prophet == null or prophet.is_dead or !prophet.is_alive()) continue;
+				if (!prophet.is_conscious() or prophet.is_incapacitated_check()) continue;
+				if (!prophet.storm_rune_prophetic_active) continue;
+				if (!prophet.has_reaction) continue;
+				float sp_dx = float(attacker.x - prophet.x);
+				float sp_dy = float(attacker.y - prophet.y);
+				float sp_dist = sqrt(sp_dx * sp_dx + sp_dy * sp_dy) * 5.0f;
+				if (sp_dist > 60) continue;
+				if (!combat.can_see(prophet, attacker)) continue;
+				// Hostile attacker: impose disadvantage
+				if (combat.are_hostile(prophet, attacker) and !disadv) {
+					prophet.has_reaction = false;
+					disadv = true;
+					broadcast_announce(prophet.name + "'s Storm Rune prophecy imposes Disadvantage on " + attacker.name + "'s attack!", true);
+					break;
+				}
+				// Ally attacker: grant advantage
+				if (!combat.are_hostile(prophet, attacker) and !adv) {
+					prophet.has_reaction = false;
+					adv = true;
+					broadcast_announce(prophet.name + "'s Storm Rune prophecy grants Advantage on " + attacker.name + "'s attack!", true);
+					break;
+				}
+			}
+		}
+
 		// PHB 2024 Rogue L18 Elusive (para 6576-6577): "No attack roll can have
 		// Advantage against you unless you have the Incapacitated condition." Strip
 		// any advantage that would have been granted to the attacker against this
@@ -5537,6 +5571,16 @@ class battle_manager {
 					broadcast_announce(prev.name + "'s Hill Rune invocation fades. B/P/S resistance ends.", false);
 				}
 			}
+			// Tasha's Rune Knight Storm Rune invoke (para 2594): "prophetic state for
+			// 1 minute or until you're incapacitated." = 10 rounds.
+			if (prev.storm_rune_prophetic_active and prev.storm_rune_prophetic_rounds > 0) {
+				prev.storm_rune_prophetic_rounds--;
+				if (prev.storm_rune_prophetic_rounds <= 0 or prev.is_incapacitated_check()) {
+					prev.storm_rune_prophetic_active = false;
+					prev.storm_rune_prophetic_rounds = 0;
+					broadcast_announce(prev.name + "'s Storm Rune prophetic state ends.", false);
+				}
+			}
 			// Valda's Spire Gunslinger L5 Gut Shot debuff tickdown (paras 184-185):
 			// "For 1 minute or until the target replaces one of its attacks with
 			// dislodging the projectile, its Speed is halved..." 1 minute = 10 rounds.
@@ -5680,6 +5724,83 @@ class battle_manager {
 					broadcast_announce(prev.name + " breaks free from the Fire Rune's fiery shackles!", false);
 				}
 			}
+			// Tasha's Rune Knight Stone Rune invoke (para 2590): "when a creature you
+			// can see ends its turn within 30 feet of you, you can use your reaction to
+			// invoke the rune and force the creature to make a Wisdom saving throw. Unless
+			// the save succeeds, the creature is charmed by you for 1 minute. While charmed
+			// in this way, the creature has a speed of 0 and is incapacitated."
+			// Auto-fires for bots. For hostile creatures ending turn near a Rune Knight.
+			if (@prev != null and prev.is_alive() and !prev.has_condition(COND_CHARMED) and !prev.immune_charmed) {
+				for (uint sri = 0; sri < combat.combatants.length(); sri++) {
+					combatant@ rk = combat.combatants[sri];
+					if (@rk == null or rk.is_dead or !rk.is_alive()) continue;
+					if (!rk.is_conscious() or rk.is_incapacitated_check()) continue;
+					if (rk.class_name != "Fighter" or rk.subclass != "Rune Knight") continue;
+					if (!rk.stone_rune_known or rk.rune_invoke_uses <= 0) continue;
+					if (!rk.has_reaction) continue;
+					if (!combat.are_hostile(rk, prev)) continue;
+					float sr_dx = float(prev.x - rk.x);
+					float sr_dy = float(prev.y - rk.y);
+					float sr_dist = sqrt(sr_dx * sr_dx + sr_dy * sr_dy) * 5.0f;
+					if (sr_dist > 30) continue;
+					if (!combat.can_see(rk, prev)) continue;
+					// Auto-fire for bots and NPC Rune Knights
+					rk.has_reaction = false;
+					rk.rune_invoke_uses--;
+					int sr_dc = 8 + rk.get_ability_mod(ABILITY_CON) + rk.proficiency;
+					int sr_save_roll = random(1, 20);
+					int sr_save_bonus = prev.get_save_bonus(ABILITY_WIS);
+					int sr_save_total = sr_save_roll + sr_save_bonus;
+					bool sr_saved = sr_save_total >= sr_dc;
+					broadcast_announce(rk.name + " invokes the Stone Rune on " + prev.name + "!", true);
+					broadcast_roll(prev.name, "WIS save vs Stone Rune", sr_save_roll, sr_save_bonus, sr_save_total, sr_saved ? "Saved!" : "Charmed!");
+					if (!sr_saved and try_arcane_deflection_save(prev, sr_dc, sr_save_total)) sr_saved = true;
+					if (!sr_saved and try_countercharm_reroll(prev, sr_dc, sr_save_bonus, "WIS save vs Stone Rune")) sr_saved = true;
+					if (!sr_saved) { int sr_ds = try_disciplined_survivor_reroll(prev, sr_dc, sr_save_total, sr_save_bonus, "WIS save vs Stone Rune"); if (sr_ds >= sr_dc) sr_saved = true; }
+					if (!sr_saved) { int sr_fg = try_flash_of_genius(prev, sr_dc, sr_save_total, "WIS save vs Stone Rune"); if (sr_fg >= sr_dc) sr_saved = true; }
+					if (!sr_saved) { int sr_mv = try_maverick_spirit(prev, sr_dc, sr_save_total, "WIS save vs Stone Rune"); if (sr_mv >= sr_dc) sr_saved = true; }
+					if (!sr_saved and try_mage_slayer_guarded_mind(prev, ABILITY_WIS)) sr_saved = true;
+					if (!sr_saved) { int sr_bf = try_boon_of_fate_bonus(prev, sr_save_total, sr_dc); if (sr_bf >= sr_dc) sr_saved = true; }
+					if (!sr_saved and try_stroke_of_luck_save(prev, sr_dc, sr_save_bonus)) sr_saved = true;
+					if (!sr_saved) {
+						prev.add_condition(COND_CHARMED);
+						prev.add_condition(COND_INCAPACITATED);
+						prev.stone_rune_charm_source_id = rk.id;
+						prev.stone_rune_charm_dc = sr_dc;
+						broadcast_to_battle({{"type", message_types::condition_applied}, {"target", prev.name}, {"condition", "Charmed"}});
+						broadcast_announce(prev.name + " is charmed by the Stone Rune! Speed 0, incapacitated, lost in a dreamy stupor.", false);
+					}
+					break; // Only one Stone Rune attempt per turn end
+				}
+			}
+			// Tasha's Rune Knight Stone Rune charm: EOT WIS save to break free (para 2590):
+			// "The creature repeats the saving throw at the end of each of its turns,
+			// ending the effect on a success."
+			if (prev.has_condition(COND_CHARMED) and prev.stone_rune_charm_source_id != 0) {
+				int src_dc = prev.stone_rune_charm_dc;
+				int src_save_roll = random(1, 20);
+				int src_save_bonus = prev.get_save_bonus(ABILITY_WIS);
+				int src_save_total = src_save_roll + src_save_bonus;
+				bool src_saved = src_save_total >= src_dc;
+				broadcast_roll(prev.name, "WIS save vs Stone Rune charm (end of turn)", src_save_roll, src_save_bonus, src_save_total, src_saved ? "Freed!" : "Still charmed!");
+				if (!src_saved and try_arcane_deflection_save(prev, src_dc, src_save_total)) src_saved = true;
+				if (!src_saved and try_countercharm_reroll(prev, src_dc, src_save_bonus, "WIS save vs Stone Rune")) src_saved = true;
+				if (!src_saved) { int src_ds = try_disciplined_survivor_reroll(prev, src_dc, src_save_total, src_save_bonus, "WIS save vs Stone Rune"); if (src_ds >= src_dc) src_saved = true; }
+				if (!src_saved) { int src_fg = try_flash_of_genius(prev, src_dc, src_save_total, "WIS save vs Stone Rune"); if (src_fg >= src_dc) src_saved = true; }
+				if (!src_saved) { int src_mv = try_maverick_spirit(prev, src_dc, src_save_total, "WIS save vs Stone Rune"); if (src_mv >= src_dc) src_saved = true; }
+				if (!src_saved and try_mage_slayer_guarded_mind(prev, ABILITY_WIS)) src_saved = true;
+				if (!src_saved) { int src_bf = try_boon_of_fate_bonus(prev, src_save_total, src_dc); if (src_bf >= src_dc) src_saved = true; }
+				if (!src_saved and try_stroke_of_luck_save(prev, src_dc, src_save_bonus)) src_saved = true;
+				if (src_saved) {
+					prev.remove_condition(COND_CHARMED);
+					prev.remove_condition(COND_INCAPACITATED);
+					prev.stone_rune_charm_source_id = 0;
+					prev.stone_rune_charm_dc = 0;
+					broadcast_to_battle({{"type", message_types::condition_removed}, {"target", prev.name}, {"condition", "Charmed"}});
+					broadcast_announce(prev.name + " breaks free from the Stone Rune's dreamy stupor!", false);
+				}
+			}
+
 			// Blindness/Deafness: CON save each turn
 			if (prev.has_condition(COND_BLINDED)) {
 				for (uint ci = 0; ci < combat.combatants.length(); ci++) {
@@ -6963,6 +7084,24 @@ class battle_manager {
 		c.raging_storm_used_this_turn = false;
 		// Tasha's Circle of Stars Archer per-turn BA attack reset
 		c.starry_form_archer_used_this_turn = false;
+		// Tasha's Circle of Stars L10 Twinkling Constellations (para 2291-2294):
+		// "At the start of each of your turns while in your Starry Form, you can
+		// change which constellation glimmers on your body."
+		if (c.class_name == "Druid" and c.subclass == "Circle of the Stars" and c.level >= 10 and c.starry_form_active) {
+			user@ tc_u = find_user_for_combatant(c);
+			if (@tc_u != null and !tc_u.is_bot and c.is_player) {
+				tc_u.send({{"type", message_types::twinkling_constellations}, {"current_form", c.starry_form_type}});
+			} else {
+				// Bot: Chalice if below 50% HP, Archer otherwise
+				string bot_form = "Dragon";
+				if (c.current_hp < c.max_hp / 2) bot_form = "Chalice";
+				else bot_form = "Archer";
+				if (bot_form != c.starry_form_type) {
+					c.starry_form_type = bot_form;
+					broadcast_announce(c.name + "'s constellation shifts to " + bot_form + ".", false);
+				}
+			}
+		}
 		// Xanathar's Storm Herald L10 Shielding Storm (para 428): refresh resistance on allies
 		if (c.class_name == "Barbarian" and c.subclass == "Storm Herald" and c.storm_aura_active and c.level >= 10) {
 			apply_shielding_storm(c);
@@ -7275,6 +7414,12 @@ class battle_manager {
 			c.frost_rune_rounds = 0;
 			c.hill_rune_active = false;
 			c.hill_rune_rounds = 0;
+			c.storm_rune_prophetic_active = false;
+			c.storm_rune_prophetic_rounds = 0;
+			// Tasha's Rune Knight L7 Runic Shield (para 2605): "you regain all
+			// expended uses when you finish a long rest." Also resets on SR for
+			// consistency with rune invocation pattern.
+			c.runic_shield_uses = c.runic_shield_uses_max;
 		}
 		// War Magic L6 Power Surge: floor at 1 on SR
 		if (c.class_name == "Wizard" and c.subclass == "War Magic" and c.power_surge_charges < 1) {
@@ -9000,6 +9145,33 @@ class battle_manager {
 					}
 				}
 				broadcast_announce(attacker.name + "'s Mobile " + fl_label + " adds " + flourish_dmg + " damage and pushes " + target.name + " " + push_dist + " ft!", false);
+				// Xanathar's Mobile Flourish (para 591): "You can then immediately
+				// use your reaction to move up to your walking speed to an unoccupied
+				// space within 5 feet of the target."
+				if (attacker.has_reaction and @combat != null) {
+					int dist_to_target = feet_distance(attacker.x, attacker.y, target.x, target.y);
+					if (dist_to_target > 5 and dist_to_target <= attacker.speed) {
+						float mdx = float(target.x - attacker.x);
+						float mdy = float(target.y - attacker.y);
+						float mlen = sqrt(mdx * mdx + mdy * mdy);
+						if (mlen > 0.001f) {
+							mdx /= mlen;
+							mdy /= mlen;
+							int move_tiles = int(mlen) - 1;
+							if (move_tiles < 1) move_tiles = 1;
+							int dest_x = attacker.x + int(mdx * move_tiles);
+							int dest_y = attacker.y + int(mdy * move_tiles);
+							if (dest_x < 0) dest_x = 0;
+							if (dest_y < 0) dest_y = 0;
+							if (dest_x > 39) dest_x = 39;
+							if (dest_y > 39) dest_y = 39;
+							attacker.x = dest_x;
+							attacker.y = dest_y;
+							attacker.has_reaction = false;
+							broadcast_announce(attacker.name + " uses reaction to move to " + target.name + "!", false);
+						}
+					}
+				}
 			} else {
 				// Default: just damage (backwards compat)
 				broadcast_announce(attacker.name + "'s " + fl_label + " adds " + flourish_dmg + " damage!", false);
@@ -10341,6 +10513,122 @@ class battle_manager {
 						}
 						break;
 					}
+				}
+			}
+
+			// Tasha's Rune Knight L7 Runic Shield (para 2604): "When another creature
+			// you can see within 60 feet of you is hit by an attack roll, you can use
+			// your reaction to force the attacker to reroll the d20 and use the new roll."
+			// Auto-resolved: only fires when the reroll could turn a hit into a miss.
+			if (hit and !is_crit and !is_fumble and @combat != null) {
+				for (uint rs = 0; rs < combat.combatants.length(); rs++) {
+					combatant@ shield_rk = combat.combatants[rs];
+					if (@shield_rk == null or shield_rk.is_dead or !shield_rk.is_alive()) continue;
+					if (!shield_rk.is_conscious() or shield_rk.is_incapacitated_check()) continue;
+					if (shield_rk.id == target.id) continue; // "another creature" — not self
+					if (shield_rk.class_name != "Fighter" or shield_rk.subclass != "Rune Knight") continue;
+					if (shield_rk.level < 7 or shield_rk.runic_shield_uses <= 0 or !shield_rk.has_reaction) continue;
+					if (combat.are_hostile(shield_rk, target)) continue; // Must be allied with target
+					float rs_dx = float(shield_rk.x - target.x);
+					float rs_dy = float(shield_rk.y - target.y);
+					float rs_dist = sqrt(rs_dx * rs_dx + rs_dy * rs_dy) * 5.0f;
+					if (rs_dist > 60) continue;
+					if (!combat.can_see(shield_rk, c)) continue;
+					// Force attacker to reroll the d20 and use the new roll
+					shield_rk.runic_shield_uses--;
+					shield_rk.has_reaction = false;
+					int rs_reroll = random(1, 20);
+					int rs_mod_diff = natural_roll - rs_reroll;
+					natural_roll = rs_reroll;
+					total -= rs_mod_diff;
+					bool rs_still_hit = total >= target.armor_class and rs_reroll != 1;
+					if (rs_reroll >= get_critical_threshold(c, pr)) rs_still_hit = true;
+					broadcast_announce(shield_rk.name + " invokes Runic Shield! " + c.name + " rerolls: " + rs_reroll + " (new total: " + total + "). (" + shield_rk.runic_shield_uses + " uses remaining)", true);
+					if (!rs_still_hit) {
+						hit = false;
+						outcome = "Miss! (Runic Shield forced reroll)";
+					} else {
+						is_crit = (rs_reroll >= get_critical_threshold(c, pr));
+					}
+					break;
+				}
+			}
+
+			// Tasha's Rune Knight Cloud Rune invoke (para 2584): "when you or a creature
+			// you can see within 30 feet of you is hit by an attack roll, you can use your
+			// reaction to invoke the rune and choose a different creature within 30 feet of
+			// you, other than the attacker. The chosen creature becomes the target of the
+			// attack, using the same roll." Auto-resolved: redirect attack to nearest enemy
+			// of the Rune Knight within 30ft (prefer hostiles that are not the original target).
+			if (hit and !is_fumble and @combat != null) {
+				for (uint cr = 0; cr < combat.combatants.length(); cr++) {
+					combatant@ cloud_rk = combat.combatants[cr];
+					if (@cloud_rk == null or cloud_rk.is_dead or !cloud_rk.is_alive()) continue;
+					if (!cloud_rk.is_conscious() or cloud_rk.is_incapacitated_check()) continue;
+					if (cloud_rk.class_name != "Fighter" or cloud_rk.subclass != "Rune Knight") continue;
+					if (!cloud_rk.cloud_rune_known or cloud_rk.rune_invoke_uses <= 0) continue;
+					if (!cloud_rk.has_reaction) continue;
+					// "you or a creature you can see within 30 feet" — check if target or RK itself is hit
+					bool rk_is_target = (cloud_rk.id == target.id);
+					float cr_to_target = 0;
+					if (!rk_is_target) {
+						float crtx = float(cloud_rk.x - target.x);
+						float crty = float(cloud_rk.y - target.y);
+						cr_to_target = sqrt(crtx * crtx + crty * crty) * 5.0f;
+						if (cr_to_target > 30) continue;
+					}
+					if (!rk_is_target and !combat.can_see(cloud_rk, target)) continue;
+					// "a different creature within 30 feet of you, other than the attacker"
+					// Find best redirect target: prefer enemies of the Rune Knight
+					combatant@ best_redirect = null;
+					float best_dist = 999;
+					for (uint rt = 0; rt < combat.combatants.length(); rt++) {
+						combatant@ redirect_t = combat.combatants[rt];
+						if (@redirect_t == null or redirect_t.is_dead or !redirect_t.is_alive()) continue;
+						if (redirect_t.id == c.id) continue; // Not the attacker
+						if (redirect_t.id == target.id) continue; // Not the original target
+						float rdx = float(redirect_t.x - cloud_rk.x);
+						float rdy = float(redirect_t.y - cloud_rk.y);
+						float r_dist = sqrt(rdx * rdx + rdy * rdy) * 5.0f;
+						if (r_dist > 30) continue;
+						// Prefer enemies of the Rune Knight
+						if (combat.are_hostile(cloud_rk, redirect_t)) {
+							if (@best_redirect == null or !combat.are_hostile(cloud_rk, best_redirect) or r_dist < best_dist) {
+								@best_redirect = redirect_t;
+								best_dist = r_dist;
+							}
+						} else if (@best_redirect == null) {
+							// Only consider allies if no enemy found (unlikely to redirect to ally)
+							// Skip — don't redirect to allies
+						}
+					}
+					if (@best_redirect == null) continue; // No valid redirect target
+					// Check if the attack would hit the new target
+					bool redirect_hits = total >= best_redirect.armor_class;
+					cloud_rk.rune_invoke_uses--;
+					cloud_rk.has_reaction = false;
+					broadcast_announce(cloud_rk.name + " invokes the Cloud Rune! Redirecting " + c.name + "'s attack from " + target.name + " to " + best_redirect.name + "! (attack total " + total + " vs AC " + best_redirect.armor_class + ")", true);
+					if (redirect_hits) {
+						// Deal damage to new target using same attack stats
+						int rd_count = pr.damage_dice_count > 0 ? pr.damage_dice_count : get_attack_damage_count(c, false);
+						int rd_sides = pr.damage_dice_sides > 0 ? pr.damage_dice_sides : get_attack_damage_dice(c, false);
+						int rd_mod = pr.damage_dice_count > 0 ? pr.damage_modifier : get_damage_modifier_for_attack(c, false);
+						int rd_type = pr.damage_dice_count > 0 ? pr.damage_type : get_attack_damage_type(c, false);
+						int rd_total_dmg = 0;
+						int die_count = is_crit ? rd_count * 2 : rd_count;
+						for (int d = 0; d < die_count; d++) rd_total_dmg += random(1, rd_sides);
+						rd_total_dmg += rd_mod;
+						if (rd_total_dmg < 1) rd_total_dmg = 1;
+						broadcast_announce(c.name + "'s redirected attack hits " + best_redirect.name + " for " + rd_total_dmg + " damage!", false);
+						combat.apply_damage(best_redirect, rd_total_dmg, rd_type, c, is_crit);
+					} else {
+						broadcast_announce(c.name + "'s redirected attack misses " + best_redirect.name + " (AC " + best_redirect.armor_class + ").", false);
+					}
+					// Original attack is consumed — mark as miss on original target
+					// so the normal flow continues with Extra Attacks etc.
+					hit = false;
+					is_crit = false;
+					outcome = "Redirected! (Cloud Rune)";
 				}
 			}
 

@@ -1616,16 +1616,23 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         }
         // Invoke pool: simplified as shared pool. Each known rune can be invoked 1/LR
         // (2/LR at L15 Master of Runes). Pool = number of invocable runes.
-        // Invocable runes: Fire (L3), Frost (L7), Hill (L10). Cloud/Stone/Storm deferred.
-        int invocable_count = 1; // Fire at L3
-        if (cs.level >= 7) invocable_count = 2; // +Frost
-        if (cs.level >= 10) invocable_count = 3; // +Hill
+        // All 6 runes are now invocable: Fire (L3), Cloud (L3), Frost (L7), Stone (L7), Hill (L10), Storm (L15).
+        int invocable_count = 2; // Fire + Cloud at L3
+        if (cs.level >= 7) invocable_count = 4; // +Frost +Stone
+        if (cs.level >= 10) invocable_count = 5; // +Hill
+        if (cs.level >= 15) invocable_count = 6; // +Storm
         c.rune_invoke_uses_max = invocable_count;
         c.rune_invoke_uses = invocable_count;
-        // L15 Master of Runes: double the pool
+        // Tasha's Rune Knight L15 Master of Runes (para 2612): "You can invoke each rune
+        // you know from your Rune Carver feature twice, rather than once." Double the pool.
         if (cs.level >= 15) {
             c.rune_invoke_uses_max = invocable_count * 2;
             c.rune_invoke_uses = invocable_count * 2;
+        }
+        // Tasha's Rune Knight L7 Runic Shield (para 2604): proficiency bonus uses per LR
+        if (cs.level >= 7) {
+            c.runic_shield_uses = proficiency_bonus(cs.level);
+            c.runic_shield_uses_max = proficiency_bonus(cs.level);
         }
         // Hill Rune passive: poison resistance
         if (c.hill_rune_known) {

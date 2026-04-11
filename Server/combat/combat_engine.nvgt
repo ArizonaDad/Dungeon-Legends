@@ -529,6 +529,15 @@ class combatant {
 	int frost_rune_rounds = 0;        // Duration countdown (100 = 10 min)
 	bool hill_rune_active = false;    // B/P/S resistance while active
 	int hill_rune_rounds = 0;         // Duration countdown (10 = 1 min)
+	// Tasha's Rune Knight Storm Rune invoke (para 2594): prophetic state 1 min
+	bool storm_rune_prophetic_active = false; // In prophetic state (reaction to force reroll)
+	int storm_rune_prophetic_rounds = 0;      // Duration countdown (10 = 1 min)
+	// Tasha's Rune Knight Stone Rune invoke (para 2590): Charmed+Incapacitated tracking
+	uint stone_rune_charm_source_id = 0;      // Who applied Stone Rune charm
+	int stone_rune_charm_dc = 0;              // Save DC for EOT WIS save to break free
+	// Tasha's Rune Knight L7 Runic Shield (para 2604): reaction to force attacker reroll
+	int runic_shield_uses = 0;                // Uses per LR (proficiency bonus)
+	int runic_shield_uses_max = 0;
 	bool wrath_of_storms_available = false; // Storm Sorcerer
 	bool emboldening_bond_active = false; // Peace Domain Cleric
 	bool drunken_master_opportunity = false; // Way of the Drunken Master
@@ -2945,6 +2954,11 @@ class battle {
 				state["my_fire_rune_pending"] = c.fire_rune_pending;
 				state["my_frost_rune_active"] = c.frost_rune_active;
 				state["my_hill_rune_active"] = c.hill_rune_active;
+				state["my_storm_rune_known"] = c.storm_rune_known;
+				state["my_cloud_rune_known"] = c.cloud_rune_known;
+				state["my_stone_rune_known"] = c.stone_rune_known;
+				state["my_storm_rune_prophetic_active"] = c.storm_rune_prophetic_active;
+				state["my_runic_shield_uses"] = c.runic_shield_uses;
 				state["my_assassinate_available"] = c.assassinate_available;
 				state["my_warding_flare_uses"] = c.warding_flare_uses;
 				state["my_war_priest_uses"] = c.war_priest_uses;

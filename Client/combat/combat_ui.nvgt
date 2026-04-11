@@ -171,6 +171,10 @@ string spell_choice_kind = "binary";       // "binary" or "distribution"
 int spell_choice_distribution_count = 0;   // For distribution: total picks needed
 string[] spell_choice_picks_collected;     // For distribution: target IDs picked so far
 uint64 next_spell_choice_reminder = 0;
+// Twinkling Constellations (Stars Druid L10) — server prompts constellation swap at turn start.
+bool waiting_for_twinkling_prompt = false;
+string twinkling_current_form = "Chalice";
+uint64 next_twinkling_reminder = 0;
 
 // Targeting
 uint current_target_id = 0;
@@ -277,6 +281,11 @@ bool my_hill_rune_known = false;
 bool my_fire_rune_pending = false;
 bool my_frost_rune_active = false;
 bool my_hill_rune_active = false;
+bool my_storm_rune_known = false;
+bool my_cloud_rune_known = false;
+bool my_stone_rune_known = false;
+bool my_storm_rune_prophetic_active = false;
+int my_runic_shield_uses = 0;
 // Cavalier Fighter (Xanathar's paras 1669-1682)
 bool my_cavalier_retaliation_available = false;
 int my_unwavering_mark_ba_uses = 0;
@@ -602,6 +611,39 @@ void prompt_spell_choice(string text, string spell_id, string[]@ keys, string[]@
 		}
 		speak(list_text, false);
 	}
+}
+
+// Tasha's Circle of Stars L10 Twinkling Constellations (para 2291-2294):
+// At the start of each turn while in Starry Form, the player can change constellation.
+void prompt_twinkling_constellations(string current_form) {
+	waiting_for_twinkling_prompt = true;
+	twinkling_current_form = current_form;
+	next_twinkling_reminder = ticks() + 5000;
+	speak("Twinkling Constellations: your current form is " + current_form + ". Press 1 for Archer, 2 for Chalice, 3 for Dragon, or Escape to keep " + current_form + ".", true);
+}
+
+bool check_twinkling_input() {
+	if (!waiting_for_twinkling_prompt) return false;
+	if (ticks() >= next_twinkling_reminder) {
+		speak("Choose constellation: 1 Archer, 2 Chalice, 3 Dragon, Escape to keep " + twinkling_current_form + ".", true);
+		next_twinkling_reminder = ticks() + 5000;
+	}
+	string form = "";
+	if (key_pressed(KEY_1)) form = "Archer";
+	else if (key_pressed(KEY_2)) form = "Chalice";
+	else if (key_pressed(KEY_3)) form = "Dragon";
+	else if (key_pressed(KEY_ESCAPE)) form = twinkling_current_form;
+	if (form != "") {
+		waiting_for_twinkling_prompt = false;
+		send({{"type", message_types::twinkling_constellations_response}, {"form", form}});
+		if (form != twinkling_current_form) {
+			speak("Constellation shifts to " + form + ".", true);
+		} else {
+			speak("Keeping " + form + " constellation.", true);
+		}
+		return true;
+	}
+	return true; // Block other input while prompt is active.
 }
 
 bool check_roll_input() {
@@ -1159,6 +1201,7 @@ void show_bonus_action_menu() {
 	int fire_rune_opt = -1;
 	int frost_rune_opt = -1;
 	int hill_rune_opt = -1;
+	int storm_rune_opt = -1;
 	int empowered_healing_opt = -1;
 	int emboldening_bond_opt = -1;
 	int twilight_sanctuary_opt = -1;
@@ -1636,6 +1679,7 @@ void show_bonus_action_menu() {
 		if (my_fire_rune_known and my_rune_invoke_uses > 0 and !my_fire_rune_pending) fire_rune_opt = m.add_item("Fire Rune. Bonus action. Prime next weapon hit for +2d6 fire damage + Restrained. (" + my_rune_invoke_uses + " invocations left)");
 		if (my_frost_rune_known and my_rune_invoke_uses > 0 and !my_frost_rune_active) frost_rune_opt = m.add_item("Frost Rune. Bonus action. +2 to STR and CON checks and saves for 10 minutes. (" + my_rune_invoke_uses + " invocations left)");
 		if (my_hill_rune_known and my_rune_invoke_uses > 0 and !my_hill_rune_active) hill_rune_opt = m.add_item("Hill Rune. Bonus action. Resistance to bludgeoning, piercing, and slashing damage for 1 minute. (" + my_rune_invoke_uses + " invocations left)");
+		if (my_storm_rune_known and my_rune_invoke_uses > 0 and !my_storm_rune_prophetic_active) storm_rune_opt = m.add_item("Storm Rune. Bonus action. Enter prophetic state for 1 minute. Force advantage or disadvantage on d20 rolls within 60 feet. (" + my_rune_invoke_uses + " invocations left)");
 	}
 	if (lc == "sorcerer" and subclass == "Divine Soul") {
 		empowered_healing_opt = m.add_item("Empowered Healing. Reroll dice on next healing spell.");
@@ -2622,6 +2666,10 @@ void show_bonus_action_menu() {
 	else if (hill_rune_opt >= 0 and res == hill_rune_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "hill_rune"}});
 		speak("Hill Rune invoked. Resistance to bludgeoning, piercing, and slashing damage.", true);
+	}
+	else if (storm_rune_opt >= 0 and res == storm_rune_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "storm_rune"}});
+		speak("Storm Rune invoked. Prophetic state active. Force advantage or disadvantage on rolls within 60 feet.", true);
 	}
 	else if (empowered_healing_opt >= 0 and res == empowered_healing_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "empowered_healing"}});
@@ -4514,6 +4562,11 @@ void parse_game_state(json_object@ msg) {
 	my_fire_rune_pending = msg.exists("my_fire_rune_pending") ? bool(msg["my_fire_rune_pending"]) : false;
 	my_frost_rune_active = msg.exists("my_frost_rune_active") ? bool(msg["my_frost_rune_active"]) : false;
 	my_hill_rune_active = msg.exists("my_hill_rune_active") ? bool(msg["my_hill_rune_active"]) : false;
+	my_storm_rune_known = msg.exists("my_storm_rune_known") ? bool(msg["my_storm_rune_known"]) : false;
+	my_cloud_rune_known = msg.exists("my_cloud_rune_known") ? bool(msg["my_cloud_rune_known"]) : false;
+	my_stone_rune_known = msg.exists("my_stone_rune_known") ? bool(msg["my_stone_rune_known"]) : false;
+	my_storm_rune_prophetic_active = msg.exists("my_storm_rune_prophetic_active") ? bool(msg["my_storm_rune_prophetic_active"]) : false;
+	my_runic_shield_uses = msg.exists("my_runic_shield_uses") ? int(msg["my_runic_shield_uses"]) : 0;
 	// Cavalier Fighter
 	my_cavalier_retaliation_available = msg.exists("my_cavalier_retaliation_available") ? bool(msg["my_cavalier_retaliation_available"]) : false;
 	my_unwavering_mark_ba_uses = msg.exists("my_unwavering_mark_ba_uses") ? int(msg["my_unwavering_mark_ba_uses"]) : 0;
@@ -4753,6 +4806,7 @@ void reset_combat_state() {
 	waiting_for_tactical_mind_prompt = false;
 	waiting_for_smite_prompt = false;
 	waiting_for_reaction_prompt = false;
+	waiting_for_twinkling_prompt = false;
 	next_roll_prompt_reminder = 0;
 	next_bardic_prompt_reminder = 0;
 	next_lucky_prompt_reminder = 0;
@@ -4760,6 +4814,7 @@ void reset_combat_state() {
 	next_tactical_mind_prompt_reminder = 0;
 	next_smite_prompt_reminder = 0;
 	next_reaction_prompt_reminder = 0;
+	next_twinkling_reminder = 0;
 	roll_type = -1;
 	current_target_id = 0;
 	current_target_name = "";
@@ -4838,6 +4893,11 @@ void reset_combat_state() {
 	my_fire_rune_pending = false;
 	my_frost_rune_active = false;
 	my_hill_rune_active = false;
+	my_storm_rune_known = false;
+	my_cloud_rune_known = false;
+	my_stone_rune_known = false;
+	my_storm_rune_prophetic_active = false;
+	my_runic_shield_uses = 0;
 	my_cavalier_retaliation_available = false;
 	my_unwavering_mark_ba_uses = 0;
 	my_unwavering_mark_ba_uses_max = 0;
@@ -5134,6 +5194,10 @@ void combat_game_loop() {
 		}
 		if (waiting_for_spell_choice_prompt) {
 			check_spell_choice_prompt_input();
+			continue;
+		}
+		if (waiting_for_twinkling_prompt) {
+			check_twinkling_input();
 			continue;
 		}
 		// Process chat/history form only when focus is on chat or history.

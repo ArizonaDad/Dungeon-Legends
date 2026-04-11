@@ -193,4 +193,8 @@ namespace message_types
 	const string player_stats = "player_stats";               // Client requests or server sends full player stats.
 	const string inspect_player = "inspect_player";           // Client requests to view another player's public stats.
 	const string player_inspect_data = "player_inspect_data"; // Server sends inspected player's public stats.
+
+	// Twinkling Constellations (Tasha's Stars Druid L10)
+	const string twinkling_constellations = "twinkling_constellations";           // Server prompts player to swap Starry Form constellation at turn start.
+	const string twinkling_constellations_response = "twinkling_constellations_response"; // Client responds with chosen constellation.
 }

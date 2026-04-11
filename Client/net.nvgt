@@ -314,6 +314,11 @@ void handle_message(json_object@ msg)
 		}
 		prompt_spell_choice(text, spell_id, keys, labels, kind, dist_count);
 	}
+	else if (msg_type == message_types::twinkling_constellations) {
+		// Tasha's Circle of Stars L10 Twinkling Constellations (para 2291-2294)
+		string current = msg.exists("current_form") ? string(msg["current_form"]) : "Chalice";
+		prompt_twinkling_constellations(current);
+	}
 	else if (msg_type == message_types::roll_result) {
 		// Server broadcasts roll results to ALL players - spoken via TTS
 		int natural_roll = msg.exists("natural") ? int(msg["natural"]) : 0;
