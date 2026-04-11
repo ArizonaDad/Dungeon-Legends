@@ -3404,7 +3404,8 @@ void handle_user_message(user@ u, json_object@ msg)
 		}
 
 		else if (feature == "blade_flourish") {
-			// Xanathar's College of Swords L3 Blade Flourish (para 586-591)
+			// Xanathar's College of Swords L3 Blade Flourish (para 586-591):
+			// 3 variants: Defensive (+AC), Slashing (AoE), Mobile (push + move)
 			if (c.class_name != "Bard" or c.subclass != "College of Swords") { u.send({{"type", message_types::announce}, {"text", "Only College of Swords bards can use Blade Flourish."}, {"interrupt", true}}); return; }
 			// Xanathar's L14 Master's Flourish (para 594-595): "you can roll a d6
 			// and use it instead of expending a Bardic Inspiration die."
@@ -3416,7 +3417,13 @@ void handle_user_message(user@ u, json_object@ msg)
 			if (!masters) c.bardic_inspiration_uses--;
 			c.blade_flourish_active = true;
 			c.masters_flourish_free = masters;
-			string fl_msg = masters ? " prepares a Master's Flourish! (free d6, no BI spent)" : " prepares a Blade Flourish! Next weapon attack gets bonus damage.";
+			// Accept flourish_type from client: defensive/slashing/mobile
+			c.blade_flourish_type = msg.exists("flourish_type") ? string(msg["flourish_type"]) : "defensive";
+			string type_label = c.blade_flourish_type;
+			if (type_label == "defensive") type_label = "Defensive";
+			else if (type_label == "slashing") type_label = "Slashing";
+			else if (type_label == "mobile") type_label = "Mobile";
+			string fl_msg = masters ? " prepares a " + type_label + " Master's Flourish! (free d6)" : " prepares a " + type_label + " Blade Flourish!";
 			u.room.bm.broadcast_announce(c.name + fl_msg, true);
 		}
 
@@ -3694,10 +3701,21 @@ void handle_user_message(user@ u, json_object@ msg)
 			if (c.class_name != "Fighter" or c.subclass != "Arcane Archer") { u.send({{"type", message_types::announce}, {"text", "Only Arcane Archers can use Arcane Shot."}, {"interrupt", true}}); return; }
 			if (c.arcane_shot_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Arcane Shot uses remaining."}, {"interrupt", true}}); return; }
 			string shot_type = msg.exists("shot_type") ? string(msg["shot_type"]) : "bursting";
-			c.arcane_shot_pending = true;
-			c.arcane_shot_type = shot_type;
 			c.arcane_shot_uses--;
-			u.room.bm.broadcast_announce(c.name + " readies " + shot_type + " Arcane Shot! (" + c.arcane_shot_uses + " uses remaining)", false);
+			// Xanathar's Piercing Arrow (para 1636) and Seeking Arrow (para 1640):
+			// "you don't make an attack roll" — resolve immediately, not on hit.
+			if (shot_type == "piercing") {
+				u.room.bm.resolve_piercing_arrow(c);
+				u.room.bm.broadcast_announce("(" + c.arcane_shot_uses + " Arcane Shot uses remaining)", false);
+			} else if (shot_type == "seeking") {
+				u.room.bm.resolve_seeking_arrow(c);
+				u.room.bm.broadcast_announce("(" + c.arcane_shot_uses + " Arcane Shot uses remaining)", false);
+			} else {
+				// Standard shots: set pending flag, resolves on next weapon hit
+				c.arcane_shot_pending = true;
+				c.arcane_shot_type = shot_type;
+				u.room.bm.broadcast_announce(c.name + " readies " + shot_type + " Arcane Shot! (" + c.arcane_shot_uses + " uses remaining)", false);
+			}
 		}
 
 		else if (feature == "abjure_extraplanar") {

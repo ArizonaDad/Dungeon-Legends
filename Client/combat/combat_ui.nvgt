@@ -2382,8 +2382,20 @@ void show_bonus_action_menu() {
 		speak("Symbiotic Entity. Gaining temporary HP and bonus necrotic damage.", true);
 	}
 	else if (blade_flourish_opt >= 0 and res == blade_flourish_opt) {
-		send({{"type", message_types::bonus_action}, {"feature", "blade_flourish"}});
-		speak("Blade Flourish prepared. Your next weapon attack gets bonus damage.", true);
+		// Xanathar's Blade Flourish: sub-menu for 3 variants
+		menu@ fl_menu = setup_sub_menu("Choose Blade Flourish type.");
+		int def_opt = fl_menu.add_item("Defensive Flourish. Add die to damage and AC until next turn.");
+		int sla_opt = fl_menu.add_item("Slashing Flourish. Add die to damage, also damages enemies within 5 feet.");
+		int mob_opt = fl_menu.add_item("Mobile Flourish. Add die to damage and push target away.");
+		int fl_res = fl_menu.run();
+		if (fl_res < 0) return;
+		string fl_type = "defensive";
+		string fl_label = "Defensive";
+		if (fl_res == def_opt) { fl_type = "defensive"; fl_label = "Defensive"; }
+		else if (fl_res == sla_opt) { fl_type = "slashing"; fl_label = "Slashing"; }
+		else if (fl_res == mob_opt) { fl_type = "mobile"; fl_label = "Mobile"; }
+		send({{"type", message_types::bonus_action}, {"feature", "blade_flourish"}, {"flourish_type", fl_type}});
+		speak(fl_label + " Flourish prepared. Your next weapon attack applies the effect.", true);
 	}
 	else if (psychic_blades_bard_opt >= 0 and res == psychic_blades_bard_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "psychic_blades"}});
@@ -2430,8 +2442,34 @@ void show_bonus_action_menu() {
 		speak("Twilight Sanctuary. Creating healing aura.", true);
 	}
 	else if (arcane_shot_opt >= 0 and res == arcane_shot_opt) {
-		send({{"type", message_types::bonus_action}, {"feature", "arcane_shot"}, {"shot_type", "beguiling"}});
-		speak("Arcane Shot readied. Next ranged attack applies the magical effect.", true);
+		// Xanathar's Arcane Archer: sub-menu for 8 shot types
+		menu@ shot_menu = setup_sub_menu("Choose Arcane Shot type.");
+		int ban_opt = shot_menu.add_item("Banishing Arrow. 2d6 force, CHA save or incapacitated.");
+		int beg_opt = shot_menu.add_item("Beguiling Arrow. 2d6 psychic, WIS save or charmed.");
+		int bur_opt = shot_menu.add_item("Bursting Arrow. 2d6 force to target and all within 10 feet.");
+		int enf_opt = shot_menu.add_item("Enfeebling Arrow. 2d6 necrotic, CON save or weapon damage halved.");
+		int gra_opt = shot_menu.add_item("Grasping Arrow. 2d6 poison, minus 10 feet speed, damage on move.");
+		int pie_opt = shot_menu.add_item("Piercing Arrow. 30 foot line, DEX save, arrow damage plus extra piercing.");
+		int see_opt = shot_menu.add_item("Seeking Arrow. Auto seek target, DEX save, arrow damage plus extra force.");
+		int sha_opt = shot_menu.add_item("Shadow Arrow. 2d6 psychic, WIS save or blinded.");
+		int shot_res = shot_menu.run();
+		if (shot_res < 0) return;
+		string shot_type = "bursting";
+		string shot_label = "Bursting";
+		if (shot_res == ban_opt) { shot_type = "banishing"; shot_label = "Banishing"; }
+		else if (shot_res == beg_opt) { shot_type = "beguiling"; shot_label = "Beguiling"; }
+		else if (shot_res == bur_opt) { shot_type = "bursting"; shot_label = "Bursting"; }
+		else if (shot_res == enf_opt) { shot_type = "enfeebling"; shot_label = "Enfeebling"; }
+		else if (shot_res == gra_opt) { shot_type = "grasping"; shot_label = "Grasping"; }
+		else if (shot_res == pie_opt) { shot_type = "piercing"; shot_label = "Piercing"; }
+		else if (shot_res == see_opt) { shot_type = "seeking"; shot_label = "Seeking"; }
+		else if (shot_res == sha_opt) { shot_type = "shadow"; shot_label = "Shadow"; }
+		send({{"type", message_types::bonus_action}, {"feature", "arcane_shot"}, {"shot_type", shot_type}});
+		if (shot_type == "piercing" or shot_type == "seeking") {
+			speak(shot_label + " Arrow fired!", true);
+		} else {
+			speak(shot_label + " Arrow readied. Next ranged attack applies the effect.", true);
+		}
 	}
 	else if (abjure_extraplanar_opt >= 0 and res == abjure_extraplanar_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "abjure_extraplanar"}});

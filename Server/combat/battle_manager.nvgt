@@ -3960,6 +3960,126 @@ class battle_manager {
 		}
 	}
 
+	// Xanathar's Arcane Archer Piercing Arrow (Transmutation, para 1636-1638):
+	// "the arrow shoots forward in a line, which is 1 foot wide and 30 feet long...
+	// Each creature in that line must make a Dexterity saving throw. On a failed
+	// save, a creature takes damage as if it were hit by the arrow, plus an extra
+	// 1d6 piercing damage. On a successful save, a target takes half as much damage."
+	void resolve_piercing_arrow(combatant@ c) {
+		if (@combat == null or @c == null) return;
+		int as_dc = 8 + c.proficiency + c.get_ability_mod(ABILITY_INT);
+		int shot_dice = c.level >= 18 ? 2 : 1;
+		// Calculate base weapon damage (longbow/shortbow assumed ranged + DEX)
+		int weapon_dmg = 0;
+		for (int wd = 0; wd < c.main_hand_damage_count; wd++) weapon_dmg += random(1, c.main_hand_damage_dice);
+		weapon_dmg += c.get_ability_mod(ABILITY_DEX);
+		// Extra piercing dice from the shot
+		for (int ed = 0; ed < shot_dice; ed++) weapon_dmg += random(1, 6);
+		if (weapon_dmg < 1) weapon_dmg = 1;
+		// Determine line direction toward nearest hostile
+		combatant@ line_target = null;
+		int best_d = 999;
+		for (uint lt = 0; lt < combat.combatants.length(); lt++) {
+			combatant@ ct = combat.combatants[lt];
+			if (@ct == null or ct.is_dead or ct.id == c.id or !combat.are_hostile(c, ct)) continue;
+			int d = feet_distance(c.x, c.y, ct.x, ct.y);
+			if (d < best_d) { best_d = d; @line_target = ct; }
+		}
+		if (@line_target == null) {
+			broadcast_announce(c.name + "'s Piercing Arrow finds no targets in range!", false);
+			return;
+		}
+		float dx = float(line_target.x - c.x);
+		float dy = float(line_target.y - c.y);
+		float len = sqrt(dx * dx + dy * dy);
+		if (len < 0.001f) { dx = 1.0f; dy = 0.0f; len = 1.0f; }
+		float ndx = dx / len;
+		float ndy = dy / len;
+		broadcast_announce(c.name + "'s Piercing Arrow fires in a 30ft line! (DEX save DC " + as_dc + ")", true);
+		int targets_hit = 0;
+		for (uint i = 0; i < combat.combatants.length(); i++) {
+			combatant@ ct = combat.combatants[i];
+			if (@ct == null or ct.is_dead or ct.id == c.id) continue;
+			if (!combat.are_hostile(c, ct)) continue;
+			int dist = feet_distance(c.x, c.y, ct.x, ct.y);
+			if (dist > 30 or dist == 0) continue;
+			// Check if creature is roughly on the line (within 1 tile / 5ft perp distance)
+			float tx = float(ct.x - c.x);
+			float ty = float(ct.y - c.y);
+			float proj = tx * ndx + ty * ndy;
+			if (proj <= 0) continue; // Behind the archer
+			float perp = abs(tx * ndy - ty * ndx) * 5.0f;
+			if (perp > 5.0f) continue; // Too far from the line
+			// DEX save with full save failure chain
+			int sn = random(1, 20);
+			apply_hound_save_disadvantage(ct, c.id, sn);
+			int sb = ct.get_save_bonus(ABILITY_DEX);
+			int bl = roll_bless_bonus(ct);
+			int st = sn + sb + bl;
+			bool saved = st >= as_dc;
+			if (!saved and try_arcane_deflection_save(ct, as_dc, st)) saved = true;
+			if (!saved) { int fg = try_flash_of_genius(ct, as_dc, st, "DEX save vs Piercing Arrow"); if (fg >= as_dc) saved = true; }
+			if (!saved) { int mv = try_maverick_spirit(ct, as_dc, st, "DEX save vs Piercing Arrow"); if (mv >= as_dc) saved = true; }
+			if (!saved) { int bf = try_boon_of_fate_bonus(ct, st, as_dc); if (bf >= as_dc) saved = true; }
+			if (!saved and try_stroke_of_luck_save(ct, as_dc, sb + bl)) saved = true;
+			int dmg = saved ? weapon_dmg / 2 : weapon_dmg;
+			broadcast_roll(ct.name, "DEX save vs Piercing Arrow", sn, sb + bl, st, saved ? "Saved! (" + dmg + " dmg)" : "Failed! (" + dmg + " dmg)");
+			combat.apply_damage(ct, dmg, DMG_PIERCING, c);
+			targets_hit++;
+		}
+		if (targets_hit == 0) broadcast_announce("The Piercing Arrow finds no creatures in its path.", false);
+		broadcast_state();
+		check_battle_end();
+	}
+
+	// Xanathar's Arcane Archer Seeking Arrow (Divination, para 1640-1643):
+	// "choose one creature you have seen in the past minute. The arrow flies toward
+	// that creature, moving around corners... the target must make a Dexterity saving
+	// throw. On a failed save, the target takes damage as if it were hit by the arrow,
+	// plus an extra 1d6 force damage... On a successful save, half damage."
+	void resolve_seeking_arrow(combatant@ c) {
+		if (@combat == null or @c == null) return;
+		int as_dc = 8 + c.proficiency + c.get_ability_mod(ABILITY_INT);
+		int shot_dice = c.level >= 18 ? 2 : 1;
+		// Find nearest hostile target (seeking ignores cover/LoS)
+		combatant@ target = null;
+		int best_d = 999;
+		for (uint st = 0; st < combat.combatants.length(); st++) {
+			combatant@ ct = combat.combatants[st];
+			if (@ct == null or ct.is_dead or ct.id == c.id or !combat.are_hostile(c, ct)) continue;
+			int d = feet_distance(c.x, c.y, ct.x, ct.y);
+			if (d < best_d) { best_d = d; @target = ct; }
+		}
+		if (@target == null) {
+			broadcast_announce(c.name + "'s Seeking Arrow finds no targets!", false);
+			return;
+		}
+		// Calculate weapon damage + extra force dice
+		int weapon_dmg = 0;
+		for (int wd = 0; wd < c.main_hand_damage_count; wd++) weapon_dmg += random(1, c.main_hand_damage_dice);
+		weapon_dmg += c.get_ability_mod(ABILITY_DEX);
+		for (int ed = 0; ed < shot_dice; ed++) weapon_dmg += random(1, 6);
+		if (weapon_dmg < 1) weapon_dmg = 1;
+		broadcast_announce(c.name + "'s Seeking Arrow hones in on " + target.name + "! (DEX save DC " + as_dc + ")", true);
+		// DEX save with full save failure chain
+		int sn = random(1, 20);
+		apply_hound_save_disadvantage(target, c.id, sn);
+		int sb = target.get_save_bonus(ABILITY_DEX);
+		int bl = roll_bless_bonus(target);
+		int st = sn + sb + bl;
+		bool saved = st >= as_dc;
+		if (!saved and try_arcane_deflection_save(target, as_dc, st)) saved = true;
+		if (!saved) { int fg = try_flash_of_genius(target, as_dc, st, "DEX save vs Seeking Arrow"); if (fg >= as_dc) saved = true; }
+		if (!saved) { int mv = try_maverick_spirit(target, as_dc, st, "DEX save vs Seeking Arrow"); if (mv >= as_dc) saved = true; }
+		if (!saved) { int bf = try_boon_of_fate_bonus(target, st, as_dc); if (bf >= as_dc) saved = true; }
+		if (!saved and try_stroke_of_luck_save(target, as_dc, sb + bl)) saved = true;
+		int dmg = saved ? weapon_dmg / 2 : weapon_dmg;
+		broadcast_roll(target.name, "DEX save vs Seeking Arrow", sn, sb + bl, st, saved ? "Saved! (" + dmg + " dmg)" : "Failed! (" + dmg + " dmg)");
+		combat.apply_damage(target, dmg, DMG_FORCE, c);
+		broadcast_state();
+		check_battle_end();
+	}
+
 	void clear_concentration_effects(combatant@ caster) {
 		if (@caster == null or @combat == null) return;
 		// Xanathar's War Magic L10 Durable Magic (para 2941-2942): remove +2 AC
@@ -8170,7 +8290,7 @@ class battle_manager {
 
 		// Xanathar's College of Swords L3 Blade Flourish (para 586-591) + L14 Master's
 		// Flourish (para 594-595): "you can roll a d6 and use it instead of expending
-		// a Bardic Inspiration die."
+		// a Bardic Inspiration die." 3 variants: Defensive, Slashing, Mobile.
 		if (attacker.class_name == "Bard" and attacker.subclass == "College of Swords" and attacker.blade_flourish_active and is_weapon_attack) {
 			int fl_die = attacker.masters_flourish_free ? 6 : attacker.bardic_inspiration_grant_die;
 			int flourish_dmg = random(1, fl_die);
@@ -8178,7 +8298,56 @@ class battle_manager {
 			attacker.blade_flourish_active = false;
 			attacker.masters_flourish_free = false;
 			string fl_label = fl_die == 6 ? "Master's Flourish" : "Blade Flourish";
-			broadcast_announce(attacker.name + "'s " + fl_label + " adds " + flourish_dmg + " damage!", false);
+			string fl_type = attacker.blade_flourish_type;
+			if (fl_type == "defensive") {
+				// Xanathar's Defensive Flourish (para 588): "You also add the number
+				// rolled to your AC until the start of your next turn."
+				attacker.armor_class += flourish_dmg;
+				attacker.blade_flourish_ac_bonus = flourish_dmg;
+				broadcast_announce(attacker.name + "'s Defensive " + fl_label + " adds " + flourish_dmg + " damage and +" + flourish_dmg + " AC!", false);
+			} else if (fl_type == "slashing") {
+				// Xanathar's Slashing Flourish (para 590): "damage to the target... and
+				// to any other creature of your choice that you can see within 5 feet of you."
+				if (@combat != null) {
+					for (uint sfi = 0; sfi < combat.combatants.length(); sfi++) {
+						combatant@ sf_ct = combat.combatants[sfi];
+						if (@sf_ct == null or sf_ct.is_dead or sf_ct.id == attacker.id or sf_ct.id == target.id) continue;
+						if (!combat.are_hostile(attacker, sf_ct)) continue;
+						if (feet_distance(attacker.x, attacker.y, sf_ct.x, sf_ct.y) <= 5) {
+							combat.apply_damage(sf_ct, flourish_dmg, attacker.main_hand_damage_type, attacker);
+							broadcast_announce(sf_ct.name + " takes " + flourish_dmg + " slashing flourish damage!", false);
+						}
+					}
+				}
+				broadcast_announce(attacker.name + "'s Slashing " + fl_label + " adds " + flourish_dmg + " damage!", false);
+			} else if (fl_type == "mobile") {
+				// Xanathar's Mobile Flourish (para 592): "You can also push the target up
+				// to 5 feet away from you, plus a number of feet equal to the number you
+				// roll on that die."
+				int push_dist = 5 + flourish_dmg;
+				int push_tiles = push_dist / 5;
+				if (push_tiles > 0 and @combat != null) {
+					float pdx = float(target.x - attacker.x);
+					float pdy = float(target.y - attacker.y);
+					float plen = sqrt(pdx * pdx + pdy * pdy);
+					if (plen > 0.001f) {
+						pdx /= plen;
+						pdy /= plen;
+						int new_x = target.x + int(pdx * push_tiles);
+						int new_y = target.y + int(pdy * push_tiles);
+						if (new_x < 0) new_x = 0;
+						if (new_y < 0) new_y = 0;
+						if (new_x > 39) new_x = 39;
+						if (new_y > 39) new_y = 39;
+						target.x = new_x;
+						target.y = new_y;
+					}
+				}
+				broadcast_announce(attacker.name + "'s Mobile " + fl_label + " adds " + flourish_dmg + " damage and pushes " + target.name + " " + push_dist + " ft!", false);
+			} else {
+				// Default: just damage (backwards compat)
+				broadcast_announce(attacker.name + "'s " + fl_label + " adds " + flourish_dmg + " damage!", false);
+			}
 		}
 
 		// Xanathar's College of Whispers L3 Psychic Blades (para 610-613): "extra

@@ -484,6 +484,8 @@ class combatant {
 	bool blade_flourish_active = false; // College of Swords Bard
 	bool masters_flourish_free = false; // Xanathar's Swords Bard L14 (para 594-595)
 	bool blade_flourish_speed_applied = false; // Xanathar's Swords Bard L3 (para 1497): +10ft on Attack action
+	string blade_flourish_type = ""; // Xanathar's Swords Bard L3: defensive/slashing/mobile
+	int blade_flourish_ac_bonus = 0; // Xanathar's Defensive Flourish (para 588): +die to AC until next turn
 	bool psychic_blades_pending = false; // College of Whispers Bard
 	bool strength_of_the_grave_used = false; // Shadow Magic Sorcerer
 	bool searing_vengeance_available = false; // Xanathar's Celestial Warlock L14 (para 2745-2747)
@@ -1493,6 +1495,11 @@ class combatant {
 		// Basic Rules 2024 Foresight (para 13025-13031): "the target has Advantage on
 		// D20 Tests" — covers ALL saving throws. Approximated as +5.
 		if (foresight_active) mod += 5;
+		// Xanathar's Monster Slayer L7 Supernatural Defense (para 2243-2244): "Whenever
+		// the target of your Slayer's Prey forces you to make a saving throw... add 1d6
+		// to your roll." Approximated as blanket +1d6 when prey is active (source-tracking
+		// at each save site deferred; in practice, most saves come from the prey target).
+		if (supernatural_defense_active and monster_slayer_target != 0) mod += random(1, 6);
 		return mod;
 	}
 
@@ -1924,6 +1931,11 @@ class battle {
 		}
 		c.agile_parry_bonus = false;
 		c.blade_flourish_speed_applied = false;
+		// Xanathar's Defensive Flourish (para 588): AC bonus lasts "until the start of your next turn"
+		if (c.blade_flourish_ac_bonus > 0) {
+			c.armor_class -= c.blade_flourish_ac_bonus;
+			c.blade_flourish_ac_bonus = 0;
+		}
 		c.kenseis_shot_active = false;
 		c.deft_strike_used_this_turn = false;
 		c.unerring_accuracy_used_this_turn = false;
