@@ -91,6 +91,13 @@ class combatant {
 	bool swift_quiver_active = false;    // Swift Quiver spell: BA for 2 ranged attacks (concentration)
 	bool true_seeing_active = false;     // True Seeing spell: Truesight 120ft (not concentration per 2024)
 	bool counterspell_pending = false;   // Counterspell readied as a reaction (intercept the next enemy spell)
+	// Basic Rules 2024 Command (para 12421-12433): one-turn command effect
+	string command_effect = "";          // "grovel", "halt", "flee", "approach", "drop" — applied at turn start
+	uint command_source_id = 0;          // Caster who issued the command (for Flee/Approach direction)
+	// Basic Rules 2024 Shillelagh (para 14966-14974): weapon enhancement
+	bool shillelagh_active = false;      // Club/Quarterstaff enhanced
+	int shillelagh_rounds = 0;           // Duration remaining (10 = 1 minute)
+	int shillelagh_damage_die = 8;       // d8 base, scales at L5/11/17
 	bool searing_smite_pending = false;  // Searing Smite rider on next weapon hit
 	int searing_smite_dice = 0;          // Number of d6 to roll for Searing Smite damage
 	// Basic Rules 2024 Searing Smite (para 14881): repeating fire damage at turn start

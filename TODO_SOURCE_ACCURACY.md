@@ -139,6 +139,12 @@ Phase 1 notes that the PHB file is missing spell descriptions. Basic Rules file 
 - **Shining Smite** (Basic Rules para 14976): Was announce-only. Now 2d6+upcast radiant on hit + advantage on all attacks vs target (`shining_smite_debuff` in `apply_attack_advantage_state`) + invisibility block. 10-round concentration. Full cleanup.
 - **Ballistic Smite** (Gun Slinger Class para 724): Was announce-only. Now 2d6+upcast force on next ranged hit. Instantaneous.
 
+### Command spell turn-start execution — RESOLVED 2026-04-10:
+- **Command** (Basic Rules para 12421-12433): Full 5-option turn-start enforcement in `advance_turn`. Grovel (Prone + end turn), Halt (no move/action/BA), Flee (Dash-speed movement away from caster with OA triggers), Approach (move toward caster, stops within 5ft), Drop (announce + end turn). Cleanup on Stunned/Paralyzed/Unconscious skip. Bot AI auto-picks Grovel (Halt for concentrating targets).
+
+### Shillelagh cantrip — RESOLVED 2026-04-10:
+- **Shillelagh** (Basic Rules para 14966-14974): Full weapon enhancement. Uses spellcasting ability instead of STR for melee attack/damage rolls (`get_weapon_attack_ability_mod`). Damage die override: d8 base, d10 at L5, d12 at L11, 2d6 at L17 (`get_attack_damage_dice` + `get_attack_damage_count`). Force damage type default (`get_attack_damage_type`). 10-round duration countdown in `advance_turn`. Player damage-type choice (Force vs normal) deferred — defaults to Force.
+
 ### Missing smite spell descriptions (Paladin spell list only, NO full descriptions in Basic Rules):
 - **Thunderous Smite** (L1) — listed in Paladin spell table (para 5739) but full description not in Basic Rules. Cannot implement per source mandate.
 - **Wrathful Smite** (L1) — listed in Paladin spell table (para 5742) but full description not in Basic Rules. Cannot implement per source mandate.

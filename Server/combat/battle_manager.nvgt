@@ -1655,6 +1655,15 @@ class battle_manager {
 			int cha_mod = c.get_ability_mod(ABILITY_CHA);
 			if (cha_mod > ability_mod) ability_mod = cha_mod;
 		}
+		// Basic Rules 2024 Shillelagh (para 14966-14974): "you can use your
+		// spellcasting ability instead of Strength for the attack and damage rolls
+		// of melee attacks using that weapon."
+		if (c.shillelagh_active and !c.main_hand_is_ranged) {
+			int spell_ability = c.spellcasting_ability;
+			if (spell_ability < 0 or spell_ability > 5) spell_ability = ABILITY_WIS;
+			int cast_mod = c.get_ability_mod(spell_ability);
+			if (cast_mod > ability_mod) ability_mod = cast_mod;
+		}
 		return ability_mod;
 	}
 
@@ -2971,12 +2980,17 @@ class battle_manager {
 	int get_attack_damage_count(combatant@ attacker, bool use_secondary = false) {
 		if (@attacker == null) return 0;
 		if (!attacker.is_player and use_secondary) return attacker.monster_attack2_count;
+		// Basic Rules 2024 Shillelagh (para 14966-14974): 2d6 at level 17+
+		if (attacker.shillelagh_active and !attacker.main_hand_is_ranged and attacker.level >= 17) return 2;
 		return attacker.main_hand_damage_count;
 	}
 
 	int get_attack_damage_dice(combatant@ attacker, bool use_secondary = false) {
 		if (@attacker == null) return 0;
 		if (!attacker.is_player and use_secondary) return attacker.monster_attack2_dice;
+		// Basic Rules 2024 Shillelagh (para 14966-14974): "the weapon's damage die
+		// becomes a d8. Cantrip Upgrade: d10 at L5, d12 at L11, 2d6 at L17."
+		if (attacker.shillelagh_active and !attacker.main_hand_is_ranged) return attacker.shillelagh_damage_die;
 		if (attack_name_is_unarmed(attacker.main_hand)) {
 			if (attacker.class_name == "Monk") {
 				int martial_die = monk_martial_arts_die(attacker);
@@ -3004,6 +3018,11 @@ class battle_manager {
 		if (attacker.empowered_strikes_active and attacker.empowered_strikes_force and attack_name_is_unarmed(attacker.main_hand)) {
 			return DMG_FORCE;
 		}
+		// Basic Rules 2024 Shillelagh (para 14966-14974): "If the attack deals damage,
+		// it can be Force damage or the weapon's normal damage type (your choice)."
+		// Default to Force (strictly better — few creatures resist it). Player
+		// damage-type prompt deferred; logged in TODO_SOURCE_ACCURACY.md.
+		if (attacker.shillelagh_active and !attacker.main_hand_is_ranged) return DMG_FORCE;
 		return attacker.main_hand_damage_type;
 	}
 
@@ -5404,6 +5423,8 @@ class battle_manager {
 			string reason = "Stunned";
 			if (c.has_condition(COND_PARALYZED)) reason = "Paralyzed";
 			if (c.has_condition(COND_UNCONSCIOUS)) reason = "Unconscious";
+			// Basic Rules 2024 Command (para 12421): commanded effect wasted — creature can't act.
+			if (c.command_effect != "") { c.command_effect = ""; c.command_source_id = 0; }
 			broadcast_announce(c.name + " is " + reason + " and loses their turn.", true);
 			broadcast_state();
 			advance_turn();
@@ -5434,6 +5455,88 @@ class battle_manager {
 				c.movement_remaining = 0;
 				broadcast_announce(c.name + " is dazed! Can only take an action this turn.", true);
 			}
+		}
+		// Basic Rules 2024 Command (para 12421-12433): execute the commanded effect
+		// at the start of the commanded creature's next turn, then clear it.
+		if (c.command_effect != "") {
+			if (c.command_effect == "grovel") {
+				// "The target has the Prone condition and then ends its turn."
+				c.add_condition(COND_PRONE);
+				c.has_action = false;
+				c.has_bonus_action = false;
+				c.movement_remaining = 0;
+				broadcast_announce(c.name + " grovels on the ground, falling Prone!", true);
+			}
+			else if (c.command_effect == "halt") {
+				// "On its turn, the target doesn't move and takes no action or Bonus Action."
+				c.has_action = false;
+				c.has_bonus_action = false;
+				c.movement_remaining = 0;
+				broadcast_announce(c.name + " is halted and cannot move or act this turn!", true);
+			}
+			else if (c.command_effect == "flee") {
+				// "The target spends its turn moving away from you by the fastest
+				// available means." Fastest means = Dash (double movement).
+				combatant@ cmd_src = combat.get_combatant(c.command_source_id);
+				if (@cmd_src != null and !cmd_src.is_dead) {
+					c.movement_remaining = c.speed * 2; // Dash for fastest means
+					while (c.movement_remaining >= FEET_PER_TILE and c.is_alive()) {
+						int old_x = c.x;
+						int old_y = c.y;
+						int dx = 0, dy = 0;
+						// Move AWAY from the caster
+						if (cmd_src.x > c.x) dx = -1;
+						else if (cmd_src.x < c.x) dx = 1;
+						if (cmd_src.y > c.y) dy = -1;
+						else if (cmd_src.y < c.y) dy = 1;
+						if (dx != 0) { c.x += dx; c.movement_remaining -= FEET_PER_TILE; }
+						else if (dy != 0) { c.y += dy; c.movement_remaining -= FEET_PER_TILE; }
+						else break;
+						check_opportunity_attacks(c, old_x, old_y, c.x, c.y);
+						if (@current_roll != null or c.is_dead or c.current_hp == 0) break;
+					}
+				}
+				c.has_action = false;
+				c.has_bonus_action = false;
+				c.movement_remaining = 0;
+				if (c.is_alive()) broadcast_announce(c.name + " flees under the Command spell!", true);
+			}
+			else if (c.command_effect == "approach") {
+				// "The target moves toward you by the shortest and most direct route,
+				// ending its turn if it moves within 5 feet of you."
+				combatant@ cmd_src = combat.get_combatant(c.command_source_id);
+				if (@cmd_src != null and !cmd_src.is_dead) {
+					while (c.movement_remaining >= FEET_PER_TILE and feet_distance(c.x, c.y, cmd_src.x, cmd_src.y) > FEET_PER_TILE and c.is_alive()) {
+						int old_x = c.x;
+						int old_y = c.y;
+						int dx = 0, dy = 0;
+						if (cmd_src.x > c.x) dx = 1;
+						else if (cmd_src.x < c.x) dx = -1;
+						if (cmd_src.y > c.y) dy = 1;
+						else if (cmd_src.y < c.y) dy = -1;
+						if (dx != 0) { c.x += dx; c.movement_remaining -= FEET_PER_TILE; }
+						else if (dy != 0) { c.y += dy; c.movement_remaining -= FEET_PER_TILE; }
+						else break;
+						check_opportunity_attacks(c, old_x, old_y, c.x, c.y);
+						if (@current_roll != null or c.is_dead or c.current_hp == 0) break;
+					}
+				}
+				c.has_action = false;
+				c.has_bonus_action = false;
+				c.movement_remaining = 0;
+				if (c.is_alive()) broadcast_announce(c.name + " approaches the caster under the Command spell!", true);
+			}
+			else if (c.command_effect == "drop") {
+				// "The target drops whatever it is holding and then ends its turn."
+				// No item-drop system — announce and waste their turn.
+				c.has_action = false;
+				c.has_bonus_action = false;
+				c.movement_remaining = 0;
+				broadcast_announce(c.name + " drops what they're holding under the Command spell!", true);
+			}
+			c.command_effect = "";
+			c.command_source_id = 0;
+			broadcast_state();
 		}
 		// Basic Rules 2024 Bestow Curse (para 12219-12222): forced_dodge curse —
 		// "target must make a WIS save at the start of each of its turns. On a
@@ -5978,6 +6081,14 @@ class battle_manager {
 		c.steady_aim_pending = false;
 		// PHB 2024 Blade Ward (cantrip): resistance expires at the start of the caster's next turn.
 		c.blade_ward_active = false;
+		// Basic Rules 2024 Shillelagh (para 14966-14974): 1 minute duration countdown.
+		if (c.shillelagh_active) {
+			c.shillelagh_rounds--;
+			if (c.shillelagh_rounds <= 0) {
+				c.shillelagh_active = false;
+				broadcast_announce(c.name + "'s Shillelagh effect fades.", false);
+			}
+		}
 		// Levitate: levitated creatures cannot move horizontally. Zero out their movement.
 		if (c.levitate_active) c.movement_remaining = 0;
 		// Reset Shield Master once-per-turn shove
@@ -15441,10 +15552,9 @@ class battle_manager {
 				broadcast_announce(c.name + " casts Mass Suggestion, charming " + count + " creature" + (count == 1 ? "" : "s") + ".", true);
 			}
 			else if (spell.id == "command" and @target != null) {
-				// Basic Rules paras 12427-12430: "You speak a one-word command to a creature
-				// you can see within range. The target must succeed on a Wisdom saving throw
-				// or follow the command on its next turn." Defaults to Drop or Flee depending
-				// on combat state. Approach is the most useful but movement-based.
+				// Basic Rules 2024 Command (para 12421-12433): "You speak a one-word
+				// command to a creature you can see within range. The target must succeed
+				// on a Wisdom saving throw or follow the command on its next turn."
 				int save_roll = random(1, 20);
 				apply_hound_save_disadvantage(target, c.id, save_roll);
 				int save_bonus = target.get_save_bonus(ABILITY_WIS);
@@ -15456,15 +15566,27 @@ class battle_manager {
 				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Command")) saved = true;
 				if (!saved) { int ds = try_disciplined_survivor_reroll(target, save_dc, save_total, save_bonus + bless_bonus, "WIS save vs Command"); if (ds >= save_dc) saved = true; }
 				if (!saved) { int new_total = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Command"); if (new_total >= save_dc) saved = true; }
-			if (!saved) { int ms_total = try_maverick_spirit(target, save_dc, save_total, "WIS save vs Command"); if (ms_total >= save_dc) saved = true; }
+				if (!saved) { int ms_total = try_maverick_spirit(target, save_dc, save_total, "WIS save vs Command"); if (ms_total >= save_dc) saved = true; }
 				if (!saved and try_mage_slayer_guarded_mind(target, ABILITY_WIS)) saved = true;
 				if (!saved) { int bf = try_boon_of_fate_bonus(target, save_total, save_dc); if (bf > 0) saved = true; }
 				if (!saved and try_stroke_of_luck_save(target, save_dc, save_bonus + bless_bonus)) saved = true;
 				if (!saved) {
-					// Approximation: target loses its action next turn (treated as Incapacitated for one turn)
-					// then immediately recovers. We mark it with the existing COND_CHARMED to suppress its turn.
-					target.add_condition(COND_CHARMED);
-					broadcast_announce(c.name + " commands " + target.name + " — they will obey on their next turn!", true);
+					// Basic Rules 2024 Command effects (para 12427-12433):
+					// Auto-pick for bots: Grovel (most universally useful)
+					// Player choice via pending_spell_choice deferred — auto-pick Grovel.
+					string cmd = "grovel";
+					// AI pick: Halt for casters, Grovel for melee
+					if (!c.is_player) {
+						if (target.is_concentrating) cmd = "halt";
+					}
+					target.command_effect = cmd;
+					target.command_source_id = c.id;
+					string cmd_label = "Grovel";
+					if (cmd == "halt") cmd_label = "Halt";
+					else if (cmd == "flee") cmd_label = "Flee";
+					else if (cmd == "approach") cmd_label = "Approach";
+					else if (cmd == "drop") cmd_label = "Drop";
+					broadcast_announce(c.name + " commands " + target.name + ": " + cmd_label + "! They must obey on their next turn.", true);
 				}
 			}
 			else if (spell.id == "suggestion" and @target != null) {
@@ -17652,7 +17774,21 @@ class battle_manager {
 				return;
 			}
 			else if (spell.id == "shillelagh") {
-				broadcast_announce(c.name + " casts Shillelagh, infusing their club or quarterstaff with magical force (1d8).", true);
+				// Basic Rules 2024 Shillelagh (para 14966-14974): "A Club or Quarterstaff
+				// you are holding is imbued with nature's power. For the duration, you can
+				// use your spellcasting ability instead of Strength for the attack and damage
+				// rolls of melee attacks using that weapon, and the weapon's damage die
+				// becomes a d8." Cantrip Upgrade: d10 at L5, d12 at L11, 2d6 at L17.
+				c.shillelagh_active = true;
+				c.shillelagh_rounds = 10; // 1 minute
+				// Set damage die based on cantrip scaling
+				if (c.level >= 17) c.shillelagh_damage_die = 6; // 2d6 (count handled in get_attack_damage_count)
+				else if (c.level >= 11) c.shillelagh_damage_die = 12;
+				else if (c.level >= 5) c.shillelagh_damage_die = 10;
+				else c.shillelagh_damage_die = 8;
+				string die_label = "1d" + c.shillelagh_damage_die;
+				if (c.level >= 17) die_label = "2d6";
+				broadcast_announce(c.name + " casts Shillelagh, infusing their weapon with nature's power (" + die_label + " force damage).", true);
 			}
 			// Level 1
 			else if (spell.id == "ballistic_smite") {
