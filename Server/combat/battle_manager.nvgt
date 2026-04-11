@@ -4873,6 +4873,50 @@ class battle_manager {
 				}
 			}
 
+			// Wall of Fire (Basic Rules para 15545-15547): DEX save, 5d8+upcast fire, half on save.
+			// "deals 5d8 Fire damage to each creature that ends its turn within 10 feet of that side"
+			else if (ca_caster.concentration_spell == "Wall of Fire" and ca_caster.conc_aoe_slot_level > 0) {
+				if (feet_distance(ca_caster.conc_aoe_x, ca_caster.conc_aoe_y, c.x, c.y) <= 10) {
+					int wf_dice = 5 + (ca_caster.conc_aoe_slot_level - 4);
+					if (wf_dice < 5) wf_dice = 5;
+					int wf_dc = spell_save_dc(ca_caster, "wall_of_fire");
+					int wf_roll = random(1, 20);
+					int wf_bonus = c.get_save_bonus(ABILITY_DEX);
+					bool wf_saved = (wf_roll + wf_bonus) >= wf_dc;
+					broadcast_roll(c.name, "DEX save vs Wall of Fire", wf_roll, wf_bonus, wf_roll + wf_bonus, wf_saved ? "Half damage!" : "Full damage!");
+					int wf_dmg = 0;
+					for (int d = 0; d < wf_dice; d++) wf_dmg += random(1, 8);
+					if (wf_saved) wf_dmg /= 2;
+					if (wf_dmg < 1) wf_dmg = 1;
+					combat.apply_damage(c, wf_dmg, DMG_FIRE, ca_caster);
+					broadcast_announce(c.name + " takes " + wf_dmg + " fire damage from " + ca_caster.name + "'s Wall of Fire!", true);
+					if (c.is_dead) break;
+				}
+			}
+
+			// Sleet Storm (Basic Rules para 15038-15039): DEX save or Prone + lose Concentration.
+			// "starts its turn there, must succeed on a DEX saving throw or have the Prone condition"
+			else if (ca_caster.concentration_spell == "Sleet Storm" and ca_caster.conc_aoe_slot_level > 0) {
+				if (feet_distance(ca_caster.conc_aoe_x, ca_caster.conc_aoe_y, c.x, c.y) <= 20) {
+					int ss_dc = spell_save_dc(ca_caster, "sleet_storm");
+					int ss_roll = random(1, 20);
+					int ss_bonus = c.get_save_bonus(ABILITY_DEX);
+					bool ss_saved = (ss_roll + ss_bonus) >= ss_dc;
+					broadcast_roll(c.name, "DEX save vs Sleet Storm", ss_roll, ss_bonus, ss_roll + ss_bonus, ss_saved ? "Saved!" : "Prone!");
+					if (!ss_saved) {
+						c.add_condition(COND_PRONE);
+						if (c.is_concentrating) {
+							clear_concentration_effects(c);
+							c.is_concentrating = false;
+							c.remove_condition(COND_CONCENTRATING);
+							broadcast_announce(c.name + "'s concentration is broken by " + ca_caster.name + "'s Sleet Storm!", true);
+						} else {
+							broadcast_announce(c.name + " is knocked Prone by " + ca_caster.name + "'s Sleet Storm!", true);
+						}
+					}
+				}
+			}
+
 			// Moonbeam (Basic Rules): 5ft cylinder, CON save, 2d10+upcast radiant, half on save
 			if (ca_caster.moonbeam_active and ca_caster.moonbeam_slot_level > 0) {
 				if (feet_distance(ca_caster.moonbeam_x, ca_caster.moonbeam_y, c.x, c.y) <= 5) {
@@ -12268,6 +12312,9 @@ class battle_manager {
 					combat.apply_damage(t, dmg, DMG_FIRE, c);
 					broadcast_announce(t.name + " takes " + dmg + " fire damage from the Wall of Fire.", false);
 				}
+				c.conc_aoe_x = center_x;
+				c.conc_aoe_y = center_y;
+				c.conc_aoe_slot_level = cast_slot_level;
 				broadcast_state();
 				check_battle_end();
 				return;
@@ -14359,6 +14406,9 @@ class battle_manager {
 						}
 					}
 				}
+				c.conc_aoe_x = center_x;
+				c.conc_aoe_y = center_y;
+				c.conc_aoe_slot_level = cast_slot_level;
 				broadcast_state();
 				check_battle_end();
 				return;

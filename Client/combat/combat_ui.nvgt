@@ -196,6 +196,7 @@ int my_innate_sorcery_uses_remaining = 0;
 bool my_innate_sorcery_active = false;
 int my_sorcery_points = 0;
 int my_sorcery_points_max = 0;
+string[] my_metamagic_choices; // PHB 2024 Sorcerer L2 — known metamagic option IDs for menu filtering
 // PHB 2024 Sorcerer Draconic Sorcery L6/L14/L18 + Wizard Evoker L3/L10/L14 — synced from server
 string my_elemental_affinity_type = "";
 string my_elemental_adept_type = "";
@@ -1943,22 +1944,36 @@ void show_bonus_action_menu() {
 		send({{"type", message_types::bonus_action}, {"feature", "font_of_magic_to_sp"}, {"slot_level", picked_level}});
 	}
 	else if (metamagic_opt >= 0 and res == metamagic_opt) {
-		// PHB 2024 Sorcerer L2 Metamagic (paras 6979-7020)
+		// PHB 2024 Sorcerer L2 Metamagic (paras 6979-7020) — filtered to known options
+		string[] all_mm_ids = {"careful", "distant", "empowered", "extended", "heightened", "quickened", "seeking", "subtle", "transmuted", "twinned"};
+		string[] all_mm_labels = {
+			"Careful Spell. 1 SP. Allies auto-succeed on your spell's saves.",
+			"Distant Spell. 1 SP. Double spell range or Touch becomes 30 feet.",
+			"Empowered Spell. 1 SP. Reroll some damage dice.",
+			"Extended Spell. 1 SP. Double spell duration, advantage on concentration.",
+			"Heightened Spell. 2 SP. Target has disadvantage on saves vs your spell.",
+			"Quickened Spell. 2 SP. Cast an action spell as a bonus action.",
+			"Seeking Spell. 1 SP. Reroll a missed spell attack.",
+			"Subtle Spell. 1 SP. Cast without verbal, somatic, or material components.",
+			"Transmuted Spell. 1 SP. Change damage type to acid, cold, fire, lightning, poison, or thunder.",
+			"Twinned Spell. 1 SP plus spell level minus 1. Target a second creature with the same spell."
+		};
 		menu@ mm = setup_sub_menu("Choose a Metamagic option. Sorcery Points: " + my_sorcery_points + ".");
-		mm.add_item("Careful Spell. 1 SP. Allies auto-succeed on your spell's saves.");
-		mm.add_item("Distant Spell. 1 SP. Double spell range or Touch becomes 30 feet.");
-		mm.add_item("Empowered Spell. 1 SP. Reroll some damage dice.");
-		mm.add_item("Extended Spell. 1 SP. Double spell duration, advantage on concentration.");
-		mm.add_item("Heightened Spell. 2 SP. Target has disadvantage on saves vs your spell.");
-		mm.add_item("Quickened Spell. 2 SP. Cast an action spell as a bonus action.");
-		mm.add_item("Seeking Spell. 1 SP. Reroll a missed spell attack.");
-		mm.add_item("Subtle Spell. 1 SP. Cast without verbal, somatic, or material components.");
-		mm.add_item("Transmuted Spell. 1 SP. Change damage type to acid, cold, fire, lightning, poison, or thunder.");
-		mm.add_item("Twinned Spell. 1 SP plus spell level minus 1. Target a second creature with the same spell.");
+		string[] shown_ids;
+		for (uint mi = 0; mi < all_mm_ids.length(); mi++) {
+			bool known = my_metamagic_choices.length() == 0; // legacy compat: show all if no choices stored
+			for (uint mj = 0; mj < my_metamagic_choices.length(); mj++) {
+				if (my_metamagic_choices[mj] == all_mm_ids[mi]) { known = true; break; }
+			}
+			if (known) {
+				mm.add_item(all_mm_labels[mi]);
+				shown_ids.insert_last(all_mm_ids[mi]);
+			}
+		}
+		if (shown_ids.length() == 0) { speak("No Metamagic options learned yet. Choose options at level-up.", true); return; }
 		int mm_res = mm.run();
 		if (mm_res < 0) return;
-		string[] mm_options = {"careful", "distant", "empowered", "extended", "heightened", "quickened", "seeking", "subtle", "transmuted", "twinned"};
-		string chosen = mm_options[mm_res];
+		string chosen = shown_ids[mm_res];
 		if (chosen == "transmuted") {
 			// Sub-menu for damage type choice
 			menu@ dm = setup_sub_menu("Choose the new damage type for Transmuted Spell.");
@@ -4040,6 +4055,12 @@ void parse_game_state(json_object@ msg) {
 	my_innate_sorcery_active = msg.exists("my_innate_sorcery_active") ? bool(msg["my_innate_sorcery_active"]) : false;
 	my_sorcery_points = msg.exists("my_sorcery_points") ? int(msg["my_sorcery_points"]) : 0;
 	my_sorcery_points_max = msg.exists("my_sorcery_points_max") ? int(msg["my_sorcery_points_max"]) : 0;
+	// PHB 2024 Sorcerer L2 Metamagic: parse known options for menu filtering
+	my_metamagic_choices.resize(0);
+	if (msg.exists("my_metamagic_choices")) {
+		json_array@ mc = msg["my_metamagic_choices"];
+		if (@mc != null) { for (uint mci = 0; mci < mc.length(); mci++) my_metamagic_choices.insert_last(string(mc[mci])); }
+	}
 	// PHB 2024 Sorcerer Draconic Sorcery L6/L14/L18 + Wizard Evoker L3/L10/L14
 	my_elemental_affinity_type = msg.exists("my_elemental_affinity_type") ? string(msg["my_elemental_affinity_type"]) : "";
 	my_elemental_adept_type = msg.exists("my_elemental_adept_type") ? string(msg["my_elemental_adept_type"]) : "";
@@ -4328,6 +4349,7 @@ void reset_combat_state() {
 	my_innate_sorcery_active = false;
 	my_sorcery_points = 0;
 	my_sorcery_points_max = 0;
+	my_metamagic_choices.resize(0);
 	my_elemental_affinity_type = "";
 	my_elemental_adept_type = "";
 	my_dragon_wings_active = false;

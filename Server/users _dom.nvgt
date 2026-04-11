@@ -2361,6 +2361,17 @@ void handle_user_message(user@ u, json_object@ msg)
 			// learning 2/4/6 — player choice at level-up deferred to future UI batch).
 			if (c.class_name != "Sorcerer" or c.level < 2) { u.send({{"type", message_types::announce}, {"text", "Only Sorcerers of level 2+ can use Metamagic."}, {"interrupt", true}}); return; }
 			string option = msg.exists("option") ? string(msg["option"]) : "";
+			// PHB 2024 Sorcerer L2 Metamagic: validate option against player's chosen metamagic
+			if (c.metamagic_choices.length() > 0) {
+				bool option_known = false;
+				for (uint mci = 0; mci < c.metamagic_choices.length(); mci++) {
+					if (c.metamagic_choices[mci] == option) { option_known = true; break; }
+				}
+				if (!option_known) {
+					u.send({{"type", message_types::announce}, {"text", "You haven't learned that Metamagic option. Choose new options at level-up."}, {"interrupt", true}});
+					return;
+				}
+			}
 			// Clear all pending metamagic first (only one at a time per source, except Empowered/Seeking)
 			bool was_active = false;
 			if (option == "careful" and c.metamagic_careful_active) was_active = true;

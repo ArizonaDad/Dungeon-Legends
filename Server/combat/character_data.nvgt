@@ -778,6 +778,7 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
     c.save_proficiencies = cs.save_profs;
     c.initiative_bonus = ability_modifier(cs.dexterity);
     c.feats = cs.feats;
+    c.metamagic_choices = cs.metamagic_choices;
     // Level-up fighting style choice: add as feat if not already present
     if (cs.fighting_style != "" and !c.has_feat(cs.fighting_style)) {
         c.feats.insert_last(cs.fighting_style);

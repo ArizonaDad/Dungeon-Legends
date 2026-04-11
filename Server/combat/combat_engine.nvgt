@@ -224,6 +224,7 @@ class combatant {
 	bool metamagic_seeking_active = false;   // 1 SP - reroll missed spell attack
 	bool metamagic_transmuted_active = false; // 1 SP - swap damage type Acid/Cold/Fire/Lightning/Poison/Thunder
 	int metamagic_transmuted_target_type = 0; // Damage type ID to convert to
+	string[] metamagic_choices; // Sorcerer L2+ selected metamagic option IDs (for validation)
 	// Warlock PHB 2024 base class features
 	int eldritch_invocations_known = 0;    // L1+: scales by level
 	bool pact_of_the_blade = false;        // Pact Boon variants
@@ -643,6 +644,11 @@ class combatant {
 	int spirit_guardians_slot_level = 0;
 	bool spirit_guardians_necrotic = false; // true if caster is evil-aligned
 	bool spirit_guardians_damaged_this_turn = false; // prevent double SG damage per turn
+	// Concentration AoE per-turn tracking: center coords + slot level + per-turn flag
+	int conc_aoe_x = 0; int conc_aoe_y = 0; int conc_aoe_slot_level = 0;
+	// Moonbeam: single-column radiant damage, can move with action
+	bool moonbeam_active = false;
+	int moonbeam_x = 0; int moonbeam_y = 0; int moonbeam_slot_level = 0;
 	bool fog_cloud_active = false;
 	bool darkness_active = false;
 	// Fire Shield variant
@@ -2253,6 +2259,12 @@ class battle {
 				state["my_innate_sorcery_active"] = c.innate_sorcery_active;
 				state["my_sorcery_points"] = c.sorcery_points;
 				state["my_sorcery_points_max"] = c.sorcery_points_max;
+				// PHB 2024 Sorcerer L2 Metamagic: send known options for client menu filtering
+				if (c.metamagic_choices.length() > 0) {
+					json_array mc_arr;
+					for (uint mci = 0; mci < c.metamagic_choices.length(); mci++) mc_arr.add(c.metamagic_choices[mci]);
+					state["my_metamagic_choices"] = mc_arr;
+				}
 				// PHB 2024 Warlock L2 Magical Cunning / L9 Contact Patron / L11+ Mystic Arcanum
 				state["my_magical_cunning_available"] = c.magical_cunning_available;
 				state["my_contact_patron_available"] = c.contact_patron_available;
