@@ -14839,6 +14839,9 @@ class battle_manager {
 				c.fire_resistance = true; // Game doesn't have immunity tier - approximated as resistance
 				c.cold_resistance = true;
 				c.investiture_flame_active = true;
+				c.is_concentrating = true;
+				c.add_condition(COND_CONCENTRATING);
+				c.concentration_spell = spell.name;
 				broadcast_announce(c.name + " is wreathed in flame from Investiture of Flame! Fire immunity and cold resistance. Adjacent creatures take 1d10 fire damage.", true);
 			}
 			else if (spell.id == "investiture_of_ice") {
@@ -17957,7 +17960,16 @@ class battle_manager {
 				broadcast_announce(c.name + " casts Legend Lore.", true);
 			}
 			else if (spell.id == "mislead") {
-				broadcast_announce(c.name + " casts Mislead.", true);
+				// Basic Rules 2024 Mislead (COMPLETE_SPELL_CATALOG): "You gain the Invisible
+				// condition at the same time that an illusory double of you appears where you
+				// are standing. The invisibility ends immediately after you make an attack
+				// roll, deal damage, or cast a spell." Concentration, 1 hour.
+				c.add_condition(COND_INVISIBLE);
+				c.is_hidden = true;
+				c.is_concentrating = true;
+				c.add_condition(COND_CONCENTRATING);
+				c.concentration_spell = spell.name;
+				broadcast_announce(c.name + " vanishes and leaves behind an illusory double! Invisible until attacking, dealing damage, or casting a spell.", true);
 			}
 			else if (spell.id == "modify_memory") {
 				broadcast_announce(c.name + " casts Modify Memory.", true);
