@@ -3757,6 +3757,16 @@ class battle_manager {
 		// Venomous Mark: curse damage on target (concentration)
 		caster.venomous_mark_target_id = 0;
 		caster.venomous_mark_rounds = 0;
+		// Concentration AoE per-turn tracking (Cloudkill, Stinking Cloud,
+		// Spike Growth, Insect Plague, Evard's Black Tentacles)
+		caster.conc_aoe_x = 0;
+		caster.conc_aoe_y = 0;
+		caster.conc_aoe_slot_level = 0;
+		// Moonbeam per-turn tracking
+		caster.moonbeam_active = false;
+		caster.moonbeam_x = 0;
+		caster.moonbeam_y = 0;
+		caster.moonbeam_slot_level = 0;
 		// Area effects — fog_cloud/darkness are positional not per-caster,
 		// so we clear the caster's flag (damage/visibility effects will
 		// be handled separately if positional tracking is added later).
@@ -4725,6 +4735,121 @@ class battle_manager {
 				// Half movement speed within aura
 				c.speed = c.speed / 2 > 5 ? c.speed / 2 : 5;
 				break;
+			}
+		}
+
+		// Concentration AoE per-turn effects: creatures starting their turn in
+		// the caster's ongoing concentration area take the per-round effect.
+		// Cloudkill, Insect Plague, Stinking Cloud, Spike Growth, Black Tentacles, Moonbeam.
+		for (uint cai = 0; cai < combat.combatants.length(); cai++) {
+			combatant@ ca_caster = combat.combatants[cai];
+			if (@ca_caster == null or ca_caster.is_dead or !ca_caster.is_concentrating) continue;
+			if (ca_caster.id == c.id) continue; // casters not affected by own AoE
+
+			// Cloudkill (Basic Rules para 12408): CON save, 5d8+upcast poison, half on save
+			if (ca_caster.concentration_spell == "Cloudkill" and ca_caster.conc_aoe_slot_level > 0) {
+				if (feet_distance(ca_caster.conc_aoe_x, ca_caster.conc_aoe_y, c.x, c.y) <= 20) {
+					int ck_dice = 5 + (ca_caster.conc_aoe_slot_level - 5);
+					if (ck_dice < 5) ck_dice = 5;
+					int ck_dc = spell_save_dc(ca_caster, "cloudkill");
+					int ck_roll = random(1, 20);
+					int ck_bonus = c.get_save_bonus(ABILITY_CON);
+					bool ck_saved = (ck_roll + ck_bonus) >= ck_dc;
+					broadcast_roll(c.name, "CON save vs Cloudkill", ck_roll, ck_bonus, ck_roll + ck_bonus, ck_saved ? "Half damage!" : "Full damage!");
+					int ck_dmg = 0;
+					for (int d = 0; d < ck_dice; d++) ck_dmg += random(1, 8);
+					if (ck_saved) ck_dmg /= 2;
+					if (ck_dmg < 1) ck_dmg = 1;
+					combat.apply_damage(c, ck_dmg, DMG_POISON, ca_caster);
+					broadcast_announce(c.name + " takes " + ck_dmg + " poison damage from " + ca_caster.name + "'s Cloudkill!", true);
+					if (c.is_dead) break;
+				}
+			}
+
+			// Insect Plague (Basic Rules para 13899): CON save, 4d10+upcast piercing, half on save
+			else if (ca_caster.concentration_spell == "Insect Plague" and ca_caster.conc_aoe_slot_level > 0) {
+				if (feet_distance(ca_caster.conc_aoe_x, ca_caster.conc_aoe_y, c.x, c.y) <= 20) {
+					int ip_dice = 4 + (ca_caster.conc_aoe_slot_level - 5);
+					if (ip_dice < 4) ip_dice = 4;
+					int ip_dc = spell_save_dc(ca_caster, "insect_plague");
+					int ip_roll = random(1, 20);
+					int ip_bonus = c.get_save_bonus(ABILITY_CON);
+					bool ip_saved = (ip_roll + ip_bonus) >= ip_dc;
+					broadcast_roll(c.name, "CON save vs Insect Plague", ip_roll, ip_bonus, ip_roll + ip_bonus, ip_saved ? "Half damage!" : "Full damage!");
+					int ip_dmg = 0;
+					for (int d = 0; d < ip_dice; d++) ip_dmg += random(1, 10);
+					if (ip_saved) ip_dmg /= 2;
+					if (ip_dmg < 1) ip_dmg = 1;
+					combat.apply_damage(c, ip_dmg, DMG_PIERCING, ca_caster);
+					broadcast_announce(c.name + " takes " + ip_dmg + " piercing damage from " + ca_caster.name + "'s Insect Plague!", true);
+					if (c.is_dead) break;
+				}
+			}
+
+			// Stinking Cloud (Basic Rules para 15152): CON save or Poisoned until end of turn
+			else if (ca_caster.concentration_spell == "Stinking Cloud" and ca_caster.conc_aoe_slot_level > 0) {
+				if (feet_distance(ca_caster.conc_aoe_x, ca_caster.conc_aoe_y, c.x, c.y) <= 20) {
+					int sc_dc = spell_save_dc(ca_caster, "stinking_cloud");
+					int sc_roll = random(1, 20);
+					int sc_bonus = c.get_save_bonus(ABILITY_CON);
+					bool sc_saved = (sc_roll + sc_bonus) >= sc_dc;
+					broadcast_roll(c.name, "CON save vs Stinking Cloud", sc_roll, sc_bonus, sc_roll + sc_bonus, sc_saved ? "Saved!" : "Poisoned!");
+					if (!sc_saved) {
+						c.add_condition(COND_POISONED);
+						broadcast_to_battle({{"type", message_types::condition_applied}, {"target", c.name}, {"condition", "Poisoned"}});
+						broadcast_announce(c.name + " is Poisoned by " + ca_caster.name + "'s Stinking Cloud!", true);
+					}
+				}
+			}
+
+			// Spike Growth (Basic Rules para 15114): 2d4 piercing, no save (movement approximation)
+			else if (ca_caster.concentration_spell == "Spike Growth" and ca_caster.conc_aoe_slot_level > 0) {
+				if (feet_distance(ca_caster.conc_aoe_x, ca_caster.conc_aoe_y, c.x, c.y) <= 20) {
+					int spk_dmg = random(1, 4) + random(1, 4);
+					combat.apply_damage(c, spk_dmg, DMG_PIERCING, ca_caster);
+					broadcast_announce(c.name + " takes " + spk_dmg + " piercing damage from " + ca_caster.name + "'s Spike Growth!", true);
+					if (c.is_dead) break;
+				}
+			}
+
+			// Evard's Black Tentacles (Basic Rules): STR save, 3d6 bludgeoning + Restrained
+			else if (ca_caster.concentration_spell == "Evard's Black Tentacles" and ca_caster.conc_aoe_slot_level > 0) {
+				if (feet_distance(ca_caster.conc_aoe_x, ca_caster.conc_aoe_y, c.x, c.y) <= 20) {
+					int bt_dc = spell_save_dc(ca_caster, "evards_black_tentacles");
+					int bt_roll = random(1, 20);
+					int bt_bonus = c.get_save_bonus(ABILITY_STR);
+					bool bt_saved = (bt_roll + bt_bonus) >= bt_dc;
+					broadcast_roll(c.name, "STR save vs Black Tentacles", bt_roll, bt_bonus, bt_roll + bt_bonus, bt_saved ? "Saved!" : "Grabbed!");
+					int bt_dmg = 0;
+					for (int d = 0; d < 3; d++) bt_dmg += random(1, 6);
+					combat.apply_damage(c, bt_dmg, DMG_BLUDGEONING, ca_caster);
+					broadcast_announce(c.name + " takes " + bt_dmg + " bludgeoning damage from " + ca_caster.name + "'s Black Tentacles!", true);
+					if (!bt_saved) {
+						c.add_condition(COND_RESTRAINED);
+						broadcast_to_battle({{"type", message_types::condition_applied}, {"target", c.name}, {"condition", "Restrained"}});
+					}
+					if (c.is_dead) break;
+				}
+			}
+
+			// Moonbeam (Basic Rules): 5ft cylinder, CON save, 2d10+upcast radiant, half on save
+			if (ca_caster.moonbeam_active and ca_caster.moonbeam_slot_level > 0) {
+				if (feet_distance(ca_caster.moonbeam_x, ca_caster.moonbeam_y, c.x, c.y) <= 5) {
+					int mb_dice = 2 + (ca_caster.moonbeam_slot_level - 2);
+					if (mb_dice < 2) mb_dice = 2;
+					int mb_dc = spell_save_dc(ca_caster, "moonbeam");
+					int mb_roll = random(1, 20);
+					int mb_bonus = c.get_save_bonus(ABILITY_CON);
+					bool mb_saved = (mb_roll + mb_bonus) >= mb_dc;
+					broadcast_roll(c.name, "CON save vs Moonbeam", mb_roll, mb_bonus, mb_roll + mb_bonus, mb_saved ? "Half damage!" : "Full damage!");
+					int mb_dmg = 0;
+					for (int d = 0; d < mb_dice; d++) mb_dmg += random(1, 10);
+					if (mb_saved) mb_dmg /= 2;
+					if (mb_dmg < 1) mb_dmg = 1;
+					combat.apply_damage(c, mb_dmg, DMG_RADIANT, ca_caster);
+					broadcast_announce(c.name + " takes " + mb_dmg + " radiant damage from " + ca_caster.name + "'s Moonbeam!", true);
+					if (c.is_dead) break;
+				}
 			}
 		}
 
@@ -12060,6 +12185,10 @@ class battle_manager {
 					combat.apply_damage(t, dmg, DMG_POISON, c);
 					broadcast_announce(t.name + " takes " + dmg + " poison damage from the Cloudkill.", false);
 				}
+				// Track AoE center for per-turn damage in advance_turn
+				c.conc_aoe_x = center_x;
+				c.conc_aoe_y = center_y;
+				c.conc_aoe_slot_level = cast_slot_level;
 				broadcast_state();
 				check_battle_end();
 				return;
@@ -12116,6 +12245,10 @@ class battle_manager {
 					if (@t == null or t.is_dead or t.id == c.id) continue;
 					if (feet_distance(center_x, center_y, t.x, t.y) <= 20) sc_targets.insert_last(t);
 				}
+				// Track AoE center for per-turn Poisoned in advance_turn
+				c.conc_aoe_x = center_x;
+				c.conc_aoe_y = center_y;
+				c.conc_aoe_slot_level = cast_slot_level;
 				broadcast_announce(c.name + " conjures a 20-foot Stinking Cloud of nauseating gas!", true);
 				for (uint ti = 0; ti < sc_targets.length(); ti++) {
 					combatant@ t = sc_targets[ti];
@@ -13910,6 +14043,10 @@ class battle_manager {
 				// per-cast effect (the per-foot tracking would need a movement hook).
 				int center_x = @target != null ? target.x : c.x;
 				int center_y = @target != null ? target.y : c.y;
+				// Track AoE center for per-turn damage in advance_turn
+				c.conc_aoe_x = center_x;
+				c.conc_aoe_y = center_y;
+				c.conc_aoe_slot_level = cast_slot_level;
 				broadcast_announce(c.name + " conjures Spike Growth in a 20-foot sphere of difficult terrain.", true);
 				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
 					combatant@ t = combat.combatants[ti];
@@ -14112,6 +14249,10 @@ class battle_manager {
 					if (@t == null or t.is_dead or t.id == c.id) continue;
 					if (feet_distance(center_x, center_y, t.x, t.y) <= 20) ip_targets.insert_last(t);
 				}
+				// Track AoE center for per-turn damage in advance_turn
+				c.conc_aoe_x = center_x;
+				c.conc_aoe_y = center_y;
+				c.conc_aoe_slot_level = cast_slot_level;
 				broadcast_announce(c.name + " summons an Insect Plague — a 20-foot swarm of locusts!", true);
 				for (uint ti = 0; ti < ip_targets.length(); ti++) {
 					combatant@ t = ip_targets[ti];
@@ -15988,7 +16129,11 @@ class battle_manager {
 			}
 			else if (spell.id == "moonbeam" and @target != null) {
 				// Basic Rules: CON save, 2d10 radiant, half on success.
-				// Simplified: instant on target. Upcast +1d10 per level.
+				// Per-turn: creature starting turn in 5ft cylinder takes damage.
+				c.moonbeam_active = true;
+				c.moonbeam_x = target.x;
+				c.moonbeam_y = target.y;
+				c.moonbeam_slot_level = cast_slot_level;
 				int dice_count = 2 + upcast_levels;
 				int total_damage = 0;
 				for (int d = 0; d < dice_count; d++) total_damage += random(1, 10);
@@ -16191,6 +16336,10 @@ class battle_manager {
 				// Basic Rules: DEX save, 3d6 bludgeoning and Restrained in 20 ft square.
 				int center_x = @target != null ? target.x : c.x;
 				int center_y = @target != null ? target.y : c.y;
+				// Track AoE center for per-turn damage in advance_turn
+				c.conc_aoe_x = center_x;
+				c.conc_aoe_y = center_y;
+				c.conc_aoe_slot_level = cast_slot_level;
 				broadcast_announce(c.name + " summons Evard's Black Tentacles!", true);
 				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
 					combatant@ t = combat.combatants[ti];
