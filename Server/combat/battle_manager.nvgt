@@ -4133,6 +4133,19 @@ class battle_manager {
 		}
 		// Investiture of Flame: clear per-turn damage flag when concentration breaks
 		caster.investiture_flame_active = false;
+		// Dismiss companions spawned by concentration spells when concentration breaks.
+		// Permanent companions (beast_master, steel_defender, drake_companion, etc.) are excluded.
+		for (uint dci = 0; dci < combat.combatants.length(); dci++) {
+			combatant@ comp = combat.combatants[dci];
+			if (@comp == null or comp.is_dead or !comp.is_companion) continue;
+			if (comp.owner_id != caster.id) continue;
+			string cs = comp.companion_subclass;
+			if (cs == "animate_objects" or cs == "giant_insect" or cs == "bigbys_hand"
+				or cs == "conjure_animals_pack" or cs == "conjure_elemental"
+				or cs == "summon_dragon" or cs == "conjure_fey" or cs == "conjure_celestial") {
+				dismiss_companion(comp, true);
+			}
+		}
 		// Slow: restore speed and AC for all affected targets when concentration breaks
 		if (conc == "Slow") {
 			for (uint sli = 0; sli < combat.combatants.length(); sli++) {
