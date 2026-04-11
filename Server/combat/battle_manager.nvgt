@@ -1796,6 +1796,43 @@ class battle_manager {
 		return 2 + cast_slot_level;
 	}
 
+	// Tasha's Circle of Stars L2 Starry Form — Chalice (para 2155-2159):
+	// "Whenever you cast a spell using a spell slot that restores hit points to
+	// a creature, you or another creature within 30 feet of you can regain hit
+	// points equal to 1d8 plus your Wisdom modifier."
+	// L10 Twinkling Constellations (para 2169-2173): scales to 2d8 + WIS.
+	void try_chalice_healing(combatant@ caster) {
+		if (@caster == null or @combat == null) return;
+		if (!caster.starry_form_active or caster.starry_form_type != "Chalice") return;
+		int wis_mod = caster.get_ability_mod(ABILITY_WIS);
+		int dice_count = caster.level >= 10 ? 2 : 1;
+		int heal = 0;
+		for (int d = 0; d < dice_count; d++) heal += random(1, 8);
+		heal += wis_mod;
+		if (heal < 1) heal = 1;
+		// Find the most-injured ally within 30ft (or self)
+		combatant@ best_target = null;
+		int worst_deficit = 0;
+		for (uint chi = 0; chi < combat.combatants.length(); chi++) {
+			combatant@ ally = combat.combatants[chi];
+			if (@ally == null or ally.is_dead or ally.current_hp <= 0) continue;
+			if (ally.is_player != caster.is_player and ally.id != caster.id) continue;
+			if (feet_distance(caster.x, caster.y, ally.x, ally.y) > 30) continue;
+			int deficit = ally.max_hp - ally.current_hp;
+			if (deficit > worst_deficit) {
+				worst_deficit = deficit;
+				@best_target = ally;
+			}
+		}
+		// If no injured ally, heal self (even if at full, apply_healing handles cap)
+		if (@best_target == null) @best_target = caster;
+		int eff = combat.apply_healing(best_target, heal);
+		if (eff > 0) {
+			record_effective_healing(caster.player_username, eff);
+			broadcast_announce("Chalice form healing: " + best_target.name + " regains " + eff + " HP!", false);
+		}
+	}
+
 	// Xanathar's Circle of the Shepherd L2 Unicorn Spirit Totem (para 923):
 	// "if you cast a spell using a spell slot that restores hit points to any
 	// creature inside or outside the aura, each creature of your choice in
@@ -6784,6 +6821,8 @@ class battle_manager {
 		c.sudden_strike_used_this_turn = false;
 		// Xanathar's Storm Herald L14 Raging Storm per-turn flag reset
 		c.raging_storm_used_this_turn = false;
+		// Tasha's Circle of Stars Archer per-turn BA attack reset
+		c.starry_form_archer_used_this_turn = false;
 		// Xanathar's Storm Herald L10 Shielding Storm (para 428): refresh resistance on allies
 		if (c.class_name == "Barbarian" and c.subclass == "Storm Herald" and c.storm_aura_active and c.level >= 10) {
 			apply_shielding_storm(c);
@@ -14982,6 +15021,7 @@ class battle_manager {
 			}
 			broadcast_announce(target.name + " healed for " + heal_amount + " HP! Now at " + target.current_hp + ".", true);
 			try_unicorn_totem_heal(c);
+			try_chalice_healing(c);
 		}
 		else if (spell.id == "spiritual_weapon") {
 			clear_spiritual_weapon_effect(c, false);
@@ -16516,6 +16556,7 @@ class battle_manager {
 				record_effective_healing(c.player_username, effective);
 				broadcast_announce(c.name + " heals " + target.name + " for " + heal + " HP with Cure Wounds.", true);
 				try_unicorn_totem_heal(c);
+				try_chalice_healing(c);
 			}
 			else if (spell.id == "fireball") {
 				// Basic Rules para 13302: "Each creature in a 20-foot-radius Sphere
@@ -17173,6 +17214,7 @@ class battle_manager {
 						broadcast_announce(c.name + "'s Words of Creation echoes Power Word Heal onto " + second.name + " — full health restored!", true);
 					}
 				}
+				try_chalice_healing(c);
 			}
 			else if (spell.id == "sunburst") {
 				// Basic Rules para 15267: "Brilliant sunlight flashes in a 60-foot-radius
@@ -17286,6 +17328,7 @@ class battle_manager {
 				record_effective_healing(c.player_username, effective);
 				broadcast_announce(c.name + " heals " + target.name + " for " + heal + " HP with Healing Word.", true);
 				try_unicorn_totem_heal(c);
+				try_chalice_healing(c);
 			}
 			else if (spell.id == "mass_healing_word") {
 				// Basic Rules para 14145: "Up to six creatures of your choice that you can
@@ -17312,6 +17355,7 @@ class battle_manager {
 				}
 				broadcast_announce(c.name + " casts Mass Healing Word, healing " + healed + " ally" + (healed == 1 ? "" : "ies") + " for " + heal + " HP each.", true);
 				try_unicorn_totem_heal(c);
+				try_chalice_healing(c);
 			}
 			else if (spell.id == "feeblemind" and @target != null) {
 				// Basic Rules (not quoted — using the 2024 version): target INT save or
@@ -18348,6 +18392,7 @@ class battle_manager {
 				} else {
 					broadcast_announce(c.name + " casts Goodberry, but is already at full health.", true);
 				}
+				try_chalice_healing(c);
 			}
 			else if (spell.id == "grease") {
 				// DEX save in 10 ft area, prone on fail
@@ -20679,6 +20724,7 @@ class battle_manager {
 					healed++;
 				}
 				broadcast_announce(c.name + " casts Prayer of Healing, restoring " + heal + " HP to " + healed + " ally" + (healed == 1 ? "" : "ies") + ".", true);
+				try_chalice_healing(c);
 			}
 			else if (spell.id == "call_lightning") {
 				// Basic Rules 2024 Call Lightning (para 12321-12323): DEX save, 3d10
@@ -20895,6 +20941,7 @@ class battle_manager {
 					healed++;
 				}
 				broadcast_announce(c.name + " casts Mass Cure Wounds, restoring " + heal + " HP to " + healed + " ally" + (healed == 1 ? "" : "ies") + ".", true);
+				try_chalice_healing(c);
 			}
 			else if (spell.id == "circle_of_death") {
 				// Basic Rules: CON save, 8d6 necrotic in 60 ft sphere. Upcast +2d6 per level.

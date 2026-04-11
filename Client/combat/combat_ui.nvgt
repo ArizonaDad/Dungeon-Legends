@@ -286,6 +286,10 @@ bool my_deft_strike_active = false;
 int my_sharpen_the_blade_bonus = 0;
 bool my_unerring_accuracy_active = false;
 bool my_sun_shield_active = false;
+// Tasha's Circle of Stars Druid (paras 2131-2181) — Starry Form
+bool my_starry_form_active = false;
+string my_starry_form_type = "";
+bool my_starry_form_archer_used_this_turn = false;
 // Horizon Walker / Monster Slayer / Oath of Redemption (Xanathar's)
 bool my_spectral_defense_active = false;
 bool my_supernatural_defense_active = false;
@@ -1150,6 +1154,7 @@ void show_bonus_action_menu() {
 	int genie_vessel_opt = -1;
 	int form_of_dread_opt = -1;
 	int starry_form_opt = -1;
+	int starry_form_archer_opt = -1;
 	int wildfire_opt = -1;
 	int echo_manifest_opt = -1;
 	int unleash_incarnation_opt = -1;
@@ -1654,6 +1659,10 @@ void show_bonus_action_menu() {
 	}
 	if (lc == "druid" and subclass == "Circle of the Stars") {
 		starry_form_opt = m.add_item("Starry Form. Bonus action. Assume Chalice, Archer, or Dragon form.");
+		if (my_starry_form_active and my_starry_form_type == "Archer" and !my_starry_form_archer_used_this_turn) {
+			string archer_dice = level >= 10 ? "2d8" : "1d8";
+			starry_form_archer_opt = m.add_item("Archer Attack. Bonus action. Ranged spell attack, 60ft, " + archer_dice + "+WIS radiant.");
+		}
 	}
 	if (lc == "druid" and subclass == "Circle of Wildfire") {
 		wildfire_opt = m.add_item("Wildfire Spirit. Action. Summon a wildfire spirit companion.");
@@ -2712,6 +2721,14 @@ void show_bonus_action_menu() {
 		else if (sfr == 2) form = "Dragon";
 		send({{"type", message_types::bonus_action}, {"feature", "starry_form"}, {"form", form}});
 		speak("Starry Form: " + form, true);
+	}
+	else if (starry_form_archer_opt >= 0 and res == starry_form_archer_opt) {
+		if (current_target_id == 0) {
+			speak("No target selected. Scan with I J K L and press Enter to lock a target.", true);
+			return;
+		}
+		send({{"type", message_types::bonus_action}, {"feature", "starry_form_archer_attack"}, {"target_id", current_target_id}});
+		speak("Archer constellation firing at target.", true);
 	}
 	else if (wildfire_opt >= 0 and res == wildfire_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "wildfire_spirit"}});
@@ -4428,6 +4445,10 @@ void parse_game_state(json_object@ msg) {
 	my_sharpen_the_blade_bonus = msg.exists("my_sharpen_the_blade_bonus") ? int(msg["my_sharpen_the_blade_bonus"]) : 0;
 	my_unerring_accuracy_active = msg.exists("my_unerring_accuracy_active") ? bool(msg["my_unerring_accuracy_active"]) : false;
 	my_sun_shield_active = msg.exists("my_sun_shield_active") ? bool(msg["my_sun_shield_active"]) : false;
+	// Tasha's Circle of Stars Druid — Starry Form state
+	my_starry_form_active = msg.exists("my_starry_form_active") ? bool(msg["my_starry_form_active"]) : false;
+	my_starry_form_type = msg.exists("my_starry_form_type") ? string(msg["my_starry_form_type"]) : "";
+	my_starry_form_archer_used_this_turn = msg.exists("my_starry_form_archer_used_this_turn") ? bool(msg["my_starry_form_archer_used_this_turn"]) : false;
 	my_wholeness_of_body_uses = msg.exists("my_wholeness_of_body_uses") ? int(msg["my_wholeness_of_body_uses"]) : 0;
 	my_wholeness_of_body_uses_max = msg.exists("my_wholeness_of_body_uses_max") ? int(msg["my_wholeness_of_body_uses_max"]) : 0;
 	my_quivering_palm_pending = msg.exists("my_quivering_palm_pending") ? bool(msg["my_quivering_palm_pending"]) : false;
@@ -4725,6 +4746,9 @@ void reset_combat_state() {
 	my_sharpen_the_blade_bonus = 0;
 	my_unerring_accuracy_active = false;
 	my_sun_shield_active = false;
+	my_starry_form_active = false;
+	my_starry_form_type = "";
+	my_starry_form_archer_used_this_turn = false;
 	my_spectral_defense_active = false;
 	my_supernatural_defense_active = false;
 	my_slayers_counter_active = false;

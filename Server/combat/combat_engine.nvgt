@@ -599,6 +599,7 @@ class combatant {
 	bool raging_storm_used_this_turn = false;  // Desert/Sea reaction 1/turn
 	bool starry_form_active = false; // Circle of Stars Druid
 	string starry_form_type = ""; // Archer/Chalice/Dragon
+	bool starry_form_archer_used_this_turn = false; // Tasha's Archer form BA 1/turn
 	bool land_stride_active = false; // Circle of the Land
 	bool open_hand_ki_used = false; // Way of the Open Hand
 	// PHB 2024 Warrior of the Open Hand (paras 5376-5400)
@@ -2907,6 +2908,10 @@ class battle {
 				state["my_divine_soul_affinity"] = c.divine_soul_affinity;
 				state["my_otherworldly_wings_active"] = c.otherworldly_wings_active;
 				state["my_unearthly_recovery_available"] = c.unearthly_recovery_available;
+				// Tasha's Circle of Stars Druid (paras 2131-2181) — Starry Form state
+				state["my_starry_form_active"] = c.starry_form_active;
+				state["my_starry_form_type"] = c.starry_form_type;
+				state["my_starry_form_archer_used_this_turn"] = c.starry_form_archer_used_this_turn;
 				// PHB 2024 Boon of Dimensional Travel (para 7876)
 				state["my_blink_steps_available"] = c.blink_steps_available;
 				// PHB 2024 Elemental Adept type (para 7610)

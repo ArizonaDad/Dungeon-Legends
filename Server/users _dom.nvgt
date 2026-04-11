@@ -4240,6 +4240,44 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.room.bm.broadcast_announce(c.name + " assumes Starry Form: " + form + "!", true);
 		}
 
+		else if (feature == "starry_form_archer_attack") {
+			// Tasha's Circle of Stars L2 Starry Form — Archer (para 2153-2159):
+			// "A luminous arrow, which you can use to make ranged spell attacks...
+			// dealing radiant damage equal to 1d8 + your Wisdom modifier."
+			// L10 Twinkling Constellations (para 2169-2173): damage scales to 2d8.
+			if (c.class_name != "Druid" or c.subclass != "Circle of the Stars") { u.send({{"type", message_types::announce}, {"text", "Only Circle of the Stars druids can use Starry Form Archer."}, {"interrupt", true}}); return; }
+			if (!c.starry_form_active or c.starry_form_type != "Archer") { u.send({{"type", message_types::announce}, {"text", "You must be in Archer Starry Form to use this."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			if (c.starry_form_archer_used_this_turn) { u.send({{"type", message_types::announce}, {"text", "Already used Archer attack this turn."}, {"interrupt", true}}); return; }
+			combatant@ tgt = target_id != 0 ? u.room.bm.combat.get_combatant(target_id) : null;
+			if (@tgt == null or tgt.is_dead) { u.send({{"type", message_types::announce}, {"text", "Invalid target."}, {"interrupt", true}}); return; }
+			int dist = feet_distance(c.x, c.y, tgt.x, tgt.y);
+			if (dist > 60) { u.send({{"type", message_types::announce}, {"text", "Target is out of range (60 ft). Distance: " + dist + " ft."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.starry_form_archer_used_this_turn = true;
+			int wis_mod = c.get_ability_mod(ABILITY_WIS);
+			int spell_atk = wis_mod + c.proficiency;
+			int roll = random(1, 20);
+			int total = roll + spell_atk;
+			// Tasha's L10 Twinkling Constellations (para 2169-2173): 2d8 at L10+
+			int dice_count = c.level >= 10 ? 2 : 1;
+			if (total >= tgt.armor_class or roll == 20) {
+				int dmg = 0;
+				for (int di = 0; di < dice_count; di++) dmg += random(1, 8);
+				dmg += wis_mod;
+				if (dmg < 1) dmg = 1;
+				if (roll == 20) dmg *= 2; // crit
+				u.room.bm.combat.apply_damage(tgt, dmg, DMG_RADIANT, c);
+				string crit_str = roll == 20 ? " CRITICAL HIT!" : "";
+				u.room.bm.broadcast_announce(c.name + "'s Archer constellation strikes " + tgt.name + " for " + dmg + " radiant damage!" + crit_str + " (Rolled " + roll + "+" + spell_atk + "=" + total + " vs AC " + tgt.armor_class + ")", true);
+			} else {
+				u.room.bm.broadcast_announce(c.name + "'s Archer constellation misses " + tgt.name + ". (Rolled " + roll + "+" + spell_atk + "=" + total + " vs AC " + tgt.armor_class + ")", false);
+			}
+			u.room.bm.broadcast_state();
+			u.room.bm.check_battle_end();
+		}
+
 		else if (feature == "land_stride") {
 			// Circle of the Land Druid: Land's Stride - ignore difficult terrain
 			if (c.class_name != "Druid" or c.subclass != "Circle of the Land") { u.send({{"type", message_types::announce}, {"text", "Only Circle of the Land druids can use Land's Stride."}, {"interrupt", true}}); return; }
