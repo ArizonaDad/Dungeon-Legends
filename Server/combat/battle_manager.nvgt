@@ -4009,13 +4009,108 @@ class battle_manager {
 				lev_t.levitate_source_id = 0;
 			}
 		}
-		// Compulsion: clear Charmed from all targets when concentration breaks.
-		// Approximation — blanket-clear since we don't track per-target spell sources.
-		if (caster.concentration_spell == "Compulsion") {
+		// Charm/Dominate/Hypnotic Pattern/Enthrall/Compulsion: remove COND_CHARMED
+		// (and COND_INCAPACITATED for Hypnotic Pattern) from targets when the
+		// caster's concentration breaks. Uses charm_spell_caster_id for precise
+		// per-caster tracking; Compulsion blanket-clears as a fallback since it
+		// hits multiple targets and doesn't set the tracking field.
+		string conc = caster.concentration_spell;
+		bool is_charm_conc = (conc == "Charm Person" or conc == "Charm Monster"
+			or conc == "Dominate Person" or conc == "Dominate Monster"
+			or conc == "Dominate Beast" or conc == "Hypnotic Pattern"
+			or conc == "Enthrall" or conc == "Compulsion");
+		if (is_charm_conc) {
 			for (uint cpi = 0; cpi < combat.combatants.length(); cpi++) {
 				combatant@ cp_t = combat.combatants[cpi];
-				if (@cp_t != null and cp_t.has_condition(COND_CHARMED)) {
+				if (@cp_t == null or cp_t.is_dead) continue;
+				// Source-tracked targets: only clear charm from this caster's victims
+				if (cp_t.charm_spell_caster_id == caster.id and cp_t.has_condition(COND_CHARMED)) {
 					cp_t.remove_condition(COND_CHARMED);
+					cp_t.charm_spell_caster_id = 0;
+					// Hypnotic Pattern also applies Incapacitated alongside Charmed
+					if (conc == "Hypnotic Pattern" and cp_t.has_condition(COND_INCAPACITATED)) {
+						cp_t.remove_condition(COND_INCAPACITATED);
+					}
+					broadcast_announce(cp_t.name + " is freed from " + conc + "!", true);
+				}
+				// Compulsion fallback: blanket-clear (no per-target tracking)
+				if (conc == "Compulsion" and cp_t.has_condition(COND_CHARMED)) {
+					cp_t.remove_condition(COND_CHARMED);
+				}
+			}
+		}
+		// Hold Person / Hold Monster: remove COND_PARALYZED from held targets
+		if (conc == "Hold Person" or conc == "Hold Monster") {
+			for (uint hpi = 0; hpi < combat.combatants.length(); hpi++) {
+				combatant@ hp_t = combat.combatants[hpi];
+				if (@hp_t == null or hp_t.is_dead) continue;
+				if (hp_t.hold_spell_caster_id == caster.id and hp_t.has_condition(COND_PARALYZED)) {
+					hp_t.remove_condition(COND_PARALYZED);
+					hp_t.hold_spell_caster_id = 0;
+					broadcast_announce(hp_t.name + " is freed from " + conc + "!", true);
+				}
+			}
+		}
+		// Tasha's Hideous Laughter: remove COND_INCAPACITATED + COND_PRONE
+		if (conc == "Tasha's Hideous Laughter") {
+			for (uint thi = 0; thi < combat.combatants.length(); thi++) {
+				combatant@ th_t = combat.combatants[thi];
+				if (@th_t == null or th_t.is_dead) continue;
+				if (th_t.laughter_spell_caster_id == caster.id) {
+					if (th_t.has_condition(COND_INCAPACITATED)) th_t.remove_condition(COND_INCAPACITATED);
+					if (th_t.has_condition(COND_PRONE)) th_t.remove_condition(COND_PRONE);
+					th_t.laughter_spell_caster_id = 0;
+					broadcast_announce(th_t.name + " stops laughing as the spell fades!", true);
+				}
+			}
+		}
+		// Fear / Phantasmal Killer / Eyebite: remove COND_FRIGHTENED from targets
+		// where this caster is the frightened_source_id. All three spells already
+		// set frightened_source_id = c.id in their handlers.
+		if (conc == "Fear" or conc == "Phantasmal Killer" or conc == "Eyebite") {
+			for (uint fri = 0; fri < combat.combatants.length(); fri++) {
+				combatant@ fr_t = combat.combatants[fri];
+				if (@fr_t == null or fr_t.is_dead) continue;
+				if (fr_t.frightened_source_id == caster.id and fr_t.has_condition(COND_FRIGHTENED)) {
+					fr_t.remove_condition(COND_FRIGHTENED);
+					broadcast_announce(fr_t.name + " is freed from " + conc + "!", true);
+				}
+			}
+		}
+		// Web / Entangle / Flesh to Stone: remove COND_RESTRAINED from targets
+		if (conc == "Web" or conc == "Entangle" or conc == "Flesh to Stone") {
+			for (uint ri = 0; ri < combat.combatants.length(); ri++) {
+				combatant@ r_t = combat.combatants[ri];
+				if (@r_t == null or r_t.is_dead) continue;
+				if (r_t.restrained_spell_caster_id == caster.id and r_t.has_condition(COND_RESTRAINED)) {
+					r_t.remove_condition(COND_RESTRAINED);
+					r_t.restrained_spell_caster_id = 0;
+					broadcast_announce(r_t.name + " is freed from " + conc + "!", true);
+				}
+			}
+		}
+		// Sleep / Confusion / Otto's Irresistible Dance: remove COND_INCAPACITATED
+		if (conc == "Sleep" or conc == "Confusion" or conc == "Otto's Irresistible Dance") {
+			for (uint ici = 0; ici < combat.combatants.length(); ici++) {
+				combatant@ ic_t = combat.combatants[ici];
+				if (@ic_t == null or ic_t.is_dead) continue;
+				if (ic_t.incap_spell_caster_id == caster.id) {
+					if (ic_t.has_condition(COND_INCAPACITATED)) ic_t.remove_condition(COND_INCAPACITATED);
+					if (ic_t.has_condition(COND_UNCONSCIOUS)) ic_t.remove_condition(COND_UNCONSCIOUS);
+					ic_t.incap_spell_caster_id = 0;
+					broadcast_announce(ic_t.name + " is freed from " + conc + "!", true);
+				}
+			}
+		}
+		// Sunbeam: remove COND_BLINDED from targets
+		if (conc == "Sunbeam") {
+			for (uint sbi = 0; sbi < combat.combatants.length(); sbi++) {
+				combatant@ sb_t = combat.combatants[sbi];
+				if (@sb_t == null or sb_t.is_dead) continue;
+				if (sb_t.blinded_spell_caster_id == caster.id and sb_t.has_condition(COND_BLINDED)) {
+					sb_t.remove_condition(COND_BLINDED);
+					sb_t.blinded_spell_caster_id = 0;
+					broadcast_announce(sb_t.name + "'s blindness fades as Sunbeam ends!", true);
 				}
 			}
 		}
@@ -4672,13 +4767,13 @@ class battle_manager {
 
 		// End-of-turn saves for the combatant whose turn just ended
 		if (@prev != null and prev.is_alive()) {
-			// Hold Person: WIS save to end Paralyzed (from Hold Person specifically)
-			if (prev.has_condition(COND_PARALYZED) and prev.is_concentrating == false) {
-				// Find if any caster is concentrating on Hold Person affecting this target
+			// Hold Person / Hold Monster: WIS save to end Paralyzed
+			if (prev.has_condition(COND_PARALYZED) and prev.hold_spell_caster_id != 0) {
 				for (uint ci = 0; ci < combat.combatants.length(); ci++) {
 					combatant@ caster = combat.combatants[ci];
 					if (@caster == null or caster.is_dead) continue;
-					if (caster.concentration_spell == "Hold Person" and caster.is_concentrating) {
+					if (caster.id == prev.hold_spell_caster_id and caster.is_concentrating
+						and (caster.concentration_spell == "Hold Person" or caster.concentration_spell == "Hold Monster")) {
 						int save_roll = random(1, 20);
 						if (prev.staggering_blow_active) { int sb2 = random(1, 20); if (sb2 < save_roll) save_roll = sb2; prev.staggering_blow_active = false; broadcast_announce(prev.name + " has disadvantage from Staggering Blow!", false); }
 						apply_hound_save_disadvantage(prev, caster.id, save_roll);
@@ -4686,17 +4781,19 @@ class battle_manager {
 						int save_dc_val = spell_save_dc(caster);
 						int save_total = save_roll + save_bonus;
 						bool saved = save_total >= save_dc_val;
-						broadcast_roll(prev.name, "WIS save vs Hold Person (end of turn)", save_roll, save_bonus, save_total, saved ? "Freed!" : "Still paralyzed!");
+						string hold_name = caster.concentration_spell;
+						broadcast_roll(prev.name, "WIS save vs " + hold_name + " (end of turn)", save_roll, save_bonus, save_total, saved ? "Freed!" : "Still paralyzed!");
 						if (!saved and try_arcane_deflection_save(prev, save_dc_val, save_total)) saved = true;
-						if (!saved) { int ff_total = try_fanatical_focus(prev, save_dc_val, save_total, save_bonus, "WIS save vs Hold Person"); if (ff_total >= save_dc_val) saved = true; }
-						if (!saved) { int ds = try_disciplined_survivor_reroll(prev, save_dc_val, save_total, save_bonus, "WIS save vs Hold Person"); if (ds >= save_dc_val) saved = true; }
-						if (!saved) { int new_total = try_flash_of_genius(prev, save_dc_val, save_total, "WIS save vs Hold Person"); if (new_total >= save_dc_val) saved = true; }
-						if (!saved) { int ms_total = try_maverick_spirit(prev, save_dc_val, save_total, "WIS save vs Hold Person"); if (ms_total >= save_dc_val) saved = true; }
+						if (!saved) { int ff_total = try_fanatical_focus(prev, save_dc_val, save_total, save_bonus, "WIS save vs " + hold_name); if (ff_total >= save_dc_val) saved = true; }
+						if (!saved) { int ds = try_disciplined_survivor_reroll(prev, save_dc_val, save_total, save_bonus, "WIS save vs " + hold_name); if (ds >= save_dc_val) saved = true; }
+						if (!saved) { int new_total = try_flash_of_genius(prev, save_dc_val, save_total, "WIS save vs " + hold_name); if (new_total >= save_dc_val) saved = true; }
+						if (!saved) { int ms_total = try_maverick_spirit(prev, save_dc_val, save_total, "WIS save vs " + hold_name); if (ms_total >= save_dc_val) saved = true; }
 						if (!saved and try_mage_slayer_guarded_mind(prev, ABILITY_WIS)) saved = true;
 						if (!saved) { int bf = try_boon_of_fate_bonus(prev, save_total, save_dc_val); if (bf > 0) saved = true; }
 						if (!saved and try_stroke_of_luck_save(prev, save_dc_val, save_bonus)) saved = true;
 						if (saved) {
 							prev.remove_condition(COND_PARALYZED);
+							prev.hold_spell_caster_id = 0;
 							broadcast_to_battle({{"type", message_types::condition_removed}, {"target", prev.name}, {"condition", "Paralyzed"}});
 						}
 						break;
@@ -4724,6 +4821,7 @@ class battle_manager {
 						if (!saved and try_stroke_of_luck_save(prev, save_dc_val, save_bonus)) saved = true;
 						if (saved) {
 							prev.remove_condition(COND_RESTRAINED);
+							prev.restrained_spell_caster_id = 0;
 							broadcast_to_battle({{"type", message_types::condition_removed}, {"target", prev.name}, {"condition", "Restrained"}});
 						}
 						break;
@@ -4790,11 +4888,12 @@ class battle_manager {
 				}
 			}
 			// Tasha's Hideous Laughter: WIS save each turn
-			if (prev.has_condition(COND_INCAPACITATED) and prev.has_condition(COND_PRONE)) {
+			if (prev.has_condition(COND_INCAPACITATED) and prev.laughter_spell_caster_id != 0) {
 				for (uint ci = 0; ci < combat.combatants.length(); ci++) {
 					combatant@ caster = combat.combatants[ci];
 					if (@caster == null or caster.is_dead) continue;
-					if (caster.concentration_spell == "Tasha's Hideous Laughter" and caster.is_concentrating) {
+					if (caster.id == prev.laughter_spell_caster_id and caster.is_concentrating
+						and caster.concentration_spell == "Tasha's Hideous Laughter") {
 						int save_roll = random(1, 20);
 						if (prev.staggering_blow_active) { int sb2 = random(1, 20); if (sb2 < save_roll) save_roll = sb2; prev.staggering_blow_active = false; broadcast_announce(prev.name + " has disadvantage from Staggering Blow!", false); }
 						apply_hound_save_disadvantage(prev, caster.id, save_roll);
@@ -4814,6 +4913,7 @@ class battle_manager {
 						if (saved) {
 							prev.remove_condition(COND_INCAPACITATED);
 							prev.remove_condition(COND_PRONE);
+							prev.laughter_spell_caster_id = 0;
 							broadcast_to_battle({{"type", message_types::condition_removed}, {"target", prev.name}, {"condition", "Incapacitated"}});
 						}
 						break;
@@ -12878,6 +12978,7 @@ class battle_manager {
 					broadcast_roll(t.name, "DEX save vs Web", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Restrained!");
 					if (!saved) {
 						t.add_condition(COND_RESTRAINED);
+						t.restrained_spell_caster_id = c.id;
 						broadcast_to_battle({{"type", message_types::condition_applied}, {"target", t.name}, {"condition", "Restrained"}});
 					}
 				}
@@ -12985,6 +13086,7 @@ class battle_manager {
 					if (!saved) {
 						t.add_condition(COND_CHARMED);
 						t.add_condition(COND_INCAPACITATED);
+						t.charm_spell_caster_id = c.id;
 						broadcast_to_battle({{"type", message_types::condition_applied}, {"target", t.name}, {"condition", "Charmed"}});
 						broadcast_to_battle({{"type", message_types::condition_applied}, {"target", t.name}, {"condition", "Incapacitated"}});
 					}
@@ -13046,6 +13148,7 @@ class battle_manager {
 				if (!saved and try_stroke_of_luck_save(target, save_dc, save_bonus + bless_bonus)) saved = true;
 				if (!saved) {
 					target.add_condition(COND_PARALYZED);
+					target.hold_spell_caster_id = c.id;
 					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Paralyzed"}});
 				}
 				// Twinned Spell: Hold Person on second target
@@ -13067,6 +13170,7 @@ class battle_manager {
 					if (!t2_saved and try_stroke_of_luck_save(twinned_target, save_dc, t2_bonus + t2_bless)) t2_saved = true;
 					if (!t2_saved) {
 						twinned_target.add_condition(COND_PARALYZED);
+						twinned_target.hold_spell_caster_id = c.id;
 						broadcast_to_battle({{"type", message_types::condition_applied}, {"target", twinned_target.name}, {"condition", "Paralyzed"}});
 					}
 				}
@@ -13100,6 +13204,7 @@ class battle_manager {
 					broadcast_roll(hm_t.name, "WIS save vs Hold Monster", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Paralyzed!");
 					if (!saved) {
 						hm_t.add_condition(COND_PARALYZED);
+						hm_t.hold_spell_caster_id = c.id;
 						broadcast_to_battle({{"type", message_types::condition_applied}, {"target", hm_t.name}, {"condition", "Paralyzed"}});
 					}
 				}
@@ -15122,6 +15227,7 @@ class battle_manager {
 					combat.apply_damage(t, dmg, DMG_RADIANT, c);
 					if (!saved) {
 						t.add_condition(COND_BLINDED);
+						t.blinded_spell_caster_id = c.id;
 					}
 				}
 				broadcast_state();
@@ -15315,6 +15421,7 @@ class battle_manager {
 				if (!saved and try_stroke_of_luck_save(target, save_dc, save_bonus + bless_bonus)) saved = true;
 				if (!saved) {
 					target.add_condition(COND_CHARMED);
+					target.charm_spell_caster_id = c.id;
 					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Charmed"}});
 					broadcast_announce(target.name + " is dominated by " + c.name + "!", true);
 				}
@@ -15358,6 +15465,7 @@ class battle_manager {
 				if (!saved and try_stroke_of_luck_save(target, save_dc, save_bonus + bless_bonus)) saved = true;
 				if (!saved) {
 					target.add_condition(COND_CHARMED);
+					target.charm_spell_caster_id = c.id;
 					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Charmed"}});
 					broadcast_announce(target.name + " is charmed by " + c.name + "!", true);
 				}
@@ -15394,6 +15502,7 @@ class battle_manager {
 					broadcast_roll(t.name, "WIS save vs Sleep", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Incapacitated!");
 					if (!saved) {
 						t.add_condition(COND_INCAPACITATED);
+						t.incap_spell_caster_id = c.id;
 						broadcast_to_battle({{"type", message_types::condition_applied}, {"target", t.name}, {"condition", "Incapacitated"}});
 						broadcast_announce(t.name + " is lulled by Sleep! Must save again at end of turn or fall Unconscious.", false);
 					}
@@ -15444,6 +15553,7 @@ class battle_manager {
 				if (!saved) {
 					target.add_condition(COND_PRONE);
 					target.add_condition(COND_INCAPACITATED);
+					target.laughter_spell_caster_id = c.id;
 					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Prone"}});
 					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Incapacitated"}});
 					broadcast_announce(target.name + " falls prone laughing uncontrollably!", true);
@@ -15683,6 +15793,7 @@ class battle_manager {
 					broadcast_roll(t.name, "STR save vs Entangle", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Restrained!");
 					if (!saved) {
 						t.add_condition(COND_RESTRAINED);
+						t.restrained_spell_caster_id = c.id;
 						broadcast_to_battle({{"type", message_types::condition_applied}, {"target", t.name}, {"condition", "Restrained"}});
 					}
 				}
@@ -16107,6 +16218,7 @@ class battle_manager {
 					broadcast_roll(t.name, "WIS save vs Confusion", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Confused!");
 					if (!saved) {
 						t.add_condition(COND_INCAPACITATED);
+						t.incap_spell_caster_id = c.id;
 						broadcast_to_battle({{"type", message_types::condition_applied}, {"target", t.name}, {"condition", "Confused"}});
 					}
 				}
@@ -16389,7 +16501,9 @@ class battle_manager {
 				if (!saved and try_stroke_of_luck_save(target, save_dc, save_bonus + bless_bonus)) saved = true;
 				if (!saved) {
 					target.add_condition(COND_CHARMED);
+					target.charm_spell_caster_id = c.id;
 					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Charmed"}});
+					broadcast_announce(target.name + " is dominated by " + c.name + "!", true);
 				}
 			}
 			else if (spell.id == "glibness") {
@@ -16737,6 +16851,7 @@ class battle_manager {
 				if (!saved and try_stroke_of_luck_save(target, save_dc, save_bonus + bless_bonus)) saved = true;
 				if (!saved) {
 					target.add_condition(COND_CHARMED);
+					target.charm_spell_caster_id = c.id;
 					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Charmed"}});
 					broadcast_announce(c.name + " enthralls " + target.name + " for 1 minute.", true);
 				}
@@ -16860,6 +16975,7 @@ class battle_manager {
 				if (!saved and try_stroke_of_luck_save(target, save_dc, save_bonus + bless_bonus)) saved = true;
 				if (!saved) {
 					target.add_condition(COND_CHARMED);
+					target.charm_spell_caster_id = c.id;
 					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Charmed"}});
 					broadcast_announce(c.name + " charms " + target.name + " with Charm Monster.", true);
 				}
@@ -16942,6 +17058,7 @@ class battle_manager {
 				if (!saved and try_stroke_of_luck_save(target, save_dc, save_bonus + bless_bonus)) saved = true;
 				if (!saved) {
 					target.add_condition(COND_CHARMED);
+					target.charm_spell_caster_id = c.id;
 					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Charmed"}});
 					broadcast_announce(c.name + " dominates " + target.name + " with Dominate Beast.", true);
 				}
@@ -17117,6 +17234,7 @@ class battle_manager {
 				broadcast_roll(target.name, "CON save vs Flesh to Stone", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Petrifying!");
 				if (!saved) {
 					target.add_condition(COND_RESTRAINED);
+					target.restrained_spell_caster_id = c.id;
 					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Restrained"}});
 					broadcast_announce(c.name + " begins petrifying " + target.name + " with Flesh to Stone!", true);
 				}
@@ -17144,6 +17262,7 @@ class battle_manager {
 				broadcast_roll(target.name, "WIS save vs Otto's Irresistible Dance", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Dancing!");
 				if (!saved) {
 					target.add_condition(COND_INCAPACITATED);
+					target.incap_spell_caster_id = c.id;
 					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Incapacitated"}});
 					broadcast_announce(c.name + " compels " + target.name + " to dance uncontrollably!", true);
 				}

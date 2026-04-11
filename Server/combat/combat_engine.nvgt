@@ -607,6 +607,12 @@ class combatant {
 	bool orders_demand_used = false; // Order Domain Cleric Channel Divinity
 	uint orders_demand_charmed_by = 0; // ID of cleric who charmed this target via Order's Demand
 	int orders_demand_turns_left = 0; // turns remaining until charm expires (2 when set, decrements at caster's turn end)
+	uint charm_spell_caster_id = 0; // ID of caster who applied COND_CHARMED via a concentration charm/dominate spell
+	uint hold_spell_caster_id = 0; // ID of caster who applied COND_PARALYZED via Hold Person/Monster
+	uint laughter_spell_caster_id = 0; // ID of caster who applied COND_INCAPACITATED+PRONE via Tasha's Hideous Laughter
+	uint restrained_spell_caster_id = 0; // ID of caster who applied COND_RESTRAINED via Web/Entangle/Flesh to Stone
+	uint incap_spell_caster_id = 0; // ID of caster who applied COND_INCAPACITATED via Sleep/Confusion/Otto's Irresistible Dance
+	uint blinded_spell_caster_id = 0; // ID of caster who applied COND_BLINDED via Sunbeam
 	bool wizardly_quill_active = false; // Order of Scribes Wizard
 	int awakened_spellbook_changes = 0; // Order of Scribes - replace damage type
 	// Gunslinger subclasses (Valda's Spire of Secrets paras 229-490)
