@@ -472,8 +472,9 @@ class combatant {
 	int warding_maneuver_uses_max = 0;
 	bool warding_maneuver_resistance = false; // consumed in apply_damage to halve damage
 	bool hold_the_line_active = false; // L10: deferred (needs OA trigger on 5ft move)
-	bool ferocious_charger_active = false; // L15: deferred (needs movement path tracking)
+	bool ferocious_charger_active = false; // L15: Xanathar's para 1679-1680
 	bool ferocious_charger_used_this_turn = false;
+	int distance_moved_this_turn = 0;
 	bool vigilant_defender_active = false; // L18: deferred (needs multi-reaction system)
 	// Oath of Conquest Paladin (Xanathar's paras 1992-2003)
 	bool scornful_rebuke_active = false; // L15: attacker takes CHA mod psychic on hit
@@ -486,6 +487,11 @@ class combatant {
 	bool stalkers_flurry_active = false; // L11: on miss, make another weapon attack
 	bool stalkers_flurry_used_this_turn = false; // once per turn
 	bool shadowy_dodge_active = false; // L15: reaction to impose disadvantage
+	// Xanathar's/Tasha's Fey Wanderer L11 Distant Strike: teleport 10ft before each
+	// attack; if 2+ different targets hit, grant one bonus attack.
+	bool distant_strike_active = false;
+	array<uint> distant_strike_targets_hit; // track unique target IDs hit this Attack action
+	bool distant_strike_bonus_granted = false; // prevent granting multiple bonus attacks
 	int superiority_maneuvers_known = 0; // Battle Master
 	int drunken_master_advantage = 0; // Drunken Master Monk (unused legacy field)
 	// Way of the Drunken Master (Xanathar's paras 1780-1805)
@@ -542,6 +548,13 @@ class combatant {
 	bool emboldening_bond_active = false; // Peace Domain Cleric
 	bool drunken_master_opportunity = false; // DEPRECATED: Redirect Attack is now auto-resolved in finalize_roll_result
 	bool drunkards_luck_active = false; // Drunken Master L11: spend 1 ki to cancel save disadvantage
+	// PHB 2024 Monk L10 Heightened Focus — Step of the Wind ally carry (para 5348-5349):
+	// "you can choose a willing creature within 5 feet of you that is Large or smaller.
+	// That creature can move with you until the end of your turn."
+	uint step_carry_ally_id = 0; // ID of ally being carried by Step of the Wind this turn
+	// Tasha's Rune Knight L18 Runic Juggernaut: when Giant's Might activates at L18+,
+	// size becomes Huge instead of Large, and reach increases by 5 feet.
+	bool runic_juggernaut_active = false;
 	array<uint> flurry_targets_hit; // Xanathar's Drunken Master L17 Intoxicated Frenzy: track IDs of targets already hit this flurry
 	bool arcane_shot_pending = false; // Arcane Archer Fighter
 	string arcane_shot_type = "";
@@ -1448,6 +1461,9 @@ class combatant {
 	// cast of a level <=5 cleric spell consumes the flag instead of a spell slot.
 	bool divine_intervention_ready = false;
 	bool divine_intervention_used_this_rest = false;
+	// PHB 2024 Cleric L20 Greater Divine Intervention (para 3628-3631): auto-succeed,
+	// heals all allies to full + removes conditions (combined Greater Restoration + Mass Heal).
+	bool greater_divine_intervention_active = false;
 
 	// PHB 2024 Druid L1 Primal Order (para 4387-4390) — "" / "magician" / "warden"
 	string primal_order = "";
@@ -1461,7 +1477,9 @@ class combatant {
 	// (slot → wild shape use) and the other is "no action" 1/long rest (wild shape → L1 slot).
 	bool wild_resurgence_slot_to_use_used_this_turn = false;
 	bool wild_resurgence_use_to_slot_used_this_rest = false;
-	// PHB 2024 Druid L20 Archdruid Nature Magician (para 4445): convert WS uses to one slot, 1/LR
+	// PHB 2024 Druid L20 Archdruid Nature Magician (para 4454-4457): expend Wild Shape use
+	// to recover one expended spell slot of level 4 or lower. No action required, 1/LR.
+	bool nature_magician_active = false;
 	bool nature_magician_used_this_rest = false;
 
 	// Potion buff tracking
@@ -2039,12 +2057,15 @@ class battle {
 		c.piercer_reroll_used_this_turn = false;
 		c.fighting_spirit_active = false;
 		c.ferocious_charger_used_this_turn = false;
+		c.distance_moved_this_turn = 0;
 		c.ancestral_protector_hit_this_turn = false;
 		c.planar_warrior_active = false;
 		c.swashbuckler_attacked_this_turn = false;
 		c.trip_attack_pending = false;
 		c.precision_attack_pending = false;
 		c.stalkers_flurry_used_this_turn = false;
+		c.distant_strike_targets_hit.resize(0);
+		c.distant_strike_bonus_granted = false;
 		if (c.agile_parry_bonus) {
 			c.armor_class -= 2;
 		}

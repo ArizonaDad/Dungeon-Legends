@@ -1523,6 +1523,8 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         c.divine_order = cs.divine_order;
         c.blessed_strikes_choice = cs.blessed_strikes_choice;
         c.divine_strike_damage_type = cs.divine_strike_damage_type;
+        // PHB 2024 Cleric L20 Greater Divine Intervention (para 3628-3631): auto-succeed
+        if (cs.level >= 20) c.greater_divine_intervention_active = true;
         if (cs.subclass == "Light Domain" and cs.level >= 2) {
             c.warding_flare_uses = ability_modifier(cs.wisdom);
             if (c.warding_flare_uses < 1) c.warding_flare_uses = 1;
@@ -1633,6 +1635,11 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         if (cs.level >= 7) {
             c.runic_shield_uses = proficiency_bonus(cs.level);
             c.runic_shield_uses_max = proficiency_bonus(cs.level);
+        }
+        // Tasha's Rune Knight L18 Runic Juggernaut: "When you use Giant's Might, your
+        // size can increase to Huge... your reach increases by 5 feet."
+        if (cs.level >= 18) {
+            c.runic_juggernaut_active = true;
         }
         // Hill Rune passive: poison resistance
         if (c.hill_rune_known) {
@@ -2521,6 +2528,9 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         if (cs.level >= 7) c.elemental_fury_active = true;
         // PHB 2024 Druid L18 Beast Spells (para 4449): cast spells while in Wild Shape
         if (cs.level >= 18) c.beast_spells_active = true;
+        // PHB 2024 Druid L20 Archdruid Nature Magician (para 4454-4457): expend Wild Shape
+        // use to recover one expended spell slot of level 4 or lower.
+        if (cs.level >= 20) c.nature_magician_active = true;
         if (cs.subclass == "Circle of the Shepherd" and cs.level >= 2) {
             c.shepherd_circle_active = true;
         }
@@ -2772,6 +2782,26 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         // the forces of nature grants you Blindsight with a range of 30 feet."
         if (cs.level >= 18) {
             if (c.blindsight_range < 30) c.blindsight_range = 30;
+        }
+        // PHB 2024 Ranger Deft Explorer (para 6160-6165): "You gain Expertise in
+        // one of your skill proficiencies of your choice" at L2, and a second at L9.
+        if (cs.level >= 2) {
+            for (uint i = 0; i < c.skill_proficiencies.length(); i++) {
+                string sk = c.skill_proficiencies[i];
+                if (c.skill_expertise.find(sk) < 0) {
+                    c.skill_expertise.insert_last(sk);
+                    break;
+                }
+            }
+        }
+        if (cs.level >= 9) {
+            for (uint i = 0; i < c.skill_proficiencies.length(); i++) {
+                string sk = c.skill_proficiencies[i];
+                if (c.skill_expertise.find(sk) < 0) {
+                    c.skill_expertise.insert_last(sk);
+                    break;
+                }
+            }
         }
         // Fizban's: Drakewarden (Drake Companion HP and stats)
         if (cs.subclass == "Drakewarden" and cs.level >= 3) {
@@ -3470,6 +3500,12 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
             if (cs.level >= 11) c.stalkers_flurry_active = true;
             // L15 Shadowy Dodge (para 2162-2163): reaction to impose disadvantage
             if (cs.level >= 15) c.shadowy_dodge_active = true;
+        }
+        // PHB 2024 Fey Wanderer Ranger (para 6173-6195)
+        if (cs.subclass == "Fey Wanderer") {
+            // L11 Distant Strike (para 6187-6190): teleport 10ft before each attack;
+            // if 2+ different targets hit during Attack action, gain one additional attack.
+            if (cs.level >= 11) c.distant_strike_active = true;
         }
         // Tasha's Swarmkeeper Ranger
         if (cs.subclass == "Swarmkeeper") {

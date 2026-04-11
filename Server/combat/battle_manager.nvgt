@@ -2722,6 +2722,7 @@ class battle_manager {
 			string save_name = pr.spell_save_type >= 0 and pr.spell_save_type < int(ABILITY_SHORT.length()) ? ABILITY_SHORT[pr.spell_save_type] : "save";
 			if (bless_bonus > 0) broadcast_announce(t.name + "'s Bless adds " + bless_bonus + " to the save.", false);
 			// Save failure reaction chain for damage saves (mirrors condition save chain)
+			if (!saved and try_slayers_counter(t, caster.id)) saved = true;
 			if (!saved and try_arcane_deflection_save(t, pr.spell_save_dc, save_total)) saved = true;
 			if (!saved) { int fg = try_flash_of_genius(t, pr.spell_save_dc, save_total, save_name + " save vs " + pr.spell_name); if (fg >= pr.spell_save_dc) { saved = true; save_total = fg; } }
 			if (!saved) { int mv = try_maverick_spirit(t, pr.spell_save_dc, save_total, save_name + " save vs " + pr.spell_name); if (mv >= pr.spell_save_dc) { saved = true; save_total = mv; } }
@@ -3338,8 +3339,13 @@ class battle_manager {
 
 	int get_attack_range(combatant@ attacker, bool use_secondary = false) {
 		if (@attacker == null) return 5;
-		if (!attacker.is_player and use_secondary) return attacker.monster_attack2_range;
-		return attacker.main_hand_range;
+		int range = 5;
+		if (!attacker.is_player and use_secondary) range = attacker.monster_attack2_range;
+		else range = attacker.main_hand_range;
+		// Tasha's Rune Knight L18 Runic Juggernaut: "your reach increases by 5 feet"
+		// when Giant's Might is active and the character has the Runic Juggernaut feature.
+		if (attacker.runic_juggernaut_active and attacker.giants_might_active and range <= 10) range += 5;
+		return range;
 	}
 
 	string get_attack_name(combatant@ attacker, bool use_secondary = false) {
@@ -3534,6 +3540,28 @@ class battle_manager {
 		if (@bot == null or @target == null or @combat == null or !bot.is_player or bot.is_dead or target.is_dead) return false;
 		if (!combatant_is_controlled_by_bot(bot)) return false;
 
+		// PHB 2024 Fey Wanderer L11 Distant Strike (para 6187-6190): teleport 10ft before attack
+		if (bot.distant_strike_active) {
+			int ds_dist = feet_distance(bot.x, bot.y, target.x, target.y);
+			if (ds_dist > 5) {
+				int dx = 0;
+				int dy = 0;
+				if (target.x > bot.x) dx = 1;
+				else if (target.x < bot.x) dx = -1;
+				if (target.y > bot.y) dy = 1;
+				else if (target.y < bot.y) dy = -1;
+				int steps = (ds_dist > 10) ? 2 : 1;
+				for (int dsi = 0; dsi < steps; dsi++) {
+					int nx = bot.x + dx;
+					int ny = bot.y + dy;
+					if (nx != target.x or ny != target.y) {
+						bot.x = nx;
+						bot.y = ny;
+					} else break;
+				}
+				broadcast_announce(bot.name + " teleports 10 feet via Distant Strike!", false);
+			}
+		}
 		int dist = feet_distance(bot.x, bot.y, target.x, target.y);
 		// Xanathar's Sun Soul L3 Radiant Sun Bolt: extend range to 30ft
 		bool bot_use_sun_bolt = false;
@@ -3651,12 +3679,19 @@ class battle_manager {
 		}
 
 		// PHB 2024 Prone: bot must spend half speed to stand before moving
+		// PHB 2024 Athlete (para 7557): standing from prone costs 0 movement.
+		// Xanathar's Drunken Master L6 Leap to Your Feet (para 1798): costs 5ft instead of half speed.
 		if (bot.has_condition(COND_PRONE)) {
-			int stand_cost = bot.speed / 2;
+			int stand_cost = bot.has_feat("athlete") ? 0 : bot.speed / 2;
+			if (stand_cost > 5 and bot.class_name == "Monk" and bot.subclass == "Way of the Drunken Master" and bot.level >= 6) stand_cost = 5;
 			if (bot.movement_remaining >= stand_cost) {
-				bot.movement_remaining -= stand_cost;
+				if (stand_cost > 0) bot.movement_remaining -= stand_cost;
 				bot.remove_condition(COND_PRONE);
-				broadcast_announce(bot.name + " stands up (" + stand_cost + " ft used).", false);
+				string stand_msg = bot.name + " stands up";
+				if (stand_cost == 0) stand_msg += " instantly (Athlete)";
+				else if (bot.class_name == "Monk" and bot.subclass == "Way of the Drunken Master" and bot.level >= 6) stand_msg += " nimbly (5 ft — Leap to Your Feet)";
+				else stand_msg += " (" + stand_cost + " ft used)";
+				broadcast_announce(stand_msg + ".", false);
 			}
 		}
 
@@ -3675,6 +3710,17 @@ class battle_manager {
 
 			bot.movement_remaining -= FEET_PER_TILE;
 			announce_movement_to_visible_players(bot, bot.x - old_x, bot.y - old_y, FEET_PER_TILE);
+			// PHB 2024 Monk L10 Heightened Focus — Step of the Wind ally carry
+			if (bot.step_carry_ally_id != 0 and @combat != null) {
+				combatant@ carried = combat.get_combatant(bot.step_carry_ally_id);
+				if (@carried != null and !carried.is_dead) {
+					int carry_dx = old_x - carried.x;
+					int carry_dy = old_y - carried.y;
+					carried.x = old_x;
+					carried.y = old_y;
+					announce_movement_to_visible_players(carried, carry_dx, carry_dy, 0);
+				}
+			}
 			check_opportunity_attacks(bot, old_x, old_y, bot.x, bot.y);
 			if (@current_roll != null or bot.is_dead or bot.current_hp == 0) {
 				broadcast_state();
@@ -4176,6 +4222,47 @@ class battle_manager {
 		target.stroke_of_luck_available = false;
 		broadcast_announce(target.name + "'s Stroke of Luck turns the saving throw into a 20! New total: " + new_total + " — saved!", true);
 		return true;
+	}
+
+	// Xanathar's Monster Slayer L15 Slayer's Counter (para 2249-2250): "If the target
+	// of your Slayer's Prey forces you to make a saving throw, you can use your
+	// reaction to make one weapon attack against the quarry. If the attack hits, you
+	// automatically succeed on the saving throw, in addition to the attack's normal
+	// effects." Returns true if the save is auto-succeeded.
+	bool try_slayers_counter(combatant@ saver, uint caster_id) {
+		if (@saver == null or @combat == null) return false;
+		if (!saver.slayers_counter_active or !saver.has_reaction) return false;
+		if (saver.monster_slayer_target == 0 or saver.monster_slayer_target != caster_id) return false;
+		combatant@ prey = combat.get_combatant(caster_id);
+		if (@prey == null or prey.is_dead) return false;
+		// Consume reaction
+		saver.has_reaction = false;
+		// Auto-resolve weapon attack: d20 + attack bonus vs target AC
+		int atk_roll = random(1, 20);
+		int atk_bonus = get_attack_bonus_for_roll(saver);
+		int atk_total = atk_roll + atk_bonus;
+		bool atk_hit = (atk_roll == 20) or (atk_roll != 1 and atk_total >= prey.armor_class);
+		broadcast_announce(saver.name + " uses Slayer's Counter \u2014 reaction weapon attack against " + prey.name + "!", true);
+		broadcast_roll(saver.name, "Slayer's Counter attack", atk_roll, atk_bonus, atk_total, atk_hit ? ("Hit! (AC " + prey.armor_class + ") Auto-succeed on save!") : ("Miss. (AC " + prey.armor_class + ")"));
+		if (atk_hit) {
+			// Apply weapon damage
+			int dmg_count = saver.main_hand_damage_count;
+			int dmg_sides = get_attack_damage_dice(saver);
+			int dmg_mod = get_damage_modifier_for_attack(saver);
+			int dmg = 0;
+			for (int di = 0; di < dmg_count; di++) dmg += random(1, dmg_sides);
+			dmg += dmg_mod;
+			if (dmg < 1) dmg = 1;
+			bool was_crit = (atk_roll == 20);
+			if (was_crit) {
+				for (int di = 0; di < dmg_count; di++) dmg += random(1, dmg_sides);
+			}
+			int dmg_type = get_attack_damage_type(saver);
+			combat.apply_damage(prey, dmg, dmg_type, saver, was_crit);
+			broadcast_announce(saver.name + "'s Slayer's Counter deals " + dmg + " damage to " + prey.name + "!", false);
+			return true; // Auto-succeed on save
+		}
+		return false; // Attack missed, save not auto-succeeded
 	}
 
 	// Valda's Spire Gunslinger maneuver Grazing Shot (paras 213-214): "When you miss with
@@ -5521,6 +5608,9 @@ class battle_manager {
 		if (@prev != null) {
 			prev.is_dodging = false;
 			prev.remove_condition(COND_DODGING);
+			// PHB 2024 Monk L10 Heightened Focus — Step of the Wind ally carry ends
+			// "until the end of your turn" (para 5348-5349).
+			if (prev.step_carry_ally_id != 0) prev.step_carry_ally_id = 0;
 			// PHB 2024 Ranger L14 Nature's Veil (para 6184-6186): Invisible "until the
 			// end of your next turn." Cast sets rounds_remaining = 2; tick down on each
 			// of the Ranger's turn-ends. When it hits 0, remove the Invisible condition.
@@ -5772,6 +5862,7 @@ class battle_manager {
 						bool saved = save_total >= save_dc_val;
 						string hold_name = caster.concentration_spell;
 						broadcast_roll(prev.name, "WIS save vs " + hold_name + " (end of turn)", save_roll, save_bonus, save_total, saved ? "Freed!" : "Still paralyzed!");
+						if (!saved and try_slayers_counter(prev, caster.id)) saved = true;
 						if (!saved and try_arcane_deflection_save(prev, save_dc_val, save_total)) saved = true;
 						if (!saved) { int ff_total = try_fanatical_focus(prev, save_dc_val, save_total, save_bonus, "WIS save vs " + hold_name); if (ff_total >= save_dc_val) saved = true; }
 						if (!saved) { int ds = try_disciplined_survivor_reroll(prev, save_dc_val, save_total, save_bonus, "WIS save vs " + hold_name); if (ds >= save_dc_val) saved = true; }
@@ -5803,6 +5894,7 @@ class battle_manager {
 						int save_total = save_roll + save_bonus;
 						bool saved = save_total >= save_dc_val;
 						broadcast_roll(prev.name, "DEX save vs Web (end of turn)", save_roll, save_bonus, save_total, saved ? "Freed!" : "Still restrained!");
+						if (!saved and try_slayers_counter(prev, caster.id)) saved = true;
 						if (!saved and try_arcane_deflection_save(prev, save_dc_val, save_total)) saved = true;
 						if (!saved) { int ff_total = try_fanatical_focus(prev, save_dc_val, save_total, save_bonus, "DEX save vs Web"); if (ff_total >= save_dc_val) saved = true; }
 						if (!saved) { int ds = try_disciplined_survivor_reroll(prev, save_dc_val, save_total, save_bonus, "DEX save vs Web"); if (ds >= save_dc_val) saved = true; }
@@ -5932,6 +6024,7 @@ class battle_manager {
 						int save_total = save_roll + save_bonus;
 						bool saved = save_total >= save_dc_val;
 						broadcast_roll(prev.name, "CON save vs Blindness/Deafness (end of turn)", save_roll, save_bonus, save_total, saved ? "Recovered!" : "Still blinded!");
+						if (!saved and try_slayers_counter(prev, caster.id)) saved = true;
 						if (!saved and try_arcane_deflection_save(prev, save_dc_val, save_total)) saved = true;
 						if (!saved) { int ff_total = try_fanatical_focus(prev, save_dc_val, save_total, save_bonus, "CON save vs Blindness/Deafness"); if (ff_total >= save_dc_val) saved = true; }
 						if (!saved) { int ds = try_disciplined_survivor_reroll(prev, save_dc_val, save_total, save_bonus, "CON save vs Blindness/Deafness"); if (ds >= save_dc_val) saved = true; }
@@ -5961,6 +6054,7 @@ class battle_manager {
 						int save_total = save_roll + save_bonus;
 						bool saved = save_total >= save_dc_val;
 						broadcast_roll(prev.name, "WIS save vs Fear (end of turn)", save_roll, save_bonus, save_total, saved ? "Courage returns!" : "Still frightened!");
+						if (!saved and try_slayers_counter(prev, caster.id)) saved = true;
 						if (!saved and try_arcane_deflection_save(prev, save_dc_val, save_total)) saved = true;
 						if (!saved) { int ff_total = try_fanatical_focus(prev, save_dc_val, save_total, save_bonus, "WIS save vs Fear"); if (ff_total >= save_dc_val) saved = true; }
 						if (!saved) { int ds = try_disciplined_survivor_reroll(prev, save_dc_val, save_total, save_bonus, "WIS save vs Fear"); if (ds >= save_dc_val) saved = true; }
@@ -6058,6 +6152,7 @@ class battle_manager {
 						int save_total = save_roll + save_bonus;
 						bool saved = save_total >= save_dc_val;
 						broadcast_roll(prev.name, "WIS save vs Tasha's Hideous Laughter (end of turn)", save_roll, save_bonus, save_total, saved ? "Laughter fades!" : "Still laughing!");
+						if (!saved and try_slayers_counter(prev, caster.id)) saved = true;
 						if (!saved and try_arcane_deflection_save(prev, save_dc_val, save_total)) saved = true;
 						if (!saved) { int ff_total = try_fanatical_focus(prev, save_dc_val, save_total, save_bonus, "WIS save vs Tasha's Hideous Laughter"); if (ff_total >= save_dc_val) saved = true; }
 						if (!saved) { int ds = try_disciplined_survivor_reroll(prev, save_dc_val, save_total, save_bonus, "WIS save vs Tasha's Hideous Laughter"); if (ds >= save_dc_val) saved = true; }
@@ -6109,6 +6204,7 @@ class battle_manager {
 						int save_total = save_roll + save_bonus;
 						bool saved = save_total >= save_dc_val;
 						broadcast_roll(prev.name, "WIS save vs Compulsion (end of turn)", save_roll, save_bonus, save_total, saved ? "Freed!" : "Still compelled!");
+						if (!saved and try_slayers_counter(prev, caster.id)) saved = true;
 						if (!saved and try_arcane_deflection_save(prev, save_dc_val, save_total)) saved = true;
 						if (!saved) { if (try_countercharm_reroll(prev, save_dc_val, save_bonus, "WIS save vs Compulsion")) saved = true; }
 						if (!saved) { int ds = try_disciplined_survivor_reroll(prev, save_dc_val, save_total, save_bonus, "WIS save vs Compulsion"); if (ds >= save_dc_val) saved = true; }
@@ -6142,6 +6238,7 @@ class battle_manager {
 						int save_total = save_roll + save_bonus + bless_bonus;
 						bool saved = save_total >= save_dc_val;
 						broadcast_roll(prev.name, "WIS save vs Slow (end of turn)", save_roll, save_bonus + bless_bonus, save_total, saved ? "Freed!" : "Still slowed!");
+						if (!saved and try_slayers_counter(prev, caster.id)) saved = true;
 						if (!saved and try_arcane_deflection_save(prev, save_dc_val, save_total)) saved = true;
 						if (!saved) { int ds = try_disciplined_survivor_reroll(prev, save_dc_val, save_total, save_bonus + bless_bonus, "WIS save vs Slow"); if (ds >= save_dc_val) saved = true; }
 						if (!saved) { int fg = try_flash_of_genius(prev, save_dc_val, save_total, "WIS save vs Slow"); if (fg >= save_dc_val) saved = true; }
@@ -6177,6 +6274,7 @@ class battle_manager {
 						int save_total = save_roll + save_bonus + bless_bonus;
 						bool saved = save_total >= save_dc_val;
 						broadcast_roll(prev.name, "WIS save vs Confusion (end of turn)", save_roll, save_bonus + bless_bonus, save_total, saved ? "Freed!" : "Still confused!");
+						if (!saved and try_slayers_counter(prev, caster.id)) saved = true;
 						if (!saved and try_arcane_deflection_save(prev, save_dc_val, save_total)) saved = true;
 						if (!saved) { int ds = try_disciplined_survivor_reroll(prev, save_dc_val, save_total, save_bonus + bless_bonus, "WIS save vs Confusion"); if (ds >= save_dc_val) saved = true; }
 						if (!saved) { int fg = try_flash_of_genius(prev, save_dc_val, save_total, "WIS save vs Confusion"); if (fg >= save_dc_val) saved = true; }
@@ -6211,6 +6309,7 @@ class battle_manager {
 				int save_total = save_roll + save_bonus + bless_bonus;
 				bool saved = save_total >= save_dc_val;
 				broadcast_roll(prev.name, "CON save vs Power Word Stun (end of turn)", save_roll, save_bonus + bless_bonus, save_total, saved ? "Freed!" : "Still stunned!");
+				if (!saved and try_slayers_counter(prev, pws_caster.id)) saved = true;
 				if (!saved and try_arcane_deflection_save(prev, save_dc_val, save_total)) saved = true;
 				if (!saved) { int ds = try_disciplined_survivor_reroll(prev, save_dc_val, save_total, save_bonus + bless_bonus, "CON save vs Power Word Stun"); if (ds >= save_dc_val) saved = true; }
 				if (!saved) { int fg = try_flash_of_genius(prev, save_dc_val, save_total, "CON save vs Power Word Stun"); if (fg >= save_dc_val) saved = true; }
@@ -8412,10 +8511,13 @@ class battle_manager {
 		}
 
 		// PHB 2024 Prone: monster must spend half speed to stand up before moving
+		// Note: Athlete feat and Drunken Master Leap to Your Feet are player-only features,
+		// but if a monster somehow gains them they would apply here too.
 		if (monster.has_condition(COND_PRONE)) {
-			int stand_cost = monster.speed / 2;
+			int stand_cost = monster.has_feat("athlete") ? 0 : monster.speed / 2;
+			if (stand_cost > 5 and monster.class_name == "Monk" and monster.subclass == "Way of the Drunken Master" and monster.level >= 6) stand_cost = 5;
 			if (monster.movement_remaining >= stand_cost) {
-				monster.movement_remaining -= stand_cost;
+				if (stand_cost > 0) monster.movement_remaining -= stand_cost;
 				monster.remove_condition(COND_PRONE);
 				broadcast_announce(monster.name + " stands up (" + stand_cost + " ft used).", false);
 			}
@@ -11955,6 +12057,22 @@ class battle_manager {
 			}
 			combat.apply_damage(target, total_damage, pr.damage_type, c, pr.is_crit);
 
+			// PHB 2024 Fey Wanderer L11 Distant Strike (para 6187-6190): track unique
+			// targets hit during the Attack action. If 2+ different targets are hit,
+			// one additional attack is granted.
+			if (c.distant_strike_active and pr.is_weapon_attack and !c.distant_strike_bonus_granted) {
+				bool already_tracked = false;
+				for (uint dti = 0; dti < c.distant_strike_targets_hit.length(); dti++) {
+					if (c.distant_strike_targets_hit[dti] == target.id) { already_tracked = true; break; }
+				}
+				if (!already_tracked) c.distant_strike_targets_hit.insert_last(target.id);
+				if (c.distant_strike_targets_hit.length() >= 2 and !c.distant_strike_bonus_granted) {
+					c.distant_strike_bonus_granted = true;
+					c.attacks_remaining_this_turn++;
+					broadcast_announce(c.name + "'s Distant Strike grants a bonus attack for hitting 2 different targets!", true);
+				}
+			}
+
 			// PHB 2024 Monk L3 Deflect Attacks — Redirect (para 5339): If damage was
 			// reduced to 0 by Deflect Attacks, Monk can spend 1 Focus Point to redirect
 			// force at the attacker. DEX save or 2d8 + DEX mod Force damage.
@@ -12165,6 +12283,26 @@ class battle_manager {
 						broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Paralyzed"}});
 						broadcast_announce(c.name + "'s attack paralyzes " + target.name + "!", true);
 					}
+				}
+			}
+
+			// Xanathar's Cavalier L15 Ferocious Charger (para 1679-1680): "If you
+			// move at least 10 feet in a straight line right before attacking a creature
+			// and you hit it with the attack, that target must succeed on a Strength
+			// saving throw (DC 8 + your proficiency bonus + your Strength modifier) or
+			// be knocked prone. You can use this feature only once per turn."
+			if (c.ferocious_charger_active and !c.ferocious_charger_used_this_turn and pr.is_weapon_attack and !target.is_dead and c.distance_moved_this_turn >= 10 and !target.has_condition(COND_PRONE)) {
+				c.ferocious_charger_used_this_turn = true;
+				int fc_dc = 8 + c.proficiency + c.get_ability_mod(ABILITY_STR);
+				int fc_roll = random(1, 20);
+				int fc_bonus = target.get_save_bonus(ABILITY_STR);
+				int fc_total = fc_roll + fc_bonus;
+				bool fc_saved = fc_total >= fc_dc;
+				broadcast_roll(target.name, "STR save vs Ferocious Charger", fc_roll, fc_bonus, fc_total, fc_saved ? "Stands firm!" : "Knocked prone!");
+				if (!fc_saved) {
+					target.add_condition(COND_PRONE);
+					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Prone"}});
+					broadcast_announce(c.name + "'s Ferocious Charger knocks " + target.name + " prone!", true);
 				}
 			}
 
@@ -14179,6 +14317,31 @@ class battle_manager {
 			if (c.is_dead) { broadcast_state(); check_battle_end(); return; }
 		}
 
+		// PHB 2024 Fey Wanderer L11 Distant Strike (para 6187-6190): "When you take
+		// the Attack action, you can teleport up to 10 feet before each attack to an
+		// unoccupied space you can see."
+		if (c.distant_strike_active) {
+			int ds_dist = feet_distance(c.x, c.y, target.x, target.y);
+			if (ds_dist > 5) {
+				// Move up to 10ft (2 tiles) toward target
+				int dx = 0;
+				int dy = 0;
+				if (target.x > c.x) dx = 1;
+				else if (target.x < c.x) dx = -1;
+				if (target.y > c.y) dy = 1;
+				else if (target.y < c.y) dy = -1;
+				int steps = (ds_dist > 10) ? 2 : 1;
+				for (int dsi = 0; dsi < steps; dsi++) {
+					int nx = c.x + dx;
+					int ny = c.y + dy;
+					if (nx != target.x or ny != target.y) {
+						c.x = nx;
+						c.y = ny;
+					} else break;
+				}
+				broadcast_announce(c.name + " teleports 10 feet via Distant Strike!", false);
+			}
+		}
 		// Range check.
 		int dist = feet_distance(c.x, c.y, target.x, target.y);
 		// Xanathar's Sun Soul L3 Radiant Sun Bolt: extend range to 30ft
@@ -14429,7 +14592,26 @@ class battle_manager {
 		c.y = new_y;
 		c.movement_remaining -= move_cost;
 		c.has_moved = true;
+		c.distance_moved_this_turn += move_cost; // Track for Ferocious Charger
 		announce_movement_to_visible_players(c, dx, dy, move_cost);
+
+		// PHB 2024 Monk L10 Heightened Focus — Step of the Wind ally carry (para 5348-5349):
+		// "That creature can move with you until the end of your turn. The creature's
+		// movement doesn't provoke Opportunity Attacks."
+		// Move the carried ally to the monk's previous position after each move step.
+		if (c.step_carry_ally_id != 0 and @combat != null) {
+			combatant@ carried = combat.get_combatant(c.step_carry_ally_id);
+			if (@carried != null and !carried.is_dead) {
+				int carry_dx = old_x - carried.x;
+				int carry_dy = old_y - carried.y;
+				carried.x = old_x;
+				carried.y = old_y;
+				announce_movement_to_visible_players(carried, carry_dx, carry_dy, 0);
+				// No opportunity attacks per source: "The creature's movement doesn't
+				// provoke Opportunity Attacks."
+			}
+		}
+
 		refresh_paladin_auras(); // Position changed — update aura coverage
 
 		// Basic Rules 2024 Antilife Shell (para 11796-11803): "If you move so that an

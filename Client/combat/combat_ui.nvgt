@@ -1270,6 +1270,7 @@ void show_bonus_action_menu() {
 	int wild_companion_opt = -1;
 	int wild_resurgence_slot_to_use_opt = -1;
 	int wild_resurgence_use_to_slot_opt = -1;
+	int nature_magician_opt = -1;
 	int magic_coin_opt = -1;
 	int create_void_opt = -1;
 	int breath_of_dragon_opt = -1;
@@ -1522,6 +1523,9 @@ void show_bonus_action_menu() {
 		wild_resurgence_slot_to_use_opt = m.add_item("Wild Resurgence: spell slot to Wild Shape. No action. Once per turn. Burn a slot to recover one Wild Shape use (only if 0 uses left).");
 		wild_resurgence_use_to_slot_opt = m.add_item("Wild Resurgence: Wild Shape to level 1 slot. No action. 1/long rest. Burn a Wild Shape use to recover a level 1 spell slot.");
 	}
+	if (lc == "druid" and level >= 20) {
+		nature_magician_opt = m.add_item("Nature Magician. No action. 1/long rest. Expend a Wild Shape use to recover one spell slot of level 4 or lower.");
+	}
 	if (my_spiritual_weapon_active) spiritual_weapon_opt = m.add_item("Spiritual Weapon. Strike a target within 60 feet with your summoned weapon.");
 	if (my_heat_metal_active) heat_metal_opt = m.add_item("Heat Metal. Use your bonus action to re-deal fire damage to the searing target.");
 	int swift_quiver_opt = -1;
@@ -1675,7 +1679,12 @@ void show_bonus_action_menu() {
 		if (level >= 20) invincible_conqueror_opt = m.add_item("Invincible Conqueror. Action. Resistance to all damage, extra attack, crit 19 to 20. 1 minute.");
 	}
 	if (lc == "fighter" and subclass == "Rune Knight") {
-		giants_might_opt = m.add_item("Giant's Might. Bonus action. Become Large with +1d6 damage.");
+		if (level >= 18)
+			giants_might_opt = m.add_item("Giant's Might. Bonus action. Become Huge with +1d10 damage and +5 ft reach. (Runic Juggernaut)");
+		else if (level >= 10)
+			giants_might_opt = m.add_item("Giant's Might. Bonus action. Become Large with +1d8 damage.");
+		else
+			giants_might_opt = m.add_item("Giant's Might. Bonus action. Become Large with +1d6 damage.");
 		if (my_fire_rune_known and my_rune_invoke_uses > 0 and !my_fire_rune_pending) fire_rune_opt = m.add_item("Fire Rune. Bonus action. Prime next weapon hit for +2d6 fire damage + Restrained. (" + my_rune_invoke_uses + " invocations left)");
 		if (my_frost_rune_known and my_rune_invoke_uses > 0 and !my_frost_rune_active) frost_rune_opt = m.add_item("Frost Rune. Bonus action. +2 to STR and CON checks and saves for 10 minutes. (" + my_rune_invoke_uses + " invocations left)");
 		if (my_hill_rune_known and my_rune_invoke_uses > 0 and !my_hill_rune_active) hill_rune_opt = m.add_item("Hill Rune. Bonus action. Resistance to bludgeoning, piercing, and slashing damage for 1 minute. (" + my_rune_invoke_uses + " invocations left)");
@@ -1944,7 +1953,10 @@ void show_bonus_action_menu() {
 	// You don't need to meet the requirements to cast the spell, including costly components."
 	// Once per long rest. Scales to "no roll needed" automatically at L10+.
 	if (lc == "cleric" and level >= 10) {
-		divine_intervention_opt = m.add_item("Divine Intervention. Bonus action. Once per long rest. Your next cast of any Cleric spell of level 5 or lower consumes no spell slot.");
+		if (level >= 20)
+			divine_intervention_opt = m.add_item("Greater Divine Intervention. Action. Once per long rest. Auto-succeed: heal all allies to full HP and remove all conditions.");
+		else
+			divine_intervention_opt = m.add_item("Divine Intervention. Action. Once per long rest. Your next cast of any Cleric spell of level 5 or lower consumes no spell slot.");
 	}
 	if (lc == "bard" and subclass == "College of Mercantile" and level >= 3) {
 		magic_coin_opt = m.add_item("Magic Coin. Action. Fling a coin at target for 1d12 thunder damage (scales).");
@@ -3112,6 +3124,10 @@ void show_bonus_action_menu() {
 	else if (wild_resurgence_use_to_slot_opt >= 0 and res == wild_resurgence_use_to_slot_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "wild_resurgence_use_to_slot"}});
 		speak("Wild Resurgence: trading Wild Shape for spell slot.", true);
+	}
+	else if (nature_magician_opt >= 0 and res == nature_magician_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "nature_magician"}});
+		speak("Nature Magician: expending Wild Shape for spell slot.", true);
 	}
 	else if (magic_coin_opt >= 0 and res == magic_coin_opt) {
 		if (current_target_id == 0) { speak("No target selected.", true); return; }

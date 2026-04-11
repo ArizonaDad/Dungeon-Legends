@@ -2707,6 +2707,30 @@ void handle_user_message(user@ u, json_object@ msg)
 			if (spend_focus) {
 				c.focus_points--;
 				c.took_disengage = true;
+				// PHB 2024 Monk L10 Heightened Focus (para 5348-5349): "When you use
+				// Step of the Wind, you can choose a willing creature within 5 feet of
+				// you that is Large or smaller. That creature can move with you until
+				// the end of your turn. The creature's movement doesn't provoke
+				// Opportunity Attacks."
+				if (c.heightened_focus_active and @u.room.bm.combat != null) {
+					combatant@ nearest_ally = null;
+					int nearest_ally_dist = 9999;
+					for (uint sci = 0; sci < u.room.bm.combat.combatants.length(); sci++) {
+						combatant@ scan = u.room.bm.combat.combatants[sci];
+						if (@scan == null or scan.is_dead or scan.id == c.id) continue;
+						if (scan.is_player != c.is_player) continue; // Must be same side
+						if (scan.size > SIZE_LARGE) continue; // Large or smaller only
+						int sdist = feet_distance(c.x, c.y, scan.x, scan.y);
+						if (sdist <= 5 and sdist < nearest_ally_dist) {
+							nearest_ally_dist = sdist;
+							@nearest_ally = scan;
+						}
+					}
+					if (@nearest_ally != null) {
+						c.step_carry_ally_id = nearest_ally.id;
+						u.room.bm.broadcast_announce(c.name + " carries " + nearest_ally.name + " along with Step of the Wind! (Heightened Focus)", true);
+					}
+				}
 				u.room.bm.broadcast_announce(c.name + " uses Step of the Wind, gaining Dash and Disengage as a bonus action!", true);
 			} else {
 				u.room.bm.broadcast_announce(c.name + " uses Step of the Wind to Dash as a bonus action.", true);
@@ -4004,6 +4028,8 @@ void handle_user_message(user@ u, json_object@ msg)
 
 		else if (feature == "giants_might") {
 			// Rune Knight Fighter: become Large, +1d6 damage, advantage on STR checks
+			// Tasha's Rune Knight L18 Runic Juggernaut: size can increase to Huge,
+			// reach increases by 5 feet, Giant's Might damage die becomes 1d10.
 			if (c.class_name != "Fighter" or c.subclass != "Rune Knight") { u.send({{"type", message_types::announce}, {"text", "Only Rune Knights can use Giant's Might."}, {"interrupt", true}}); return; }
 			if (c.giants_might_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Giant's Might uses remaining."}, {"interrupt", true}}); return; }
 			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
@@ -4011,8 +4037,15 @@ void handle_user_message(user@ u, json_object@ msg)
 			c.used_bonus_action = true;
 			c.giants_might_uses--;
 			c.giants_might_active = true;
-			c.size = SIZE_LARGE;
-			u.room.bm.broadcast_announce(c.name + " grows with Giant's Might! Size increased to Large, +1d6 damage.", true);
+			if (c.runic_juggernaut_active) {
+				c.size = SIZE_HUGE;
+				u.room.bm.broadcast_announce(c.name + " grows with Giant's Might! Size increased to Huge, +1d10 damage, +5 ft reach. (Runic Juggernaut)", true);
+			} else {
+				c.size = SIZE_LARGE;
+				int gm_die_label = 6;
+				if (c.level >= 10) gm_die_label = 8;
+				u.room.bm.broadcast_announce(c.name + " grows with Giant's Might! Size increased to Large, +1d" + gm_die_label + " damage.", true);
+			}
 		}
 
 		else if (feature == "fire_rune") {
@@ -4875,9 +4908,41 @@ void handle_user_message(user@ u, json_object@ msg)
 			if (c.divine_intervention_used_this_rest) { u.send({{"type", message_types::announce}, {"text", "Divine Intervention has already been used this rest."}, {"interrupt", true}}); return; }
 			c.has_action = false;
 			c.used_action = true;
-			c.divine_intervention_ready = true;
 			c.divine_intervention_used_this_rest = true;
-			u.room.bm.broadcast_announce(c.name + " calls on their deity for Divine Intervention. Their next Cleric spell of level 5 or lower is cast without consuming a slot.", true);
+			// PHB 2024 Cleric L20 Greater Divine Intervention (para 3628-3631):
+			// "your call for intervention succeeds automatically; no roll required."
+			// Effect: combined Greater Restoration + Mass Heal — heal all allies to full
+			// HP and remove Blinded, Deafened, Paralyzed, Petrified, Poisoned, Stunned,
+			// Charmed, Frightened, and Exhaustion conditions.
+			if (c.greater_divine_intervention_active) {
+				int healed_count = 0;
+				for (uint gdi = 0; gdi < u.room.bm.combat.combatants.length(); gdi++) {
+					combatant@ ally = u.room.bm.combat.combatants[gdi];
+					if (@ally == null or ally.is_dead) continue;
+					if (u.room.bm.combat.are_hostile(c, ally)) continue; // Allies only
+					int healed = ally.max_hp - ally.current_hp;
+					if (healed > 0) {
+						ally.current_hp = ally.max_hp;
+						healed_count++;
+					}
+					// Remove conditions: Greater Restoration + Mass Heal combined
+					ally.remove_condition(COND_BLINDED);
+					ally.remove_condition(COND_DEAFENED);
+					ally.remove_condition(COND_PARALYZED);
+					ally.remove_condition(COND_PETRIFIED);
+					ally.remove_condition(COND_POISONED);
+					ally.remove_condition(COND_STUNNED);
+					ally.remove_condition(COND_CHARMED);
+					ally.remove_condition(COND_FRIGHTENED);
+					if (ally.exhaustion_level > 0) ally.exhaustion_level = 0;
+				}
+				u.room.bm.broadcast_announce(c.name + " invokes Greater Divine Intervention! Divine power floods the battlefield — all allies are healed to full HP and all conditions are purged!", true);
+				u.room.bm.broadcast_state();
+			} else {
+				// Standard L10-L19 Divine Intervention: flag for next free spell cast
+				c.divine_intervention_ready = true;
+				u.room.bm.broadcast_announce(c.name + " calls on their deity for Divine Intervention. Their next Cleric spell of level 5 or lower is cast without consuming a slot.", true);
+			}
 		}
 		else if (feature == "set_divine_order") {
 			// PHB 2024 Cleric L1 Divine Order (para 3600-3603) — player chooses
@@ -5225,6 +5290,26 @@ void handle_user_message(user@ u, json_object@ msg)
 			c.spell_slots_current[1]++;
 			c.wild_resurgence_use_to_slot_used_this_rest = true;
 			u.room.bm.broadcast_announce(c.name + " channels Wild Resurgence — burns a Wild Shape use to recover a level 1 spell slot.", true);
+		}
+		else if (feature == "nature_magician") {
+			// PHB 2024 Druid L20 Archdruid Nature Magician (para 4454-4457):
+			// "you can expend one use of your Wild Shape (no action required)
+			// to recover one expended spell slot, but the slot can be no higher
+			// than level 4." Once per rest.
+			if (c.class_name != "Druid") { u.send({{"type", message_types::announce}, {"text", "Only Druids can use Nature Magician."}, {"interrupt", true}}); return; }
+			if (!c.nature_magician_active) { u.send({{"type", message_types::announce}, {"text", "Nature Magician unlocks at Druid L20."}, {"interrupt", true}}); return; }
+			if (c.wild_shape_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Wild Shape uses available."}, {"interrupt", true}}); return; }
+			if (c.nature_magician_used_this_rest) { u.send({{"type", message_types::announce}, {"text", "Already used Nature Magician this rest."}, {"interrupt", true}}); return; }
+			// Find the first empty spell slot level 1-4
+			int nm_slot = 0;
+			for (int sl = 4; sl >= 1; sl--) {
+				if (c.spell_slots_current[sl] < c.spell_slots_max[sl]) { nm_slot = sl; break; }
+			}
+			if (nm_slot == 0) { u.send({{"type", message_types::announce}, {"text", "All spell slots of level 4 and below are full."}, {"interrupt", true}}); return; }
+			c.wild_shape_uses--;
+			c.spell_slots_current[nm_slot]++;
+			c.nature_magician_used_this_rest = true;
+			u.room.bm.broadcast_announce(c.name + " channels Nature Magician — expends a Wild Shape use to recover a level " + nm_slot + " spell slot.", true);
 		}
 		else if (feature == "arcane_recovery") {
 			// PHB 2024 Wizard L1 Arcane Recovery: "Once per day when you finish a Short
