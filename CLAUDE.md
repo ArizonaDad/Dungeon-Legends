@@ -138,7 +138,7 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 
 - Move + Action + Bonus Action + Reaction per turn
 
-- Initiative rolled at battle start (d20 + DEX mod), all rolls announced to all players, then full turn order broadcast
+- Initiative rolled at battle start (d20 + DEX mod), all rolls announced to all players, then full turn order broadcast. Tie-breaking: DEX modifier (higher first), then random. Exhaustion penalty (-2 * level) applied to initiative rolls.
 
 - Combat rounds start at 1 (first turn of each round announces "Round N!")
 
@@ -157,6 +157,7 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 - Advantage/disadvantage from conditions (prone, paralyzed, dodging, etc.)
 - **Condition Mechanics**: Paralyzed/Unconscious → auto-crit on melee hit within 5ft. Incapacitated blocks actions/bonus actions/reactions (gated in handle_attack, handle_cast, bonus action handler). Stunned/Paralyzed/Unconscious auto-skip turns. Stunned/Paralyzed auto-fail STR/DEX saves (-100 in get_save_bonus). Frightened/Poisoned impose disadvantage on ability checks (request_skill_check). Frightened blocks movement toward fear source (`frightened_source_id` tracked at all 8 application sites, enforced in `handle_move` and monster AI). Restrained imposes disadvantage on DEX saves (-5 approx in get_save_bonus). Blinded target grants advantage to attackers (apply_attack_advantage_state). Petrified grants resistance to all damage + poison immunity (apply_damage + add_condition guard). Dodge grants advantage on DEX saves (+5 approx in get_save_bonus, gated on not Incapacitated). Grapple Escape action: Athletics/Acrobatics check vs DC 8+STR+Prof of grappler.
 - **Crit at 0 HP**: Critical hits on unconscious creatures count as 2 death save failures (was_crit parameter in apply_damage).
+- **Unconscious → Prone** (PHB 2024 para 16319): Creatures reduced to 0 HP automatically fall Prone alongside Unconscious at all 3 paths (instant death, player death saves, troll regen). Healing removes Unconscious but NOT Prone (must stand with half speed).
 - **Sanctuary Enforcement** (Basic Rules 2024 para 14826): WIS save enforced on all 3 attack paths (handle_attack, start_monster_attack_sequence, start_player_bot_attack_sequence). Self-break when warded creature attacks or casts a spell affecting an enemy.
 - **Bonus Action Spell Rule** (PHB 2024 para 7986-7989): If a bonus action spell is cast, only cantrips may be cast as the action. Tracked via `cast_ba_spell_this_turn` / `cast_leveled_spell_this_turn` flags. Quickened Spell counts as BA spell.
 
@@ -256,7 +257,7 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 
 - **Shield of Faith** (L1, concentration): Basic Rules 2024 para 15004. Uses dedicated `shield_of_faith_active` + `shield_of_faith_caster_id` fields on combatant (NOT `shield_active`/`shield_ac_bonus` which are shared with Shield reaction and cleared at turn start). Applies `armor_class += 2` on cast. Concentration cleanup removes +2 AC via per-caster tracking. Self-cast and ally-cast variants. Re-casting replaces old bond.
 
-- **Beacon of Hope** (L3, concentration): Basic Rules 2024 para 12201. Sets `beacon_of_hope_active` + `beacon_of_hope_caster_id` on all allies within 30ft. When active, healing spells restore maximum possible HP instead of rolling dice (Cure Wounds d8→8, Healing Word d4→4, Mass Healing Word d4→4, Prayer of Healing d8→8, Mass Cure Wounds d8→8). Multi-target heals check beacon per-target. Concentration cleanup clears per-caster.
+- **Beacon of Hope** (L3, concentration): Basic Rules 2024 para 12201. Sets `beacon_of_hope_active` + `beacon_of_hope_caster_id` on all allies within 30ft. When active, healing spells restore maximum possible HP instead of rolling dice (Cure Wounds d8→8, Healing Word d4→4, Mass Healing Word d4→4, Prayer of Healing d8→8, Mass Cure Wounds d8→8). Multi-target heals check beacon per-target. **Death save advantage**: in `process_roll_result`, rolls a second d20 server-side and takes the higher when `beacon_of_hope_active` (works for both human and bot players). Concentration cleanup clears per-caster.
 
 - **Heroism Frightened Immunity**: Basic Rules 2024 para 13767. Ongoing `heroism_source_id != 0` blocks COND_FRIGHTENED in `add_condition()`. Previously only removed Frightened on initial cast.
 
@@ -625,7 +626,7 @@ Per-class audit of all 13 base class features against `basic_rules_full.txt` (Ba
 - **Extended Spell Concentration Advantage** (`7665fb3`): PHB 2024 para 7029 — `extended_spell_concentration` flag set on combatant when casting with Extended Spell active. Grants advantage on concentration saves for that spell. Cleared in `clear_concentration_effects()`.
 - **Weapon Mastery Properties** (`7665fb3`): All 7 PHB 2024 mastery properties (Push/Sap/Slow/Topple/Vex/Cleave/Graze) wired into attack resolution. `main_hand_mastery` field plumbed from weapon table through character_sheet to combatant. Per-turn flags for Cleave/Slow/Sap/Vex.
 - **Staggering Blow + Daze Wiring** (`ae7e13c`): Barbarian L13 Staggering Blow disadvantage wired into 6 save sites (central spell save + 5 EOT condition saves). Rogue L14 Daze enforced at turn start (lose movement + bonus action).
-- **Exhaustion Death** (`7665fb3`): PHB 2024 para 16254 — death at exhaustion level 6 enforced.
+- **Exhaustion** (PHB 2024 paras 16254-16257): Full 2024 system. -2 per level to ALL d20 Tests (attacks, saves, ability checks, initiative). -5 ft speed per level. Death at level 6. Wired in: `get_save_bonus`, `get_skill_bonus`, `get_attack_bonus`, initiative modifier, movement_remaining. Exhaustion -1 on short rest for Ranger L10 Tireless.
 - **Concentration Cleanup** (`ddc77f1`): Fixed critical bug where 11 concentration spell flags (Spirit Guardians, Divine Favor, Holy Weapon, Fire Shield, Stoneskin, Fly, Ensnaring Strike, Sanctuary, Venomous Mark, Fog Cloud, Darkness) were NOT cleared when concentration broke. All now reset in `clear_concentration_effects()`.
 - **Short Rest System** (`6d36682`): `apply_short_rest()` fires between waves in endless and wave modes. 25% max HP heal + restore Fighter Action Surge/Second Wind, Warlock Pact Magic, Wizard Arcane Recovery/Signature Spells, Druid Wild Shape, Battle Master/Arcane Archer dice, Monk Focus Points, Bard Bardic Inspiration, Cleric/Paladin Channel Divinity, Sorcerer Sorcerous Restoration.
 - **Mobile feat** (`81b63fb`): PHB 2024 para 7635 — blanket OA immunity approximation in check_opportunity_attacks. Strict RAW is per-creature-attacked-this-turn.
@@ -836,6 +837,7 @@ Epic Boon feats: combat_prowess, dimensional_travel, energy_resistance, fate, fo
 - Arcane Archer: Arcane Shot resets
 - Sorcerer: Sorcerous Restoration (floor(level/2) SP, 1/LR)
 - Clear conditions and end concentration
+- **Concentration cleanup**: calls `clear_concentration_effects(c)` BEFORE clearing `is_concentrating`, properly removing per-target spell flags (heat_metal_disadv, greater_invisibility, bestow_curse, enlarge, shield_of_faith, beacon_of_hope, etc.)
 
 ### Targeting & Scanning
 
