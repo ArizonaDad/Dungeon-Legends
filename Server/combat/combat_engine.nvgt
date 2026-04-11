@@ -1755,10 +1755,23 @@ class battle {
 			if (!combatants[i].is_alive()) continue;
 			initiative_order.insert_last(int(i));
 		}
-		// Bubble sort by initiative roll descending
+		// Bubble sort by initiative roll descending; PHB 2024 tie-break
+		// by DEX modifier (higher goes first), then random if still tied
 		for (uint i = 0; i < initiative_order.length(); i++) {
 			for (uint j = i + 1; j < initiative_order.length(); j++) {
-				if (combatants[initiative_order[j]].initiative_roll > combatants[initiative_order[i]].initiative_roll) {
+				combatant@ ci = combatants[initiative_order[i]];
+				combatant@ cj = combatants[initiative_order[j]];
+				bool swap = false;
+				if (cj.initiative_roll > ci.initiative_roll) {
+					swap = true;
+				} else if (cj.initiative_roll == ci.initiative_roll) {
+					// Tie-break by DEX modifier
+					int dex_i = ci.get_ability_mod(ABILITY_DEX);
+					int dex_j = cj.get_ability_mod(ABILITY_DEX);
+					if (dex_j > dex_i) swap = true;
+					else if (dex_j == dex_i) swap = (random(0, 1) == 1);
+				}
+				if (swap) {
 					int temp = initiative_order[i];
 					initiative_order[i] = initiative_order[j];
 					initiative_order[j] = temp;
@@ -2300,6 +2313,7 @@ class battle {
 				target.is_dead = true;
 				target.current_hp = 0;
 				target.add_condition(COND_UNCONSCIOUS);
+				target.add_condition(COND_PRONE); // PHB 2024 para 16319: unconscious creatures fall Prone
 				return;
 			}
 			target.current_hp = 0;
@@ -2315,7 +2329,9 @@ class battle {
 					target.death_save_failures = 0;
 				} else {
 					// Player falls unconscious, start death saves
+					// PHB 2024 para 16319: unconscious creatures fall Prone
 					target.add_condition(COND_UNCONSCIOUS);
+					target.add_condition(COND_PRONE);
 					target.death_save_successes = 0;
 					target.death_save_failures = 0;
 				}
@@ -2326,6 +2342,7 @@ class battle {
 				if (target.regen_amount > 0 and !target.regen_blocked_this_round) {
 					// Troll is "down" but not dead — regeneration will bring it back
 					target.add_condition(COND_UNCONSCIOUS);
+					target.add_condition(COND_PRONE); // PHB 2024 para 16319
 				} else {
 					// Monster dies instantly (standard D&D rule)
 					target.is_dead = true;

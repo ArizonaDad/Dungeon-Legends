@@ -4692,6 +4692,8 @@ class battle_manager {
 		pr.player_username = c.is_player ? c.player_username : c.name;
 		pr.roll_type = ROLL_INITIATIVE;
 		pr.dice_sides = 20;
+		// PHB 2024 Exhaustion (para 16255): d20 Tests reduced by 2 * exhaustion level
+		mod -= c.exhaustion_level * 2;
 		pr.modifier = mod;
 		pr.reason = "initiative";
 		// PHB 2024 Barbarian Level 7: Feral Instinct (para 2334-2335):
