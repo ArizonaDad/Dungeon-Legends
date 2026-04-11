@@ -262,7 +262,7 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 
 - **Heroes' Feast** (L6, NOT concentration, 24 hours): Applies to all allies. +2d10 max HP and current HP (`heroes_feast_hp_bonus`). Poison damage resistance in `apply_damage`. Immunity to Frightened and Poisoned in `add_condition`. +5 WIS save advantage in `get_save_bonus`.
 
-- **Resilient Sphere** (L4, NOT concentration, 1 min): DEX save for unwilling targets (full chain). Sets `resilient_sphere_trapped` — full damage immunity (return early in `apply_damage`) + COND_INCAPACITATED. Fallback no-target handler.
+- **Resilient Sphere** (L4, NOT concentration, 1 min): DEX save for unwilling targets (full chain). Sets `resilient_sphere_trapped` + `resilient_sphere_rounds = 10`. Full damage immunity (return early in `apply_damage`) + COND_INCAPACITATED. Duration countdown at trapped creature's turn start in `advance_turn`. Auto-releases when rounds hit 0. Dispel Magic (L4+) can shatter it. Otiluke's variant now also uses the same system.
 
 - **Goodberry** (L1): Practical combat approximation — heals caster 10 HP immediately (no berry inventory system).
 
@@ -320,6 +320,42 @@ Companions are full combatants tracked in `combat.combatants` with their own HP,
 - Echo Knight Manifest Echo (needs HP=1 dummy logic)
 - Bigby's Hand mode prompt (Clenched Fist / Forceful Hand / Grasping Hand / Interposing Hand)
 - Companion AI improvements (currently uses generic monster turn flow)
+
+### Monster AI & Special Abilities (2026-04-10)
+
+**Smart Targeting** (`find_nearest_target_for_monster`): Score-based system replaces pure-nearest targeting.
+- Distance penalty (prefer closer targets, +50 bonus for already-in-melee-range)
+- Focus fire: +80 for targets at ≤25% HP, +40 for ≤50%, +15 for ≤75%
+- Target concentrating casters: +35
+- Target healers (Cleric/Druid +25, Paladin/Bard +15)
+- Avoid Resilient Sphere trapped: −200 
+- Avoid dodging targets: −20
+- Never targets downed (0 HP) players when conscious players exist
+
+**Monster Traits** (`monster_def` fields, copied to `combatant` in `create_monster_combatant`):
+- **Pack Tactics** (`pack_tactics`): Advantage on attacks when ally within 5ft of target. Applied in `apply_attack_advantage_state`. Used by: Kobold, Wolf, Dire Wolf.
+- **Regeneration** (`regen_amount`): Heal N HP at start of turn in `advance_turn`. Blocked by fire/acid damage taken since last turn (`regen_blocked_this_round` set in `apply_damage`). Used by: Troll (10 HP/turn).
+- **Knockdown** (`knockdown_dc`): On weapon hit, target STR save or Prone. Applied after damage in `finalize_roll_result`. Used by: Wolf (DC 11), Dire Wolf (DC 13).
+- **Paralyzing Touch** (`paralyze_dc`): On weapon hit, target CON save or Paralyzed. Applied after damage in `finalize_roll_result`. Used by: Ghoul (DC 10).
+- **Breath Weapon** (`breath_name/save_type/save_dc/dice/count/damage_type/range/recharge_min`): AoE action targeting all enemies in range. Full save failure chain (Arcane Deflection, Countercharm, Flash of Genius, etc.). AI uses breath when 2+ targets in range OR 1 target in range but not in melee. Recharges each turn start on d6 ≥ `recharge_min`. Used by: Young White Dragon (10d8 cold, DC 15 CON, 30ft), Young Red Dragon (16d6 fire, DC 17 DEX, 30ft), Adult Black Dragon (12d8 acid, DC 18 DEX, 60ft), Adult Red Dragon (18d6 fire, DC 21 DEX, 60ft).
+
+**Damage Resistances/Immunities** (set via monster_def bools, mapped to existing combatant resistance fields):
+- Skeleton: poison immunity + poisoned immunity
+- Zombie: poison immunity + poisoned immunity
+- Ghoul: poison/poisoned/charmed immunity
+- Wight: poison/poisoned immunity, necrotic resistance, B/P/S nonmagical resistance
+- Fire Elemental: fire immunity, poison/poisoned/paralyzed/charmed immunity
+- Shadow Demon: cold/fire/lightning resistance, poison immunity
+- Wraith: acid/cold/fire/lightning/thunder resistance, necrotic/poison immunity, poisoned/charmed/paralyzed immunity, B/P/S nonmagical resistance
+- Frost Giant: cold immunity
+- Pit Fiend: fire immunity, cold resistance, poison/poisoned/frightened immunity, B/P/S nonmagical resistance
+- Lich: cold/lightning/necrotic resistance, poison/poisoned/charmed/frightened/paralyzed immunity, B/P/S nonmagical resistance
+- Adult Dragons: fire/acid immunity (matching breath type), frightened immunity
+- Beholder: poisoned condition immunity
+
+**Condition Immunities** (`immune_poisoned/frightened/charmed/paralyzed/exhaustion` on combatant): Checked in `add_condition()` to prevent the condition from being applied.
+
+**B/P/S Nonmagical Resistance** (`resist_bps_nonmagical`): In `apply_damage`, B/P/S damage is halved unless the source has `magic_weapon_bonus > 0`. Used by: Lich, Pit Fiend, Wraith, Wight.
 
 ### Skill Check System
 

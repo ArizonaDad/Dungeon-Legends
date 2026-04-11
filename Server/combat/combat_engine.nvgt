@@ -709,8 +709,10 @@ class combatant {
 	int heroes_feast_hp_bonus = 0; // The 2d10 max HP increase
 	// Resilient Sphere: target enclosed in sphere, immune to outside damage/effects,
 	// can't damage anything outside. Approximated as damage immunity + Incapacitated.
+	// Duration: 10 rounds (1 minute). Countdown at trapped creature's turn start.
 	bool resilient_sphere_trapped = false;
 	uint resilient_sphere_source_id = 0;
+	int resilient_sphere_rounds = 0; // Rounds remaining before sphere expires
 	// Time Stop: caster gets 1d4+1 extra turns in a row.
 	int time_stop_turns_remaining = 0;
 	// Antimagic Field (Basic Rules 2024 para 11938): Concentration.
@@ -719,6 +721,36 @@ class combatant {
 	// Creature type for PfEaG and similar creature-type-dependent effects.
 	// Players default to "humanoid"; monsters get their type from monster_def.
 	string creature_type = "humanoid";
+	// --- Monster Trait Fields ---
+	// Pack Tactics: advantage when an ally is within 5ft of target
+	bool pack_tactics = false;
+	// Regeneration: heal at start of turn (blocked by fire/acid taken last round)
+	int regen_amount = 0;
+	bool regen_needs_no_fire = false;
+	bool regen_needs_no_acid = false;
+	bool regen_blocked_this_round = false; // Set when fire/acid damage is taken
+	// On-hit riders: STR save or Prone (Wolf/Dire Wolf)
+	int knockdown_dc = 0;
+	// On-hit riders: CON save or Paralyzed (Ghoul)
+	int paralyze_dc = 0;
+	// Breath weapon tracking
+	bool breath_available = true;      // Whether breath weapon is charged
+	string breath_name = "";
+	int breath_save_type = 0;
+	int breath_save_dc = 0;
+	int breath_dice = 0;
+	int breath_count = 0;
+	int breath_damage_type = 0;
+	int breath_range = 30;
+	int breath_recharge_min = 5;
+	// Condition immunities (for monsters — players use feat/species booleans)
+	bool immune_poisoned = false;
+	bool immune_frightened = false;
+	bool immune_charmed = false;
+	bool immune_paralyzed = false;
+	bool immune_exhaustion = false;
+	// B/P/S nonmagical resistance (werewolves, fiends, etc.)
+	bool resist_bps_nonmagical = false;
 	// Fire Shield variant
 	bool fire_shield_active = false;
 	bool fire_shield_warm = true; // true=warm (cold resist, reflects fire), false=chill (fire resist, reflects cold)
@@ -1309,6 +1341,11 @@ class combatant {
 		// Heroes' Feast (Basic Rules 2024 para 13760): "Immunity to the Frightened
 		// and Poisoned conditions" for 24 hours.
 		if (heroes_feast_active and (cond_id == COND_FRIGHTENED or cond_id == COND_POISONED)) return;
+		// Monster condition immunities (SRD stat block immunities)
+		if (immune_poisoned and cond_id == COND_POISONED) return;
+		if (immune_frightened and cond_id == COND_FRIGHTENED) return;
+		if (immune_charmed and cond_id == COND_CHARMED) return;
+		if (immune_paralyzed and cond_id == COND_PARALYZED) return;
 		if (!has_condition(cond_id)) conditions.insert_last(cond_id);
 	}
 
@@ -1746,6 +1783,14 @@ class battle {
 		// since "nothing can pass through the barrier."
 		if (target.resilient_sphere_trapped) return;
 
+		// SRD Regeneration blocking: fire or acid damage prevents regen next turn
+		if (target.regen_amount > 0) {
+			if ((damage_type == DMG_FIRE and target.regen_needs_no_fire) or
+				(damage_type == DMG_ACID and target.regen_needs_no_acid)) {
+				target.regen_blocked_this_round = true;
+			}
+		}
+
 		if (target.raging and (damage_type == DMG_BLUDGEONING or damage_type == DMG_PIERCING or damage_type == DMG_SLASHING)) {
 			amount = (amount + 1) / 2;
 		}
@@ -1859,6 +1904,17 @@ class battle {
 		if (damage_type == DMG_PIERCING and target.piercing_resistance) amount = (amount + 1) / 2;
 		if (damage_type == DMG_BLUDGEONING and target.bludgeoning_resistance) amount = (amount + 1) / 2;
 		if (damage_type == DMG_SLASHING and target.slashing_resistance) amount = (amount + 1) / 2;
+		// SRD: B/P/S resistance from nonmagical attacks (Lich, Pit Fiend, Wraith, Wight).
+		// Approximation: player weapon attacks are treated as nonmagical unless they have
+		// a magic weapon flag; spell-sourced B/P/S bypasses this resistance.
+		if (target.resist_bps_nonmagical and !target.piercing_resistance and !target.bludgeoning_resistance and !target.slashing_resistance) {
+			if (damage_type == DMG_BLUDGEONING or damage_type == DMG_PIERCING or damage_type == DMG_SLASHING) {
+				// If source has Magic Weapon spell (+1/+2/+3), bypass this resistance
+				bool magic_weapon = false;
+				if (@source != null and source.magic_weapon_bonus > 0) magic_weapon = true;
+				if (!magic_weapon) amount = (amount + 1) / 2;
+			}
+		}
 		if (damage_type == DMG_FIRE and target.fire_resistance and !ea_bypass) amount = (amount + 1) / 2;
 		// PHB 2024 Sorcerer Draconic Sorcery L6 Elemental Affinity (para 7559-7560):
 		// "You have Resistance to that damage type" (the type chosen for Elemental

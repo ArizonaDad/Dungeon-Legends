@@ -2662,6 +2662,20 @@ class battle_manager {
 		if (attacker.vow_of_enmity_target != 0 and attacker.vow_of_enmity_target == target.id) {
 			adv = true;
 		}
+		// SRD Pack Tactics (Wolves, Kobolds, etc.): advantage on attack when an ally
+		// is within 5 feet of the target and the ally isn't incapacitated.
+		if (attacker.pack_tactics and @combat != null) {
+			for (uint pti = 0; pti < combat.combatants.length(); pti++) {
+				combatant@ ally = combat.combatants[pti];
+				if (@ally == null or ally.is_dead or ally.id == attacker.id) continue;
+				if (ally.is_player != attacker.is_player) continue; // Must be same side
+				if (ally.has_condition(COND_INCAPACITATED) or !ally.is_alive()) continue;
+				if (feet_distance(ally.x, ally.y, target.x, target.y) <= 5) {
+					adv = true;
+					break;
+				}
+			}
+		}
 		// PHB 2024 Ranger L17 Precise Hunter (para 6187-6188): "You have Advantage
 		// on attack rolls against the creature currently marked by your Hunter's
 		// Mark."
@@ -2952,36 +2966,71 @@ class battle_manager {
 		return attack_index > 0;
 	}
 
+	// Smart monster targeting: score-based system instead of pure nearest.
+	// Priority: low HP targets > concentrating casters > healers > nearest.
+	// Never attack downed (0 HP) players if others are still conscious.
 	combatant@ find_nearest_target_for_monster(combatant@ monster) {
 		if (@monster == null or @combat == null) return null;
 
-		combatant@ nearest = null;
-		int nearest_dist = 9999;
+		combatant@ best_target = null;
+		int best_score = -9999;
 
 		for (uint i = 0; i < combat.combatants.length(); i++) {
 			combatant@ other = combat.combatants[i];
-			if (!other.is_player or other.is_dead) continue;
-			if (other.current_hp == 0) continue;
+			if (@other == null or !other.is_player or other.is_dead) continue;
+			if (other.current_hp <= 0) continue; // Skip downed players
+
 			int dist = feet_distance(monster.x, monster.y, other.x, other.y);
-			if (dist < nearest_dist) {
-				nearest_dist = dist;
-				@nearest = other;
+			int score = 0;
+
+			// Base: prefer closer targets (distance penalty)
+			score -= dist;
+
+			// Heavily prioritize targets already in melee range
+			if (dist <= monster.main_hand_range) score += 50;
+
+			// Focus fire: prefer wounded targets (the lower HP %, the higher priority)
+			if (other.max_hp > 0) {
+				int hp_pct = (other.current_hp * 100) / other.max_hp;
+				if (hp_pct <= 25) score += 80;       // Nearly dead — finish them
+				else if (hp_pct <= 50) score += 40;  // Wounded
+				else if (hp_pct <= 75) score += 15;  // Somewhat hurt
+			}
+
+			// Target concentrating casters (break their spell)
+			if (other.is_concentrating) score += 35;
+
+			// Target healers (Cleric, Druid, Paladin, Bard — they sustain the party)
+			if (other.class_name == "Cleric" or other.class_name == "Druid") score += 25;
+			else if (other.class_name == "Paladin" or other.class_name == "Bard") score += 15;
+
+			// Slightly avoid targets in Resilient Sphere (can't damage them)
+			if (other.resilient_sphere_trapped) score -= 200;
+
+			// Slightly prefer targets not currently dodging
+			if (other.is_dodging) score -= 20;
+
+			if (score > best_score) {
+				best_score = score;
+				@best_target = other;
 			}
 		}
 
-		if (@nearest != null) return nearest;
+		if (@best_target != null) return best_target;
 
+		// Fallback: find ANY living player (including 0 HP) for death save attacks
+		combatant@ fallback = null;
+		int fallback_dist = 9999;
 		for (uint i = 0; i < combat.combatants.length(); i++) {
 			combatant@ other = combat.combatants[i];
-			if (!other.is_player or other.is_dead) continue;
+			if (@other == null or !other.is_player or other.is_dead) continue;
 			int dist = feet_distance(monster.x, monster.y, other.x, other.y);
-			if (dist < nearest_dist) {
-				nearest_dist = dist;
-				@nearest = other;
+			if (dist < fallback_dist) {
+				fallback_dist = dist;
+				@fallback = other;
 			}
 		}
-
-		return nearest;
+		return fallback;
 	}
 
 	bool start_monster_attack_sequence(combatant@ monster, combatant@ target, int attack_index, int attacks_remaining) {
@@ -5529,6 +5578,49 @@ class battle_manager {
 			broadcast_announce(c.name + " is hobbled by Long Arm of the Law and cannot move (must Disengage first).", false);
 		}
 
+		// Resilient Sphere duration countdown: at the start of the trapped
+		// creature's turn, decrement rounds. When 0, the sphere expires.
+		if (c.resilient_sphere_trapped) {
+			c.resilient_sphere_rounds--;
+			if (c.resilient_sphere_rounds <= 0) {
+				c.resilient_sphere_trapped = false;
+				c.resilient_sphere_source_id = 0;
+				c.resilient_sphere_rounds = 0;
+				c.remove_condition(COND_INCAPACITATED);
+				broadcast_to_battle({{"type", message_types::condition_removed}, {"target", c.name}, {"condition", "Incapacitated"}});
+				broadcast_announce(c.name + "'s Resilient Sphere fades away!", true);
+			} else {
+				broadcast_announce(c.name + " is still trapped in a Resilient Sphere. (" + c.resilient_sphere_rounds + " round" + (c.resilient_sphere_rounds != 1 ? "s" : "") + " remaining)", false);
+			}
+		}
+
+		// SRD Monster Regeneration: heal at start of turn (Troll, etc.)
+		// Blocked if fire or acid damage was taken since last turn.
+		if (c.regen_amount > 0 and c.is_alive() and !c.is_dead) {
+			if (c.regen_blocked_this_round) {
+				broadcast_announce(c.name + "'s regeneration is blocked this turn!", false);
+				c.regen_blocked_this_round = false;
+			} else {
+				int heal = c.regen_amount;
+				int old_hp = c.current_hp;
+				c.current_hp += heal;
+				if (c.current_hp > c.max_hp) c.current_hp = c.max_hp;
+				int healed = c.current_hp - old_hp;
+				if (healed > 0) {
+					broadcast_announce(c.name + " regenerates " + healed + " HP! (" + c.current_hp + "/" + c.max_hp + ")", false);
+				}
+			}
+		}
+
+		// SRD Breath Weapon Recharge: roll d6 at start of turn. If >= recharge_min, recharged.
+		if (!c.breath_available and c.breath_name != "") {
+			int recharge_roll = random(1, 6);
+			if (recharge_roll >= c.breath_recharge_min) {
+				c.breath_available = true;
+				broadcast_announce(c.name + "'s " + c.breath_name + " recharges!", true);
+			}
+		}
+
 		// Sacred Weapon glow reminder
 		if (c.sacred_weapon_active) {
 			broadcast_announce(c.name + "'s weapon glows with sacred power. (+" + c.get_ability_mod(ABILITY_CHA) + " to attack rolls)", false);
@@ -6500,8 +6592,69 @@ class battle_manager {
 			broadcast_state();
 		}
 
-		// Step 2: Attack if the target is in range and the monster still has an action.
-		if (monster.has_action and nearest_dist <= desired_attack_range) {
+		// Step 2: Use action — breath weapon or melee attack.
+		// AI decision: prefer breath weapon when available and 2+ enemies in range.
+		bool used_breath = false;
+		if (monster.has_action and monster.breath_available and monster.breath_name != "") {
+			// Count enemies within breath range
+			int targets_in_breath_range = 0;
+			for (uint bti = 0; bti < combat.combatants.length(); bti++) {
+				combatant@ bt = combat.combatants[bti];
+				if (@bt == null or bt.is_dead or !bt.is_player or bt.current_hp <= 0) continue;
+				if (feet_distance(monster.x, monster.y, bt.x, bt.y) <= monster.breath_range) {
+					targets_in_breath_range++;
+				}
+			}
+			// Use breath if 2+ targets in range, or 1 target in range and not in melee
+			if (targets_in_breath_range >= 2 or (targets_in_breath_range >= 1 and nearest_dist > 5)) {
+				monster.has_action = false;
+				monster.used_action = true;
+				monster.breath_available = false;
+				used_breath = true;
+				// Roll breath weapon damage
+				int breath_total = 0;
+				for (int bd = 0; bd < monster.breath_count; bd++) breath_total += random(1, monster.breath_dice);
+				broadcast_announce(monster.name + " uses " + monster.breath_name + "!", true);
+				// Apply to all enemies in range
+				for (uint bhi = 0; bhi < combat.combatants.length(); bhi++) {
+					combatant@ bh = combat.combatants[bhi];
+					if (@bh == null or bh.is_dead or !bh.is_player or bh.current_hp <= 0) continue;
+					if (feet_distance(monster.x, monster.y, bh.x, bh.y) > monster.breath_range) continue;
+					int save_roll = random(1, 20);
+					int save_bonus = bh.get_save_bonus(monster.breath_save_type);
+					int bless_bonus = roll_bless_bonus(bh);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= monster.breath_save_dc;
+					// Full save failure chain
+					if (!saved and try_arcane_deflection_save(bh, monster.breath_save_dc, save_total)) saved = true;
+					if (!saved) { if (try_countercharm_reroll(bh, monster.breath_save_dc, save_bonus + bless_bonus, ABILITY_NAMES[monster.breath_save_type] + " save vs " + monster.breath_name)) saved = true; }
+					if (!saved) { int ds = try_disciplined_survivor_reroll(bh, monster.breath_save_dc, save_total, save_bonus + bless_bonus, ABILITY_NAMES[monster.breath_save_type] + " save vs " + monster.breath_name); if (ds >= monster.breath_save_dc) saved = true; }
+					if (!saved) { int fg = try_flash_of_genius(bh, monster.breath_save_dc, save_total, ABILITY_NAMES[monster.breath_save_type] + " save vs " + monster.breath_name); if (fg >= monster.breath_save_dc) saved = true; }
+					if (!saved) { int mv = try_maverick_spirit(bh, monster.breath_save_dc, save_total, ABILITY_NAMES[monster.breath_save_type] + " save vs " + monster.breath_name); if (mv >= monster.breath_save_dc) saved = true; }
+					if (!saved and try_mage_slayer_guarded_mind(bh, monster.breath_save_type)) saved = true;
+					if (!saved) { int bf = try_boon_of_fate_bonus(bh, save_total, monster.breath_save_dc); if (bf > 0) saved = true; }
+					if (!saved and try_stroke_of_luck_save(bh, monster.breath_save_dc, save_bonus + bless_bonus)) saved = true;
+					int dmg = breath_total;
+					if (saved) dmg = dmg / 2;
+					string save_name = "DEX";
+					if (monster.breath_save_type == ABILITY_CON) save_name = "CON";
+					else if (monster.breath_save_type == ABILITY_WIS) save_name = "WIS";
+					broadcast_roll(bh.name, save_name + " save vs " + monster.breath_name, save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved! Half damage." : "Failed!");
+					if (dmg > 0) {
+						combat.apply_damage(bh, dmg, monster.breath_damage_type, monster);
+						broadcast_announce(bh.name + " takes " + dmg + " damage from " + monster.breath_name + "!" + (saved ? " (half)" : ""), true);
+						if (bh.is_dead or bh.current_hp <= 0) {
+							check_battle_end();
+							if (!combat.battle_active) return;
+						}
+					}
+				}
+				broadcast_state();
+			}
+		}
+
+		// Step 2b: Melee/ranged attack if breath was not used
+		if (!used_breath and monster.has_action and nearest_dist <= desired_attack_range) {
 			monster.has_action = false;
 			monster.used_action = true;
 			if (start_monster_attack_sequence(monster, nearest, 0, monster.extra_attacks)) return;
@@ -9137,6 +9290,38 @@ class battle_manager {
 					}
 				} else {
 					broadcast_announce(target.name + " resists " + c.name + "'s Shield Master shove (save " + sb_save + " vs DC " + sb_dc + ").", false);
+				}
+			}
+
+			// SRD Monster On-Hit Riders: Knockdown (Wolf/Dire Wolf) and Paralyze (Ghoul).
+			// These fire only on melee weapon hits from monsters with the trait.
+			if (!c.is_player and pr.is_weapon_attack and !target.is_dead and target.is_alive()) {
+				// SRD Wolf/Dire Wolf: Bite knocks target prone (STR save or Prone)
+				if (c.knockdown_dc > 0 and !target.has_condition(COND_PRONE)) {
+					int kd_roll = random(1, 20);
+					int kd_bonus = target.get_save_bonus(ABILITY_STR);
+					int kd_total = kd_roll + kd_bonus;
+					bool kd_saved = kd_total >= c.knockdown_dc;
+					broadcast_roll(target.name, "STR save vs knockdown", kd_roll, kd_bonus, kd_total, kd_saved ? "Stands firm!" : "Knocked prone!");
+					if (!kd_saved) {
+						target.add_condition(COND_PRONE);
+						broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Prone"}});
+						broadcast_announce(c.name + " knocks " + target.name + " prone!", true);
+					}
+				}
+				// SRD Ghoul: Claws paralyze target (CON save or Paralyzed, 1 minute).
+				// Condition immunity check is handled by add_condition.
+				if (c.paralyze_dc > 0 and !target.has_condition(COND_PARALYZED)) {
+					int par_roll = random(1, 20);
+					int par_bonus = target.get_save_bonus(ABILITY_CON);
+					int par_total = par_roll + par_bonus;
+					bool par_saved = par_total >= c.paralyze_dc;
+					broadcast_roll(target.name, "CON save vs paralyzing touch", par_roll, par_bonus, par_total, par_saved ? "Resists!" : "Paralyzed!");
+					if (!par_saved) {
+						target.add_condition(COND_PARALYZED);
+						broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Paralyzed"}});
+						broadcast_announce(c.name + "'s attack paralyzes " + target.name + "!", true);
+					}
 				}
 			}
 
@@ -13371,6 +13556,15 @@ class battle_manager {
 				if (target.shield_active) { clear_shield_effect(target, true); dispelled++; }
 				if (target.stoneskin_active) { target.stoneskin_active = false; dispelled++; }
 				if (target.fly_active) { target.fly_active = false; target.flying_speed = 0; dispelled++; }
+				if (target.resilient_sphere_trapped and max_dispel_level >= 4) {
+					target.resilient_sphere_trapped = false;
+					target.resilient_sphere_source_id = 0;
+					target.resilient_sphere_rounds = 0;
+					target.remove_condition(COND_INCAPACITATED);
+					broadcast_to_battle({{"type", message_types::condition_removed}, {"target", target.name}, {"condition", "Incapacitated"}});
+					broadcast_announce(c.name + "'s Dispel Magic shatters " + target.name + "'s Resilient Sphere!", true);
+					dispelled++;
+				}
 				if (target.is_concentrating) {
 					string ended = target.concentration_spell;
 					clear_concentration_effects(target);
@@ -15877,9 +16071,10 @@ class battle_manager {
 				if (!rs_saved) {
 					target.resilient_sphere_trapped = true;
 					target.resilient_sphere_source_id = c.id;
+					target.resilient_sphere_rounds = 10; // 1 minute = 10 rounds
 					target.add_condition(COND_INCAPACITATED);
 					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Incapacitated"}});
-					broadcast_announce(c.name + " traps " + target.name + " in a Resilient Sphere! They are immune to all damage but cannot act.", true);
+					broadcast_announce(c.name + " traps " + target.name + " in a Resilient Sphere! They are immune to all damage but cannot act. (10 rounds)", true);
 				}
 				broadcast_state();
 				return;
@@ -16718,9 +16913,12 @@ class battle_manager {
 				if (!saved and try_stroke_of_luck_save(target, save_dc, save_bonus + bless_bonus)) saved = true;
 				broadcast_roll(target.name, "DEX save vs Otiluke's Resilient Sphere", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Trapped!");
 				if (!saved) {
-					target.add_condition(COND_RESTRAINED);
-					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Restrained"}});
-					broadcast_announce(c.name + " traps " + target.name + " in Otiluke's Resilient Sphere!", true);
+					target.resilient_sphere_trapped = true;
+					target.resilient_sphere_source_id = c.id;
+					target.resilient_sphere_rounds = 10; // 1 minute = 10 rounds
+					target.add_condition(COND_INCAPACITATED);
+					broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Incapacitated"}});
+					broadcast_announce(c.name + " traps " + target.name + " in Otiluke's Resilient Sphere! They are immune to all damage but cannot act. (10 rounds)", true);
 				}
 				broadcast_state();
 				return;
