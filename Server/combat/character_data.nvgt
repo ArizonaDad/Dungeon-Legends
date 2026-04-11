@@ -1925,6 +1925,14 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         if (!c.knows_spell("guidance")) c.prepared_spells.insert_last("guidance");
         if (!c.knows_spell("guiding_bolt")) c.prepared_spells.insert_last("guiding_bolt");
         c.grant_free_cast("guiding_bolt", c.proficiency);
+        // L6 Cosmic Omen (para 2161-2168): reaction add/subtract d6 on d20 test
+        // within 30ft. Uses = proficiency bonus per long rest. Weal/Woe determined
+        // randomly (simulates consulting the Star Map on long rest).
+        if (cs.level >= 6) {
+            c.cosmic_omen_uses_max = proficiency_bonus(cs.level);
+            c.cosmic_omen_uses = c.cosmic_omen_uses_max;
+            c.cosmic_omen_weal = (random(1, 20) % 2 == 0);
+        }
         // L14 Full of Stars (para 2179-2181): B/P/S resistance while in starry form
         // (applied dynamically in apply_damage when starry_form_active, see below)
     }

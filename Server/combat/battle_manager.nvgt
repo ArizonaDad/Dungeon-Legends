@@ -9995,13 +9995,16 @@ class battle_manager {
 				broadcast_announce(c.name + "'s Agile Parry grants +2 AC until the start of their next turn.", false);
 			}
 
-			// Xanathar's Drunken Master L6 Redirect Attack (para 1798-1800): "When a
-			// creature misses you with a melee attack roll, you can use your reaction
-			// and spend 1 ki point to cause that attack to hit one creature of your
-			// choice, other than the attacker, that you can see within 5 feet of you."
-			// Ki + reaction already consumed in users_dom handler when flag was set.
+			// Xanathar's Drunken Master L6 Redirect Attack (para 1794-1797): "When a
+			// creature misses you with a melee attack roll, you can spend 1 ki point
+			// as a reaction to cause that attack to hit one creature of your choice,
+			// other than the attacker, that you can see within 5 feet of you."
+			// Auto-resolved: if target is Drunken Master L6+ with FP and reaction,
+			// find nearest hostile within 5ft and redirect the attack.
 			if (!hit and !is_fumble and pr.is_weapon_attack and !c.main_hand_is_ranged
-				and target.drunken_master_opportunity and !target.is_dead and @combat != null) {
+				and !target.is_dead and @combat != null
+				and target.class_name == "Monk" and target.subclass == "Way of the Drunken Master"
+				and target.level >= 6 and target.focus_points > 0 and target.has_reaction) {
 				combatant@ redirect_target = null;
 				int best_rt_dist = 999;
 				for (uint rti = 0; rti < combat.combatants.length(); rti++) {
@@ -10015,18 +10018,22 @@ class battle_manager {
 					}
 				}
 				if (@redirect_target != null) {
-					target.drunken_master_opportunity = false;
-					// Redirected attack auto-hits with the attacker's weapon damage
-					int rd_dmg = 0;
-					for (int rdi = 0; rdi < c.main_hand_damage_count; rdi++) rd_dmg += random(1, c.main_hand_damage_dice);
-					rd_dmg += get_weapon_attack_ability_mod(c);
-					if (rd_dmg < 1) rd_dmg = 1;
-					combat.apply_damage(redirect_target, rd_dmg, c.main_hand_damage_type, c);
-					broadcast_announce(target.name + " redirects the attack! " + c.name + "'s blow strikes " + redirect_target.name + " for " + rd_dmg + " damage! (Redirect Attack)", true);
-				} else {
-					// No valid target within 5ft to redirect to — flag wasted
-					target.drunken_master_opportunity = false;
-					broadcast_announce(target.name + " tries to Redirect Attack but no creature is within 5 feet!", false);
+					// Consume 1 FP + reaction
+					target.focus_points--;
+					target.has_reaction = false;
+					// Apply the original attack roll against the new target
+					bool rd_hit = (total >= redirect_target.armor_class);
+					if (is_crit) rd_hit = true;
+					if (rd_hit) {
+						int rd_dmg = 0;
+						for (int rdi = 0; rdi < c.main_hand_damage_count; rdi++) rd_dmg += random(1, c.main_hand_damage_dice);
+						rd_dmg += get_weapon_attack_ability_mod(c);
+						if (rd_dmg < 1) rd_dmg = 1;
+						combat.apply_damage(redirect_target, rd_dmg, c.main_hand_damage_type, c);
+						broadcast_announce(target.name + " uses Redirect Attack! " + c.name + "'s blow strikes " + redirect_target.name + " for " + rd_dmg + " damage! (1 FP spent)", true);
+					} else {
+						broadcast_announce(target.name + " uses Redirect Attack, redirecting " + c.name + "'s attack toward " + redirect_target.name + ", but the redirected attack misses! (AC " + redirect_target.armor_class + ", 1 FP spent)", false);
+					}
 				}
 			}
 
@@ -10276,6 +10283,72 @@ class battle_manager {
 						broadcast_announce(wmc.name + "'s Warding Maneuver (+"+ward_roll+" AC) grants " + target.name + " resistance against the attack!", true);
 					}
 					break;
+				}
+			}
+
+			// Tasha's Circle of Stars L6 Cosmic Omen — Woe (paras 2161-2168):
+			// When an enemy makes an attack roll that would hit, a Stars Druid
+			// within 30ft with Woe + uses + reaction can subtract d6 from the total.
+			// Auto-resolved: only fires if the d6 would turn the hit into a miss.
+			if (hit and !is_crit and !is_fumble and @combat != null) {
+				for (uint co_w = 0; co_w < combat.combatants.length(); co_w++) {
+					combatant@ sd = combat.combatants[co_w];
+					if (@sd == null or sd.is_dead or sd.id == c.id) continue;
+					if (sd.class_name != "Druid" or sd.subclass != "Circle of the Stars") continue;
+					if (sd.level < 6 or sd.cosmic_omen_uses <= 0 or !sd.has_reaction) continue;
+					if (sd.cosmic_omen_weal) continue; // Woe only
+					if (!combat.are_hostile(sd, c)) continue; // Druid must be hostile to attacker
+					int co_dist = feet_distance(sd.x, sd.y, target.x, target.y);
+					if (co_dist > 30) continue;
+					// Smart-spend: only subtract if d6 max (6) could turn hit to miss
+					if (total - 6 < target.armor_class) {
+						int co_roll = random(1, 6);
+						sd.cosmic_omen_uses--;
+						sd.has_reaction = false;
+						total -= co_roll;
+						reported_modifier -= co_roll;
+						if (total < target.armor_class) {
+							hit = false;
+							outcome = "Miss! (Cosmic Omen Woe -" + co_roll + ")";
+							broadcast_announce(sd.name + "'s Cosmic Omen (Woe) subtracts " + co_roll + " from the attack, turning a hit into a miss! (" + sd.cosmic_omen_uses + " uses remaining)", true);
+						} else {
+							broadcast_announce(sd.name + "'s Cosmic Omen (Woe) subtracts " + co_roll + " but the attack still hits. (" + sd.cosmic_omen_uses + " uses remaining)", false);
+						}
+						break;
+					}
+				}
+			}
+
+			// Tasha's Circle of Stars L6 Cosmic Omen — Weal (paras 2161-2168):
+			// When an ally within 30ft makes an attack roll that misses, a Stars
+			// Druid with Weal + uses + reaction can add d6 to the total.
+			// Auto-resolved: only fires if d6 could turn the miss into a hit.
+			if (!hit and !is_fumble and @combat != null) {
+				for (uint co_a = 0; co_a < combat.combatants.length(); co_a++) {
+					combatant@ sd = combat.combatants[co_a];
+					if (@sd == null or sd.is_dead or sd.id == c.id) continue;
+					if (sd.class_name != "Druid" or sd.subclass != "Circle of the Stars") continue;
+					if (sd.level < 6 or sd.cosmic_omen_uses <= 0 or !sd.has_reaction) continue;
+					if (!sd.cosmic_omen_weal) continue; // Weal only
+					if (combat.are_hostile(sd, c)) continue; // Druid must be allied with attacker
+					int co_dist = feet_distance(sd.x, sd.y, c.x, c.y);
+					if (co_dist > 30) continue;
+					// Smart-spend: only add if d6 max (6) could turn miss to hit
+					if (total + 6 >= target.armor_class) {
+						int co_roll = random(1, 6);
+						sd.cosmic_omen_uses--;
+						sd.has_reaction = false;
+						total += co_roll;
+						reported_modifier += co_roll;
+						if (total >= target.armor_class) {
+							hit = true;
+							outcome = "Hit! (Cosmic Omen Weal +" + co_roll + ")";
+							broadcast_announce(sd.name + "'s Cosmic Omen (Weal) adds " + co_roll + " to the attack, turning a miss into a hit! (" + sd.cosmic_omen_uses + " uses remaining)", true);
+						} else {
+							broadcast_announce(sd.name + "'s Cosmic Omen (Weal) adds " + co_roll + " but the attack still misses. (" + sd.cosmic_omen_uses + " uses remaining)", false);
+						}
+						break;
+					}
 				}
 			}
 

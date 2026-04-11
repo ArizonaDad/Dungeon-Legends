@@ -303,6 +303,9 @@ bool my_sun_shield_active = false;
 bool my_starry_form_active = false;
 string my_starry_form_type = "";
 bool my_starry_form_archer_used_this_turn = false;
+// Tasha's Circle of Stars L6 Cosmic Omen (paras 2161-2168)
+int my_cosmic_omen_uses = 0;
+bool my_cosmic_omen_weal = false;
 // Horizon Walker / Monster Slayer / Oath of Redemption (Xanathar's)
 bool my_spectral_defense_active = false;
 bool my_supernatural_defense_active = false;
@@ -4537,6 +4540,9 @@ void parse_game_state(json_object@ msg) {
 	my_starry_form_active = msg.exists("my_starry_form_active") ? bool(msg["my_starry_form_active"]) : false;
 	my_starry_form_type = msg.exists("my_starry_form_type") ? string(msg["my_starry_form_type"]) : "";
 	my_starry_form_archer_used_this_turn = msg.exists("my_starry_form_archer_used_this_turn") ? bool(msg["my_starry_form_archer_used_this_turn"]) : false;
+	// Tasha's Circle of Stars L6 Cosmic Omen
+	my_cosmic_omen_uses = msg.exists("my_cosmic_omen_uses") ? int(msg["my_cosmic_omen_uses"]) : 0;
+	my_cosmic_omen_weal = msg.exists("my_cosmic_omen_weal") ? bool(msg["my_cosmic_omen_weal"]) : false;
 	my_wholeness_of_body_uses = msg.exists("my_wholeness_of_body_uses") ? int(msg["my_wholeness_of_body_uses"]) : 0;
 	my_wholeness_of_body_uses_max = msg.exists("my_wholeness_of_body_uses_max") ? int(msg["my_wholeness_of_body_uses_max"]) : 0;
 	my_quivering_palm_pending = msg.exists("my_quivering_palm_pending") ? bool(msg["my_quivering_palm_pending"]) : false;
@@ -4853,6 +4859,8 @@ void reset_combat_state() {
 	my_starry_form_active = false;
 	my_starry_form_type = "";
 	my_starry_form_archer_used_this_turn = false;
+	my_cosmic_omen_uses = 0;
+	my_cosmic_omen_weal = false;
 	my_spectral_defense_active = false;
 	my_supernatural_defense_active = false;
 	my_slayers_counter_active = false;

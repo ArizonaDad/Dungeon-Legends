@@ -629,6 +629,12 @@ class combatant {
 	bool starry_form_active = false; // Circle of Stars Druid
 	string starry_form_type = ""; // Archer/Chalice/Dragon
 	bool starry_form_archer_used_this_turn = false; // Tasha's Archer form BA 1/turn
+	// Tasha's Circle of Stars L6 Cosmic Omen (paras 2161-2168): reaction add/subtract
+	// d6 from a d20 test within 30ft. Weal (even) = add, Woe (odd) = subtract.
+	// Uses = proficiency bonus per long rest.
+	bool cosmic_omen_weal = false;
+	int cosmic_omen_uses = 0;
+	int cosmic_omen_uses_max = 0;
 	bool land_stride_active = false; // Circle of the Land
 	bool open_hand_ki_used = false; // Way of the Open Hand
 	// PHB 2024 Warrior of the Open Hand (paras 5376-5400)
@@ -2370,6 +2376,32 @@ class battle {
 			warding_bond_shared_amount = amount; // source takes post-resistance amount
 		}
 
+		// Xanathar's Oath of Redemption Paladin L7 Aura of the Guardian (paras 2047-2048):
+		// "when a creature within 10 feet of you takes damage, you can use your reaction
+		// to magically take that damage instead. This feature doesn't transfer any other
+		// effects that might accompany the damage, and this damage can't be reduced in
+		// any way." Auto-resolved: the Paladin absorbs the full post-reduction damage
+		// directly to their HP (bypasses all resistances and temp HP).
+		if (amount > 0 and @target != null and !target.is_dead) {
+			for (uint aog = 0; aog < combatants.length(); aog++) {
+				combatant@ pal = combatants[aog];
+				if (@pal == null or pal.is_dead or pal.id == target.id) continue;
+				if (!pal.aura_of_guardian_active or !pal.has_reaction) continue;
+				if (pal.current_hp <= 0) continue;
+				// Must be allied with the target
+				if (are_hostile(pal, target)) continue;
+				int aog_dist = feet_distance(pal.x, pal.y, target.x, target.y);
+				if (aog_dist > pal.aura_of_guardian_range) continue;
+				// Paladin takes the damage instead — unreduced, directly to HP
+				pal.has_reaction = false;
+				pal.current_hp -= amount;
+				// Target takes 0 damage
+				amount = 0;
+				break;
+			}
+		}
+		if (amount <= 0) return;
+
 		// Death Ward (Basic Rules para 12784): "The first time the target would drop to
 		// 0 Hit Points before the spell ends, the target instead drops to 1 Hit Point,
 		// and the spell ends."
@@ -3000,6 +3032,9 @@ class battle {
 				state["my_starry_form_active"] = c.starry_form_active;
 				state["my_starry_form_type"] = c.starry_form_type;
 				state["my_starry_form_archer_used_this_turn"] = c.starry_form_archer_used_this_turn;
+				// Tasha's Circle of Stars L6 Cosmic Omen (paras 2161-2168)
+				state["my_cosmic_omen_uses"] = c.cosmic_omen_uses;
+				state["my_cosmic_omen_weal"] = c.cosmic_omen_weal;
 				// PHB 2024 Boon of Dimensional Travel (para 7876)
 				state["my_blink_steps_available"] = c.blink_steps_available;
 				// PHB 2024 Elemental Adept type (para 7610)
