@@ -490,6 +490,14 @@ class combatant {
 	bool arcane_shot_pending = false; // Arcane Archer Fighter
 	string arcane_shot_type = "";
 	int arcane_shot_uses = 0;
+	// Xanathar's Arcane Archer Shot Effects (paras 1618-1646): tracking fields
+	// for shot debuffs that expire "until the start of your next turn."
+	uint arcane_enfeeble_source = 0;   // Enfeebling Arrow: weapon damage halved
+	bool arcane_grasping_active = false; // Grasping Arrow: -10ft speed + movement damage
+	uint arcane_grasping_source = 0;   // Caster who applied grasping
+	int arcane_grasping_rounds = 0;    // Rounds remaining (10 = 1 minute)
+	bool arcane_grasping_damaged_this_turn = false; // Per-turn flag for movement damage
+	uint arcane_banish_source = 0;     // Banishing Arrow: incapacitated + speed 0
 	bool restore_balance_ready = false; // Clockwork Soul Sorcerer L1
 	int restore_balance_uses = 0;
 	// Tasha's Clockwork Soul L6/L14/L18 (paras 3997-4011)

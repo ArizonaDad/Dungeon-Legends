@@ -5082,6 +5082,17 @@ class battle_manager {
 					broadcast_announce(prev.name + " dislodges the Gut Shot projectile. Speed restored.", false);
 				}
 			}
+			// Xanathar's Arcane Archer Grasping Arrow (paras 1618-1646): "The effect
+			// lasts for 1 minute." Tick down rounds; clear on expiry, restore speed.
+			if (prev.arcane_grasping_active and prev.arcane_grasping_rounds > 0) {
+				prev.arcane_grasping_rounds--;
+				if (prev.arcane_grasping_rounds <= 0) {
+					prev.arcane_grasping_active = false;
+					prev.arcane_grasping_source = 0;
+					prev.speed += 10;
+					broadcast_announce(prev.name + "'s Grasping Arrow thorns wither away. Speed restored.", false);
+				}
+			}
 			// Valda's Spire Gunslinger White Hat L10 Long Arm of the Law (paras 462-463):
 			// The hobble lasts only one turn — clear the lockout flag at end of the
 			// affected combatant's turn so it doesn't persist into future rounds.
@@ -6195,6 +6206,8 @@ class battle_manager {
 		c.cast_leveled_spell_this_turn = false;
 		// Spirit Guardians: once per turn damage tracking
 		c.spirit_guardians_damaged_this_turn = false;
+		// Arcane Archer Grasping Arrow: once per turn movement damage tracking
+		c.arcane_grasping_damaged_this_turn = false;
 		// Counterspell readied action expires at start of your next turn
 		c.counterspell_pending = false;
 		// PHB 2024 Boon of Dimensional Travel Blink Steps (para 7876)
@@ -6246,6 +6259,15 @@ class battle_manager {
 				cr_t.speed += 10;
 				cr_t.slasher_hamstring_active = false;
 				cr_t.slasher_hamstring_source_id = 0;
+			}
+			// Xanathar's Arcane Archer: clear shot debuffs that expire "at start of your next turn"
+			if (@cr_t != null and cr_t.arcane_enfeeble_source == c.id) {
+				cr_t.arcane_enfeeble_source = 0;
+			}
+			if (@cr_t != null and cr_t.arcane_banish_source == c.id) {
+				cr_t.remove_condition(COND_INCAPACITATED);
+				cr_t.arcane_banish_source = 0;
+				broadcast_announce(cr_t.name + " returns from banishment!", false);
 			}
 		}
 		c.mastery_sap_active = false;
@@ -7512,6 +7534,16 @@ class battle_manager {
 						break;
 					}
 				}
+			}
+
+			// Xanathar's Arcane Archer Grasping Arrow (paras 1618-1646): movement damage
+			if (monster.arcane_grasping_active and !monster.arcane_grasping_damaged_this_turn and !monster.is_dead) {
+				int grasp_dmg = random(1, 6) + random(1, 6);
+				combatant@ grasp_src = combat.get_combatant(monster.arcane_grasping_source);
+				combat.apply_damage(monster, grasp_dmg, DMG_SLASHING, @grasp_src != null ? grasp_src : monster);
+				broadcast_announce(monster.name + " takes " + grasp_dmg + " slashing damage from Grasping Arrow thorns!", true);
+				monster.arcane_grasping_damaged_this_turn = true;
+				if (monster.is_dead) { broadcast_state(); check_battle_end(); return; }
 			}
 
 			nearest_dist = feet_distance(monster.x, monster.y, nearest.x, nearest.y);
@@ -10171,6 +10203,12 @@ class battle_manager {
 			// PHB 2024 Skulker: reveal on hit (deferred from attack declaration)
 			// Basic Rules 2024 Greater Invisibility: does NOT break on attack.
 			if (c.is_hidden and !c.greater_invisibility_active) reveal_hidden_combatant(c, "hitting with an attack");
+			// Xanathar's Arcane Archer Enfeebling Arrow (paras 1618-1646): "the damage
+			// dealt by its weapon attacks is halved until the start of your next turn."
+			if (c.arcane_enfeeble_source != 0 and pr.is_weapon_attack) {
+				total_damage = (total_damage + 1) / 2;
+				broadcast_announce(c.name + "'s weapon damage is halved by Enfeebling Arrow! (" + total_damage + " damage)", true);
+			}
 			combat.apply_damage(target, total_damage, pr.damage_type, c, pr.is_crit);
 
 			// PHB 2024 Monk L3 Deflect Attacks — Redirect (para 5339): If damage was
@@ -10519,6 +10557,85 @@ class battle_manager {
 				target.y += push_dy;
 				c.tavern_brawler_push_used = true;
 				broadcast_announce(c.name + " batters " + target.name + " back 5 feet with Tavern Brawler!", false);
+			}
+
+			// Xanathar's Arcane Archer L3 Arcane Shot (paras 1618-1646): apply shot
+			// effect on weapon hit. Flag set via bonus action menu in users_dom.nvgt.
+			if (c.arcane_shot_pending and !target.is_dead and pr.is_weapon_attack) {
+				c.arcane_shot_pending = false;
+				int as_dc = 8 + c.proficiency + c.get_ability_mod(ABILITY_INT);
+				string shot = c.arcane_shot_type;
+				if (shot == "bursting") {
+					// Bursting Arrow (Evocation): 2d6 force to all creatures within 10ft of target
+					int burst_dmg = random(1, 6) + random(1, 6);
+					broadcast_announce(c.name + "'s Bursting Arrow explodes for " + burst_dmg + " force damage!", true);
+					if (@combat != null) {
+						for (uint bi = 0; bi < combat.combatants.length(); bi++) {
+							combatant@ bt = combat.combatants[bi];
+							if (@bt == null or bt.is_dead or bt.id == c.id) continue;
+							if (feet_distance(bt.x, bt.y, target.x, target.y) <= 10) {
+								combat.apply_damage(bt, burst_dmg, DMG_FORCE, c);
+								if (bt.id != target.id) broadcast_announce(bt.name + " is caught in the blast for " + burst_dmg + " force damage!", false);
+							}
+						}
+					}
+				} else if (shot == "beguiling") {
+					// Beguiling Arrow (Enchantment): 2d6 psychic + WIS save or charmed
+					int beg_dmg = random(1, 6) + random(1, 6);
+					combat.apply_damage(target, beg_dmg, DMG_PSYCHIC, c);
+					int beg_save = random(1, 20) + target.get_save_bonus(ABILITY_WIS);
+					if (beg_save < as_dc) {
+						target.add_condition(COND_CHARMED);
+						broadcast_announce(c.name + "'s Beguiling Arrow deals " + beg_dmg + " psychic and charms " + target.name + "! (save " + beg_save + " vs DC " + as_dc + ")", true);
+					} else {
+						broadcast_announce(c.name + "'s Beguiling Arrow deals " + beg_dmg + " psychic but " + target.name + " resists the charm (save " + beg_save + " vs DC " + as_dc + ").", false);
+					}
+				} else if (shot == "shadow") {
+					// Shadow Arrow (Illusion): 2d6 psychic + WIS save or blinded
+					int sha_dmg = random(1, 6) + random(1, 6);
+					combat.apply_damage(target, sha_dmg, DMG_PSYCHIC, c);
+					int sha_save = random(1, 20) + target.get_save_bonus(ABILITY_WIS);
+					if (sha_save < as_dc) {
+						target.add_condition(COND_BLINDED);
+						broadcast_announce(c.name + "'s Shadow Arrow deals " + sha_dmg + " psychic and blinds " + target.name + "! (save " + sha_save + " vs DC " + as_dc + ")", true);
+					} else {
+						broadcast_announce(c.name + "'s Shadow Arrow deals " + sha_dmg + " psychic but " + target.name + " resists (save " + sha_save + " vs DC " + as_dc + ").", false);
+					}
+				} else if (shot == "banishing") {
+					// Banishing Arrow (Abjuration): CHA save or incapacitated + speed 0
+					int ban_save = random(1, 20) + target.get_save_bonus(ABILITY_CHA);
+					if (ban_save < as_dc) {
+						target.add_condition(COND_INCAPACITATED);
+						target.movement_remaining = 0;
+						target.arcane_banish_source = c.id;
+						broadcast_announce(c.name + "'s Banishing Arrow banishes " + target.name + "! Incapacitated and speed 0 until end of their next turn. (save " + ban_save + " vs DC " + as_dc + ")", true);
+					} else {
+						broadcast_announce(c.name + "'s Banishing Arrow fails — " + target.name + " resists (save " + ban_save + " vs DC " + as_dc + ").", false);
+					}
+				} else if (shot == "enfeebling") {
+					// Enfeebling Arrow (Necromancy): 2d6 necrotic + CON save or weapon damage halved
+					int enf_dmg = random(1, 6) + random(1, 6);
+					combat.apply_damage(target, enf_dmg, DMG_NECROTIC, c);
+					int enf_save = random(1, 20) + target.get_save_bonus(ABILITY_CON);
+					if (enf_save < as_dc) {
+						target.arcane_enfeeble_source = c.id;
+						broadcast_announce(c.name + "'s Enfeebling Arrow deals " + enf_dmg + " necrotic and enfeebles " + target.name + "! Weapon damage halved. (save " + enf_save + " vs DC " + as_dc + ")", true);
+					} else {
+						broadcast_announce(c.name + "'s Enfeebling Arrow deals " + enf_dmg + " necrotic but " + target.name + " resists the enfeebling (save " + enf_save + " vs DC " + as_dc + ").", false);
+					}
+				} else if (shot == "grasping") {
+					// Grasping Arrow (Conjuration): 2d6 poison + -10ft speed, 1 minute
+					int gra_dmg = random(1, 6) + random(1, 6);
+					combat.apply_damage(target, gra_dmg, DMG_POISON, c);
+					target.arcane_grasping_active = true;
+					target.arcane_grasping_source = c.id;
+					target.arcane_grasping_rounds = 10;
+					if (target.speed >= 10) target.speed -= 10;
+					broadcast_announce(c.name + "'s Grasping Arrow deals " + gra_dmg + " poison and ensnares " + target.name + " in thorny brambles! Speed reduced by 10ft for 1 minute.", true);
+				} else {
+					// Default/unknown shot type: just announce
+					broadcast_announce(c.name + "'s Arcane Shot (" + shot + ") strikes " + target.name + "!", false);
+				}
 			}
 
 			broadcast_state();
@@ -12436,6 +12553,22 @@ class battle_manager {
 					}
 					break;
 				}
+			}
+		}
+
+		// Xanathar's Arcane Archer Grasping Arrow (paras 1618-1646): "it takes 2d6
+		// slashing damage each time it moves 1 foot or more without teleporting."
+		// Triggers once per turn on voluntary movement.
+		if (c.arcane_grasping_active and !c.arcane_grasping_damaged_this_turn and !c.is_dead) {
+			int grasp_dmg = random(1, 6) + random(1, 6);
+			combatant@ grasp_src = combat.get_combatant(c.arcane_grasping_source);
+			combat.apply_damage(c, grasp_dmg, DMG_SLASHING, @grasp_src != null ? grasp_src : c);
+			broadcast_announce(c.name + " takes " + grasp_dmg + " slashing damage from Grasping Arrow thorns!", true);
+			c.arcane_grasping_damaged_this_turn = true;
+			if (c.is_dead) {
+				broadcast_state();
+				check_battle_end();
+				return;
 			}
 		}
 
