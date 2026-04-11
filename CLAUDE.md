@@ -210,7 +210,7 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 
 - Cantrip scaling at levels 5/11/17
 
-- Concentration management (drop old when casting new). Full cleanup in `clear_concentration_effects()`: clears Spirit Guardians, Divine Favor, Holy Weapon, Fire Shield, Stoneskin, Fly, Ensnaring Strike, Sanctuary, Venomous Mark, Fog Cloud, Darkness, Hunter's Mark, Hex, Bane, Bless, Haste, Heroism, Pass Without Trace, Adjust Density, and Durable Magic AC bonus.
+- Concentration management (drop old when casting new). Full cleanup in `clear_concentration_effects()`: clears Spirit Guardians, Divine Favor, Holy Weapon, Fire Shield, Stoneskin, Fly, Ensnaring Strike, Sanctuary, Venomous Mark, Fog Cloud, Darkness, Hunter's Mark, Hex, Bane, Bless, Haste, Heroism, Pass Without Trace, Adjust Density, Silence, Blur, Conjure Minor Elementals, Conjure Woodland Beings, Polymorph, Heat Metal, Call Lightning, Flaming Sphere, Swift Quiver, Extended Spell, Enhance Ability, Guidance, Resistance, Protection from Energy, Protection from Evil and Good, Expeditious Retreat, Levitate, Compulsion, Antimagic Field, and Durable Magic AC bonus.
 
 - Spirit Guardians: 15ft aura, 3d8+ radiant damage on enemies starting turn within range OR entering the aura on movement (once per turn via `spirit_guardians_damaged_this_turn` flag). Halved movement while in aura. Movement entry trigger wired into both `handle_move` (player) and monster AI loop.
 
@@ -229,6 +229,46 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 - Spell menu shows level (Cantrip/Level N) and Concentration tag for each spell
 
 - **Bane spell** (Basic Rules 2024 para 12032): Random 1d4 penalty on attack rolls (via `roll_bane_penalty()` in battle_manager) and saving throws (via `random(1,4)` in `get_save_bonus`). Concentration with blanket-clear on break.
+
+- **Blade Ward** (cantrip): Sets `blade_ward_active` for B/P/S resistance until start of caster's next turn. Half damage in `apply_damage`. Cleared in `advance_turn` at turn start.
+
+- **Blur** (L2, concentration): Sets `blur_active`. Attackers who can see the target have disadvantage in `apply_attack_advantage_state`. Cleared in `clear_concentration_effects`.
+
+- **Guidance** (cantrip, concentration): Sets `guidance_active` on target. +1d4 on next ability check in `finalize_roll_result` for `ROLL_ABILITY_CHECK`, auto-cleared after use.
+
+- **Resistance** (cantrip, concentration): Sets `resistance_active` on target. +1d4 on next saving throw in `get_save_bonus`, auto-cleared after use.
+
+- **Protection from Energy** (L3, concentration): Uses `pending_spell_choice` for 5 damage type options (Acid/Cold/Fire/Lightning/Thunder). Sets `protection_from_energy_active` + `protection_from_energy_type`. Half damage for matching type in `apply_damage`.
+
+- **Protection from Evil and Good** (L1, concentration): Sets `protection_from_evil_and_good_active` on target with `pfeg_source_id`. Creatures of type aberration/celestial/elemental/fey/fiend/undead have disadvantage on attacks against target (in `apply_attack_advantage_state`). Heroes' Feast blocks charm/fright from those types. `creature_type` field on combatant tracks type (default "humanoid", set from `monster_def.type` for monsters).
+
+- **See Invisibility** (L2, NOT concentration): Sets `see_invisibility_active`. Bypasses invisible disadvantage in `apply_attack_advantage_state` and `can_see`. No range limit.
+
+- **Freedom of Movement** (L4, NOT concentration per 2024): Sets `freedom_of_movement_active`. Blocks COND_PARALYZED and COND_RESTRAINED in `add_condition`.
+
+- **Enhance Ability** (L2, concentration): Sets `enhance_ability_active` with `enhance_ability_caster_id`. Grants advantage on ability checks in `request_skill_check`.
+
+- **Silence** (L3, concentration): Places 20ft sphere at `silence_x/y`. Applies COND_DEAFENED to creatures in zone. Blocks spellcasting in `handle_cast` (Subtle Spell bypasses). Cleanup removes Deafened.
+
+- **Swift Quiver** (L5, concentration): Sets `swift_quiver_active`. Bonus action for 2 ranged attacks via flurry-style chain (`attacks_remaining` + `resolution_tag = "swift_quiver"`). Client menu entry + bonus action handler.
+
+- **True Seeing** (L6, NOT concentration): Sets `true_seeing_active`. Truesight 120ft — bypasses invisible in `apply_attack_advantage_state` and `can_see`.
+
+- **Expeditious Retreat** (L1, concentration): Sets `expeditious_retreat_active`. Immediate Dash on cast + Dash as bonus action each turn. Client bonus action menu entry sends `expeditious_retreat_dash`. Server handler in `users_dom.nvgt` adds speed to movement. State synced via `my_expeditious_retreat_active`.
+
+- **Levitate** (L2, concentration): CON save for unwilling targets (full save failure chain). Sets `levitate_active` + `levitate_source_id`. Blocks horizontal movement in `handle_move` and zeros movement at turn start in `advance_turn`.
+
+- **Compulsion** (L4, concentration): AoE WIS save or Charmed with full save failure chain (including Countercharm). End-of-turn WIS re-save in `advance_turn` to break free. Concentration break clears Charmed from all targets.
+
+- **Heroes' Feast** (L6, NOT concentration, 24 hours): Applies to all allies. +2d10 max HP and current HP (`heroes_feast_hp_bonus`). Poison damage resistance in `apply_damage`. Immunity to Frightened and Poisoned in `add_condition`. +5 WIS save advantage in `get_save_bonus`.
+
+- **Resilient Sphere** (L4, NOT concentration, 1 min): DEX save for unwilling targets (full chain). Sets `resilient_sphere_trapped` — full damage immunity (return early in `apply_damage`) + COND_INCAPACITATED. Fallback no-target handler.
+
+- **Goodberry** (L1): Practical combat approximation — heals caster 10 HP immediately (no berry inventory system).
+
+- **Time Stop** (L9, instantaneous): Rolls 1d4+1, sets `time_stop_turns_remaining`. In `advance_turn`, if the previous combatant has turns remaining, the initiative order does NOT advance — instead their turn resources are reset and they take another full turn. Supports monster AI and bot players during extra turns.
+
+- **Antimagic Field** (L8, concentration): Sets `antimagic_field_active`. 10ft emanation blocks all spellcasting — checked in `handle_cast` after Silence check. Own field doesn't block self. Cleared in `clear_concentration_effects`.
 
 ### Reroll Mechanics
 
