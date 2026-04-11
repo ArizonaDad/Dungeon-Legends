@@ -1410,6 +1410,16 @@ void handle_user_message(user@ u, json_object@ msg)
 						for (uint i = 0; i < mc.length(); i++) existing_mc.add(mc[i]);
 					}
 				}
+				if (msg.exists("invocation_choices")) {
+					json_array@ ivc = msg["invocation_choices"];
+					if (@ivc != null and ivc.length() > 0) {
+						// Append to existing invocation choices
+						json_array@ existing_ivc = null;
+						if (character.exists("invocation_choices")) @existing_ivc = character["invocation_choices"];
+						if (@existing_ivc == null) { json_array arr; character["invocation_choices"] = arr; @existing_ivc = character["invocation_choices"]; }
+						for (uint i = 0; i < ivc.length(); i++) existing_ivc.add(ivc[i]);
+					}
+				}
 				u.account.commit();
 				send_character_profile_to_user(u, GAME_TYPE_ADVENTURE);
 				u.send({{"type", message_types::announce}, {"text", "Level-up choices saved!"}, {"interrupt", false}});

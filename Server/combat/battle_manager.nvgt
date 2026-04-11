@@ -1070,6 +1070,33 @@ class battle_manager {
 		if (metamagic_new < 0) metamagic_new = 0;
 		msg["metamagic_count"] = metamagic_new;
 
+		// Warlock Eldritch Invocations: known count by level (PHB 2024 paras 7607-7762)
+		int inv_total = 0;
+		if (class_name == "Warlock") {
+			inv_total = 1;
+			if (new_level >= 2) inv_total = 3;
+			if (new_level >= 5) inv_total = 5;
+			if (new_level >= 7) inv_total = 6;
+			if (new_level >= 9) inv_total = 7;
+			if (new_level >= 12) inv_total = 8;
+			if (new_level >= 16) inv_total = 9;
+			if (new_level >= 18) inv_total = 10;
+		}
+		int inv_existing = 0;
+		json_array existing_inv_arr;
+		if (character.exists("invocation_choices")) {
+			json_array@ ic = character["invocation_choices"];
+			if (@ic != null) { inv_existing = int(ic.length()); existing_inv_arr = ic; }
+		}
+		int inv_needed = inv_total - inv_existing;
+		if (inv_needed < 0) inv_needed = 0;
+		msg["invocations_needed"] = inv_needed;
+		if (inv_needed > 0) {
+			msg["existing_invocations"] = existing_inv_arr;
+			string existing_pb = character.exists("pact_boon") ? string(character["pact_boon"]) : "";
+			msg["existing_pact_boon"] = existing_pb;
+		}
+
 		// Wildemount Vestige of Divergence advancement announcement
 		// (Wildemount para 9071): "A Vestige of Divergence typically remains
 		// dormant until its wielder achieves 9th level. It becomes awakened

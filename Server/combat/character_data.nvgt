@@ -3237,32 +3237,42 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         // PHB 2024 Warlock L20 Eldritch Master (paras 7798-7799): Magical Cunning regains
         // all expended Pact Magic spell slots. Flag is read by the Magical Cunning handler.
         if (cs.level >= 20) c.eldritch_master_active = true;
-		// Eldritch Invocations: default combat-relevant invocations by level + pact.
-		// TODO: Build invocation selection prompt so players can choose their own set.
-		// No-prerequisite invocations (available from L1)
-		c.armor_of_shadows = true;   // Free Mage Armor on self (para 7808-7809)
-		c.eldritch_mind = true;      // Advantage on concentration saves (para 7823-7824)
-		if (cs.level >= 2) {
-			c.agonizing_blast = true;  // +CHA to EB damage (para 7749-7752)
-			c.repelling_blast = true;  // Push 10ft on EB hit (para 7831-7834)
-			c.devils_sight = true;     // See in darkness 120ft (para 7758-7760)
-			c.eldritch_spear = true;   // +30*level range on EB (para 7830-7832)
-			c.fiendish_vigor = true;   // Auto False Life max die (para 7835-7837)
-		}
-		if (c.pact_of_the_blade) {
-			if (cs.level >= 5) {
-				c.thirsting_blade = true;  // Extra Attack with pact weapon (para 7835-7837)
-				c.extra_attacks = 1;
-				c.eldritch_smite = true;   // Force damage + prone on pact hit (para 7766-7768)
+		// Eldritch Invocations (PHB 2024 paras 7749-7852): use player's chosen
+		// invocations if available, otherwise default combat-optimal set.
+		if (cs.invocation_choices.length() > 0) {
+			for (uint ici = 0; ici < cs.invocation_choices.length(); ici++) {
+				string inv = cs.invocation_choices[ici];
+				if (inv == "armor_of_shadows") c.armor_of_shadows = true;
+				else if (inv == "eldritch_mind") c.eldritch_mind = true;
+				else if (inv == "agonizing_blast") c.agonizing_blast = true;
+				else if (inv == "repelling_blast") c.repelling_blast = true;
+				else if (inv == "devils_sight") c.devils_sight = true;
+				else if (inv == "eldritch_spear") c.eldritch_spear = true;
+				else if (inv == "fiendish_vigor") c.fiendish_vigor = true;
+				else if (inv == "thirsting_blade") { c.thirsting_blade = true; if (c.extra_attacks < 1) c.extra_attacks = 1; }
+				else if (inv == "eldritch_smite") c.eldritch_smite = true;
+				else if (inv == "lifedrinker") c.lifedrinker = true;
+				else if (inv == "devouring_blade") { c.devouring_blade = true; c.extra_attacks = 2; }
+				else if (inv == "gift_of_the_protectors") c.gift_of_the_protectors = true;
 			}
-			if (cs.level >= 9) c.lifedrinker = true; // +1d6 necrotic on pact hit (para 7801-7803)
-			if (cs.level >= 12) {
-				c.devouring_blade = true;  // 3 attacks instead of 2 (para 7761-7763)
-				c.extra_attacks = 2;
+		} else {
+			// Legacy fallback: default combat-relevant invocations by level + pact
+			c.armor_of_shadows = true;
+			c.eldritch_mind = true;
+			if (cs.level >= 2) {
+				c.agonizing_blast = true;
+				c.repelling_blast = true;
+				c.devils_sight = true;
+				c.eldritch_spear = true;
+				c.fiendish_vigor = true;
 			}
+			if (c.pact_of_the_blade) {
+				if (cs.level >= 5) { c.thirsting_blade = true; c.extra_attacks = 1; c.eldritch_smite = true; }
+				if (cs.level >= 9) c.lifedrinker = true;
+				if (cs.level >= 12) { c.devouring_blade = true; c.extra_attacks = 2; }
+			}
+			if (c.pact_of_the_tome and cs.level >= 9) c.gift_of_the_protectors = true;
 		}
-		// Pact of the Tome: Gift of the Protectors (para 7849-7852)
-		if (c.pact_of_the_tome and cs.level >= 9) c.gift_of_the_protectors = true;
 		// Armor of Shadows: apply Mage Armor AC (13 + DEX) if higher than current
 		if (c.armor_of_shadows) {
 			int ma_ac = 13 + c.get_ability_mod(ABILITY_DEX);
