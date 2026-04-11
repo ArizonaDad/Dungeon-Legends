@@ -2027,6 +2027,51 @@ class battle {
 			target.orders_demand_turns_left = 0;
 		}
 
+		// Basic Rules 2024 Dominate Person (para 12981) / Dominate Monster (para 12967) /
+		// Dominate Beast (para 12958): "Each time the target takes damage, it makes a new
+		// Wisdom saving throw against the spell. If the saving throw succeeds, the spell ends."
+		if (amount > 0 and target.charm_spell_caster_id != 0 and target.has_condition(COND_CHARMED)) {
+			combatant@ dom_caster = get_combatant(target.charm_spell_caster_id);
+			if (@dom_caster != null and dom_caster.is_concentrating
+				and (dom_caster.concentration_spell == "Dominate Person"
+					or dom_caster.concentration_spell == "Dominate Monster"
+					or dom_caster.concentration_spell == "Dominate Beast")) {
+				int dom_dc = spell_save_dc(dom_caster);
+				int dom_save = random(1, 20) + target.get_save_bonus(ABILITY_WIS);
+				if (dom_save >= dom_dc) {
+					target.remove_condition(COND_CHARMED);
+					target.charm_spell_caster_id = 0;
+					dom_caster.is_concentrating = false;
+					dom_caster.concentration_spell = "";
+					dom_caster.remove_condition(COND_CONCENTRATING);
+				}
+			}
+		}
+
+		// Basic Rules 2024 Charm Person (para 12306): "The spell ends on a target if you
+		// or your allies deal damage to it or force it to make a saving throw."
+		// Approximation: if the charmed target takes ANY damage, end the charm.
+		if (amount > 0 and target.charm_spell_caster_id != 0 and target.has_condition(COND_CHARMED)) {
+			combatant@ chm_caster = get_combatant(target.charm_spell_caster_id);
+			if (@chm_caster != null and chm_caster.is_concentrating
+				and (chm_caster.concentration_spell == "Charm Person"
+					or chm_caster.concentration_spell == "Charm Monster")) {
+				target.remove_condition(COND_CHARMED);
+				target.charm_spell_caster_id = 0;
+				chm_caster.is_concentrating = false;
+				chm_caster.concentration_spell = "";
+				chm_caster.remove_condition(COND_CONCENTRATING);
+			}
+			// Basic Rules 2024 Hypnotic Pattern (para 13821): "The spell ends for an
+			// affected creature if it takes any damage." Per-target end, not full spell.
+			else if (@chm_caster != null and chm_caster.is_concentrating
+				and chm_caster.concentration_spell == "Hypnotic Pattern") {
+				target.remove_condition(COND_CHARMED);
+				if (target.has_condition(COND_INCAPACITATED)) target.remove_condition(COND_INCAPACITATED);
+				target.charm_spell_caster_id = 0;
+			}
+		}
+
 		// Xanathar's Oath of Redemption L20 Emissary of Redemption retaliation (para 2054):
 		// "whenever a creature damages you, it takes radiant damage equal to half the
 		// amount it dealt to you." Guard against recursion via emissary check on source.
