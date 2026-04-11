@@ -632,6 +632,10 @@ class combatant {
 	// tracking separate from other spell sources for clean concentration cleanup.
 	uint eyebite_asleep_source_id = 0;    // Caster who applied Eyebite Asleep
 	uint eyebite_sickened_source_id = 0;  // Caster who applied Eyebite Sickened
+	// Basic Rules 2024 Bestow Curse (para 12219-12222): 4 curse types — ability disadv,
+	// attack disadv vs caster, forced dodge, or extra 1d8 necrotic on caster's attacks.
+	string bestow_curse_type = "";        // "extra_damage","attack_disadv","forced_dodge","ability_X"
+	uint bestow_curse_source_id = 0;      // Caster ID for cleanup + attack targeting
 	bool wizardly_quill_active = false; // Order of Scribes Wizard
 	int awakened_spellbook_changes = 0; // Order of Scribes - replace damage type
 	// Gunslinger subclasses (Valda's Spire of Secrets paras 229-490)
@@ -1304,6 +1308,17 @@ class combatant {
 		if (mind_sliver_penalty_active) {
 			mod -= random(1, 4);
 			mind_sliver_penalty_active = false;
+		}
+		// Basic Rules 2024 Bestow Curse (para 12219-12222): ability_X curse gives
+		// "Disadvantage on ability checks and saving throws" for that ability.
+		// Approximated as -5 (matching save adv/disadv pattern).
+		if (bestow_curse_source_id != 0) {
+			if (bestow_curse_type == "ability_str" and ability_id == ABILITY_STR) mod -= 5;
+			else if (bestow_curse_type == "ability_dex" and ability_id == ABILITY_DEX) mod -= 5;
+			else if (bestow_curse_type == "ability_con" and ability_id == ABILITY_CON) mod -= 5;
+			else if (bestow_curse_type == "ability_int" and ability_id == ABILITY_INT) mod -= 5;
+			else if (bestow_curse_type == "ability_wis" and ability_id == ABILITY_WIS) mod -= 5;
+			else if (bestow_curse_type == "ability_cha" and ability_id == ABILITY_CHA) mod -= 5;
 		}
 		// Basic Rules 2024 Bane (para 12032): "the target must roll a d4 and subtract
 		// the number rolled from the attack roll or saving throw."

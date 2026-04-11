@@ -1323,6 +1323,18 @@ class battle_manager {
 				}
 			}
 		}
+		// Basic Rules 2024 Bestow Curse (para 12219-12222): ability_X curse gives
+		// "Disadvantage on ability checks and saving throws" for that ability.
+		if (c.bestow_curse_source_id != 0) {
+			int bc_cursed_ability = -1;
+			if (c.bestow_curse_type == "ability_str") bc_cursed_ability = ABILITY_STR;
+			else if (c.bestow_curse_type == "ability_dex") bc_cursed_ability = ABILITY_DEX;
+			else if (c.bestow_curse_type == "ability_con") bc_cursed_ability = ABILITY_CON;
+			else if (c.bestow_curse_type == "ability_int") bc_cursed_ability = ABILITY_INT;
+			else if (c.bestow_curse_type == "ability_wis") bc_cursed_ability = ABILITY_WIS;
+			else if (c.bestow_curse_type == "ability_cha") bc_cursed_ability = ABILITY_CHA;
+			if (bc_cursed_ability == ability_id) disadv = true;
+		}
 		// Pass Without Trace stacks +10 onto Stealth checks (also Dexterity (Stealth)).
 		if (skill_name == "Stealth") mod += c.pass_without_trace_bonus;
 		string tag = custom_tag != "" ? custom_tag : skill_resolution_tag(skill_name);
@@ -2666,6 +2678,11 @@ class battle_manager {
 					}
 				}
 			}
+		}
+		// Basic Rules 2024 Bestow Curse (para 12219-12222): attack_disadv curse gives
+		// the target "Disadvantage on attack rolls against" the curse source.
+		if (attacker.bestow_curse_type == "attack_disadv" and attacker.bestow_curse_source_id == target.id) {
+			disadv = true;
 		}
 		// PHB 2024 Invisible condition (para 16219): "Attack rolls against the creature
 		// have Disadvantage, and the creature's attack rolls have Advantage." The defender
@@ -4232,6 +4249,16 @@ class battle_manager {
 		caster.globe_of_invulnerability_level = 5;
 		// Holy Aura: clear aura when concentration breaks
 		caster.holy_aura_active = false;
+		// Bestow Curse: clear curse effects on all combatants cursed by this caster
+		for (uint bci = 0; bci < combat.combatants.length(); bci++) {
+			combatant@ bct = combat.combatants[bci];
+			if (@bct == null) continue;
+			if (bct.bestow_curse_source_id == caster.id) {
+				bct.bestow_curse_type = "";
+				bct.bestow_curse_source_id = 0;
+				broadcast_announce(bct.name + "'s curse from Bestow Curse fades!", true);
+			}
+		}
 	}
 
 	// ---- Swarming Modifier Helper ----
@@ -5253,6 +5280,35 @@ class battle_manager {
 				c.has_bonus_action = false;
 				c.movement_remaining = 0;
 				broadcast_announce(c.name + " is dazed! Can only take an action this turn.", true);
+			}
+		}
+		// Basic Rules 2024 Bestow Curse (para 12219-12222): forced_dodge curse —
+		// "target must make a WIS save at the start of each of its turns. On a
+		// failed save, it wastes its Action that turn doing nothing."
+		if (c.bestow_curse_type == "forced_dodge" and c.bestow_curse_source_id != 0) {
+			combatant@ curse_src = combat.get_combatant(c.bestow_curse_source_id);
+			if (@curse_src != null and !curse_src.is_dead) {
+				int bc_dc = spell_save_dc(curse_src);
+				int bc_roll = random(1, 20);
+				if (c.staggering_blow_active) { int sb2 = random(1, 20); if (sb2 < bc_roll) bc_roll = sb2; c.staggering_blow_active = false; }
+				apply_hound_save_disadvantage(c, curse_src.id, bc_roll);
+				int bc_bonus = c.get_save_bonus(ABILITY_WIS);
+				int bc_bless = roll_bless_bonus(c);
+				int bc_total = bc_roll + bc_bonus + bc_bless;
+				bool bc_saved = bc_total >= bc_dc;
+				if (!bc_saved and try_arcane_deflection_save(c, bc_dc, bc_total)) bc_saved = true;
+				if (!bc_saved) { int ds = try_disciplined_survivor_reroll(c, bc_dc, bc_total, bc_bonus + bc_bless, "WIS save vs Bestow Curse"); if (ds >= bc_dc) bc_saved = true; }
+				if (!bc_saved) { int fg = try_flash_of_genius(c, bc_dc, bc_total, "WIS save vs Bestow Curse"); if (fg >= bc_dc) { bc_saved = true; bc_total = fg; } }
+				if (!bc_saved) { int mv = try_maverick_spirit(c, bc_dc, bc_total, "WIS save vs Bestow Curse"); if (mv >= bc_dc) { bc_saved = true; bc_total = mv; } }
+				if (!bc_saved and try_mage_slayer_guarded_mind(c, ABILITY_WIS)) bc_saved = true;
+				if (!bc_saved) { int bf = try_boon_of_fate_bonus(c, bc_total, bc_dc); if (bf > 0) bc_saved = true; }
+				if (!bc_saved and try_stroke_of_luck_save(c, bc_dc, bc_bonus + bc_bless)) bc_saved = true;
+				broadcast_roll(c.name, "WIS save vs Bestow Curse (turn start)", bc_roll, bc_bonus + bc_bless, bc_total, bc_saved ? "Resists!" : "Forced to Dodge!");
+				if (!bc_saved) {
+					c.has_action = false;
+					c.is_dodging = true;
+					broadcast_announce(c.name + " is forced to Dodge by the curse!", true);
+				}
 			}
 		}
 		if (c.heroism_source_id != 0 and c.is_alive() and c.heroism_temp_hp_amount > 0) {
@@ -9139,6 +9195,13 @@ class battle_manager {
 				total_damage += hex_damage;
 				broadcast_announce(c.name + "'s Hex deals " + hex_damage + " extra necrotic damage to " + target.name + ".", false);
 			}
+			// Basic Rules 2024 Bestow Curse (para 12219-12222): extra_damage curse —
+			// "whenever you deal damage to the Cursed target, it takes an extra 1d8 Necrotic."
+			if (target.bestow_curse_type == "extra_damage" and target.bestow_curse_source_id == c.id) {
+				int bc_dmg = random(1, 8);
+				total_damage += bc_dmg;
+				broadcast_announce(c.name + "'s Bestow Curse deals " + bc_dmg + " extra necrotic damage to " + target.name + ".", false);
+			}
 			// Basic Rules 2024 Enlarge/Reduce (para 12795-12800): Enlarged weapons deal
 			// +1d4 extra damage; Reduced weapons deal -1d4 damage (min 1 total).
 			if (c.enlarge_active and !pr.is_spell_effect and pr.is_weapon_attack) {
@@ -11299,6 +11362,49 @@ class battle_manager {
 					tgt.add_condition(COND_POISONED);
 					tgt.eyebite_sickened_source_id = c.id;
 					broadcast_announce(tgt.name + " is Sickened by " + c.name + "'s Eyebite! Disadvantage on attacks and ability checks.", true);
+				}
+			}
+		}
+		else if (sc.spell_id == "bestow_curse") {
+			// Basic Rules 2024 Bestow Curse (para 12219-12222): WIS save, then apply
+			// the chosen curse effect. Touch range (5 ft), concentration at L3.
+			combatant@ tgt = combat.get_combatant(sc.primary_target_id);
+			if (@tgt == null or tgt.is_dead) return;
+			int save_dc = spell_save_dc(c);
+			int save_roll = random(1, 20);
+			apply_hound_save_disadvantage(tgt, c.id, save_roll);
+			int save_bonus = tgt.get_save_bonus(ABILITY_WIS);
+			int bless_bonus = roll_bless_bonus(tgt);
+			int save_total = save_roll + save_bonus + bless_bonus;
+			bool saved = save_total >= save_dc;
+			// Full save failure chain (WIS — condition, Mage Slayer applies)
+			if (!saved and try_arcane_deflection_save(tgt, save_dc, save_total)) saved = true;
+			if (!saved) { int ds = try_disciplined_survivor_reroll(tgt, save_dc, save_total, save_bonus + bless_bonus, "WIS save vs Bestow Curse"); if (ds >= save_dc) saved = true; }
+			if (!saved) { int fg = try_flash_of_genius(tgt, save_dc, save_total, "WIS save vs Bestow Curse"); if (fg >= save_dc) { saved = true; save_total = fg; } }
+			if (!saved) { int mv = try_maverick_spirit(tgt, save_dc, save_total, "WIS save vs Bestow Curse"); if (mv >= save_dc) { saved = true; save_total = mv; } }
+			if (!saved and try_mage_slayer_guarded_mind(tgt, ABILITY_WIS)) saved = true;
+			if (!saved) { int bf = try_boon_of_fate_bonus(tgt, save_total, save_dc); if (bf >= save_dc) { saved = true; save_total = bf; } }
+			if (!saved and try_stroke_of_luck_save(tgt, save_dc, save_bonus + bless_bonus)) saved = true;
+			broadcast_roll(tgt.name, "WIS save vs Bestow Curse", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Cursed!");
+			if (!saved) {
+				tgt.bestow_curse_type = choice;
+				tgt.bestow_curse_source_id = c.id;
+				if (choice == "extra_damage") {
+					broadcast_announce(c.name + " curses " + tgt.name + "! Attacks and spells against them deal extra 1d8 necrotic damage.", true);
+				} else if (choice == "attack_disadv") {
+					broadcast_announce(c.name + " curses " + tgt.name + "! They have disadvantage on attack rolls against " + c.name + ".", true);
+				} else if (choice == "forced_dodge") {
+					broadcast_announce(c.name + " curses " + tgt.name + "! They must succeed on a WIS save each turn or be forced to Dodge.", true);
+				} else {
+					// ability_str through ability_cha
+					string ab_name = choice;
+					if (choice == "ability_str") ab_name = "Strength";
+					else if (choice == "ability_dex") ab_name = "Dexterity";
+					else if (choice == "ability_con") ab_name = "Constitution";
+					else if (choice == "ability_int") ab_name = "Intelligence";
+					else if (choice == "ability_wis") ab_name = "Wisdom";
+					else if (choice == "ability_cha") ab_name = "Charisma";
+					broadcast_announce(c.name + " curses " + tgt.name + "! Disadvantage on " + ab_name + " checks and saves.", true);
 				}
 			}
 		}
@@ -14754,31 +14860,18 @@ class battle_manager {
 				return;
 			}
 			else if (spell.id == "bestow_curse" and @target != null) {
-				// Basic Rules paras 12219-12222: "You touch a creature, which must succeed
-				// on a Wisdom saving throw or become cursed for the duration. Until the
-				// curse ends, the target suffers one of the following effects of your
-				// choice." Defaults to "Disadvantage on attack rolls against you" since
-				// the alternatives need a per-spell choice prompt.
-				int save_roll = random(1, 20);
-				apply_hound_save_disadvantage(target, c.id, save_roll);
-				int save_bonus = target.get_save_bonus(ABILITY_WIS);
-				int bless_bonus = roll_bless_bonus(target);
-				int save_total = save_roll + save_bonus + bless_bonus;
-				bool saved = save_total >= save_dc;
-				// Save failure chain (WIS — Cursed condition)
-				if (!saved and try_arcane_deflection_save(target, save_dc, save_total)) saved = true;
-				if (!saved) { int ds = try_disciplined_survivor_reroll(target, save_dc, save_total, save_bonus + bless_bonus, "WIS save vs Bestow Curse"); if (ds >= save_dc) saved = true; }
-				if (!saved) { int fg = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Bestow Curse"); if (fg >= save_dc) { saved = true; save_total = fg; } }
-				if (!saved) { int mv = try_maverick_spirit(target, save_dc, save_total, "WIS save vs Bestow Curse"); if (mv >= save_dc) { saved = true; save_total = mv; } }
-				if (!saved and try_mage_slayer_guarded_mind(target, ABILITY_WIS)) saved = true;
-				if (!saved) { int bf = try_boon_of_fate_bonus(target, save_total, save_dc); if (bf >= save_dc) { saved = true; save_total = bf; } }
-				if (!saved and try_stroke_of_luck_save(target, save_dc, save_bonus + bless_bonus)) saved = true;
-				broadcast_roll(target.name, "WIS save vs Bestow Curse", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Cursed!");
-				if (!saved) {
-					// Use the existing baned flag as the closest approximation
-					target.baned = true;
-					broadcast_announce(c.name + " bestows a curse on " + target.name + "! They have disadvantage on attack rolls (-1d4 approximation).", true);
-				}
+				// Basic Rules 2024 Bestow Curse (para 12219-12222): Caster chooses curse type.
+				// 4 main options + 6 ability sub-options = 9 total choices.
+				pending_spell_choice sc;
+				sc.player_username = c.player_username;
+				sc.caster_id = c.id;
+				sc.spell_id = "bestow_curse";
+				sc.cast_slot_level = cast_slot_level;
+				sc.primary_target_id = target.id;
+				sc.option_keys = {"extra_damage", "attack_disadv", "forced_dodge", "ability_str", "ability_dex", "ability_con", "ability_int", "ability_wis", "ability_cha"};
+				sc.option_labels = {"Extra 1d8 necrotic on your attacks vs target", "Target has disadvantage on attacks against you", "Target must Dodge or waste their turn each round", "Target disadv on STR checks and saves", "Target disadv on DEX checks and saves", "Target disadv on CON checks and saves", "Target disadv on INT checks and saves", "Target disadv on WIS checks and saves", "Target disadv on CHA checks and saves"};
+				sc.prompt_text = "Bestow Curse: choose an effect. 1 for extra damage, 2 for attack disadvantage, 3 for forced dodge, 4 through 9 for ability disadvantage (4 STR, 5 DEX, 6 CON, 7 INT, 8 WIS, 9 CHA).";
+				send_spell_choice_prompt(c, sc);
 			}
 			else if (spell.id == "vampiric_touch") {
 				// Basic Rules para 15517: "Make a melee spell attack against one creature

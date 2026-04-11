@@ -284,6 +284,8 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 
 - **Eyebite** (L6, concentration): Basic Rules 2024 para 13145-13151. Full 3-way choice via `pending_spell_choice`: Asleep (COND_UNCONSCIOUS + COND_INCAPACITATED, wakes on damage via `eyebite_asleep_source_id` check in `apply_damage`), Panicked (COND_FRIGHTENED + `frightened_source_id`), Sickened (COND_POISONED + `eyebite_sickened_source_id`). WIS save with full chain including Countercharm for Panicked/Asleep. Concentration cleanup removes all 3 effect types. Per-turn retarget action deferred.
 
+- **Bestow Curse** (L3, concentration): Basic Rules 2024 para 12219-12222. Full 9-option choice via `pending_spell_choice`: extra_damage (1d8 necrotic on caster's hits), attack_disadv (disadvantage on attacks against caster), forced_dodge (WIS save each turn or waste action), ability_str through ability_cha (disadvantage on saves and checks for that ability). Touch range (5ft), WIS save with full chain. Tracking: `bestow_curse_type` (string) and `bestow_curse_source_id` (uint) on the TARGET combatant. 6 wiring points: (1) ability curse -5 save penalty in `get_save_bonus`, (2) ability curse disadvantage in `request_skill_check`, (3) attack disadvantage in `apply_attack_advantage_state`, (4) forced dodge WIS save at turn start in `advance_turn`, (5) extra 1d8 necrotic in `finalize_roll_result`, (6) full cleanup in `clear_concentration_effects`. L4+ non-concentration mode deferred.
+
 ### Reroll Mechanics
 
 - **Lucky feat**: Characters with the Lucky feat gain Luck Points equal to proficiency bonus per battle. After a failed d20 roll, prompted to spend a Luck Point to reroll with advantage (Press L / Escape). Chains after Bardic Inspiration prompt.
@@ -395,6 +397,7 @@ When a caster's concentration breaks, `clear_concentration_effects()` must remov
 | `faerie_fire_source_id` | `faerie_fire_outlined` (persistent advantage, NOT a condition) | Faerie Fire |
 | `slow_spell_caster_id` | Speed halved + AC −2 + no reactions (restores `slow_original_speed` + AC +2) | Slow |
 | `enlarge_reduce_caster_id` | Size change + STR adv/disadv + weapon damage modifier (restores `enlarge_original_size`, clears `enlarge_active`/`reduce_active`) | Enlarge/Reduce |
+| `bestow_curse_source_id` | Curse effect (varies: extra damage, attack disadv, forced dodge, ability disadv). Clears `bestow_curse_type` + `bestow_curse_source_id` on target | Bestow Curse |
 
 **Pattern for new concentration spells:** In the spell handler, set the tracking field on the target (`target.xxx_caster_id = c.id`). In `clear_concentration_effects()`, add a name-matched block that loops combatants and removes the condition where the tracking ID matches. Compulsion uses blanket-clear (no per-target tracking) as a fallback.
 
@@ -462,6 +465,8 @@ Server-side `pending_spell_choice` state on `battle_manager` pauses spell finali
 - **Magic Missile** — distribute N darts (3 base, +1 per upcast) among visible enemies; auto-hit, each dart deals 1d4+1 force damage independently per target. Source: Basic Rules para 14089. Choice kind: `distribution`.
 - **Scorching Ray** — distribute N rays (3 base, +1 per upcast) among visible enemies; each ray is a separate ranged spell attack for 2d6 fire damage. Source: Basic Rules para 14851. Choice kind: `distribution`.
 - **Eldritch Blast** — at L5+ distribute N beams (2 at L5, 3 at L11, 4 at L17) among visible enemies; each beam is a separate ranged spell attack for 1d10 force damage. Source: Basic Rules para 13047. Choice kind: `distribution` (only at L5+; L1-4 uses the standard single-target attack path).
+- **Eyebite** — choose effect: Panicked (COND_FRIGHTENED), Asleep (COND_UNCONSCIOUS + COND_INCAPACITATED), or Sickened (COND_POISONED). WIS save. Source: Basic Rules para 13145-13151. Choice kind: `binary`.
+- **Bestow Curse** — choose from 9 curse options: extra_damage (1d8 necrotic), attack_disadv, forced_dodge, ability_str through ability_cha. WIS save. Source: Basic Rules para 12219-12222. Choice kind: `binary`.
 
 **Two choice kinds are supported:**
 
