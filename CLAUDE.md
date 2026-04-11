@@ -276,6 +276,14 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 
 - **Antimagic Field** (L8, concentration): Sets `antimagic_field_active`. 10ft emanation blocks all spellcasting — checked in `handle_cast` after Silence check. Own field doesn't block self. Cleared in `clear_concentration_effects`.
 
+- **Globe of Invulnerability** (L6, concentration): Sets `globe_of_invulnerability_active` + `globe_of_invulnerability_level` (5 + upcast levels). 10ft emanation blocks spells of the protected level or lower cast from OUTSIDE the barrier — checked in `handle_cast` after Antimagic Field check. Spells from inside the globe work normally. Cleared in `clear_concentration_effects`.
+
+- **Holy Aura** (L8, concentration): Sets `holy_aura_active`. 30ft emanation grants allies advantage on ALL saving throws (+5 approx in central spell save path) and imposes disadvantage on attack rolls against protected creatures (in `apply_attack_advantage_state`). Cleared in `clear_concentration_effects`.
+
+- **Mind Sliver** (cantrip): Basic Rules 2024 para 14174. INT save, 1d6 psychic (scales at L5/11/17). On failed save, target subtracts 1d4 from their next saving throw. `mind_sliver_penalty_active` flag on target, consumed on first save in `get_save_bonus`. Applied before Bane penalty.
+
+- **Eyebite** (L6, concentration): Basic Rules 2024 para 13145-13151. Full 3-way choice via `pending_spell_choice`: Asleep (COND_UNCONSCIOUS + COND_INCAPACITATED, wakes on damage via `eyebite_asleep_source_id` check in `apply_damage`), Panicked (COND_FRIGHTENED + `frightened_source_id`), Sickened (COND_POISONED + `eyebite_sickened_source_id`). WIS save with full chain including Countercharm for Panicked/Asleep. Concentration cleanup removes all 3 effect types. Per-turn retarget action deferred.
+
 ### Reroll Mechanics
 
 - **Lucky feat**: Characters with the Lucky feat gain Luck Points equal to proficiency bonus per battle. After a failed d20 roll, prompted to spend a Luck Point to reroll with advantage (Press L / Escape). Chains after Bardic Inspiration prompt.

@@ -2652,6 +2652,21 @@ class battle_manager {
 		// Basic Rules 2024 Protection from Evil and Good (para 14688-14691):
 		// "Creatures of those types have Disadvantage on attack rolls against the target."
 		if (target.protection_from_evil_and_good_active and is_pfeg_creature_type(attacker.creature_type)) disadv = true;
+		// Basic Rules 2024 Holy Aura (para 13799): "other creatures have Disadvantage on
+		// attack rolls against them" while in the 30-foot Emanation of the Holy Aura caster.
+		if (@combat != null) {
+			for (uint hai2 = 0; hai2 < combat.combatants.length(); hai2++) {
+				combatant@ ha_src = combat.combatants[hai2];
+				if (@ha_src == null or ha_src.is_dead or !ha_src.holy_aura_active) continue;
+				if (ha_src.is_player != target.is_player and combat.mode != "pvp") continue; // Aura protects allies
+				if (ha_src.is_player == target.is_player or !combat.are_hostile(ha_src, target)) {
+					if (feet_distance(ha_src.x, ha_src.y, target.x, target.y) <= 30) {
+						disadv = true;
+						break;
+					}
+				}
+			}
+		}
 		// PHB 2024 Invisible condition (para 16219): "Attack rolls against the creature
 		// have Disadvantage, and the creature's attack rolls have Advantage." The defender
 		// Disadvantage is above; the attacker Advantage is here.
@@ -4099,6 +4114,24 @@ class battle_manager {
 				}
 			}
 		}
+		// Eyebite additional cleanup: Asleep (Unconscious) and Sickened (Poisoned) effects
+		if (conc == "Eyebite") {
+			for (uint ebi = 0; ebi < combat.combatants.length(); ebi++) {
+				combatant@ eb_t = combat.combatants[ebi];
+				if (@eb_t == null or eb_t.is_dead) continue;
+				if (eb_t.eyebite_asleep_source_id == caster.id) {
+					if (eb_t.has_condition(COND_UNCONSCIOUS)) eb_t.remove_condition(COND_UNCONSCIOUS);
+					if (eb_t.has_condition(COND_INCAPACITATED)) eb_t.remove_condition(COND_INCAPACITATED);
+					eb_t.eyebite_asleep_source_id = 0;
+					broadcast_announce(eb_t.name + " wakes as Eyebite fades!", true);
+				}
+				if (eb_t.eyebite_sickened_source_id == caster.id) {
+					if (eb_t.has_condition(COND_POISONED)) eb_t.remove_condition(COND_POISONED);
+					eb_t.eyebite_sickened_source_id = 0;
+					broadcast_announce(eb_t.name + " is no longer Sickened as Eyebite fades!", true);
+				}
+			}
+		}
 		// Web / Entangle / Flesh to Stone: remove COND_RESTRAINED from targets
 		if (conc == "Web" or conc == "Entangle" or conc == "Flesh to Stone") {
 			for (uint ri = 0; ri < combat.combatants.length(); ri++) {
@@ -4194,6 +4227,11 @@ class battle_manager {
 		}
 		// Antimagic Field: clear flag when concentration breaks
 		caster.antimagic_field_active = false;
+		// Globe of Invulnerability: clear spell-blocking shield when concentration breaks
+		caster.globe_of_invulnerability_active = false;
+		caster.globe_of_invulnerability_level = 5;
+		// Holy Aura: clear aura when concentration breaks
+		caster.holy_aura_active = false;
 	}
 
 	// ---- Swarming Modifier Helper ----
@@ -11217,6 +11255,53 @@ class battle_manager {
 			else if (c.hex_cursed_ability == ABILITY_CHA) ability_name = "Charisma";
 			broadcast_announce(c.name + " curses " + tgt.name + " with Hex! Disadvantage on " + ability_name + " checks.", true);
 		}
+		else if (sc.spell_id == "eyebite") {
+			// Basic Rules 2024 Eyebite (para 13145-13151): WIS save, then apply chosen
+			// effect. Asleep = Unconscious (wakes on damage), Panicked = Frightened,
+			// Sickened = disadvantage on attacks + ability checks (≈ Poisoned).
+			combatant@ tgt = combat.get_combatant(sc.primary_target_id);
+			if (@tgt == null or tgt.is_dead) return;
+			int save_dc = spell_save_dc(c);
+			int save_roll = random(1, 20);
+			apply_hound_save_disadvantage(tgt, c.id, save_roll);
+			if (tgt.charm_frighten_save_advantage and (choice == "panicked" or choice == "asleep")) {
+				int r2 = random(1, 20);
+				if (r2 > save_roll) save_roll = r2;
+			}
+			int save_bonus = tgt.get_save_bonus(ABILITY_WIS);
+			int bless_bonus = roll_bless_bonus(tgt);
+			int save_total = save_roll + save_bonus + bless_bonus;
+			bool saved = save_total >= save_dc;
+			string effect_label = "Panicked";
+			if (choice == "asleep") effect_label = "Asleep";
+			else if (choice == "sickened") effect_label = "Sickened";
+			// Full save failure chain (WIS — condition, Mage Slayer applies)
+			if (!saved and try_arcane_deflection_save(tgt, save_dc, save_total)) saved = true;
+			if (!saved and (choice == "panicked" or choice == "asleep") and try_countercharm_reroll(tgt, save_dc, save_bonus + bless_bonus, "WIS save vs Eyebite")) saved = true;
+			if (!saved) { int ds = try_disciplined_survivor_reroll(tgt, save_dc, save_total, save_bonus + bless_bonus, "WIS save vs Eyebite " + effect_label); if (ds >= save_dc) saved = true; }
+			if (!saved) { int fg = try_flash_of_genius(tgt, save_dc, save_total, "WIS save vs Eyebite"); if (fg >= save_dc) { saved = true; save_total = fg; } }
+			if (!saved) { int mv = try_maverick_spirit(tgt, save_dc, save_total, "WIS save vs Eyebite"); if (mv >= save_dc) { saved = true; save_total = mv; } }
+			if (!saved and try_mage_slayer_guarded_mind(tgt, ABILITY_WIS)) saved = true;
+			if (!saved) { int bf = try_boon_of_fate_bonus(tgt, save_total, save_dc); if (bf >= save_dc) { saved = true; save_total = bf; } }
+			if (!saved and try_stroke_of_luck_save(tgt, save_dc, save_bonus + bless_bonus)) saved = true;
+			broadcast_roll(tgt.name, "WIS save vs Eyebite (" + effect_label + ")", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : effect_label + "!");
+			if (!saved) {
+				if (choice == "panicked") {
+					tgt.add_condition(COND_FRIGHTENED);
+					tgt.frightened_source_id = c.id;
+					broadcast_announce(tgt.name + " is Panicked by " + c.name + "'s Eyebite! Cannot approach the caster.", true);
+				} else if (choice == "asleep") {
+					tgt.add_condition(COND_UNCONSCIOUS);
+					tgt.add_condition(COND_INCAPACITATED);
+					tgt.eyebite_asleep_source_id = c.id;
+					broadcast_announce(tgt.name + " falls Asleep from " + c.name + "'s Eyebite! Wakes if damaged.", true);
+				} else { // sickened
+					tgt.add_condition(COND_POISONED);
+					tgt.eyebite_sickened_source_id = c.id;
+					broadcast_announce(tgt.name + " is Sickened by " + c.name + "'s Eyebite! Disadvantage on attacks and ability checks.", true);
+				}
+			}
+		}
 		else if (sc.spell_id == "adjust_density") {
 			// Wildemount p.5428: target's weight is halved (+10 ft speed, disadvantage on
 			// STR) or doubled (-10 ft speed, advantage on STR) for up to 1 minute or until
@@ -12404,7 +12489,25 @@ class battle_manager {
 			}
 		}
 
+		// Basic Rules 2024 Globe of Invulnerability (para 13549-13550): "Any spell of
+		// level 5 or lower cast from outside the barrier can't affect anything within it."
+		// Check if the targeted creature is inside a Globe and the caster is outside.
 		combatant@ target = combat.get_combatant(target_id);
+		if (@target != null and !target.is_dead and spell.level > 0 and spell.level <= 9) {
+			for (uint gi2 = 0; gi2 < combat.combatants.length(); gi2++) {
+				combatant@ globe_src = combat.combatants[gi2];
+				if (@globe_src == null or globe_src.is_dead or !globe_src.globe_of_invulnerability_active) continue;
+				// Target must be within the 10ft emanation
+				if (feet_distance(globe_src.x, globe_src.y, target.x, target.y) > 10) continue;
+				// Caster must be OUTSIDE the 10ft emanation (spells from inside work normally)
+				if (feet_distance(globe_src.x, globe_src.y, c.x, c.y) <= 10) continue;
+				// Spell level must be at or below the globe's protection level
+				if (spell.level <= globe_src.globe_of_invulnerability_level) {
+					u.send({{"type", message_types::announce}, {"text", target.name + " is protected by a Globe of Invulnerability! Spells of level " + globe_src.globe_of_invulnerability_level + " or lower from outside cannot affect them."}, {"interrupt", true}});
+					return;
+				}
+			}
+		}
 		if (spell.id == "true_strike") {
 			if (@target == null or target.is_dead) {
 				u.send({{"type", message_types::announce}, {"text", "Choose a living target for True Strike."}, {"interrupt", true}});
@@ -15172,33 +15275,21 @@ class battle_manager {
 				return;
 			}
 			else if (spell.id == "eyebite" and @target != null) {
-				// Basic Rules para 13145: "For the duration, your eyes become an inky void.
-				// One creature of your choice within 60 feet of you that you can see must
-				// succeed on a Wisdom saving throw or be affected by one of the following
-				// effects of your choice for the duration." Options: Asleep (Unconscious),
-				// Panicked (Frightened), or Sickened (disadvantage on attacks + ability checks).
-				// Defaults to Panicked since Unconscious auto-kills monsters.
-				int save_roll = random(1, 20);
-				apply_hound_save_disadvantage(target, c.id, save_roll);
-				if (target.charm_frighten_save_advantage) { int r2 = random(1, 20); if (r2 > save_roll) save_roll = r2; }
-				int save_bonus = target.get_save_bonus(ABILITY_WIS);
-				int bless_bonus = roll_bless_bonus(target);
-				int save_total = save_roll + save_bonus + bless_bonus;
-				bool saved = save_total >= save_dc;
-				broadcast_roll(target.name, "WIS save vs Eyebite", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Afflicted!");
-				if (!saved and try_arcane_deflection_save(target, save_dc, save_total)) saved = true;
-				if (!saved and try_countercharm_reroll(target, save_dc, save_bonus + bless_bonus, "WIS save vs Eyebite")) saved = true;
-				if (!saved) { int ds = try_disciplined_survivor_reroll(target, save_dc, save_total, save_bonus + bless_bonus, "WIS save vs Eyebite"); if (ds >= save_dc) saved = true; }
-				if (!saved) { int new_total = try_flash_of_genius(target, save_dc, save_total, "WIS save vs Eyebite"); if (new_total >= save_dc) saved = true; }
-			if (!saved) { int ms_total = try_maverick_spirit(target, save_dc, save_total, "WIS save vs Eyebite"); if (ms_total >= save_dc) saved = true; }
-				if (!saved and try_mage_slayer_guarded_mind(target, ABILITY_WIS)) saved = true;
-				if (!saved) { int bf = try_boon_of_fate_bonus(target, save_total, save_dc); if (bf > 0) saved = true; }
-				if (!saved and try_stroke_of_luck_save(target, save_dc, save_bonus + bless_bonus)) saved = true;
-				if (!saved) {
-					target.add_condition(COND_FRIGHTENED);
-					target.frightened_source_id = c.id;
-					broadcast_announce(target.name + " is Panicked by " + c.name + "'s Eyebite!", true);
-				}
+				// Basic Rules 2024 Eyebite (para 13145-13151): "One creature of your choice
+				// within 60 feet of you that you can see must succeed on a Wisdom saving throw
+				// or be affected by one of the following effects of your choice for the duration."
+				// 3 options: Asleep (Unconscious), Panicked (Frightened), Sickened (disadvantage).
+				// Prompt the caster for which effect to apply.
+				pending_spell_choice sc;
+				sc.player_username = c.player_username;
+				sc.caster_id = c.id;
+				sc.spell_id = "eyebite";
+				sc.cast_slot_level = cast_slot_level;
+				sc.primary_target_id = target.id;
+				sc.option_keys = {"panicked", "asleep", "sickened"};
+				sc.option_labels = {"Panicked (Frightened — can't approach caster)", "Asleep (Unconscious — wakes on damage)", "Sickened (disadvantage on attacks and ability checks)"};
+				sc.prompt_text = "Eyebite: choose an effect for " + target.name + ". Press 1 for Panicked (Frightened), 2 for Asleep (Unconscious), or 3 for Sickened (disadvantage on attacks).";
+				send_spell_choice_prompt(c, sc);
 			}
 			else if (spell.id == "mass_heal") {
 				// Basic Rules para 14137: "A flood of healing energy flows from you into
@@ -17740,8 +17831,9 @@ class battle_manager {
 				return;
 			}
 			else if (spell.id == "mind_sliver" and @target != null) {
-				// Basic Rules para 14174: INT save, 1d6 psychic. Scales at L5/11/17.
-				// Next-save 1d4 penalty flavour is announced but not tracked.
+				// Basic Rules 2024 Mind Sliver (para 14174): INT save, 1d6 psychic.
+				// Scales at L5/11/17. On failed save, target subtracts 1d4 from its
+				// next saving throw (consumed on first save in get_save_bonus).
 				int dice_count = cantrip_dice_count(1, c.level);
 				int total_damage = 0;
 				for (int d = 0; d < dice_count; d++) total_damage += random(1, 6);
@@ -17760,7 +17852,8 @@ class battle_manager {
 				broadcast_roll(target.name, "INT save vs Mind Sliver", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Hit!");
 				if (!saved) {
 					combat.apply_damage(target, total_damage, DMG_PSYCHIC, c);
-					broadcast_announce(c.name + "'s Mind Sliver deals " + total_damage + " psychic damage to " + target.name + ". Their mind is rattled.", true);
+					target.mind_sliver_penalty_active = true;
+					broadcast_announce(c.name + "'s Mind Sliver deals " + total_damage + " psychic damage to " + target.name + ". -1d4 on their next saving throw!", true);
 				}
 				broadcast_state();
 				check_battle_end();

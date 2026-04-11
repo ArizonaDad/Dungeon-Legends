@@ -624,6 +624,14 @@ class combatant {
 	bool reduce_active = false;            // Target is Reduced
 	uint enlarge_reduce_caster_id = 0;     // Caster ID for concentration cleanup
 	int enlarge_original_size = SIZE_MEDIUM; // Original size to restore on spell end
+	// Basic Rules 2024 Mind Sliver (para 14174): "the target also subtracts 1d4 from
+	// the next saving throw it makes before the end of your next turn."
+	bool mind_sliver_penalty_active = false; // Consumed on first save
+	// Basic Rules 2024 Eyebite (para 13145-13151): 3 effects — Asleep (Unconscious,
+	// wakes on damage), Panicked (Frightened), Sickened (Poisoned-equivalent). Per-target
+	// tracking separate from other spell sources for clean concentration cleanup.
+	uint eyebite_asleep_source_id = 0;    // Caster who applied Eyebite Asleep
+	uint eyebite_sickened_source_id = 0;  // Caster who applied Eyebite Sickened
 	bool wizardly_quill_active = false; // Order of Scribes Wizard
 	int awakened_spellbook_changes = 0; // Order of Scribes - replace damage type
 	// Gunslinger subclasses (Valda's Spire of Secrets paras 229-490)
@@ -1290,6 +1298,13 @@ class combatant {
 		if (save_proficiencies[ability_id] == 1) mod += proficiency;
 		// 2024 exhaustion: subtract 2 * level from d20 rolls
 		mod -= exhaustion_level * 2;
+		// Basic Rules 2024 Mind Sliver (para 14174): "the target also subtracts 1d4
+		// from the next saving throw it makes before the end of your next turn."
+		// Consumed after the first save it applies to.
+		if (mind_sliver_penalty_active) {
+			mod -= random(1, 4);
+			mind_sliver_penalty_active = false;
+		}
 		// Basic Rules 2024 Bane (para 12032): "the target must roll a d4 and subtract
 		// the number rolled from the attack roll or saving throw."
 		if (baned) mod -= random(1, 4);
@@ -2093,6 +2108,14 @@ class battle {
 				if (target.has_condition(COND_INCAPACITATED)) target.remove_condition(COND_INCAPACITATED);
 				target.charm_spell_caster_id = 0;
 			}
+		}
+
+		// Basic Rules 2024 Eyebite Asleep (para 13148): "It wakes up if it takes
+		// any damage or if another creature takes an action to shake it awake."
+		if (amount > 0 and target.eyebite_asleep_source_id != 0 and target.has_condition(COND_UNCONSCIOUS)) {
+			target.remove_condition(COND_UNCONSCIOUS);
+			if (target.has_condition(COND_INCAPACITATED)) target.remove_condition(COND_INCAPACITATED);
+			target.eyebite_asleep_source_id = 0;
 		}
 
 		// Xanathar's Oath of Redemption L20 Emissary of Redemption retaliation (para 2054):
