@@ -2509,6 +2509,31 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
             int prof_ad = proficiency_bonus(cs.level);
             c.ascendant_dragon_breath_uses = prof_ad;
         }
+        // PHB 2024 Warrior of the Open Hand (paras 5376-5400)
+        if (cs.subclass == "Warrior of the Open Hand") {
+            // L3 Open Hand Technique: handled in users_dom via open_hand_ki_used flag
+            // L6 Wholeness of Body (para 5386-5388): "As a Bonus Action, you can roll
+            // your Martial Arts die. You regain a number of Hit Points equal to the
+            // number rolled plus your Wisdom modifier (minimum of 1 Hit Point regained).
+            // You can use this feature a number of times equal to your Wisdom modifier
+            // (minimum of once), and you regain all expended uses when you finish a
+            // Long Rest."
+            if (cs.level >= 6) {
+                int wis_mod_oh = ability_modifier(cs.wisdom);
+                c.wholeness_of_body_uses_max = wis_mod_oh > 1 ? wis_mod_oh : 1;
+                c.wholeness_of_body_uses = c.wholeness_of_body_uses_max;
+            }
+            // L11 Tranquility (para 5390-5391): "At the end of a Long Rest, you gain
+            // the effect of a Sanctuary spell that lasts until the start of your next
+            // Long Rest (the spell can end early as normal)." Auto-apply Sanctuary at
+            // combat start. DC = 8 + WIS + proficiency.
+            if (cs.level >= 11) {
+                c.sanctuary_active = true;
+                c.sanctuary_dc = 8 + ability_modifier(cs.wisdom) + proficiency_bonus(cs.level);
+                c.sanctuary_source_id = c.id;
+            }
+            // L17 Quivering Palm: handled via quivering_palm_pending + trigger
+        }
         // Xanathar's Way of the Drunken Master (paras 1780-1805)
         if (cs.subclass == "Way of the Drunken Master") {
             // L3 Bonus Proficiencies (para 1785-1786): "You gain proficiency in
@@ -2520,7 +2545,7 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
             // L6 Tipsy Sway — Redirect Attack: handled via existing drunken_master_opportunity
             // L11 Drunkard's Luck (para 1798-1800): spend 1 FP to cancel save disadvantage
             if (cs.level >= 11) c.drunkards_luck_active = true;
-            // L17 Intoxicated Frenzy: deferred (needs flurry multi-target extension)
+            // L17 Intoxicated Frenzy: wired in users_dom flurry handler (5 strikes)
         }
         // Xanathar's Way of the Kensei (paras 1806-1835)
         if (cs.subclass == "Way of the Kensei") {
@@ -2536,8 +2561,8 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         if (cs.subclass == "Way of the Sun Soul") {
             // L3 Radiant Sun Bolt (para 1851-1855): existing sun_bolt_ready
             if (cs.level >= 3) c.sun_bolt_ready = true;
-            // L6 Searing Arc Strike: deferred (needs ki-cast burning_hands system)
-            // L11 Searing Sunburst: deferred (needs new AoE action)
+            // L6 Searing Arc Strike: wired in users_dom (BA, 2+ ki, Burning Hands cone)
+            // L11 Searing Sunburst: wired in users_dom (Action, 0-3 ki, 20ft radiant burst)
             // L17 Sun Shield (para 1863-1865): reaction 5+WIS radiant on melee hit
             if (cs.level >= 17) c.sun_shield_active = true;
         }

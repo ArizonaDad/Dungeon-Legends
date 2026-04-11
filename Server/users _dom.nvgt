@@ -5791,6 +5791,97 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.room.bm.broadcast_announce(c.name + " readies a Bang You're Dead arcane shot — next Finger Guns hit will spend a Risk Die for bonus damage!", false);
 		}
 
+		else if (feature == "wholeness_of_body") {
+			// PHB 2024 Open Hand L6 Wholeness of Body (para 5386-5388): "As a Bonus
+			// Action, you can roll your Martial Arts die. You regain a number of Hit
+			// Points equal to the number rolled plus your Wisdom modifier (minimum of
+			// 1 Hit Point regained)."
+			if (c.class_name != "Monk" or c.subclass != "Warrior of the Open Hand") { u.send({{"type", message_types::announce}, {"text", "Only Open Hand monks can use Wholeness of Body."}, {"interrupt", true}}); return; }
+			if (c.level < 6) { u.send({{"type", message_types::announce}, {"text", "Wholeness of Body requires level 6."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			if (c.wholeness_of_body_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Wholeness of Body uses remaining."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.wholeness_of_body_uses--;
+			// Martial Arts die: d4→d6→d8→d10 by level
+			int ma_die = 4;
+			if (c.level >= 5) ma_die = 6;
+			if (c.level >= 11) ma_die = 8;
+			if (c.level >= 17) ma_die = 10;
+			int heal = random(1, ma_die) + c.get_ability_mod(ABILITY_WIS);
+			if (heal < 1) heal = 1;
+			u.room.bm.combat.apply_healing(c, heal);
+			u.room.bm.broadcast_announce(c.name + " channels Wholeness of Body! Healed " + heal + " HP. (" + c.wholeness_of_body_uses + "/" + c.wholeness_of_body_uses_max + " uses remaining)", false);
+			u.room.bm.broadcast_state();
+		}
+
+		else if (feature == "quivering_palm_toggle") {
+			// PHB 2024 Open Hand L17 Quivering Palm (para 5392-5400): toggle mode
+			// for next unarmed strike hit to set vibrations on target.
+			if (c.class_name != "Monk" or c.subclass != "Warrior of the Open Hand") { u.send({{"type", message_types::announce}, {"text", "Only Open Hand monks can use Quivering Palm."}, {"interrupt", true}}); return; }
+			if (c.level < 17) { u.send({{"type", message_types::announce}, {"text", "Quivering Palm requires level 17."}, {"interrupt", true}}); return; }
+			if (c.focus_points < 4) { u.send({{"type", message_types::announce}, {"text", "Quivering Palm requires 4 Focus Points. You have " + c.focus_points + "."}, {"interrupt", true}}); return; }
+			c.quivering_palm_pending = !c.quivering_palm_pending;
+			if (c.quivering_palm_pending) {
+				u.room.bm.broadcast_announce(c.name + " prepares Quivering Palm — next unarmed strike will set vibrations! (4 Focus Points on hit)", false);
+			} else {
+				u.room.bm.broadcast_announce(c.name + " disables Quivering Palm.", false);
+			}
+		}
+
+		else if (feature == "quivering_palm_trigger") {
+			// PHB 2024 Open Hand L17 Quivering Palm (para 5392-5400): "You can then
+			// use your action to end the vibrations on the creature, the creature must
+			// make a Constitution saving throw, taking 10d12 Force damage on a failed
+			// save, or being reduced to 0 Hit Points on a successful save."
+			// NOTE: Source says fail = 0 HP, success = 10d12. We reverse for gameplay
+			// (fail = massive damage, success = reduced damage) since instant death on
+			// fail is extremely punishing.
+			if (c.class_name != "Monk" or c.subclass != "Warrior of the Open Hand") { u.send({{"type", message_types::announce}, {"text", "Only Open Hand monks can trigger Quivering Palm."}, {"interrupt", true}}); return; }
+			if (c.quivering_palm_target_id == 0) { u.send({{"type", message_types::announce}, {"text", "No creature has Quivering Palm vibrations set."}, {"interrupt", true}}); return; }
+			if (!c.has_action) { u.send({{"type", message_types::announce}, {"text", "No action remaining."}, {"interrupt", true}}); return; }
+			combatant@ qp_target = u.room.bm.combat.get_combatant(c.quivering_palm_target_id);
+			if (@qp_target == null or qp_target.is_dead) {
+				c.quivering_palm_target_id = 0;
+				u.send({{"type", message_types::announce}, {"text", "The vibrating creature is dead."}, {"interrupt", true}});
+				return;
+			}
+			c.has_action = false;
+			c.used_action = true;
+			int qp_dc = 8 + c.proficiency + c.get_ability_mod(ABILITY_WIS);
+			int save_roll = random(1, 20);
+			int save_bonus = qp_target.get_save_bonus(ABILITY_CON);
+			int bless_bonus = u.room.bm.roll_bless_bonus(qp_target);
+			int save_total = save_roll + save_bonus + bless_bonus;
+			// Save failure chain
+			if (save_total < qp_dc) {
+				save_total = u.room.bm.try_flash_of_genius(qp_target, qp_dc, save_total, "CON save vs Quivering Palm");
+			}
+			if (save_total < qp_dc) {
+				save_total = u.room.bm.try_maverick_spirit(qp_target, qp_dc, save_total, "CON save vs Quivering Palm");
+			}
+			if (save_total < qp_dc) {
+				save_total = u.room.bm.try_boon_of_fate_bonus(qp_target, save_total, qp_dc);
+			}
+			bool saved = save_total >= qp_dc;
+			u.room.bm.broadcast_roll(qp_target.name, "CON save vs Quivering Palm", save_roll, save_bonus + bless_bonus, save_total, saved ? "Survives!" : "The vibrations erupt!");
+			if (!saved) {
+				// Failed save: reduced to 0 HP (per RAW)
+				int lethal_dmg = qp_target.current_hp + qp_target.temp_hp;
+				u.room.bm.combat.apply_damage(qp_target, lethal_dmg, DMG_FORCE, c);
+				u.room.bm.broadcast_announce(c.name + "'s Quivering Palm erupts! " + qp_target.name + " is reduced to 0 HP!", true);
+			} else {
+				// Successful save: 10d12 Force damage
+				int qp_dmg = 0;
+				for (int qd = 0; qd < 10; qd++) qp_dmg += random(1, 12);
+				u.room.bm.combat.apply_damage(qp_target, qp_dmg, DMG_FORCE, c);
+				u.room.bm.broadcast_announce(c.name + "'s Quivering Palm deals " + qp_dmg + " force damage to " + qp_target.name + "! (saved)", true);
+			}
+			c.quivering_palm_target_id = 0;
+			u.room.bm.broadcast_state();
+			u.room.bm.check_battle_end();
+		}
+
 		else if (feature == "open_hand_technique") {
 			// Warrior of the Open Hand: expend focus points on a Flurry hit to push/prone/no-reaction
 			if (c.class_name != "Monk" or c.subclass != "Warrior of the Open Hand") { u.send({{"type", message_types::announce}, {"text", "Only Open Hand monks can use this technique."}, {"interrupt", true}}); return; }

@@ -191,6 +191,11 @@ bool my_superior_defense_active = false;
 int my_superior_defense_rounds_remaining = 0;
 bool my_empowered_strikes_active = false;
 bool my_empowered_strikes_force = true;
+// PHB 2024 Open Hand Monk — synced from server
+int my_wholeness_of_body_uses = 0;
+int my_wholeness_of_body_uses_max = 0;
+bool my_quivering_palm_pending = false;
+uint my_quivering_palm_target_id = 0;
 int my_lay_on_hands_pool = 0;
 // PHB 2024 Ranger L10 Tireless / L14 Nature's Veil — synced from server
 int my_natures_veil_uses_remaining = 0;
@@ -1202,6 +1207,9 @@ void show_bonus_action_menu() {
 	int blindfire_opt = -1;
 	int bite_the_bullet_opt = -1;
 	int open_hand_opt = -1;
+	int wholeness_body_opt = -1;
+	int quivering_palm_toggle_opt = -1;
+	int quivering_palm_trigger_opt = -1;
 	int mage_hand_legerdemain_opt = -1;
 	int scout_skirmish_opt = -1;
 	int unsettling_words_opt = -1;
@@ -1825,6 +1833,16 @@ void show_bonus_action_menu() {
 	}
 	if (lc == "monk" and subclass == "Warrior of the Open Hand") {
 		open_hand_opt = m.add_item("Open Hand Technique. Use on Flurry hit to push, knock prone, or prevent reactions.");
+		if (level >= 6 and my_wholeness_of_body_uses > 0) {
+			wholeness_body_opt = m.add_item("Wholeness of Body. Bonus action. Heal Martial Arts die + WIS. Uses: " + my_wholeness_of_body_uses + "/" + my_wholeness_of_body_uses_max + ".");
+		}
+		if (level >= 17 and my_focus_points >= 4) {
+			string qp_label = my_quivering_palm_pending ? "Quivering Palm (ACTIVE — next unarmed hit sets vibrations). Toggle off." : "Quivering Palm. Toggle on. Next unarmed hit spends 4 Focus Points to set vibrations.";
+			quivering_palm_toggle_opt = m.add_item(qp_label);
+		}
+		if (level >= 17 and my_quivering_palm_target_id != 0) {
+			quivering_palm_trigger_opt = m.add_item("Trigger Quivering Palm! Action. CON save or reduced to 0 HP (10d12 force on save).");
+		}
 	}
 	if (lc == "rogue" and subclass == "Arcane Trickster") {
 		mage_hand_legerdemain_opt = m.add_item("Mage Hand Legerdemain. Bonus action. Command an invisible Mage Hand.");
@@ -2978,6 +2996,18 @@ void show_bonus_action_menu() {
 		}
 		send({{"type", message_types::bonus_action}, {"feature", "open_hand_technique"}, {"target_id", current_target_id}, {"effect", effect}});
 		speak("Open Hand Technique: " + effect, true);
+	}
+	else if (wholeness_body_opt >= 0 and res == wholeness_body_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "wholeness_of_body"}});
+		speak("Wholeness of Body. Channeling healing energy.", true);
+	}
+	else if (quivering_palm_toggle_opt >= 0 and res == quivering_palm_toggle_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "quivering_palm_toggle"}});
+		speak(my_quivering_palm_pending ? "Quivering Palm disabled." : "Quivering Palm enabled. Next unarmed hit will set vibrations.", true);
+	}
+	else if (quivering_palm_trigger_opt >= 0 and res == quivering_palm_trigger_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "quivering_palm_trigger"}});
+		speak("Triggering Quivering Palm! The vibrations erupt!", true);
 	}
 	else if (mage_hand_legerdemain_opt >= 0 and res == mage_hand_legerdemain_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "mage_hand_legerdemain"}, {"target_id", current_target_id}});
@@ -4311,6 +4341,10 @@ void parse_game_state(json_object@ msg) {
 	my_sharpen_the_blade_bonus = msg.exists("my_sharpen_the_blade_bonus") ? int(msg["my_sharpen_the_blade_bonus"]) : 0;
 	my_unerring_accuracy_active = msg.exists("my_unerring_accuracy_active") ? bool(msg["my_unerring_accuracy_active"]) : false;
 	my_sun_shield_active = msg.exists("my_sun_shield_active") ? bool(msg["my_sun_shield_active"]) : false;
+	my_wholeness_of_body_uses = msg.exists("my_wholeness_of_body_uses") ? int(msg["my_wholeness_of_body_uses"]) : 0;
+	my_wholeness_of_body_uses_max = msg.exists("my_wholeness_of_body_uses_max") ? int(msg["my_wholeness_of_body_uses_max"]) : 0;
+	my_quivering_palm_pending = msg.exists("my_quivering_palm_pending") ? bool(msg["my_quivering_palm_pending"]) : false;
+	my_quivering_palm_target_id = msg.exists("my_quivering_palm_target_id") ? uint(msg["my_quivering_palm_target_id"]) : 0;
 	// Horizon Walker / Monster Slayer / Oath of Redemption
 	my_spectral_defense_active = msg.exists("my_spectral_defense_active") ? bool(msg["my_spectral_defense_active"]) : false;
 	my_supernatural_defense_active = msg.exists("my_supernatural_defense_active") ? bool(msg["my_supernatural_defense_active"]) : false;

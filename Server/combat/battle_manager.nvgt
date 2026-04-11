@@ -8682,6 +8682,24 @@ class battle_manager {
 			broadcast_announce(attacker.name + "'s Deft Strike deals " + deft_dmg + " extra damage! (1 Focus Point spent)", false);
 		}
 
+		// PHB 2024 Open Hand L17 Quivering Palm (para 5392-5400): "When you hit
+		// a creature with an Unarmed Strike, you can spend 4 Focus Points to start
+		// imperceptible vibrations in the creature's body." On hit with pending
+		// toggle, auto-deduct FP and set vibrations. Only one creature at a time.
+		if (attacker.quivering_palm_pending and attacker.focus_points >= 4
+			and is_weapon_attack and attack_name_is_unarmed(attacker.main_hand)
+			and @target != null and !target.is_dead) {
+			attacker.quivering_palm_pending = false;
+			attacker.focus_points -= 4;
+			// Clear previous vibration target if any
+			if (attacker.quivering_palm_target_id != 0) {
+				combatant@ old_qp = combat.get_combatant(attacker.quivering_palm_target_id);
+				if (@old_qp != null) broadcast_announce("The vibrations in " + old_qp.name + " fade.", false);
+			}
+			attacker.quivering_palm_target_id = target.id;
+			broadcast_announce(attacker.name + " sets Quivering Palm vibrations in " + target.name + "! (4 Focus Points spent, " + attacker.focus_points + " remaining)", true);
+		}
+
 		// Xanathar's Kensei L3 Kensei's Shot (para 1814-1817): "You can use a bonus
 		// action on your turn to make your ranged attacks with a kensei weapon more
 		// deadly. Any target you hit with a ranged attack using a kensei weapon takes

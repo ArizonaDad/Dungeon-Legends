@@ -582,6 +582,11 @@ class combatant {
 	string starry_form_type = ""; // Archer/Chalice/Dragon
 	bool land_stride_active = false; // Circle of the Land
 	bool open_hand_ki_used = false; // Way of the Open Hand
+	// PHB 2024 Warrior of the Open Hand (paras 5376-5400)
+	int wholeness_of_body_uses = 0;      // L6: WIS mod uses/LR, BA heal MA die + WIS
+	int wholeness_of_body_uses_max = 0;
+	bool quivering_palm_pending = false;  // L17: next unarmed hit sets vibrations
+	uint quivering_palm_target_id = 0;    // L17: creature with active vibrations
 	// Way of the Kensei (Xanathar's paras 1806-1835)
 	bool kensei_weapon_active = false; // L3: kensei weapon designation
 	bool agile_parry_bonus = false; // L3: +2 AC if unarmed strike + holding kensei weapon this turn
@@ -2889,6 +2894,11 @@ class battle {
 				state["my_sharpen_the_blade_bonus"] = c.sharpen_the_blade_bonus;
 				state["my_unerring_accuracy_active"] = c.unerring_accuracy_active;
 				state["my_sun_shield_active"] = c.sun_shield_active;
+				// PHB 2024 Open Hand Monk
+				state["my_wholeness_of_body_uses"] = c.wholeness_of_body_uses;
+				state["my_wholeness_of_body_uses_max"] = c.wholeness_of_body_uses_max;
+				state["my_quivering_palm_pending"] = c.quivering_palm_pending;
+				state["my_quivering_palm_target_id"] = c.quivering_palm_target_id;
 				// Horizon Walker / Monster Slayer / Oath of Redemption (Xanathar's)
 				state["my_spectral_defense_active"] = c.spectral_defense_active;
 				state["my_supernatural_defense_active"] = c.supernatural_defense_active;
