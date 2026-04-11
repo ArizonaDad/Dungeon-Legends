@@ -88,6 +88,8 @@ class combatant {
 	bool holy_aura_active = false;       // Holy Aura: 30 ft aura, allies adv on saves, enemies disadv to attack
 	bool stoneskin_active = false;       // Stoneskin spell: B/P/S resistance flag (cleared by Dispel Magic)
 	bool fly_active = false;             // Fly spell: flag for Dispel Magic to clear flying_speed
+	bool swift_quiver_active = false;    // Swift Quiver spell: BA for 2 ranged attacks (concentration)
+	bool true_seeing_active = false;     // True Seeing spell: Truesight 120ft (not concentration per 2024)
 	bool counterspell_pending = false;   // Counterspell readied as a reaction (intercept the next enemy spell)
 	bool searing_smite_pending = false;  // Searing Smite rider on next weapon hit
 	int searing_smite_dice = 0;          // Number of d6 to roll for Searing Smite damage
@@ -675,6 +677,10 @@ class combatant {
 	int enhance_ability_caster_id = 0; // Track who cast it for concentration cleanup
 	bool fog_cloud_active = false;
 	bool darkness_active = false;
+	// Silence spell: caster-placed 20ft sphere blocks spellcasting (verbal components)
+	bool silence_active = false;
+	int silence_x = 0;
+	int silence_y = 0;
 	// Blade Ward: B/P/S resistance until start of caster's next turn
 	bool blade_ward_active = false;
 	// Blur: attackers have disadvantage (concentration)
@@ -2151,6 +2157,8 @@ class battle {
 		if (@viewer == null or @target == null) return false;
 		if (viewer.has_condition(COND_BLINDED)) return false;
 		bool has_truesight = viewer.has_feat("boon_of_truesight") and feet_distance(viewer.x, viewer.y, target.x, target.y) <= 60;
+		// True Seeing spell grants Truesight 120ft
+		if (!has_truesight and viewer.true_seeing_active and feet_distance(viewer.x, viewer.y, target.x, target.y) <= 120) has_truesight = true;
 		if (has_truesight) return true;
 		if (target.has_condition(COND_INVISIBLE)) return false;
 		if (target.is_hidden and are_hostile(viewer, target)) return false;
@@ -2283,6 +2291,7 @@ class battle {
 				state["my_spiritual_weapon_active"] = c.spiritual_weapon_active;
 				state["my_heat_metal_active"] = c.heat_metal_active;
 				state["my_call_lightning_active"] = c.call_lightning_active;
+				state["my_swift_quiver_active"] = c.swift_quiver_active;
 				state["my_flaming_sphere_active"] = c.flaming_sphere_active;
 				state["my_conjure_woodland_disengage"] = c.conjure_woodland_disengage;
 				state["my_luck_points"] = c.luck_points;

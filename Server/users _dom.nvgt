@@ -6002,6 +6002,42 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.room.bm.start_twf_offhand_strike(c, twf_target);
 		}
 
+		else if (feature == "swift_quiver_attack") {
+			// Basic Rules 2024 Swift Quiver (para 15218): bonus action for 2 ranged attacks
+			if (!c.swift_quiver_active) {
+				u.send({{"type", message_types::error}, {"text", "Swift Quiver not active."}});
+				return;
+			}
+			if (!c.has_bonus_action) {
+				u.send({{"type", message_types::error}, {"text", "No bonus action available."}});
+				return;
+			}
+			if (!c.main_hand_is_ranged) {
+				u.send({{"type", message_types::error}, {"text", "Swift Quiver requires a ranged weapon."}});
+				return;
+			}
+			// Find target: use target_id from message or nearest hostile in range
+			combatant@ sq_target = target_id != 0 ? u.room.bm.combat.get_combatant(target_id) : null;
+			if (@sq_target == null or sq_target.is_dead) {
+				int best_sd = 9999;
+				for (uint si = 0; si < u.room.bm.combat.combatants.length(); si++) {
+					combatant@ sc = u.room.bm.combat.combatants[si];
+					if (@sc == null or sc.is_dead or sc.id == c.id) continue;
+					if (!u.room.bm.combat.are_hostile(c, sc)) continue;
+					int sd = feet_distance(c.x, c.y, sc.x, sc.y);
+					if (sd <= c.main_hand_range and sd < best_sd) { best_sd = sd; @sq_target = sc; }
+				}
+			}
+			if (@sq_target == null or sq_target.is_dead) {
+				u.send({{"type", message_types::error}, {"text", "No valid target in ranged weapon range."}});
+				return;
+			}
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			u.room.bm.broadcast_announce(c.name + " uses Swift Quiver for 2 bonus ranged attacks!", false);
+			u.room.bm.start_swift_quiver_strike(c, sq_target, 1); // 2 attacks: first with 1 remaining
+		}
+
 		else {
 			u.send({{"type", message_types::announce}, {"text", "That bonus action is not available to your character."}, {"interrupt", true}});
 			return;

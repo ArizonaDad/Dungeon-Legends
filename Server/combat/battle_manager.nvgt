@@ -2580,7 +2580,8 @@ class battle_manager {
 		// on the attack rolls of Sorcerer spells you cast." Only applied when the
 		// attack is a Sorcerer spell attack and the active Sorcerer has the buff up.
 		if (is_spell_attack and attacker.class_name == "Sorcerer" and attacker.innate_sorcery_active) adv = true;
-		bool can_ignore_invisible = attacker.has_feat("boon_of_truesight") and dist <= 60;
+		bool can_ignore_invisible = (attacker.has_feat("boon_of_truesight") and dist <= 60)
+			or (attacker.true_seeing_active and dist <= 120);
 		// Barbarian Reckless Attack (PHB 2024 para 2785): "When you make your first attack
 		// roll on your turn, you can decide to attack recklessly. Doing so gives you Advantage
 		// on attack rolls using Strength until the start of your next turn, and attack rolls
@@ -3836,6 +3837,22 @@ class battle_manager {
 		// be handled separately if positional tracking is added later).
 		caster.fog_cloud_active = false;
 		caster.darkness_active = false;
+		// Silence cleanup
+		if (caster.silence_active) {
+			caster.silence_active = false;
+			// Remove Deafened from creatures that were inside the silence zone
+			for (uint si = 0; si < combat.combatants.length(); si++) {
+				combatant@ st = combat.combatants[si];
+				if (@st == null or st.is_dead) continue;
+				if (feet_distance(caster.silence_x, caster.silence_y, st.x, st.y) <= 20) {
+					if (st.has_condition(COND_DEAFENED)) {
+						st.remove_condition(COND_DEAFENED);
+					}
+				}
+			}
+			caster.silence_x = 0;
+			caster.silence_y = 0;
+		}
 		// Blur: disadvantage on attacks against caster (concentration)
 		caster.blur_active = false;
 		// Conjure Minor Elementals cleanup
@@ -3874,6 +3891,8 @@ class battle_manager {
 		// Flaming Sphere: BA re-damage ends with concentration
 		caster.flaming_sphere_active = false;
 		caster.flaming_sphere_dice_count = 0;
+		// Swift Quiver: bonus action ranged attacks end with concentration
+		caster.swift_quiver_active = false;
 		// Extended Spell: advantage on concentration saves ends with concentration
 		caster.extended_spell_concentration = false;
 		// Enhance Ability: clear on all combatants where this caster was the source
@@ -6506,6 +6525,59 @@ class battle_manager {
 		return true;
 	}
 
+	// Basic Rules 2024 Swift Quiver (para 15218): bonus action for 2 ranged attacks
+	// using the main weapon at full attack bonus. Uses flurry-style chaining.
+	bool start_swift_quiver_strike(combatant@ attacker, combatant@ target, int remaining_after_current) {
+		if (@combat == null or @attacker == null or @target == null) return false;
+		if (target.is_dead or !target.is_alive()) return false;
+		if (!attacker.main_hand_is_ranged) return false;
+		int dist = feet_distance(attacker.x, attacker.y, target.x, target.y);
+		if (dist > attacker.main_hand_range) return false;
+		if (!combat.can_see(attacker, target)) return false;
+
+		bool adv = false;
+		bool disadv = false;
+		apply_attack_advantage_state(attacker, target, dist, true, adv, disadv);
+		reveal_hidden_combatant(attacker, "making a Swift Quiver attack");
+
+		// Use main weapon stats at full attack bonus (includes Archery, Magic Weapon, etc.)
+		int atk_bonus = get_attack_bonus_for_roll(attacker, false);
+		int dmg_mod = get_damage_modifier_for_attack(attacker, false);
+
+		pending_roll pr;
+		pr.combatant_id = attacker.id;
+		pr.player_username = attacker.is_player ? attacker.player_username : attacker.name;
+		pr.roll_type = ROLL_ATTACK;
+		pr.dice_sides = 20;
+		pr.modifier = atk_bonus;
+		pr.reason = "Swift Quiver attack (" + attacker.main_hand + ") against " + target.name;
+		pr.target_id = target.id;
+		pr.has_advantage = adv;
+		pr.has_disadvantage = disadv;
+		pr.attack_name = attacker.main_hand + " (Swift Quiver)";
+		pr.damage_dice_count = attacker.main_hand_damage_count;
+		pr.damage_dice_sides = attacker.main_hand_damage_dice;
+		pr.damage_modifier = dmg_mod;
+		pr.damage_type = attacker.main_hand_damage_type;
+		pr.is_weapon_attack = true;
+		pr.attacks_remaining = remaining_after_current;
+		pr.resolution_tag = "swift_quiver";
+		@current_roll = pr;
+
+		user@ u = find_user_for_combatant(attacker);
+		if (@u != null and !u.is_bot and attacker.is_player) {
+			send_roll_request(u, pr);
+		} else {
+			int roll1 = random(1, 20);
+			int roll2 = random(1, 20);
+			int natural = roll1;
+			if (adv and !disadv) natural = roll1 > roll2 ? roll1 : roll2;
+			else if (disadv and !adv) natural = roll1 < roll2 ? roll1 : roll2;
+			process_roll_result(natural);
+		}
+		return true;
+	}
+
 	bool start_true_strike_attack(combatant@ caster, combatant@ target) {
 		if (@combat == null or @caster == null or @target == null) return false;
 		if (target.is_dead or !target.is_alive()) return false;
@@ -6568,7 +6640,9 @@ class battle_manager {
 		if (target.has_condition(COND_PARALYZED) or target.has_condition(COND_STUNNED) or target.has_condition(COND_UNCONSCIOUS)) adv = true;
 		if (caster.has_condition(COND_BLINDED) or caster.has_condition(COND_POISONED)) disadv = true;
 		if (target.is_dodging and !caster.has_condition(COND_BLINDED)) disadv = true;
-		if (target.has_condition(COND_INVISIBLE)) disadv = true;
+		bool sw_can_ignore_invis = (caster.has_feat("boon_of_truesight") and dist <= 60)
+			or (caster.true_seeing_active and dist <= 120);
+		if (target.has_condition(COND_INVISIBLE) and !sw_can_ignore_invis) disadv = true;
 		if (target.has_condition(COND_RESTRAINED)) adv = true;
 		reveal_hidden_combatant(caster, "commanding Spiritual Weapon");
 
@@ -8210,6 +8284,11 @@ class battle_manager {
 					start_flurry_strike(c, target, pr.attacks_remaining - 1);
 				}
 			}
+			else if (pr.resolution_tag == "swift_quiver") {
+				if (pr.attacks_remaining > 0 and !target.is_dead) {
+					start_swift_quiver_strike(c, target, pr.attacks_remaining - 1);
+				}
+			}
 			else if (c.is_player and combatant_is_controlled_by_bot(c)) {
 				continue_player_bot_turn_after_attack(c, target);
 				if (pr.resolution_tag == "resume_current_turn" and @combat != null and combat.battle_active) {
@@ -9104,6 +9183,12 @@ class battle_manager {
 				else if (attacker.is_player and pr.resolution_tag == "flurry") {
 					if (pr.attacks_remaining > 0 and !target.is_dead) {
 						start_flurry_strike(attacker, target, pr.attacks_remaining - 1);
+						return;
+					}
+				}
+				else if (attacker.is_player and pr.resolution_tag == "swift_quiver") {
+					if (pr.attacks_remaining > 0 and !target.is_dead) {
+						start_swift_quiver_strike(attacker, target, pr.attacks_remaining - 1);
 						return;
 					}
 				}
@@ -11469,6 +11554,24 @@ class battle_manager {
 		if (c.arcane_deflection_no_spell_turns > 0 and spell.level > 0) {
 			u.send({{"type", message_types::announce}, {"text", "Arcane Deflection restricts you to cantrips until end of your next turn."}, {"interrupt", true}});
 			return;
+		}
+
+		// Basic Rules 2024 Silence: block casting with verbal components inside a silence zone.
+		// Nearly all spells have verbal components; only Subtle Spell metamagic bypasses this.
+		if (!c.metamagic_subtle_active) {
+			bool in_silence = false;
+			for (uint si = 0; si < combat.combatants.length(); si++) {
+				combatant@ sc = combat.combatants[si];
+				if (@sc == null or sc.is_dead or !sc.silence_active) continue;
+				if (feet_distance(sc.silence_x, sc.silence_y, c.x, c.y) <= 20) {
+					in_silence = true;
+					break;
+				}
+			}
+			if (in_silence) {
+				u.send({{"type", message_types::announce}, {"text", "You are inside a Silence zone and cannot cast spells with verbal components!"}, {"interrupt", true}});
+				return;
+			}
 		}
 
 		combatant@ target = combat.get_combatant(target_id);
@@ -15336,7 +15439,30 @@ class battle_manager {
 				broadcast_announce(c.name + " casts See Invisibility.", true);
 			}
 			else if (spell.id == "silence") {
-				broadcast_announce(c.name + " casts Silence, creating a 20-foot sphere of silence.", true);
+				// Basic Rules 2024 Silence: 20ft sphere, blocks spellcasting (verbal component),
+				// Thunder immunity, Deafened inside. Centered on a chosen point.
+				int sx = @target != null ? target.x : c.x;
+				int sy = @target != null ? target.y : c.y;
+				c.silence_active = true;
+				c.silence_x = sx;
+				c.silence_y = sy;
+				c.is_concentrating = true;
+				c.concentration_spell = "Silence";
+				c.add_condition(COND_CONCENTRATING);
+				broadcast_announce(c.name + " casts Silence! A 20-foot sphere of silence appears. No spells can be cast inside it.", true);
+				// Apply Deafened to creatures currently inside
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead) continue;
+					if (feet_distance(sx, sy, t.x, t.y) <= 20) {
+						if (!t.has_condition(COND_DEAFENED)) {
+							t.add_condition(COND_DEAFENED);
+							broadcast_announce(t.name + " is Deafened by the Silence!", false);
+						}
+					}
+				}
+				broadcast_state();
+				return;
 			}
 			else if (spell.id == "spider_climb" and @target != null) {
 				broadcast_announce(c.name + " casts Spider Climb on " + target.name + ", granting them a climb speed equal to their walking speed.", true);
@@ -15555,7 +15681,17 @@ class battle_manager {
 				broadcast_announce(c.name + " casts Seeming.", true);
 			}
 			else if (spell.id == "swift_quiver") {
-				broadcast_announce(c.name + " casts Swift Quiver.", true);
+				// Basic Rules 2024 Swift Quiver (para 15218): concentration, bonus action
+				// for 2 ranged weapon attacks each turn until the spell ends.
+				if (!c.main_hand_is_ranged) {
+					broadcast_announce(c.name + " casts Swift Quiver but has no ranged weapon equipped!", true);
+				} else {
+					c.swift_quiver_active = true;
+					c.is_concentrating = true;
+					c.add_condition(COND_CONCENTRATING);
+					c.concentration_spell = "Swift Quiver";
+					broadcast_announce(c.name + " casts Swift Quiver! Endless ammunition flows from their quiver. Bonus action for 2 ranged attacks each turn.", true);
+				}
 			}
 			else if (spell.id == "telekinesis") {
 				broadcast_announce(c.name + " casts Telekinesis.", true);
@@ -15586,7 +15722,16 @@ class battle_manager {
 				broadcast_announce(c.name + " casts Programmed Illusion.", true);
 			}
 			else if (spell.id == "true_seeing") {
-				broadcast_announce(c.name + " casts True Seeing.", true);
+				// Basic Rules 2024 True Seeing (para 15368): NOT concentration per 2024.
+				// Grants Truesight 120ft for 1 hour — see invisible, see through illusions.
+				combatant@ ts_target = @target;
+				if (@ts_target == null or ts_target.is_dead) @ts_target = c; // Self if no target
+				ts_target.true_seeing_active = true;
+				if (ts_target.id == c.id) {
+					broadcast_announce(c.name + " casts True Seeing on themselves! Truesight 120 feet.", true);
+				} else {
+					broadcast_announce(c.name + " casts True Seeing on " + ts_target.name + "! Truesight 120 feet.", true);
+				}
 			}
 			else if (spell.id == "word_of_recall") {
 				broadcast_announce(c.name + " casts Word of Recall.", true);
