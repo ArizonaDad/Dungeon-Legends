@@ -652,6 +652,15 @@ class combatant {
 	// and cleared at turn start in advance_turn, so Shield of Faith MUST NOT use them.
 	bool shield_of_faith_active = false;
 	uint shield_of_faith_caster_id = 0;
+	// Basic Rules 2024 Greater Invisibility (para 13658): "the target has the
+	// Invisible condition for the spell's duration." Does NOT break on attack
+	// (unlike regular Invisibility spell). Concentration, 1 min.
+	bool greater_invisibility_active = false;
+	uint greater_invisibility_caster_id = 0;
+	// Basic Rules 2024 Heat Metal (para 13734): "the creature has disadvantage on
+	// attack rolls and ability checks until the start of your next turn." Dedicated
+	// field — was incorrectly using the Bane spell's `baned` flag.
+	bool heat_metal_disadv = false;
 	bool wizardly_quill_active = false; // Order of Scribes Wizard
 	int awakened_spellbook_changes = 0; // Order of Scribes - replace damage type
 	// Gunslinger subclasses (Valda's Spire of Secrets paras 229-490)

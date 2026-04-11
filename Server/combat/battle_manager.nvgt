@@ -1335,6 +1335,9 @@ class battle_manager {
 			else if (c.bestow_curse_type == "ability_cha") bc_cursed_ability = ABILITY_CHA;
 			if (bc_cursed_ability == ability_id) disadv = true;
 		}
+		// Basic Rules 2024 Heat Metal (para 13734): "disadvantage on attack rolls
+		// and ability checks until the start of your next turn."
+		if (c.heat_metal_disadv) disadv = true;
 		// Pass Without Trace stacks +10 onto Stealth checks (also Dexterity (Stealth)).
 		if (skill_name == "Stealth") mod += c.pass_without_trace_bonus;
 		string tag = custom_tag != "" ? custom_tag : skill_resolution_tag(skill_name);
@@ -2690,6 +2693,11 @@ class battle_manager {
 			disadv = true;
 			attacker.vicious_mockery_disadv = false;
 		}
+		// Basic Rules 2024 Heat Metal (para 13734): "the creature has disadvantage on
+		// attack rolls and ability checks until the start of your next turn."
+		if (attacker.heat_metal_disadv) {
+			disadv = true;
+		}
 		// PHB 2024 Invisible condition (para 16219): "Attack rolls against the creature
 		// have Disadvantage, and the creature's attack rolls have Advantage." The defender
 		// Disadvantage is above; the attacker Advantage is here.
@@ -3190,7 +3198,8 @@ class battle_manager {
 		bool disadv = false;
 		apply_attack_advantage_state(bot, target, dist, bot.main_hand_is_ranged, adv, disadv);
 		// PHB 2024 Skulker (para 7783): defer reveal for ranged Skulker attacks
-		if (!(bot.is_hidden and bot.has_feat("skulker") and bot.main_hand_is_ranged)) {
+		// Basic Rules 2024 Greater Invisibility (para 13658): does NOT break on attack.
+		if (!bot.greater_invisibility_active and !(bot.is_hidden and bot.has_feat("skulker") and bot.main_hand_is_ranged)) {
 			reveal_hidden_combatant(bot, "making an attack");
 		}
 		broadcast_announce(bot.name + " attacks " + target.name + " with " + bot.main_hand + ".", false);
@@ -4012,7 +4021,12 @@ class battle_manager {
 				}
 			}
 		}
-		// Heat Metal: BA re-damage ends with concentration
+		// Heat Metal: BA re-damage ends with concentration. Also clear disadvantage
+		// on the target since the spell is no longer active.
+		if (caster.heat_metal_active and caster.heat_metal_target_id != 0) {
+			combatant@ hm_t = combat.get_combatant(caster.heat_metal_target_id);
+			if (@hm_t != null) hm_t.heat_metal_disadv = false;
+		}
 		caster.heat_metal_active = false;
 		caster.heat_metal_target_id = 0;
 		caster.heat_metal_dice_count = 0;
@@ -4299,6 +4313,22 @@ class battle_manager {
 				if (bht.beacon_of_hope_active and bht.beacon_of_hope_caster_id == caster.id) {
 					bht.beacon_of_hope_active = false;
 					bht.beacon_of_hope_caster_id = 0;
+				}
+			}
+		}
+		// Greater Invisibility: remove Invisible condition and hidden state
+		// Basic Rules 2024 Greater Invisibility (para 13658): concentration, 1 min.
+		if (caster.concentration_spell == "Greater Invisibility") {
+			for (uint gi = 0; gi < combat.combatants.length(); gi++) {
+				combatant@ git = combat.combatants[gi];
+				if (@git == null) continue;
+				if (git.greater_invisibility_active and git.greater_invisibility_caster_id == caster.id) {
+					git.greater_invisibility_active = false;
+					git.greater_invisibility_caster_id = 0;
+					git.remove_condition(COND_INVISIBLE);
+					git.is_hidden = false;
+					broadcast_to_battle({{"type", message_types::condition_removed}, {"target", git.name}, {"condition", "Invisible"}});
+					broadcast_announce(git.name + "'s Greater Invisibility fades.", true);
 				}
 			}
 		}
@@ -5265,6 +5295,12 @@ class battle_manager {
 		if (@c == null) return;
 		clear_shield_effect(c, false);
 		clear_help_effect(c, false);
+		// Basic Rules 2024 Heat Metal (para 13734): disadvantage lasts "until the
+		// start of your next turn" — clear on the CASTER's turn start.
+		if (c.heat_metal_active and c.heat_metal_target_id != 0) {
+			combatant@ hm_target = combat.get_combatant(c.heat_metal_target_id);
+			if (@hm_target != null) hm_target.heat_metal_disadv = false;
+		}
 		if (c.readied_action >= 0) {
 			broadcast_announce(c.name + "'s readied action expires.", false);
 			clear_readied_action(c);
@@ -9699,7 +9735,8 @@ class battle_manager {
 			bool target_was_full_hp = (target.current_hp == target.max_hp);
 			bool attacker_was_hidden = c.is_hidden;
 			// PHB 2024 Skulker: reveal on hit (deferred from attack declaration)
-			if (c.is_hidden) reveal_hidden_combatant(c, "hitting with an attack");
+			// Basic Rules 2024 Greater Invisibility: does NOT break on attack.
+			if (c.is_hidden and !c.greater_invisibility_active) reveal_hidden_combatant(c, "hitting with an attack");
 			combat.apply_damage(target, total_damage, pr.damage_type, c, pr.is_crit);
 
 			// PHB 2024 Monk L3 Deflect Attacks — Redirect (para 5339): If damage was
@@ -11760,7 +11797,8 @@ class battle_manager {
 		// PHB 2024 Skulker (para 7783): "If you make an attack roll while Hidden and
 		// the attack misses, making the attack roll doesn't end the Hidden condition."
 		// Defer reveal for ranged attacks with Skulker; reveal on hit in finalize_roll_result.
-		if (!(c.is_hidden and c.has_feat("skulker") and c.main_hand_is_ranged)) {
+		// Basic Rules 2024 Greater Invisibility (para 13658): does NOT break on attack.
+		if (!c.greater_invisibility_active and !(c.is_hidden and c.has_feat("skulker") and c.main_hand_is_ranged)) {
 			reveal_hidden_combatant(c, "making an attack");
 		}
 
@@ -14864,8 +14902,10 @@ class battle_manager {
 					int save_bonus = target.get_save_bonus(ABILITY_CON);
 					int save_total = save_roll + save_bonus;
 					if (save_total < save_dc) {
-						// Approximation: target gets disadvantage flag for one turn
-						target.baned = true; // closest existing flag
+						// Basic Rules 2024 Heat Metal (para 13734): "the creature has
+						// disadvantage on attack rolls and ability checks until the
+						// start of your next turn."
+						target.heat_metal_disadv = true;
 						broadcast_announce(target.name + " can't drop the searing metal! Disadvantage on attacks and ability checks.", true);
 					}
 					// Track for BA re-damage on subsequent turns (concentration)
@@ -16205,8 +16245,12 @@ class battle_manager {
 				broadcast_announce(target.name + "'s skin turns to stone, gaining resistance to bludgeoning, piercing, and slashing damage!", true);
 			}
 			else if (spell.id == "greater_invisibility" and @target != null) {
+				// Basic Rules 2024 Greater Invisibility (para 13658): concentration,
+				// 1 min. Target is Invisible and STAYS invisible even after attacking.
 				target.add_condition(COND_INVISIBLE);
 				target.is_hidden = true;
+				target.greater_invisibility_active = true;
+				target.greater_invisibility_caster_id = c.id;
 				broadcast_announce(target.name + " becomes Greater Invisible! They remain invisible even after attacking.", true);
 			}
 			else if (spell.id == "fly" and @target != null) {
