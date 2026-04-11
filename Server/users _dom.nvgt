@@ -3446,6 +3446,134 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.room.bm.broadcast_announce(c.name + " inspires with Mantle of Inspiration! " + allies_affected + " allies gain " + temp_hp + " temporary HP.", true);
 		}
 
+		else if (feature == "mantle_of_majesty") {
+			// Xanathar's Glamour Bard L6 Mantle of Majesty (para 558-561):
+			// "As a bonus action, you cast Command without expending a spell slot,
+			// and you take on an appearance of unearthly beauty for 1 minute or
+			// until your concentration ends. During this time, you can cast Command
+			// as a bonus action on each of your subsequent turns, without expending
+			// a spell slot."
+			if (c.class_name != "Bard" or c.subclass != "College of Glamour") { u.send({{"type", message_types::announce}, {"text", "Only Glamour bards can use Mantle of Majesty."}, {"interrupt", true}}); return; }
+			if (c.level < 6) { u.send({{"type", message_types::announce}, {"text", "Mantle of Majesty requires level 6."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
+			if (c.mantle_of_majesty_active) { u.send({{"type", message_types::announce}, {"text", "Mantle of Majesty is already active."}, {"interrupt", true}}); return; }
+			if (c.mantle_of_majesty_used) { u.send({{"type", message_types::announce}, {"text", "Mantle of Majesty has already been used (once per long rest)."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.mantle_of_majesty_active = true;
+			c.mantle_of_majesty_rounds = 10; // 1 minute
+			c.mantle_of_majesty_used = true;
+			// Concentration
+			if (c.is_concentrating) u.room.bm.clear_concentration_effects(c);
+			c.is_concentrating = true;
+			c.add_condition(COND_CONCENTRATING);
+			c.concentration_spell = "Mantle of Majesty";
+			// Immediately cast free Command on nearest enemy
+			int cmd_dc = spell_save_dc(c);
+			combatant@ cmd_target = null;
+			int best_dist = 999;
+			for (uint ci = 0; ci < u.room.bm.combat.combatants.length(); ci++) {
+				combatant@ ct = u.room.bm.combat.combatants[ci];
+				if (@ct == null or ct.is_dead or ct.id == c.id) continue;
+				if (!u.room.bm.combat.are_hostile(c, ct)) continue;
+				int d = feet_distance(c.x, c.y, ct.x, ct.y);
+				if (d <= 60 and d < best_dist) { best_dist = d; @cmd_target = ct; }
+			}
+			if (@cmd_target != null) {
+				int save_roll = random(1, 20);
+				int save_bonus = cmd_target.get_save_bonus(ABILITY_WIS);
+				int bless_bonus = u.room.bm.roll_bless_bonus(cmd_target);
+				int save_total = save_roll + save_bonus + bless_bonus;
+				if (save_total < cmd_dc) {
+					save_total = u.room.bm.try_flash_of_genius(cmd_target, cmd_dc, save_total, "WIS save vs Mantle of Majesty Command");
+				}
+				if (save_total < cmd_dc) {
+					save_total = u.room.bm.try_maverick_spirit(cmd_target, cmd_dc, save_total, "WIS save vs Mantle of Majesty Command");
+				}
+				if (save_total < cmd_dc) {
+					save_total = u.room.bm.try_boon_of_fate_bonus(cmd_target, save_total, cmd_dc);
+				}
+				bool saved = save_total >= cmd_dc;
+				u.room.bm.broadcast_roll(cmd_target.name, "WIS save vs Command (Mantle of Majesty)", save_roll, save_bonus + bless_bonus, save_total, saved ? "Resists!" : "Fails!");
+				if (!saved) {
+					cmd_target.command_effect = "grovel";
+					cmd_target.command_source_id = c.id;
+				}
+			}
+			u.room.bm.broadcast_announce(c.name + " assumes the Mantle of Majesty! Unearthly beauty radiates outward." + (@cmd_target != null ? "" : " No enemies within 60 feet for Command."), true);
+			u.room.bm.broadcast_state();
+		}
+
+		else if (feature == "mantle_of_majesty_command") {
+			// Xanathar's Glamour Bard L6 Mantle of Majesty (para 558-561):
+			// Free Command as a bonus action on subsequent turns while Mantle is active.
+			if (c.class_name != "Bard" or c.subclass != "College of Glamour") { u.send({{"type", message_types::announce}, {"text", "Only Glamour bards can use this."}, {"interrupt", true}}); return; }
+			if (!c.mantle_of_majesty_active) { u.send({{"type", message_types::announce}, {"text", "Mantle of Majesty is not active."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			int cmd_dc = spell_save_dc(c);
+			// Find nearest enemy within 60ft
+			combatant@ cmd_target = null;
+			int best_dist = 999;
+			for (uint ci = 0; ci < u.room.bm.combat.combatants.length(); ci++) {
+				combatant@ ct = u.room.bm.combat.combatants[ci];
+				if (@ct == null or ct.is_dead or ct.id == c.id) continue;
+				if (!u.room.bm.combat.are_hostile(c, ct)) continue;
+				int d = feet_distance(c.x, c.y, ct.x, ct.y);
+				if (d <= 60 and d < best_dist) { best_dist = d; @cmd_target = ct; }
+			}
+			if (@cmd_target == null) {
+				u.send({{"type", message_types::announce}, {"text", "No enemies within 60 feet."}, {"interrupt", true}});
+				return;
+			}
+			int save_roll = random(1, 20);
+			int save_bonus = cmd_target.get_save_bonus(ABILITY_WIS);
+			int bless_bonus = u.room.bm.roll_bless_bonus(cmd_target);
+			int save_total = save_roll + save_bonus + bless_bonus;
+			if (save_total < cmd_dc) {
+				save_total = u.room.bm.try_flash_of_genius(cmd_target, cmd_dc, save_total, "WIS save vs Mantle of Majesty Command");
+			}
+			if (save_total < cmd_dc) {
+				save_total = u.room.bm.try_maverick_spirit(cmd_target, cmd_dc, save_total, "WIS save vs Mantle of Majesty Command");
+			}
+			if (save_total < cmd_dc) {
+				save_total = u.room.bm.try_boon_of_fate_bonus(cmd_target, save_total, cmd_dc);
+			}
+			bool saved = save_total >= cmd_dc;
+			u.room.bm.broadcast_roll(cmd_target.name, "WIS save vs Command (Mantle of Majesty)", save_roll, save_bonus + bless_bonus, save_total, saved ? "Resists!" : "Fails!");
+			if (!saved) {
+				cmd_target.command_effect = "grovel";
+				cmd_target.command_source_id = c.id;
+				u.room.bm.broadcast_announce(c.name + " commands " + cmd_target.name + " to grovel through Mantle of Majesty!", true);
+			} else {
+				u.room.bm.broadcast_announce(c.name + "'s Command fails — " + cmd_target.name + " resists!", false);
+			}
+			u.room.bm.broadcast_state();
+		}
+
+		else if (feature == "unbreakable_majesty") {
+			// Xanathar's College of Glamour Bard L14 Unbreakable Majesty (para 562-565):
+			// "As a bonus action, you can assume a magically majestic presence for
+			// 1 minute or until you are incapacitated. For the duration, whenever
+			// any creature tries to attack you for the first time on a turn, the
+			// attacker must make a Charisma saving throw against your spell save DC.
+			// On a failed save, it can't attack you on this turn, and it must choose
+			// a new target for its attack or the attack is wasted."
+			if (c.class_name != "Bard" or c.subclass != "College of Glamour") { u.send({{"type", message_types::announce}, {"text", "Only Glamour bards can use Unbreakable Majesty."}, {"interrupt", true}}); return; }
+			if (c.level < 14) { u.send({{"type", message_types::announce}, {"text", "Unbreakable Majesty requires level 14."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action."}, {"interrupt", true}}); return; }
+			if (c.unbreakable_majesty_active) { u.send({{"type", message_types::announce}, {"text", "Unbreakable Majesty is already active."}, {"interrupt", true}}); return; }
+			if (c.unbreakable_majesty_used) { u.send({{"type", message_types::announce}, {"text", "Unbreakable Majesty has already been used (once per long rest)."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.unbreakable_majesty_active = true;
+			c.unbreakable_majesty_rounds = 10; // 1 minute
+			c.unbreakable_majesty_used = true;
+			u.room.bm.broadcast_announce(c.name + " assumes Unbreakable Majesty! An aura of breathtaking beauty radiates from them.", true);
+			u.room.bm.broadcast_state();
+		}
+
 		else if (feature == "psychic_blades") {
 			// Soulknife Rogue: Psychic Blades (bonus action attack with psychic blade)
 			if (c.class_name != "Rogue" or c.subclass != "Soulknife") { u.send({{"type", message_types::announce}, {"text", "Only Soulknife rogues can use Psychic Blades."}, {"interrupt", true}}); return; }
@@ -3848,6 +3976,54 @@ void handle_user_message(user@ u, json_object@ msg)
 			c.giants_might_active = true;
 			c.size = SIZE_LARGE;
 			u.room.bm.broadcast_announce(c.name + " grows with Giant's Might! Size increased to Large, +1d6 damage.", true);
+		}
+
+		else if (feature == "fire_rune") {
+			// Tasha's Rune Knight Fire Rune invoke (paras 3218-3221): "When you hit a creature
+			// with an attack using a weapon, you can invoke the rune." Sets pending flag,
+			// consumed on next weapon hit for +2d6 fire + STR save or Restrained.
+			if (c.class_name != "Fighter" or c.subclass != "Rune Knight") { u.send({{"type", message_types::announce}, {"text", "Only Rune Knights can invoke runes."}, {"interrupt", true}}); return; }
+			if (!c.fire_rune_known) { u.send({{"type", message_types::announce}, {"text", "You don't know the Fire Rune."}, {"interrupt", true}}); return; }
+			if (c.rune_invoke_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No rune invocations remaining."}, {"interrupt", true}}); return; }
+			if (c.fire_rune_pending) { u.send({{"type", message_types::announce}, {"text", "Fire Rune is already primed."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.rune_invoke_uses--;
+			c.fire_rune_pending = true;
+			u.room.bm.broadcast_announce(c.name + " invokes the Fire Rune! Next weapon hit will summon fiery shackles.", true);
+		}
+
+		else if (feature == "frost_rune") {
+			// Tasha's Rune Knight Frost Rune invoke (paras 3222-3224): "+2 bonus to all
+			// ability checks and saving throws that use Strength or Constitution" for 10 min.
+			if (c.class_name != "Fighter" or c.subclass != "Rune Knight") { u.send({{"type", message_types::announce}, {"text", "Only Rune Knights can invoke runes."}, {"interrupt", true}}); return; }
+			if (!c.frost_rune_known) { u.send({{"type", message_types::announce}, {"text", "You don't know the Frost Rune."}, {"interrupt", true}}); return; }
+			if (c.rune_invoke_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No rune invocations remaining."}, {"interrupt", true}}); return; }
+			if (c.frost_rune_active) { u.send({{"type", message_types::announce}, {"text", "Frost Rune is already active."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.rune_invoke_uses--;
+			c.frost_rune_active = true;
+			c.frost_rune_rounds = 100; // 10 minutes = 100 rounds
+			u.room.bm.broadcast_announce(c.name + " invokes the Frost Rune! +2 to STR and CON checks and saves for 10 minutes.", true);
+		}
+
+		else if (feature == "hill_rune") {
+			// Tasha's Rune Knight Hill Rune invoke (paras 3231-3232): "you gain resistance
+			// to bludgeoning, piercing, and slashing damage for 1 minute."
+			if (c.class_name != "Fighter" or c.subclass != "Rune Knight") { u.send({{"type", message_types::announce}, {"text", "Only Rune Knights can invoke runes."}, {"interrupt", true}}); return; }
+			if (!c.hill_rune_known) { u.send({{"type", message_types::announce}, {"text", "You don't know the Hill Rune."}, {"interrupt", true}}); return; }
+			if (c.rune_invoke_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No rune invocations remaining."}, {"interrupt", true}}); return; }
+			if (c.hill_rune_active) { u.send({{"type", message_types::announce}, {"text", "Hill Rune is already active."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.rune_invoke_uses--;
+			c.hill_rune_active = true;
+			c.hill_rune_rounds = 10; // 1 minute = 10 rounds
+			u.room.bm.broadcast_announce(c.name + " invokes the Hill Rune! Resistance to bludgeoning, piercing, and slashing damage for 1 minute.", true);
 		}
 
 		else if (feature == "emboldening_bond") {

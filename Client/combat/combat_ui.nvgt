@@ -264,6 +264,14 @@ bool my_keeper_of_souls_active = false;
 bool my_hexblade_curse_used = false;
 bool my_armor_of_hexes_active = false;
 bool my_master_of_hexes_active = false;
+// Tasha's Rune Knight Rune Carver (paras 3211-3240)
+int my_rune_invoke_uses = 0;
+bool my_fire_rune_known = false;
+bool my_frost_rune_known = false;
+bool my_hill_rune_known = false;
+bool my_fire_rune_pending = false;
+bool my_frost_rune_active = false;
+bool my_hill_rune_active = false;
 // Cavalier Fighter (Xanathar's paras 1669-1682)
 bool my_cavalier_retaliation_available = false;
 int my_unwavering_mark_ba_uses = 0;
@@ -320,6 +328,11 @@ bool my_countercharm_active = false;
 bool my_magical_secrets_active = false;
 bool my_superior_inspiration_active = false;
 bool my_words_of_creation_active = false;
+// Xanathar's Glamour Bard L6/L14 — synced from server
+bool my_mantle_of_majesty_active = false;
+bool my_mantle_of_majesty_used = false;
+bool my_unbreakable_majesty_active = false;
+bool my_unbreakable_majesty_used = false;
 // PHB 2024 Forge Artificer L1/L7/L10/L20 — synced from server
 int my_tinkers_magic_uses_current = 0;
 int my_tinkers_magic_uses_max = 0;
@@ -1120,6 +1133,9 @@ void show_bonus_action_menu() {
 	int heal_light_opt = -1;
 	int fey_opt = -1;
 	int mantle_opt = -1;
+	int mantle_majesty_opt = -1;
+	int mantle_majesty_cmd_opt = -1;
+	int unbreakable_majesty_opt = -1;
 	int planar_warrior_opt = -1;
 	int path_to_grave_opt = -1;
 	int hexblades_curse_opt = -1;
@@ -1132,6 +1148,9 @@ void show_bonus_action_menu() {
 	int hidden_paths_opt = -1;
 	int guided_strike_opt = -1;
 	int giants_might_opt = -1;
+	int fire_rune_opt = -1;
+	int frost_rune_opt = -1;
+	int hill_rune_opt = -1;
 	int empowered_healing_opt = -1;
 	int emboldening_bond_opt = -1;
 	int twilight_sanctuary_opt = -1;
@@ -1554,6 +1573,15 @@ void show_bonus_action_menu() {
 	if (lc == "bard") {
 		if (subclass == "College of Glamour") {
 			mantle_opt = m.add_item("Mantle of Inspiration. Grant temporary HP to all allies.");
+			if (level >= 6 and !my_mantle_of_majesty_active and !my_mantle_of_majesty_used) {
+				mantle_majesty_opt = m.add_item("Mantle of Majesty. Activate unearthly beauty (concentration, 1 minute). Free Command each turn. Once per long rest.");
+			}
+			if (my_mantle_of_majesty_active) {
+				mantle_majesty_cmd_opt = m.add_item("Command (Mantle of Majesty). Free Command on nearest enemy. No spell slot required.");
+			}
+			if (level >= 14 and !my_unbreakable_majesty_active and !my_unbreakable_majesty_used) {
+				unbreakable_majesty_opt = m.add_item("Unbreakable Majesty. Assume majestic presence for 1 minute. Attackers must make CHA save or can't attack you. Once per long rest.");
+			}
 		}
 	}
 	// New Xanathar's/Tasha's subclass bonus actions
@@ -1596,6 +1624,9 @@ void show_bonus_action_menu() {
 	}
 	if (lc == "fighter" and subclass == "Rune Knight") {
 		giants_might_opt = m.add_item("Giant's Might. Bonus action. Become Large with +1d6 damage.");
+		if (my_fire_rune_known and my_rune_invoke_uses > 0 and !my_fire_rune_pending) fire_rune_opt = m.add_item("Fire Rune. Bonus action. Prime next weapon hit for +2d6 fire damage + Restrained. (" + my_rune_invoke_uses + " invocations left)");
+		if (my_frost_rune_known and my_rune_invoke_uses > 0 and !my_frost_rune_active) frost_rune_opt = m.add_item("Frost Rune. Bonus action. +2 to STR and CON checks and saves for 10 minutes. (" + my_rune_invoke_uses + " invocations left)");
+		if (my_hill_rune_known and my_rune_invoke_uses > 0 and !my_hill_rune_active) hill_rune_opt = m.add_item("Hill Rune. Bonus action. Resistance to bludgeoning, piercing, and slashing damage for 1 minute. (" + my_rune_invoke_uses + " invocations left)");
 	}
 	if (lc == "sorcerer" and subclass == "Divine Soul") {
 		empowered_healing_opt = m.add_item("Empowered Healing. Reroll dice on next healing spell.");
@@ -1995,6 +2026,9 @@ void show_bonus_action_menu() {
 	if (heal_light_opt >= 0) options++;
 	if (fey_opt >= 0) options++;
 	if (mantle_opt >= 0) options++;
+	if (mantle_majesty_opt >= 0) options++;
+	if (mantle_majesty_cmd_opt >= 0) options++;
+	if (unbreakable_majesty_opt >= 0) options++;
 	if (focused_shot_opt >= 0) options++;
 	if (risky_business_opt >= 0) options++;
 	if (license_to_kill_one_opt >= 0) options++;
@@ -2477,6 +2511,18 @@ void show_bonus_action_menu() {
 		send({{"type", message_types::bonus_action}, {"feature", "mantle_of_inspiration"}});
 		speak("Mantle of Inspiration. Granting temporary HP to all allies.", true);
 	}
+	else if (mantle_majesty_opt >= 0 and res == mantle_majesty_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "mantle_of_majesty"}});
+		speak("Mantle of Majesty. Assuming unearthly beauty and casting Command.", true);
+	}
+	else if (mantle_majesty_cmd_opt >= 0 and res == mantle_majesty_cmd_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "mantle_of_majesty_command"}});
+		speak("Command through Mantle of Majesty. Commanding nearest enemy to grovel.", true);
+	}
+	else if (unbreakable_majesty_opt >= 0 and res == unbreakable_majesty_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "unbreakable_majesty"}});
+		speak("Unbreakable Majesty. Assuming majestic presence. Attackers must make Charisma save.", true);
+	}
 	else if (planar_warrior_opt >= 0 and res == planar_warrior_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "planar_warrior"}});
 		speak("Planar Warrior. Your next weapon attack deals force damage.", true);
@@ -2552,6 +2598,18 @@ void show_bonus_action_menu() {
 	else if (giants_might_opt >= 0 and res == giants_might_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "giants_might"}});
 		speak("Giant's Might. Growing larger.", true);
+	}
+	else if (fire_rune_opt >= 0 and res == fire_rune_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "fire_rune"}});
+		speak("Fire Rune invoked. Next weapon hit summons fiery shackles.", true);
+	}
+	else if (frost_rune_opt >= 0 and res == frost_rune_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "frost_rune"}});
+		speak("Frost Rune invoked. Plus 2 to Strength and Constitution checks and saves.", true);
+	}
+	else if (hill_rune_opt >= 0 and res == hill_rune_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "hill_rune"}});
+		speak("Hill Rune invoked. Resistance to bludgeoning, piercing, and slashing damage.", true);
 	}
 	else if (empowered_healing_opt >= 0 and res == empowered_healing_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "empowered_healing"}});
@@ -4423,6 +4481,14 @@ void parse_game_state(json_object@ msg) {
 	my_hexblade_curse_used = msg.exists("my_hexblade_curse_used") ? bool(msg["my_hexblade_curse_used"]) : false;
 	my_armor_of_hexes_active = msg.exists("my_armor_of_hexes_active") ? bool(msg["my_armor_of_hexes_active"]) : false;
 	my_master_of_hexes_active = msg.exists("my_master_of_hexes_active") ? bool(msg["my_master_of_hexes_active"]) : false;
+	// Rune Knight Rune Carver
+	my_rune_invoke_uses = msg.exists("my_rune_invoke_uses") ? int(msg["my_rune_invoke_uses"]) : 0;
+	my_fire_rune_known = msg.exists("my_fire_rune_known") ? bool(msg["my_fire_rune_known"]) : false;
+	my_frost_rune_known = msg.exists("my_frost_rune_known") ? bool(msg["my_frost_rune_known"]) : false;
+	my_hill_rune_known = msg.exists("my_hill_rune_known") ? bool(msg["my_hill_rune_known"]) : false;
+	my_fire_rune_pending = msg.exists("my_fire_rune_pending") ? bool(msg["my_fire_rune_pending"]) : false;
+	my_frost_rune_active = msg.exists("my_frost_rune_active") ? bool(msg["my_frost_rune_active"]) : false;
+	my_hill_rune_active = msg.exists("my_hill_rune_active") ? bool(msg["my_hill_rune_active"]) : false;
 	// Cavalier Fighter
 	my_cavalier_retaliation_available = msg.exists("my_cavalier_retaliation_available") ? bool(msg["my_cavalier_retaliation_available"]) : false;
 	my_unwavering_mark_ba_uses = msg.exists("my_unwavering_mark_ba_uses") ? int(msg["my_unwavering_mark_ba_uses"]) : 0;
@@ -4487,6 +4553,10 @@ void parse_game_state(json_object@ msg) {
 	my_magical_secrets_active = msg.exists("my_magical_secrets_active") ? bool(msg["my_magical_secrets_active"]) : false;
 	my_superior_inspiration_active = msg.exists("my_superior_inspiration_active") ? bool(msg["my_superior_inspiration_active"]) : false;
 	my_words_of_creation_active = msg.exists("my_words_of_creation_active") ? bool(msg["my_words_of_creation_active"]) : false;
+	my_mantle_of_majesty_active = msg.exists("my_mantle_of_majesty_active") ? bool(msg["my_mantle_of_majesty_active"]) : false;
+	my_mantle_of_majesty_used = msg.exists("my_mantle_of_majesty_used") ? bool(msg["my_mantle_of_majesty_used"]) : false;
+	my_unbreakable_majesty_active = msg.exists("my_unbreakable_majesty_active") ? bool(msg["my_unbreakable_majesty_active"]) : false;
+	my_unbreakable_majesty_used = msg.exists("my_unbreakable_majesty_used") ? bool(msg["my_unbreakable_majesty_used"]) : false;
 	my_tinkers_magic_uses_current = msg.exists("my_tinkers_magic_uses_current") ? int(msg["my_tinkers_magic_uses_current"]) : 0;
 	my_tinkers_magic_uses_max = msg.exists("my_tinkers_magic_uses_max") ? int(msg["my_tinkers_magic_uses_max"]) : 0;
 	my_flash_of_genius_uses_current = msg.exists("my_flash_of_genius_uses_current") ? int(msg["my_flash_of_genius_uses_current"]) : 0;
@@ -4728,6 +4798,14 @@ void reset_combat_state() {
 	my_hexblade_curse_used = false;
 	my_armor_of_hexes_active = false;
 	my_master_of_hexes_active = false;
+	// Rune Knight reset
+	my_rune_invoke_uses = 0;
+	my_fire_rune_known = false;
+	my_frost_rune_known = false;
+	my_hill_rune_known = false;
+	my_fire_rune_pending = false;
+	my_frost_rune_active = false;
+	my_hill_rune_active = false;
 	my_cavalier_retaliation_available = false;
 	my_unwavering_mark_ba_uses = 0;
 	my_unwavering_mark_ba_uses_max = 0;
@@ -4776,6 +4854,10 @@ void reset_combat_state() {
 	my_magical_secrets_active = false;
 	my_superior_inspiration_active = false;
 	my_words_of_creation_active = false;
+	my_mantle_of_majesty_active = false;
+	my_mantle_of_majesty_used = false;
+	my_unbreakable_majesty_active = false;
+	my_unbreakable_majesty_used = false;
 	my_tinkers_magic_uses_current = 0;
 	my_tinkers_magic_uses_max = 0;
 	my_flash_of_genius_uses_current = 0;

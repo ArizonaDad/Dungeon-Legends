@@ -387,6 +387,18 @@ class combatant {
 	// PHB 2024 Bard L20 Words of Creation (para 2764-2765): always prepared Power Word
 	// Heal/Kill; can target a second creature within 10 ft of the first.
 	bool words_of_creation_active = false;
+	// Xanathar's College of Glamour Bard L6 Mantle of Majesty (para 558-561):
+	// "As a bonus action, you cast command without expending a spell slot."
+	// Concentration, 1 minute. Free Command as BA each turn while active. 1/LR.
+	bool mantle_of_majesty_active = false;
+	int mantle_of_majesty_rounds = 0;
+	bool mantle_of_majesty_used = false; // 1/LR
+	// Xanathar's College of Glamour Bard L14 Unbreakable Majesty (para 562-565):
+	// "As a bonus action, assume a magically majestic presence for 1 minute."
+	// Attackers must make CHA save vs spell DC or can't attack you this turn. 1/LR.
+	bool unbreakable_majesty_active = false;
+	int unbreakable_majesty_rounds = 0;
+	bool unbreakable_majesty_used = false; // 1/LR
 	int rage_uses_remaining = 0;
 	int rage_damage_bonus = 0;
 	bool raging = false;
@@ -501,6 +513,22 @@ class combatant {
 	bool empowered_healing_active = false; // Divine Soul Sorcerer
 	bool giants_might_active = false; // Rune Knight Fighter
 	int giants_might_uses = 0;
+	// Tasha's Rune Knight Rune Carver (paras 3211-3240): 6 runes with passive + invoke
+	bool cloud_rune_known = false;    // L3: advantage Sleight of Hand & Deception
+	bool fire_rune_known = false;     // L3: invoke on weapon hit +2d6 fire + STR save or Restrained
+	bool frost_rune_known = false;    // L3(auto L7): invoke BA +2 STR/CON saves for 10 min
+	bool stone_rune_known = false;    // L7(auto): advantage Insight, darkvision 120ft
+	bool hill_rune_known = false;     // L7(auto): poison resistance + invoke BA B/P/S resist 1 min
+	bool storm_rune_known = false;    // L10(auto): advantage Arcana, can't be surprised
+	int rune_invoke_uses = 0;         // Shared invoke pool (each rune 1/LR, simplified as pool)
+	int rune_invoke_uses_max = 0;     // 2 at L3, 3 at L7, 4 at L10, 5 at L15
+	bool fire_rune_pending = false;   // Set by BA, consumed on next weapon hit
+	uint fire_rune_restrained_source = 0; // Tracks who applied Fire Rune Restrained (for EOT CON save)
+	int fire_rune_restrained_dc = 0;  // Save DC for Fire Rune Restrained CON save
+	bool frost_rune_active = false;   // +2 to STR and CON saves while active
+	int frost_rune_rounds = 0;        // Duration countdown (100 = 10 min)
+	bool hill_rune_active = false;    // B/P/S resistance while active
+	int hill_rune_rounds = 0;         // Duration countdown (10 = 1 min)
 	bool wrath_of_storms_available = false; // Storm Sorcerer
 	bool emboldening_bond_active = false; // Peace Domain Cleric
 	bool drunken_master_opportunity = false; // Way of the Drunken Master
@@ -1510,6 +1538,17 @@ class combatant {
 		// Tasha's Rune Knight L3 Giant's Might (para 3125-3130): "You have Advantage
 		// on Strength checks and Strength saving throws." while active.
 		if (giants_might_active and ability_id == ABILITY_STR) mod += 5;
+		// Tasha's Rune Knight Frost Rune invoke (para 3222-3224): "+2 bonus to all
+		// ability checks and saving throws that use Strength or Constitution" for 10 min.
+		if (frost_rune_active and (ability_id == ABILITY_STR or ability_id == ABILITY_CON)) mod += 2;
+		// Tasha's Rune Knight Hill Rune passive (para 3229-3230): "advantage on saving
+		// throws against being poisoned." Approximated as +5.
+		if (hill_rune_known and ability_id == ABILITY_CON) {
+			// Only for poison saves — but get_save_bonus doesn't know the damage type,
+			// so we grant a blanket +5 to CON saves (approximation matching Danger Sense).
+			// A more targeted approach would require passing the save context.
+			// For now, defer — the passive poison resistance is more impactful.
+		}
 		// Basic Rules 2024 Enlarge/Reduce (para 12795-12800): Enlarge grants Advantage
 		// on STR saves; Reduce grants Disadvantage on STR saves. Approximated as +/-5.
 		if (enlarge_active and ability_id == ABILITY_STR) mod += 5;
@@ -2066,6 +2105,11 @@ class battle {
 		// PHB 2024 Blade Ward (cantrip): "Until the start of your next turn, you have
 		// Resistance to Bludgeoning, Piercing, and Slashing damage."
 		if (target.blade_ward_active and (damage_type == DMG_BLUDGEONING or damage_type == DMG_PIERCING or damage_type == DMG_SLASHING)) {
+			amount = (amount + 1) / 2;
+		}
+		// Tasha's Rune Knight Hill Rune invoke (para 3231-3232): "you gain resistance
+		// to bludgeoning, piercing, and slashing damage for 1 minute."
+		if (target.hill_rune_active and (damage_type == DMG_BLUDGEONING or damage_type == DMG_PIERCING or damage_type == DMG_SLASHING)) {
 			amount = (amount + 1) / 2;
 		}
 
@@ -2783,6 +2827,10 @@ class battle {
 				state["my_magical_secrets_active"] = c.magical_secrets_active;
 				state["my_superior_inspiration_active"] = c.superior_inspiration_active;
 				state["my_words_of_creation_active"] = c.words_of_creation_active;
+				state["my_mantle_of_majesty_active"] = c.mantle_of_majesty_active;
+				state["my_mantle_of_majesty_used"] = c.mantle_of_majesty_used;
+				state["my_unbreakable_majesty_active"] = c.unbreakable_majesty_active;
+				state["my_unbreakable_majesty_used"] = c.unbreakable_majesty_used;
 				state["my_rage_uses_remaining"] = c.rage_uses_remaining;
 				state["my_rage_damage_bonus"] = c.rage_damage_bonus;
 				state["my_is_raging"] = c.raging;
@@ -2829,6 +2877,13 @@ class battle {
 				state["my_elegant_maneuver_active"] = c.elegant_maneuver_active;
 				state["my_sudden_strike_used"] = c.sudden_strike_used_this_turn;
 				state["my_psionic_strike_uses"] = c.psionic_strike_uses;
+				state["my_rune_invoke_uses"] = c.rune_invoke_uses;
+				state["my_fire_rune_known"] = c.fire_rune_known;
+				state["my_frost_rune_known"] = c.frost_rune_known;
+				state["my_hill_rune_known"] = c.hill_rune_known;
+				state["my_fire_rune_pending"] = c.fire_rune_pending;
+				state["my_frost_rune_active"] = c.frost_rune_active;
+				state["my_hill_rune_active"] = c.hill_rune_active;
 				state["my_assassinate_available"] = c.assassinate_available;
 				state["my_warding_flare_uses"] = c.warding_flare_uses;
 				state["my_war_priest_uses"] = c.war_priest_uses;

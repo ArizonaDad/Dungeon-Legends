@@ -1594,6 +1594,56 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
     // Rune Knight Fighter: Giant's Might uses per rest (Prof times)
     if (cs.class_name == "Fighter" and cs.subclass == "Rune Knight" and cs.level >= 3) {
         c.giants_might_uses = proficiency_bonus(cs.level);
+        // Tasha's Rune Knight Rune Carver (paras 3211-3240): learn runes at L3/L7/L10/L15.
+        // Auto-grant all 6 runes at appropriate levels for simplicity (source allows choice).
+        // L3: Cloud + Fire (2 runes)
+        c.cloud_rune_known = true;
+        c.fire_rune_known = true;
+        // L7: +Frost +Stone (4 runes total)
+        if (cs.level >= 7) {
+            c.frost_rune_known = true;
+            c.stone_rune_known = true;
+        }
+        // L10: +Hill (5 runes)
+        if (cs.level >= 10) {
+            c.hill_rune_known = true;
+        }
+        // L15: +Storm (all 6), Master of Runes (invoke each rune 2x instead of 1x)
+        if (cs.level >= 15) {
+            c.storm_rune_known = true;
+        }
+        // Invoke pool: simplified as shared pool. Each known rune can be invoked 1/LR
+        // (2/LR at L15 Master of Runes). Pool = number of invocable runes.
+        // Invocable runes: Fire (L3), Frost (L7), Hill (L10). Cloud/Stone/Storm deferred.
+        int invocable_count = 1; // Fire at L3
+        if (cs.level >= 7) invocable_count = 2; // +Frost
+        if (cs.level >= 10) invocable_count = 3; // +Hill
+        c.rune_invoke_uses_max = invocable_count;
+        c.rune_invoke_uses = invocable_count;
+        // L15 Master of Runes: double the pool
+        if (cs.level >= 15) {
+            c.rune_invoke_uses_max = invocable_count * 2;
+            c.rune_invoke_uses = invocable_count * 2;
+        }
+        // Hill Rune passive: poison resistance
+        if (c.hill_rune_known) {
+            c.poison_resistance = true;
+        }
+        // Passive skill check advantages
+        if (c.cloud_rune_known) {
+            if (!c.has_skill_check_advantage("Sleight of Hand")) c.skill_check_advantage.insert_last("Sleight of Hand");
+            if (!c.has_skill_check_advantage("Deception")) c.skill_check_advantage.insert_last("Deception");
+        }
+        if (c.frost_rune_known) {
+            if (!c.has_skill_check_advantage("Animal Handling")) c.skill_check_advantage.insert_last("Animal Handling");
+            if (!c.has_skill_check_advantage("Intimidation")) c.skill_check_advantage.insert_last("Intimidation");
+        }
+        if (c.stone_rune_known) {
+            if (!c.has_skill_check_advantage("Insight")) c.skill_check_advantage.insert_last("Insight");
+        }
+        if (c.storm_rune_known) {
+            if (!c.has_skill_check_advantage("Arcana")) c.skill_check_advantage.insert_last("Arcana");
+        }
     }
 
     // Xanathar's Arcane Archer Fighter (paras 1599-1646)

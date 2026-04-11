@@ -1302,6 +1302,9 @@ class battle_manager {
 		bool disadv = extra_disadvantage or c.has_skill_check_disadvantage(skill_name);
 		// Tasha's Rune Knight L3 Giant's Might: advantage on STR checks while active.
 		if (c.giants_might_active and ability_id == ABILITY_STR) adv = true;
+		// Tasha's Rune Knight Frost Rune invoke (para 3222-3224): "+2 bonus to all
+		// ability checks and saving throws that use Strength or Constitution."
+		if (c.frost_rune_active and (ability_id == ABILITY_STR or ability_id == ABILITY_CON)) mod += 2;
 		// Basic Rules 2024 Enlarge/Reduce (para 12795-12800): Enlarge grants Advantage
 		// on STR checks; Reduce grants Disadvantage on STR checks.
 		if (c.enlarge_active and ability_id == ABILITY_STR) adv = true;
@@ -3385,6 +3388,20 @@ class battle_manager {
 			broadcast_announce(monster.name + " resists " + target.name + "'s Sanctuary.", false);
 		}
 
+		// Xanathar's College of Glamour Bard L14 Unbreakable Majesty (para 562-565):
+		// CHA save or can't attack this target this turn.
+		if (target.unbreakable_majesty_active) {
+			int um_dc = spell_save_dc(target);
+			int um_roll = random(1, 20);
+			int um_bonus = monster.get_save_bonus(ABILITY_CHA);
+			int um_total = um_roll + um_bonus;
+			if (um_total < um_dc) {
+				broadcast_announce(monster.name + " is awed by " + target.name + "'s Unbreakable Majesty and cannot attack! (CHA " + um_total + " vs DC " + um_dc + ")", true);
+				return false;
+			}
+			broadcast_announce(monster.name + " resists " + target.name + "'s Unbreakable Majesty (CHA " + um_total + " vs DC " + um_dc + ").", false);
+		}
+
 		bool attack_is_ranged = use_secondary ? monster_secondary_is_ranged(monster) : (monster.main_hand_range > 5 and attack_name_is_ranged(monster.main_hand));
 		bool adv = false;
 		bool disadv = false;
@@ -3444,6 +3461,20 @@ class battle_manager {
 				return false;
 			}
 			broadcast_announce(bot.name + " resists " + target.name + "'s Sanctuary.", false);
+		}
+
+		// Xanathar's College of Glamour Bard L14 Unbreakable Majesty (para 562-565):
+		// CHA save or can't attack this target this turn.
+		if (target.unbreakable_majesty_active) {
+			int um_dc = spell_save_dc(target);
+			int um_roll = random(1, 20);
+			int um_bonus = bot.get_save_bonus(ABILITY_CHA);
+			int um_total = um_roll + um_bonus;
+			if (um_total < um_dc) {
+				broadcast_announce(bot.name + " is awed by " + target.name + "'s Unbreakable Majesty and cannot attack! (CHA " + um_total + " vs DC " + um_dc + ")", true);
+				return false;
+			}
+			broadcast_announce(bot.name + " resists " + target.name + "'s Unbreakable Majesty (CHA " + um_total + " vs DC " + um_dc + ").", false);
 		}
 
 		if (bot.attacks_remaining_this_turn > 0) {
@@ -4465,6 +4496,13 @@ class battle_manager {
 		caster.swift_quiver_active = false;
 		// Extended Spell: advantage on concentration saves ends with concentration
 		caster.extended_spell_concentration = false;
+		// Xanathar's Glamour Bard L6 Mantle of Majesty (para 558-561): ends on
+		// concentration break. Clears the active flag and remaining rounds.
+		if (caster.mantle_of_majesty_active) {
+			caster.mantle_of_majesty_active = false;
+			caster.mantle_of_majesty_rounds = 0;
+			broadcast_announce(caster.name + "'s Mantle of Majesty fades as concentration breaks.", false);
+		}
 		// Enhance Ability: clear on all combatants where this caster was the source
 		for (uint eai = 0; eai < combat.combatants.length(); eai++) {
 			combatant@ ea_target = combat.combatants[eai];
@@ -5401,6 +5439,31 @@ class battle_manager {
 				if (actual_heal > 0) broadcast_announce(prev.name + "'s Protective Spirit heals " + actual_heal + " HP!", false);
 			}
 
+			// Xanathar's Glamour Bard L6 Mantle of Majesty (para 558-561): "for 1 minute
+			// or until your concentration ends." Tick down on caster's turn-end.
+			if (prev.mantle_of_majesty_active and prev.mantle_of_majesty_rounds > 0) {
+				prev.mantle_of_majesty_rounds--;
+				if (prev.mantle_of_majesty_rounds <= 0) {
+					prev.mantle_of_majesty_active = false;
+					if (prev.is_concentrating and prev.concentration_spell == "Mantle of Majesty") {
+						prev.is_concentrating = false;
+						prev.remove_condition(COND_CONCENTRATING);
+						prev.concentration_spell = "";
+					}
+					broadcast_announce(prev.name + "'s Mantle of Majesty fades.", false);
+				}
+			}
+
+			// Xanathar's Glamour Bard L14 Unbreakable Majesty (para 562-565): "for 1
+			// minute or until you are incapacitated." Tick down on caster's turn-end.
+			if (prev.unbreakable_majesty_active and prev.unbreakable_majesty_rounds > 0) {
+				prev.unbreakable_majesty_rounds--;
+				if (prev.unbreakable_majesty_rounds <= 0) {
+					prev.unbreakable_majesty_active = false;
+					broadcast_announce(prev.name + "'s Unbreakable Majesty fades.", false);
+				}
+			}
+
 			// PHB 2024 Sorcerer Draconic Sorcery L14 Dragon Wings (para 7561-7563):
 			// "The wings last for 1 hour or until you dismiss them." 1 hour ≈ 600
 			// rounds. Tick down on each of the Sorcerer's turn-ends; clear flying
@@ -5443,6 +5506,24 @@ class battle_manager {
 				if (prev.trance_of_order_rounds <= 0) {
 					prev.trance_of_order_active = false;
 					broadcast_announce(prev.name + "'s Trance of Order ends.", false);
+				}
+			}
+			// Tasha's Rune Knight Frost Rune invoke (para 3222-3224): "10 minutes"
+			// = 100 rounds. +2 to STR/CON checks and saves.
+			if (prev.frost_rune_active and prev.frost_rune_rounds > 0) {
+				prev.frost_rune_rounds--;
+				if (prev.frost_rune_rounds <= 0) {
+					prev.frost_rune_active = false;
+					broadcast_announce(prev.name + "'s Frost Rune invocation fades.", false);
+				}
+			}
+			// Tasha's Rune Knight Hill Rune invoke (para 3231-3232): "1 minute"
+			// = 10 rounds. B/P/S resistance.
+			if (prev.hill_rune_active and prev.hill_rune_rounds > 0) {
+				prev.hill_rune_rounds--;
+				if (prev.hill_rune_rounds <= 0) {
+					prev.hill_rune_active = false;
+					broadcast_announce(prev.name + "'s Hill Rune invocation fades. B/P/S resistance ends.", false);
 				}
 			}
 			// Valda's Spire Gunslinger L5 Gut Shot debuff tickdown (paras 184-185):
@@ -5563,6 +5644,29 @@ class battle_manager {
 						}
 						break;
 					}
+				}
+			}
+			// Tasha's Rune Knight Fire Rune (para 3218-3221): "At the end of each of the
+			// target's turns, the target can make a Constitution saving throw, ending
+			// the effect on a success." CON save vs rune DC to break free of Restrained.
+			if (prev.has_condition(COND_RESTRAINED) and prev.fire_rune_restrained_source != 0) {
+				int fr_save_roll = random(1, 20);
+				int fr_save_bonus = prev.get_save_bonus(ABILITY_CON);
+				int fr_save_dc = prev.fire_rune_restrained_dc;
+				int fr_save_total = fr_save_roll + fr_save_bonus;
+				bool fr_saved = fr_save_total >= fr_save_dc;
+				broadcast_roll(prev.name, "CON save vs Fire Rune (end of turn)", fr_save_roll, fr_save_bonus, fr_save_total, fr_saved ? "Freed from fiery shackles!" : "Still restrained!");
+				if (!fr_saved and try_arcane_deflection_save(prev, fr_save_dc, fr_save_total)) fr_saved = true;
+				if (!fr_saved) { int ds = try_disciplined_survivor_reroll(prev, fr_save_dc, fr_save_total, fr_save_bonus, "CON save vs Fire Rune"); if (ds >= fr_save_dc) fr_saved = true; }
+				if (!fr_saved) { int fg = try_flash_of_genius(prev, fr_save_dc, fr_save_total, "CON save vs Fire Rune"); if (fg >= fr_save_dc) fr_saved = true; }
+				if (!fr_saved) { int bf = try_boon_of_fate_bonus(prev, fr_save_total, fr_save_dc); if (bf >= fr_save_dc) fr_saved = true; }
+				if (!fr_saved and try_stroke_of_luck_save(prev, fr_save_dc, fr_save_bonus)) fr_saved = true;
+				if (fr_saved) {
+					prev.remove_condition(COND_RESTRAINED);
+					prev.fire_rune_restrained_source = 0;
+					prev.fire_rune_restrained_dc = 0;
+					broadcast_to_battle({{"type", message_types::condition_removed}, {"target", prev.name}, {"condition", "Restrained"}});
+					broadcast_announce(prev.name + " breaks free from the Fire Rune's fiery shackles!", false);
 				}
 			}
 			// Blindness/Deafness: CON save each turn
@@ -7127,6 +7231,15 @@ class battle_manager {
 		if (c.class_name == "Fighter" and c.subclass == "Arcane Archer") {
 			c.arcane_shot_uses = 2;
 		}
+		// Tasha's Rune Knight: rune invocations reset on SR (para 3215)
+		if (c.class_name == "Fighter" and c.subclass == "Rune Knight") {
+			c.rune_invoke_uses = c.rune_invoke_uses_max;
+			c.fire_rune_pending = false;
+			c.frost_rune_active = false;
+			c.frost_rune_rounds = 0;
+			c.hill_rune_active = false;
+			c.hill_rune_rounds = 0;
+		}
 		// War Magic L6 Power Surge: floor at 1 on SR
 		if (c.class_name == "Wizard" and c.subclass == "War Magic" and c.power_surge_charges < 1) {
 			c.power_surge_charges = 1;
@@ -8537,6 +8650,32 @@ class battle_manager {
 				} else {
 					broadcast_announce(target.name + " resists the Telekinetic Thrust (STR save " + thrust_save + " vs DC " + thrust_dc + ").", false);
 				}
+			}
+		}
+
+		// Tasha's Rune Knight Fire Rune invoke (paras 3218-3221): "When you hit a creature
+		// with an attack using a weapon, you can invoke the rune to summon fiery shackles:
+		// the target takes an extra 2d6 fire damage, and it must make a Strength saving
+		// throw. On a failed save, the target is restrained for 1 minute. At the end of
+		// each of the target's turns, the target can make a Constitution saving throw,
+		// ending the effect on a success."
+		if (attacker.fire_rune_pending and is_weapon_attack and !target.is_dead) {
+			attacker.fire_rune_pending = false;
+			int fire_rune_dmg = random(1, 6) + random(1, 6);
+			bonus += fire_rune_dmg;
+			// Save DC = 8 + CON mod + proficiency (Rune Knight uses CON for rune DCs)
+			int rune_dc = 8 + attacker.get_ability_mod(ABILITY_CON) + attacker.proficiency;
+			int str_save = random(1, 20) + target.get_save_bonus(ABILITY_STR);
+			str_save = target.apply_indomitable_might(str_save, ABILITY_STR);
+			bool str_saved = str_save >= rune_dc;
+			broadcast_announce(attacker.name + "'s Fire Rune deals " + fire_rune_dmg + " extra fire damage!", false);
+			broadcast_roll(target.name, "STR save vs Fire Rune", str_save - target.get_save_bonus(ABILITY_STR), target.get_save_bonus(ABILITY_STR), str_save, str_saved ? "Saved!" : "Restrained!");
+			if (!str_saved) {
+				target.add_condition(COND_RESTRAINED);
+				target.fire_rune_restrained_source = attacker.id;
+				target.fire_rune_restrained_dc = rune_dc;
+				broadcast_to_battle({{"type", message_types::condition_applied}, {"target", target.name}, {"condition", "Restrained"}});
+				broadcast_announce(target.name + " is restrained by fiery shackles!", false);
 			}
 		}
 
@@ -13153,6 +13292,23 @@ class battle_manager {
 				broadcast_announce(c.name + " is deterred by " + target.name + "'s Sanctuary! (WIS " + sanc_total + " vs DC " + target.sanctuary_dc + ")", true);
 				return;
 			}
+		}
+
+		// Xanathar's College of Glamour Bard L14 Unbreakable Majesty (para 562-565):
+		// "whenever any creature tries to attack you for the first time on a turn,
+		// the attacker must make a Charisma saving throw against your spell save DC.
+		// On a failed save, it can't attack you on this turn."
+		if (target.unbreakable_majesty_active) {
+			int um_dc = spell_save_dc(target);
+			int um_roll = random(1, 20);
+			int um_bonus = c.get_save_bonus(ABILITY_CHA);
+			int um_total = um_roll + um_bonus;
+			if (um_total < um_dc) {
+				broadcast_roll(c.name, "CHA save vs Unbreakable Majesty", um_roll, um_bonus, um_total, "Fails!");
+				broadcast_announce(c.name + " is awed by " + target.name + "'s Unbreakable Majesty and cannot attack!", true);
+				return;
+			}
+			broadcast_roll(c.name, "CHA save vs Unbreakable Majesty", um_roll, um_bonus, um_total, "Resists!");
 		}
 
 		// Basic Rules 2024 Geas (para 13062-13072): "the creature takes 5d10 Psychic
