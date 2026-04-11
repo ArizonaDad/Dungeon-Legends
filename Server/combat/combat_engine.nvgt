@@ -542,6 +542,7 @@ class combatant {
 	bool emboldening_bond_active = false; // Peace Domain Cleric
 	bool drunken_master_opportunity = false; // Way of the Drunken Master
 	bool drunkards_luck_active = false; // Drunken Master L11: spend 1 ki to cancel save disadvantage
+	array<uint> flurry_targets_hit; // Xanathar's Drunken Master L17 Intoxicated Frenzy: track IDs of targets already hit this flurry
 	bool arcane_shot_pending = false; // Arcane Archer Fighter
 	string arcane_shot_type = "";
 	int arcane_shot_uses = 0;
@@ -676,6 +677,7 @@ class combatant {
 	int aura_of_guardian_range = 0; // 10ft at L7, 30ft at L18
 	bool protective_spirit_active = false; // L15: heal 1d6+half level at end of turn if below half HP
 	bool emissary_of_redemption_active = false; // L20: resist all + radiant retaliation
+	string emissary_exclusion_ids = ""; // Emissary L20: creature IDs the paladin has attacked/damaged
 	bool beast_companion_active = false; // Beast Master Ranger
 	uint beast_companion_id = 0;
 	bool monster_slayer_prey = false; // Monster Slayer Ranger
@@ -889,6 +891,7 @@ class combatant {
 	int enhance_ability_caster_id = 0; // Track who cast it for concentration cleanup
 	bool fog_cloud_active = false;
 	bool darkness_active = false;
+	bool eyes_of_the_dark_see_through = false; // Shadow Magic L3: can see through own Darkness when cast with SP
 	// Silence spell: caster-placed 20ft sphere blocks spellcasting (verbal components)
 	bool silence_active = false;
 	int silence_x = 0;
@@ -2118,6 +2121,15 @@ class battle {
 		if (@target == null or target.is_dead) return;
 		if (amount <= 0) return;
 
+		// Emissary of Redemption exclusion tracking (para 2055): when the paladin
+		// deals damage to a creature, add it to the exclusion list.
+		if (@source != null and source.emissary_of_redemption_active and source.id != target.id) {
+			string excl_check = "," + target.id + ",";
+			if (source.emissary_exclusion_ids.find(excl_check) < 0) {
+				source.emissary_exclusion_ids += "," + target.id + ",";
+			}
+		}
+
 		// Resilient Sphere: target enclosed in sphere is immune to all damage
 		// from outside. Source inside the sphere (self-damage) is also blocked
 		// since "nothing can pass through the barrier."
@@ -2144,6 +2156,31 @@ class battle {
 		// to bludgeoning, piercing, and slashing damage for 1 minute."
 		if (target.hill_rune_active and (damage_type == DMG_BLUDGEONING or damage_type == DMG_PIERCING or damage_type == DMG_SLASHING)) {
 			amount = (amount + 1) / 2;
+		}
+
+		// Tasha's Psi Warrior L3 Protective Field (para 10-13): "When you or another
+		// creature you can see within 30 feet of you takes damage, you can use your
+		// reaction to expend one Psionic Energy die, rolling it and reducing the
+		// damage taken by the number rolled plus your Intelligence modifier (min 1)."
+		if (@source != null and amount > 0) {
+			for (uint pf_i = 0; pf_i < combatants.length(); pf_i++) {
+				combatant@ pf = combatants[pf_i];
+				if (@pf == null or pf.is_dead) continue;
+				if (pf.class_name != "Fighter" or pf.subclass != "Psi Warrior") continue;
+				if (pf.psionic_strike_uses <= 0 or !pf.has_reaction) continue;
+				if (pf.is_player != target.is_player) continue; // ally only
+				int pf_dist = feet_distance(pf.x, pf.y, target.x, target.y);
+				if (pf_dist > 30) continue;
+				pf.psionic_strike_uses--;
+				pf.has_reaction = false;
+				int pf_roll = random(1, pf.psionic_die_size);
+				int pf_int_mod = pf.get_ability_mod(ABILITY_INT);
+				int pf_reduction = pf_roll + pf_int_mod;
+				if (pf_reduction < 1) pf_reduction = 1;
+				amount -= pf_reduction;
+				if (amount < 0) amount = 0;
+				break; // Only one Protective Field per damage instance
+			}
 		}
 
 		// Ancestral Guardian Barbarian: Spirit Shield damage reduction (used reaction)
@@ -2265,9 +2302,13 @@ class battle {
 		// "you have resistance to all damage dealt by other creatures (their attacks,
 		// spells, and other effects). Also, whenever a creature damages you, it takes
 		// radiant damage equal to half the amount it dealt to you."
-		// Note: source excludes creatures you've attacked — deferred (needs per-creature tracking)
+		// Exclusion: "If you attack a creature... neither benefit works against that creature
+		// until you finish a long rest." Tracked via emissary_exclusion_ids.
 		if (target.emissary_of_redemption_active and @source != null and source.id != target.id) {
-			amount = (amount + 1) / 2;
+			string src_id_check = "," + source.id + ",";
+			if (target.emissary_exclusion_ids.find(src_id_check) < 0) {
+				amount = (amount + 1) / 2;
+			}
 		}
 
 		// Basic Rules 2024 Feign Death (para 13203-13212): "The target has Resistance
@@ -2525,9 +2566,12 @@ class battle {
 		// "whenever a creature damages you, it takes radiant damage equal to half the
 		// amount it dealt to you." Guard against recursion via emissary check on source.
 		if (target.emissary_of_redemption_active and @source != null and source.id != target.id and amount > 0 and !source.emissary_of_redemption_active) {
-			int retribution = (amount + 1) / 2;
-			if (retribution > 0) {
-				source.current_hp -= retribution;
+			string ret_id_check = "," + source.id + ",";
+			if (target.emissary_exclusion_ids.find(ret_id_check) < 0) {
+				int retribution = (amount + 1) / 2;
+				if (retribution > 0) {
+					source.current_hp -= retribution;
+				}
 			}
 		}
 

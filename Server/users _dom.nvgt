@@ -2622,12 +2622,14 @@ void handle_user_message(user@ u, json_object@ msg)
 			c.has_bonus_action = false;
 			c.used_bonus_action = true;
 			int flurry_chain = c.heightened_focus_active ? 2 : 1;
-			// Xanathar's Drunken Master L17 Intoxicated Frenzy (para 1801-1805):
+			// Xanathar's Drunken Master L17 Intoxicated Frenzy (para 1804-1805):
 			// "When you use Flurry of Blows, you can make up to three additional
-			// attacks with it (up to a total of five), provided that each targets
-			// a different creature this turn." Different-creature constraint is
-			// approximated — all strikes currently chain against the same target.
+			// attacks with it (up to a total of five), provided that each Flurry
+			// of Blows attack targets a different creature this turn."
 			if (c.subclass == "Way of the Drunken Master" and c.level >= 17) flurry_chain = 4;
+			// Track targets hit during this flurry for Intoxicated Frenzy
+			c.flurry_targets_hit.resize(0);
+			c.flurry_targets_hit.insert_last(target.id);
 			if (!u.room.bm.start_flurry_strike(c, target, flurry_chain)) {
 				c.has_bonus_action = true;
 				c.used_bonus_action = false;
@@ -4179,10 +4181,8 @@ void handle_user_message(user@ u, json_object@ msg)
 			c.has_bonus_action = false;
 			c.used_bonus_action = true;
 			int dex_mod = c.get_ability_mod(ABILITY_DEX);
-			int die_size = 4;
-			if (c.level >= 5) die_size = 6;
-			if (c.level >= 11) die_size = 8;
-			if (c.level >= 17) die_size = 10;
+			// Xanathar's Sun Soul L3 (para 1851-1855): damage die is the Martial Arts die
+			int die_size = u.room.bm.monk_martial_arts_die(c);
 			int atk_bonus = dex_mod + c.proficiency;
 			int roll = random(1, 20);
 			int total = roll + atk_bonus;
