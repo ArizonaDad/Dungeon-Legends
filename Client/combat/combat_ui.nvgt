@@ -206,6 +206,11 @@ bool my_sudden_strike_used = false;
 // PHB 2024 Ranger L10 Tireless / L14 Nature's Veil — synced from server
 int my_natures_veil_uses_remaining = 0;
 int my_tireless_temp_hp_uses_remaining = 0;
+// Tasha's Swarmkeeper Ranger — synced from server
+string my_gathered_swarm_mode = "damage";
+int my_writhing_tide_uses = 0;
+bool my_writhing_tide_active = false;
+int my_swarming_dispersal_uses = 0;
 // PHB 2024 Sorcerer L1 Innate Sorcery / L2 Font of Magic — synced from server
 int my_innate_sorcery_uses_remaining = 0;
 bool my_innate_sorcery_active = false;
@@ -1231,7 +1236,8 @@ void show_bonus_action_menu() {
 	int primal_companion_opt = -1;
 	int drake_attack_opt = -1;
 	int slayers_prey_opt = -1;
-	int swarmkeeper_opt = -1;
+	int swarmkeeper_mode_opt = -1;
+	int writhing_tide_opt = -1;
 	int chronal_shift_opt = -1;
 	int dodge_roll_opt = -1;
 	int blindfire_opt = -1;
@@ -1739,7 +1745,10 @@ void show_bonus_action_menu() {
 		slayers_prey_opt = m.add_item("Slayer's Prey. Bonus action. Mark a target for bonus damage.");
 	}
 	if (lc == "ranger" and subclass == "Swarmkeeper") {
-		swarmkeeper_opt = m.add_item("Gathered Swarm. Bonus action. Command swarm for bonus force damage.");
+		swarmkeeper_mode_opt = m.add_item("Gathered Swarm Mode: " + my_gathered_swarm_mode + ". Free action. Cycle between damage, push, and move.");
+		if (level >= 7 and my_writhing_tide_uses > 0 and !my_writhing_tide_active) {
+			writhing_tide_opt = m.add_item("Writhing Tide. Bonus action. Fly 10 feet and hover for 1 minute. Uses: " + my_writhing_tide_uses + ".");
+		}
 	}
 	if (lc == "wizard" and subclass == "Chronurgy Magic") {
 		chronal_shift_opt = m.add_item("Chronal Shift. Force a roll to be rerolled.");
@@ -3123,9 +3132,17 @@ void show_bonus_action_menu() {
 		send({{"type", message_types::bonus_action}, {"feature", "slayers_prey"}, {"target_id", current_target_id}});
 		speak("Slayer's Prey marked.", true);
 	}
-	else if (swarmkeeper_opt >= 0 and res == swarmkeeper_opt) {
-		send({{"type", message_types::bonus_action}, {"feature", "swarmkeeper_shift"}});
-		speak("Swarm gathered.", true);
+	else if (swarmkeeper_mode_opt >= 0 and res == swarmkeeper_mode_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "swarmkeeper_mode"}});
+		// Client-side predict the cycle for immediate feedback
+		if (my_gathered_swarm_mode == "damage") my_gathered_swarm_mode = "push";
+		else if (my_gathered_swarm_mode == "push") my_gathered_swarm_mode = "move";
+		else my_gathered_swarm_mode = "damage";
+		speak("Gathered Swarm mode set to " + my_gathered_swarm_mode + ".", true);
+	}
+	else if (writhing_tide_opt >= 0 and res == writhing_tide_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "writhing_tide"}});
+		speak("Writhing Tide activated.", true);
 	}
 	else if (chronal_shift_opt >= 0 and res == chronal_shift_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "chronal_shift"}});
@@ -4419,6 +4436,11 @@ void parse_game_state(json_object@ msg) {
 	my_lay_on_hands_pool = msg.exists("my_lay_on_hands_pool") ? int(msg["my_lay_on_hands_pool"]) : 0;
 	my_natures_veil_uses_remaining = msg.exists("my_natures_veil_uses_remaining") ? int(msg["my_natures_veil_uses_remaining"]) : 0;
 	my_tireless_temp_hp_uses_remaining = msg.exists("my_tireless_temp_hp_uses_remaining") ? int(msg["my_tireless_temp_hp_uses_remaining"]) : 0;
+	// Tasha's Swarmkeeper
+	my_gathered_swarm_mode = msg.exists("my_gathered_swarm_mode") ? string(msg["my_gathered_swarm_mode"]) : "damage";
+	my_writhing_tide_uses = msg.exists("my_writhing_tide_uses") ? int(msg["my_writhing_tide_uses"]) : 0;
+	my_writhing_tide_active = msg.exists("my_writhing_tide_active") ? bool(msg["my_writhing_tide_active"]) : false;
+	my_swarming_dispersal_uses = msg.exists("my_swarming_dispersal_uses") ? int(msg["my_swarming_dispersal_uses"]) : 0;
 	my_innate_sorcery_uses_remaining = msg.exists("my_innate_sorcery_uses_remaining") ? int(msg["my_innate_sorcery_uses_remaining"]) : 0;
 	my_innate_sorcery_active = msg.exists("my_innate_sorcery_active") ? bool(msg["my_innate_sorcery_active"]) : false;
 	my_sorcery_points = msg.exists("my_sorcery_points") ? int(msg["my_sorcery_points"]) : 0;
@@ -4747,6 +4769,10 @@ void reset_combat_state() {
 	my_lay_on_hands_pool = 0;
 	my_natures_veil_uses_remaining = 0;
 	my_tireless_temp_hp_uses_remaining = 0;
+	my_gathered_swarm_mode = "damage";
+	my_writhing_tide_uses = 0;
+	my_writhing_tide_active = false;
+	my_swarming_dispersal_uses = 0;
 	my_innate_sorcery_uses_remaining = 0;
 	my_innate_sorcery_active = false;
 	my_sorcery_points = 0;

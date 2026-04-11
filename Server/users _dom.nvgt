@@ -6049,14 +6049,42 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.room.bm.broadcast_announce(c.name + " marks a target as their slayer prey!", false);
 		}
 
-		else if (feature == "swarmkeeper_shift") {
-			// Swarmkeeper Ranger: bonus damage + move target with swarm
+		else if (feature == "swarmkeeper_mode") {
+			// Tasha's Swarmkeeper Ranger L3 Gathered Swarm: cycle mode (damage/push/move).
+			// This is a free action toggle — no bonus action cost per source (the swarm
+			// triggers automatically once per turn on hit).
 			if (c.class_name != "Ranger" or c.subclass != "Swarmkeeper") { u.send({{"type", message_types::announce}, {"text", "Only Swarmkeepers have a magical swarm."}, {"interrupt", true}}); return; }
+			string choice = "";
+			if (msg.exists("choice")) choice = string(msg["choice"]);
+			if (choice == "damage" or choice == "push" or choice == "move") {
+				c.gathered_swarm_mode = choice;
+				u.room.bm.broadcast_announce(c.name + " sets Gathered Swarm mode to " + choice + ".", false);
+			} else {
+				// Cycle: damage -> push -> move -> damage
+				if (c.gathered_swarm_mode == "damage") c.gathered_swarm_mode = "push";
+				else if (c.gathered_swarm_mode == "push") c.gathered_swarm_mode = "move";
+				else c.gathered_swarm_mode = "damage";
+				u.room.bm.broadcast_announce(c.name + " sets Gathered Swarm mode to " + c.gathered_swarm_mode + ".", false);
+			}
+		}
+
+		else if (feature == "writhing_tide") {
+			// Tasha's Swarmkeeper L7 Writhing Tide: "As a bonus action, you gain a
+			// flying speed of 10 feet and can hover. This effect lasts for 1 minute
+			// or until you are incapacitated. You can use this feature a number of
+			// times equal to your proficiency bonus, and you regain all expended uses
+			// when you finish a long rest."
+			if (c.class_name != "Ranger" or c.subclass != "Swarmkeeper" or c.level < 7) { u.send({{"type", message_types::announce}, {"text", "Only L7+ Swarmkeepers can use Writhing Tide."}, {"interrupt", true}}); return; }
 			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			if (c.writhing_tide_uses <= 0) { u.send({{"type", message_types::announce}, {"text", "No Writhing Tide uses remaining."}, {"interrupt", true}}); return; }
+			if (c.writhing_tide_active) { u.send({{"type", message_types::announce}, {"text", "Writhing Tide is already active."}, {"interrupt", true}}); return; }
 			c.has_bonus_action = false;
 			c.used_bonus_action = true;
-			u.room.bm.broadcast_announce(c.name + " commands the swarm! Next attack deals bonus force damage.", false);
-			c.swarmkeeper_swarm_active = true;
+			c.writhing_tide_uses--;
+			c.writhing_tide_active = true;
+			c.writhing_tide_rounds = 10; // 1 minute
+			c.flying_speed = 10;
+			u.room.bm.broadcast_announce(c.name + "'s swarm condenses into a focused mass, granting flight!", false);
 		}
 
 		else if (feature == "chronal_shift") {

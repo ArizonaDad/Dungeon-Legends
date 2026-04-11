@@ -1827,6 +1827,9 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
             if (!c.knows_spell("telekinesis")) c.prepared_spells.insert_last("telekinesis");
         }
         if (cs.level >= 6) {
+            // L6 Psionic Sorcery (para 3936-3938): cast psionic spells using SP
+            // instead of a spell slot (SP cost = spell level)
+            c.psionic_sorcery_active = true;
             // L6 Psychic Defenses (para 3939-3941): psychic resistance +
             // advantage on saves against being charmed or frightened
             c.psionic_defenses_active = true;
@@ -3419,6 +3422,35 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
             if (cs.level >= 11) c.stalkers_flurry_active = true;
             // L15 Shadowy Dodge (para 2162-2163): reaction to impose disadvantage
             if (cs.level >= 15) c.shadowy_dodge_active = true;
+        }
+        // Tasha's Swarmkeeper Ranger
+        if (cs.subclass == "Swarmkeeper") {
+            if (cs.level >= 3) {
+                // L3 Swarmkeeper Magic: always-prepared spells (source: Tasha's Swarmkeeper Spells table)
+                // "You learn the mage hand cantrip if you don't already know it."
+                if (!c.knows_spell("mage_hand")) c.prepared_spells.insert_last("mage_hand");
+                if (!c.knows_spell("faerie_fire")) c.prepared_spells.insert_last("faerie_fire");
+                if (cs.level >= 5) { if (!c.knows_spell("web")) c.prepared_spells.insert_last("web"); }
+                if (cs.level >= 9) { if (!c.knows_spell("gaseous_form")) c.prepared_spells.insert_last("gaseous_form"); }
+                if (cs.level >= 13) { if (!c.knows_spell("arcane_eye")) c.prepared_spells.insert_last("arcane_eye"); }
+                if (cs.level >= 17) { if (!c.knows_spell("insect_plague")) c.prepared_spells.insert_last("insect_plague"); }
+                // L3 Gathered Swarm: auto-active, once per turn on hit (default mode = damage)
+                c.gathered_swarm_mode = "damage";
+            }
+            // L7 Writhing Tide: BA fly 10ft hover, PB uses per LR
+            if (cs.level >= 7) {
+                c.writhing_tide_uses = prof;
+                c.writhing_tide_uses_max = prof;
+            }
+            // L11 Mighty Swarm: upgrades Gathered Swarm (1d8, push+Prone, move+half cover)
+            if (cs.level >= 11) {
+                c.mighty_swarm_active = true;
+            }
+            // L15 Swarming Dispersal: reaction, resistance + teleport 30ft, PB uses per LR
+            if (cs.level >= 15) {
+                c.swarming_dispersal_uses = prof;
+                c.swarming_dispersal_uses_max = prof;
+            }
         }
     }
 

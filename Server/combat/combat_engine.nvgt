@@ -590,6 +590,7 @@ class combatant {
 	bool world_tree_temp_hp = false; // World Tree Barbarian
 	int wild_magic_surge_pending = 0; // Wild Magic Sorcerer
 	bool psionic_defenses_active = false; // Aberrant Sorcerer L6
+	bool psionic_sorcery_active = false; // Aberrant Mind L6: cast psionic spells with SP instead of slot
 	bool charm_frighten_save_advantage = false; // Aberrant Sorcerer L6 Psychic Defenses
 	bool revelation_in_flesh_active = false; // Aberrant Mind L14
 	int revelation_in_flesh_rounds = 0;
@@ -712,7 +713,17 @@ class combatant {
 	bool form_of_dread_active = false; // Undead Warlock
 	int form_of_dread_rounds = 0;
 	bool genie_vessel_active = false; // Genie Warlock
-	bool swarmkeeper_swarm_active = false; // Swarmkeeper Ranger
+	// Tasha's Swarmkeeper Ranger
+	bool gathered_swarm_used_this_turn = false; // Once per turn on-hit trigger
+	string gathered_swarm_mode = "damage"; // "damage", "push", "move" — player-chosen mode
+	bool writhing_tide_active = false; // L7: BA fly 10ft hover, 1 min
+	int writhing_tide_uses = 0; // PB uses per LR
+	int writhing_tide_uses_max = 0;
+	int writhing_tide_rounds = 0; // 10 rounds = 1 min
+	int swarming_dispersal_uses = 0; // L15: reaction, PB uses per LR
+	int swarming_dispersal_uses_max = 0;
+	bool mighty_swarm_active = false; // L11: upgrades Gathered Swarm
+	bool swarmkeeper_half_cover = false; // L11 Mighty Swarm move option: half cover until start of next turn
 	int chronal_shift_uses = 0; // Chronurgy Wizard L2 reaction, 2/LR
 	int momentary_stasis_uses = 0; // Chronurgy L6 action, INT mod/LR
 	int convergent_future_uses = 0; // Chronurgy L14 (each use grants 1 exhaustion)
@@ -2019,6 +2030,12 @@ class battle {
 		c.deft_strike_used_this_turn = false;
 		c.unerring_accuracy_used_this_turn = false;
 		c.slayer_prey_used_this_turn = false;
+		c.gathered_swarm_used_this_turn = false;
+		// Tasha's Swarmkeeper L11 Mighty Swarm: half cover from move option expires at start of next turn
+		if (c.swarmkeeper_half_cover) {
+			c.swarmkeeper_half_cover = false;
+			c.armor_class -= 2; // Remove half cover AC bonus
+		}
 		c.storm_aura_used_this_turn = false;
 		c.twf_attack_used_this_turn = false;
 		if (c.arcane_deflection_no_spell_turns > 0) c.arcane_deflection_no_spell_turns--;
@@ -2182,6 +2199,17 @@ class battle {
 					apply_damage(source, fire_dmg, DMG_FIRE, target);
 				}
 			}
+		}
+
+		// Tasha's Swarmkeeper L15 Swarming Dispersal: "When you take damage, you can
+		// use your reaction to give yourself resistance to that damage. You vanish into
+		// your swarm and then teleport to an unoccupied space that you can see within
+		// 30 feet of you." Auto-resolved: PB uses per LR, costs reaction.
+		if (target.class_name == "Ranger" and target.subclass == "Swarmkeeper" and target.level >= 15
+			and target.swarming_dispersal_uses > 0 and target.has_reaction and amount > 0) {
+			amount = amount / 2;
+			target.swarming_dispersal_uses--;
+			target.has_reaction = false;
 		}
 
 		// Heavy Armor Master: reduce B/P/S damage by Proficiency Bonus when wearing heavy armor
@@ -2902,6 +2930,11 @@ class battle {
 				// PHB 2024 Ranger L10 Tireless / L14 Nature's Veil — broadcast use counts
 				state["my_natures_veil_uses_remaining"] = c.natures_veil_uses_remaining;
 				state["my_tireless_temp_hp_uses_remaining"] = c.tireless_temp_hp_uses_remaining;
+				// Tasha's Swarmkeeper: broadcast mode, writhing tide, swarming dispersal
+				state["my_gathered_swarm_mode"] = c.gathered_swarm_mode;
+				state["my_writhing_tide_uses"] = c.writhing_tide_uses;
+				state["my_writhing_tide_active"] = c.writhing_tide_active;
+				state["my_swarming_dispersal_uses"] = c.swarming_dispersal_uses;
 				// PHB 2024 Sorcerer L1 Innate Sorcery / L2 Font of Magic
 				state["my_innate_sorcery_uses_remaining"] = c.innate_sorcery_uses_remaining;
 				state["my_innate_sorcery_active"] = c.innate_sorcery_active;
@@ -2988,6 +3021,7 @@ class battle {
 				state["my_strength_of_the_grave_used"] = c.strength_of_the_grave_used;
 				// Tasha's Aberrant Mind (paras 3894-3952)
 				state["my_psionic_defenses_active"] = c.psionic_defenses_active;
+				state["my_psionic_sorcery_active"] = c.psionic_sorcery_active;
 				state["my_revelation_in_flesh_active"] = c.revelation_in_flesh_active;
 				state["my_revelation_in_flesh_rounds"] = c.revelation_in_flesh_rounds;
 				state["my_warping_implosion_available"] = c.warping_implosion_available;

@@ -36,6 +36,7 @@ class pending_roll {
 	int extra_damage_modifier = 0;
 	int extra_damage_type = -1;
 	bool is_weapon_attack = false;
+	bool is_opportunity_attack = false; // True when this roll is an OA (for Sentinel/Hold the Line speed reduction)
 	bool is_crit = false;
 	bool is_spell_effect = false;
 	bool spell_uses_attack_roll = false;
@@ -5380,6 +5381,16 @@ class battle_manager {
 					broadcast_announce(prev.name + "'s Nature's Veil fades.", false);
 				}
 			}
+			// Tasha's Swarmkeeper L7 Writhing Tide: "This effect lasts for 1 minute
+			// or until you are incapacitated." Tick down on each of the Ranger's
+			// turn-ends. When it hits 0, deactivate.
+			if (prev.writhing_tide_active and prev.writhing_tide_rounds > 0) {
+				prev.writhing_tide_rounds--;
+				if (prev.writhing_tide_rounds <= 0) {
+					prev.writhing_tide_active = false;
+					broadcast_announce(prev.name + "'s Writhing Tide subsides.", false);
+				}
+			}
 			// Basic Rules 2024 Chill Touch (para 12055-12062) + Starry Wisp (para
 			// 14595-14602): "until the end of your next turn" — tick down on each
 			// of the caster's turn-ends across all affected targets.
@@ -7910,6 +7921,7 @@ class battle_manager {
 						pr.damage_modifier = get_damage_modifier_for_attack(enemy, false);
 						pr.damage_type = enemy.main_hand_damage_type;
 						pr.is_weapon_attack = true;
+						pr.is_opportunity_attack = true;
 						pr.resolution_tag = "resume_current_turn";
 						@current_roll = pr;
 						if (opp_user.is_bot) {
@@ -8834,6 +8846,39 @@ class battle_manager {
 			int fey_dmg = random(1, 4);
 			bonus += fey_dmg;
 			broadcast_announce(attacker.name + "'s Dreadful Strikes add " + fey_dmg + " psychic damage!", false);
+		}
+
+		// Tasha's Swarmkeeper L3 Gathered Swarm: "Once on each of your turns, you can
+		// cause the swarm to assist you in one of the following ways, immediately after
+		// you hit a creature with an attack." Three modes set via gathered_swarm_mode.
+		// L11 Mighty Swarm: damage die 1d6->1d8, push also Prone, move also half cover.
+		if (attacker.class_name == "Ranger" and attacker.subclass == "Swarmkeeper" and !attacker.gathered_swarm_used_this_turn) {
+			attacker.gathered_swarm_used_this_turn = true;
+			if (attacker.gathered_swarm_mode == "damage") {
+				int swarm_die = attacker.mighty_swarm_active ? 8 : 6;
+				int swarm_dmg = random(1, swarm_die);
+				bonus += swarm_dmg;
+				broadcast_announce(attacker.name + "'s Gathered Swarm deals " + swarm_dmg + " piercing damage!", false);
+			} else if (attacker.gathered_swarm_mode == "push") {
+				int spell_dc = spell_save_dc(attacker);
+				int target_save = random(1, 20) + target.get_save_bonus(ABILITY_STR);
+				if (target_save < spell_dc) {
+					broadcast_announce(attacker.name + "'s Gathered Swarm pushes " + target.name + " 15 feet! (STR save " + target_save + " vs DC " + spell_dc + ")", false);
+					if (attacker.mighty_swarm_active) {
+						target.add_condition(COND_PRONE);
+						broadcast_announce(target.name + " is knocked prone by the mighty swarm!", false);
+					}
+				} else {
+					broadcast_announce(target.name + " resists the swarm's push. (STR save " + target_save + " vs DC " + spell_dc + ")", false);
+				}
+			} else if (attacker.gathered_swarm_mode == "move") {
+				broadcast_announce(attacker.name + "'s Gathered Swarm repositions them 5 feet!", false);
+				if (attacker.mighty_swarm_active and !attacker.swarmkeeper_half_cover) {
+					attacker.swarmkeeper_half_cover = true;
+					attacker.armor_class += 2;
+					broadcast_announce(attacker.name + " gains half cover from the swarm!", false);
+				}
+			}
 		}
 
 		// Xanathar's Horizon Walker L3 Planar Warrior (para 2199-2201): "The next
@@ -11463,6 +11508,21 @@ class battle_manager {
 			// Check boss phase transitions after damage
 			if (target.is_boss and !target.is_dead) check_boss_phase(target);
 			maybe_apply_on_kill_features(c, target);
+			// Opportunity attack speed reduction (player OA path):
+			// Sentinel feat + Cavalier Hold the Line both set target speed to 0 on OA hit.
+			if (pr.is_opportunity_attack and !target.is_dead) {
+				if (c.has_feat("sentinel")) {
+					target.movement_remaining = 0;
+					broadcast_announce(c.name + "'s Sentinel stops " + target.name + " in their tracks!", false);
+				}
+				// Xanathar's Cavalier L10 Hold the Line (para 1677-1678):
+				// "the target's speed is reduced to 0 until the end of the current turn."
+				if (c.hold_the_line_active) {
+					target.movement_remaining = 0;
+					if (!c.has_feat("sentinel")) // Avoid double announce
+						broadcast_announce(c.name + " holds the line! " + target.name + "'s speed drops to 0!", false);
+				}
+			}
 			if (target.wild_shape_just_ended) {
 				broadcast_announce(target.name + "'s Wild Shape ends!", true);
 				target.wild_shape_just_ended = false;
@@ -14742,6 +14802,7 @@ class battle_manager {
 			bool used_spell_mastery = false;
 			bool used_signature_spell = false;
 			bool used_boon_of_spell_recall = false;
+			bool used_psionic_sorcery = false;
 			if (c.divine_intervention_ready and c.class_name == "Cleric" and spell.level <= 5) {
 				c.divine_intervention_ready = false;
 				used_divine_intervention = true;
@@ -14779,20 +14840,38 @@ class battle_manager {
 				used_boon_of_spell_recall = true;
 				cast_slot_level = spell.level;
 			} else {
-				int slot_used = -1;
-				for (int sl = spell.level; sl <= 9; sl++) {
-					if (c.spell_slots_current[sl] > 0) {
-						slot_used = sl;
-						break;
+				// Tasha's Aberrant Mind L6 Psionic Sorcery (para 3936-3938):
+				// "If you cast any spell using a Psionic Spells slot, you can cast
+				// it by expending a number of sorcery points equal to the spell's
+				// level instead of expending a spell slot."
+				if (c.psionic_sorcery_active and c.sorcery_points >= spell.level) {
+					// Check if the spell is one of the Aberrant Mind psionic spells
+					bool is_psionic_spell = (spell.id == "arms_of_hadar" or spell.id == "dissonant_whispers"
+						or spell.id == "calm_emotions" or spell.id == "detect_thoughts"
+						or spell.id == "hunger_of_hadar" or spell.id == "sending"
+						or spell.id == "evards_black_tentacles" or spell.id == "telekinesis");
+					if (is_psionic_spell) {
+						c.sorcery_points -= spell.level;
+						used_psionic_sorcery = true;
+						cast_slot_level = spell.level;
 					}
 				}
-				if (slot_used < 0) {
-					u.send({{"type", message_types::announce}, {"text", "No spell slots available for " + spell.name + "."}, {"interrupt", true}});
-					return;
+				if (!used_psionic_sorcery) {
+					int slot_used = -1;
+					for (int sl = spell.level; sl <= 9; sl++) {
+						if (c.spell_slots_current[sl] > 0) {
+							slot_used = sl;
+							break;
+						}
+					}
+					if (slot_used < 0) {
+						u.send({{"type", message_types::announce}, {"text", "No spell slots available for " + spell.name + "."}, {"interrupt", true}});
+						return;
+					}
+					c.spell_slots_current[slot_used]--;
+					slot_consumed = true;
+					cast_slot_level = slot_used;
 				}
-				c.spell_slots_current[slot_used]--;
-				slot_consumed = true;
-				cast_slot_level = slot_used;
 			}
 			reveal_hidden_combatant(c, "casting a spell");
 			if (used_divine_intervention) broadcast_announce(c.name + " casts " + spell.name + " through Divine Intervention — no spell slot consumed!", true);
@@ -14800,6 +14879,7 @@ class battle_manager {
 			else if (used_spell_mastery) broadcast_announce(c.name + " casts " + spell.name + " through Spell Mastery — no spell slot consumed!", true);
 			else if (used_signature_spell) broadcast_announce(c.name + " unleashes " + spell.name + " as a Signature Spell — no spell slot consumed!", true);
 			else if (used_boon_of_spell_recall) broadcast_announce(c.name + " invokes Boon of Spell Recall to cast " + spell.name + " — no spell slot consumed!", true);
+			else if (used_psionic_sorcery) broadcast_announce(c.name + " casts " + spell.name + " using Psionic Sorcery — spent " + spell.level + " sorcery points instead of a spell slot!", true);
 			else broadcast_announce(c.name + " casts " + spell.name + " using a level " + cast_slot_level + " spell slot.", false);
 
 			// Wild Magic Sorcerer: Wild Magic Surge (d20, on 1 trigger a random effect)

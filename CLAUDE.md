@@ -711,7 +711,7 @@ Per-class audit of all 13 base class features against `basic_rules_full.txt` (Ba
 - **Fighter**: Champion, Battle Master, Eldritch Knight, Psi Warrior, Samurai, Cavalier, Rune Knight, Arcane Archer, Echo Knight, Couatl Herald, Steel Hawk, Blade Breaker
 - **Monk**: Shadow, Mercy, Elements, Sun Soul, Kensei, Ascendant Dragon, Astral Self, Drunken Master, Open Hand, Celestial, Aether
 - **Paladin**: Devotion, Glory, Ancients, Vengeance, Conquest, Watchers, Redemption, Hearth, Zeal
-- **Ranger**: Gloom Stalker, Fey Wanderer, Hunter, Horizon Walker, Winter Trapper, Rocborne
+- **Ranger**: Gloom Stalker, Fey Wanderer, Hunter, Horizon Walker, Swarmkeeper, Winter Trapper, Rocborne
 - **Rogue**: Assassin, Soulknife, Inquisitive, Mastermind, Thief, Swashbuckler, Phantom, Arcane Trickster, Scout, Misfortune Bringer, Runetagger, Grim Surgeon
 - **Sorcerer**: Draconic, Shadow Magic, Wild Magic, Aberrant, Storm, Clockwork, Divine Soul, Frost, Desert Soul
 - **Warlock**: Fiend, Celestial, Archfey, Hexblade, Great Old One, Fathomless, Genie, Undead, Astral Griffon, Many
