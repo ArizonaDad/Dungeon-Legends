@@ -1308,6 +1308,8 @@ class battle_manager {
 		if (c.reduce_active and ability_id == ABILITY_STR) disadv = true;
 		// Basic Rules 2024 Enhance Ability (para 13068): advantage on all ability checks.
 		if (c.enhance_ability_active) adv = true;
+		// Basic Rules 2024 Foresight (para 13025-13031): "Advantage on D20 Tests"
+		if (c.foresight_active) adv = true;
 		// PHB 2024 Frightened (para 16222): "The creature has Disadvantage on ability
 		// checks and attack rolls." PHB 2024 Poisoned (para 16237): same wording.
 		if (c.has_condition(COND_FRIGHTENED) or c.has_condition(COND_POISONED)) disadv = true;
@@ -2874,6 +2876,11 @@ class battle_manager {
 				break;
 			}
 		}
+		// Basic Rules 2024 Foresight (para 13025-13031): "the target has Advantage
+		// on D20 Tests, and other creatures have Disadvantage on attack rolls against it."
+		if (attacker.foresight_active) adv = true;
+		if (target.foresight_active) disadv = true;
+
 		// PHB 2024 Rogue L18 Elusive (para 6576-6577): "No attack roll can have
 		// Advantage against you unless you have the Incapacitated condition." Strip
 		// any advantage that would have been granted to the attacker against this
@@ -2949,6 +2956,12 @@ class battle_manager {
 		if (!attacker.is_player or attacker.wild_shape_active) atk_bonus = use_secondary ? attacker.monster_attack2_bonus : attacker.monster_attack_bonus;
 		else {
 			atk_bonus = get_weapon_attack_ability_mod(attacker) + attacker.proficiency;
+			// Basic Rules 2024 Alter Self Natural Weapons (para 12010-12012):
+			// "you can use your spellcasting ability for the attack and damage rolls"
+			if (attacker.alter_self_natural_weapons and !attacker.main_hand_is_ranged) {
+				int spell_atk = get_spellcasting_ability_mod(attacker) + attacker.proficiency;
+				if (spell_atk > atk_bonus) atk_bonus = spell_atk;
+			}
 			if (attacker.has_feat("archery") and attacker.main_hand_is_ranged) atk_bonus += 2;
 		}
 		atk_bonus -= attacker.exhaustion_level * 2;
@@ -2965,6 +2978,12 @@ class battle_manager {
 		if (@attacker == null) return 0;
 		if (!attacker.is_player or attacker.wild_shape_active) return use_secondary ? attacker.monster_attack2_mod : attacker.monster_attack_damage_mod;
 		int mod = get_weapon_damage_ability_mod(attacker);
+		// Basic Rules 2024 Alter Self Natural Weapons (para 12010-12012):
+		// "you can use your spellcasting ability for the attack and damage rolls"
+		if (attacker.alter_self_natural_weapons and !attacker.main_hand_is_ranged) {
+			int spell_mod = get_spellcasting_ability_mod(attacker);
+			if (spell_mod > mod) mod = spell_mod;
+		}
 		if (attacker.raging and !attacker.main_hand_is_ranged) mod += attacker.rage_damage_bonus;
 		// Fighting Style: Dueling (+2 damage with one-handed melee, no second weapon)
 		if (attacker.has_feat("dueling") and !attacker.main_hand_is_ranged and attacker.main_hand_range <= 5) mod += 2;
@@ -3006,6 +3025,9 @@ class battle_manager {
 				if (uf_die > attacker.main_hand_damage_dice) return uf_die;
 			}
 		}
+		// Basic Rules 2024 Alter Self Natural Weapons (para 12010-12012):
+		// "the Unarmed Strike deals 1d6 damage" — floor at d6 for any melee attack
+		if (attacker.alter_self_natural_weapons and !attacker.main_hand_is_ranged and attacker.main_hand_damage_dice < 6) return 6;
 		return attacker.main_hand_damage_dice;
 	}
 
@@ -4349,6 +4371,8 @@ class battle_manager {
 		}
 		// Antimagic Field: clear flag when concentration breaks
 		caster.antimagic_field_active = false;
+		// Basic Rules 2024 Antilife Shell: clear barrier when concentration breaks
+		caster.antilife_shell_active = false;
 		// Globe of Invulnerability: clear spell-blocking shield when concentration breaks
 		caster.globe_of_invulnerability_active = false;
 		caster.globe_of_invulnerability_level = 5;
@@ -7423,6 +7447,23 @@ class battle_manager {
 				}
 			}
 
+			// Basic Rules 2024 Antilife Shell (para 11796-11803): block approach within 10ft
+			// of a hostile Antilife Shell caster. Constructs/Undead are exempt.
+			bool antilife_blocked = false;
+			if (monster.creature_type != "construct" and monster.creature_type != "undead") {
+				int try_x = monster.x + (dx != 0 ? dx : 0);
+				int try_y = monster.y + (dx == 0 and dy != 0 ? dy : 0);
+				for (uint asmi = 0; asmi < combat.combatants.length(); asmi++) {
+					combatant@ as_m = combat.combatants[asmi];
+					if (@as_m == null or as_m.is_dead or !as_m.antilife_shell_active) continue;
+					if (!combat.are_hostile(monster, as_m)) continue;
+					int new_as_dist = feet_distance(try_x, try_y, as_m.x, as_m.y);
+					int old_as_dist = feet_distance(monster.x, monster.y, as_m.x, as_m.y);
+					if (new_as_dist <= 10 and old_as_dist > 10) { antilife_blocked = true; break; }
+				}
+			}
+			if (antilife_blocked) break;
+
 			// Move one axis at a time (prefer x-axis, then y-axis).
 			if (dx != 0) {
 				monster.x += dx;
@@ -8709,6 +8750,14 @@ class battle_manager {
 			broadcast_announce(c.name + "'s Guidance adds +" + guidance_bonus + " to the ability check.", false);
 		}
 
+		// Basic Rules 2024 Glibness (para 13139-13144): "when you make a Charisma
+		// check, you can replace the number you roll with a 15." Applies to ALL CHA
+		// checks, not just specific skills. Clamps BEFORE Silver Tongue.
+		if (c.glibness_active and pr.roll_type == ROLL_ABILITY_CHECK and pr.ability_id == ABILITY_CHA and natural_roll < 15) {
+			broadcast_announce(c.name + "'s Glibness replaces the " + natural_roll + " with a 15.", false);
+			natural_roll = 15;
+			total = natural_roll + pr.modifier + bless_bonus + bardic_bonus;
+		}
 		// Silver Tongue (College of Eloquence Bard L3, Tasha's para 1696):
 		// "When you make a Charisma (Persuasion) or Charisma (Deception) check, you can
 		// treat a d20 roll of 9 or lower as a 10."
@@ -12294,6 +12343,24 @@ class battle_manager {
 			return;
 		}
 
+		// Basic Rules 2024 Antilife Shell (para 11796-11803): "The aura prevents creatures
+		// other than Constructs and Undead from passing or reaching through it."
+		// Block hostile creatures from entering the 10ft emanation of the shell caster.
+		if (@combat != null) {
+			for (uint asi = 0; asi < combat.combatants.length(); asi++) {
+				combatant@ as_src = combat.combatants[asi];
+				if (@as_src == null or as_src.is_dead or !as_src.antilife_shell_active) continue;
+				if (!combat.are_hostile(c, as_src)) continue; // Only blocks hostiles
+				if (c.creature_type == "construct" or c.creature_type == "undead") continue; // Constructs/Undead pass through
+				int new_dist = feet_distance(new_x, new_y, as_src.x, as_src.y);
+				int old_dist = feet_distance(c.x, c.y, as_src.x, as_src.y);
+				if (new_dist <= 10 and old_dist > 10) {
+					u.send({{"type", message_types::error}, {"text", as_src.name + "'s Antilife Shell blocks your path!"}});
+					return;
+				}
+			}
+		}
+
 		int old_x = c.x;
 		int old_y = c.y;
 		c.x = new_x;
@@ -12302,6 +12369,27 @@ class battle_manager {
 		c.has_moved = true;
 		announce_movement_to_visible_players(c, dx, dy, move_cost);
 		refresh_paladin_auras(); // Position changed — update aura coverage
+
+		// Basic Rules 2024 Antilife Shell (para 11796-11803): "If you move so that an
+		// affected creature is forced to pass through the barrier, the spell ends."
+		// If the moving caster has Antilife Shell and an enemy is now within 10ft, end the spell.
+		if (c.antilife_shell_active and @combat != null) {
+			for (uint asci = 0; asci < combat.combatants.length(); asci++) {
+				combatant@ asc = combat.combatants[asci];
+				if (@asc == null or asc.is_dead) continue;
+				if (!combat.are_hostile(c, asc)) continue;
+				if (asc.creature_type == "construct" or asc.creature_type == "undead") continue;
+				int new_as_dist = feet_distance(c.x, c.y, asc.x, asc.y);
+				int old_as_dist = feet_distance(old_x, old_y, asc.x, asc.y);
+				if (new_as_dist <= 10 and old_as_dist > 10) {
+					broadcast_announce(c.name + "'s Antilife Shell ends — a creature was forced through the barrier!", true);
+					clear_concentration_effects(c);
+					c.is_concentrating = false;
+					c.concentration_spell = "";
+					break;
+				}
+			}
+		}
 
 		// Check for opportunity attacks from enemies.
 		check_opportunity_attacks(c, old_x, old_y, new_x, new_y);
@@ -17772,20 +17860,60 @@ class battle_manager {
 				}
 			}
 			else if (spell.id == "glibness") {
-				broadcast_announce(c.name + " casts Glibness.", true);
+				// Basic Rules 2024 Glibness (para 13139-13144): Level 8 Enchantment.
+				// Self, 1 hour, NOT concentration. "when you make a Charisma check, you
+				// can replace the number you roll with a 15."
+				c.glibness_active = true;
+				broadcast_announce(c.name + " casts Glibness! Charisma checks can't roll below 15.", true);
 			}
 			else if (spell.id == "mind_blank") {
-				broadcast_announce(c.name + " casts Mind Blank.", true);
+				// Basic Rules 2024 Mind Blank (para 13755-13761): Level 8 Abjuration.
+				// Touch, 24 hours, NOT concentration. "one willing creature you touch has
+				// Immunity to Psychic damage and the Charmed condition."
+				combatant@ mb_target = @target != null ? target : c;
+				// Touch range check (5ft)
+				if (@mb_target != c and feet_distance(c.x, c.y, mb_target.x, mb_target.y) > 5) {
+					u.send({{"type", message_types::error}, {"text", c.name + " can't reach " + mb_target.name + " — Mind Blank requires Touch range (5 ft)."}});
+					return;
+				}
+				mb_target.mind_blank_active = true;
+				// Remove existing Charmed condition
+				if (mb_target.has_condition(COND_CHARMED)) {
+					mb_target.remove_condition(COND_CHARMED);
+					broadcast_announce(mb_target.name + " is freed from charm!", false);
+				}
+				if (@mb_target == c) {
+					broadcast_announce(c.name + " casts Mind Blank! Immune to Psychic damage and the Charmed condition.", true);
+				} else {
+					broadcast_announce(c.name + " casts Mind Blank on " + mb_target.name + "! Immune to Psychic damage and the Charmed condition.", true);
+				}
 			}
 			// Level 9
 			else if (spell.id == "astral_projection") {
 				broadcast_announce(c.name + " casts Astral Projection.", true);
 			}
-			else if (spell.id == "foresight" and @target != null) {
-				broadcast_announce(c.name + " casts Foresight on " + target.name + ". They gain advantage on attack rolls, ability checks, and saving throws for 8 hours.", true);
-			}
 			else if (spell.id == "foresight") {
-				broadcast_announce(c.name + " casts Foresight, gaining advantage on attacks, checks, and saves for 8 hours.", true);
+				// Basic Rules 2024 Foresight (para 13025-13031): Level 9 Divination.
+				// Touch, 8 hours, NOT concentration. "the target has Advantage on D20 Tests,
+				// and other creatures have Disadvantage on attack rolls against it."
+				combatant@ fs_target = @target != null ? target : c;
+				// Touch range check (5ft)
+				if (@fs_target != c and feet_distance(c.x, c.y, fs_target.x, fs_target.y) > 5) {
+					u.send({{"type", message_types::error}, {"text", c.name + " can't reach " + fs_target.name + " — Foresight requires Touch range (5 ft)."}});
+					return;
+				}
+				// "The spell ends early if you cast it again." — clear from any previous target
+				if (@combat != null) {
+					for (uint fsi = 0; fsi < combat.combatants.length(); fsi++) {
+						combat.combatants[fsi].foresight_active = false;
+					}
+				}
+				fs_target.foresight_active = true;
+				if (@fs_target == c) {
+					broadcast_announce(c.name + " casts Foresight! Advantage on all d20 tests, and enemies have disadvantage on attacks against " + c.name + ".", true);
+				} else {
+					broadcast_announce(c.name + " casts Foresight on " + fs_target.name + "! Advantage on all d20 tests, and enemies have disadvantage on attacks against " + fs_target.name + ".", true);
+				}
 			}
 			else if (spell.id == "gate") {
 				broadcast_announce(c.name + " casts Gate.", true);
@@ -18527,7 +18655,14 @@ class battle_manager {
 			}
 			// Level 5
 			else if (spell.id == "antilife_shell") {
-				broadcast_announce(c.name + " casts Antilife Shell, creating a 10-foot aura that wards off living creatures.", true);
+				// Basic Rules 2024 Antilife Shell (para 11796-11803): Level 5 Abjuration.
+				// Self, Concentration up to 1 hour. "An aura extends from you in a 10-foot
+				// Emanation for the duration. The aura prevents creatures other than Constructs
+				// and Undead from passing or reaching through it."
+				c.is_concentrating = true;
+				c.concentration_spell = "Antilife Shell";
+				c.antilife_shell_active = true;
+				broadcast_announce(c.name + " casts Antilife Shell! A 10-foot barrier wards off living creatures. Ranged attacks and spells can still pass through.", true);
 			}
 			else if (spell.id == "awaken") {
 				broadcast_announce(c.name + " casts Awaken, granting sentience to a beast or plant.", true);
@@ -18774,7 +18909,38 @@ class battle_manager {
 			}
 			// Level 9
 			else if (spell.id == "wish") {
-				broadcast_announce(c.name + " casts Wish, the mightiest spell a mortal can cast — altering reality itself.", true);
+				// Basic Rules 2024 Wish (para 15081-15097): Level 9 Conjuration.
+				// Self, Instantaneous. Primary use: "duplicate any other spell of level 8
+				// or lower." Combat option: Instant Health — "You allow yourself and up to
+				// twenty creatures that you can see to regain all Hit Points, and you end
+				// all effects on them listed in the Greater Restoration spell's description."
+				// Implementation: Instant Health (most impactful in combat arena).
+				// Greater Restoration removes: Charmed, Petrified, Stunned, curse reduction.
+				if (@combat == null) return;
+				int wish_healed = 0;
+				for (uint wi = 0; wi < combat.combatants.length(); wi++) {
+					combatant@ wt = combat.combatants[wi];
+					if (@wt == null or wt.is_dead) continue;
+					if (combat.are_hostile(c, wt)) continue; // Allies only
+					int heal_amount = wt.max_hp - wt.current_hp;
+					if (heal_amount > 0) {
+						wt.current_hp = wt.max_hp;
+						wish_healed++;
+					}
+					// Greater Restoration effects: remove Blinded, Deafened, Paralyzed, Petrified, Poisoned, Stunned, Charmed
+					if (wt.has_condition(COND_BLINDED)) { wt.remove_condition(COND_BLINDED); broadcast_announce(wt.name + " is no longer Blinded!", false); }
+					if (wt.has_condition(COND_DEAFENED)) { wt.remove_condition(COND_DEAFENED); broadcast_announce(wt.name + " is no longer Deafened!", false); }
+					if (wt.has_condition(COND_PARALYZED)) { wt.remove_condition(COND_PARALYZED); broadcast_announce(wt.name + " is no longer Paralyzed!", false); }
+					if (wt.has_condition(COND_PETRIFIED)) { wt.remove_condition(COND_PETRIFIED); broadcast_announce(wt.name + " is no longer Petrified!", false); }
+					if (wt.has_condition(COND_POISONED)) { wt.remove_condition(COND_POISONED); broadcast_announce(wt.name + " is no longer Poisoned!", false); }
+					if (wt.has_condition(COND_STUNNED)) { wt.remove_condition(COND_STUNNED); broadcast_announce(wt.name + " is no longer Stunned!", false); }
+					if (wt.has_condition(COND_CHARMED)) { wt.remove_condition(COND_CHARMED); broadcast_announce(wt.name + " is no longer Charmed!", false); }
+				}
+				if (wish_healed > 0) {
+					broadcast_announce(c.name + " casts Wish — Instant Health! All allies are restored to full Hit Points and freed from ailments!", true);
+				} else {
+					broadcast_announce(c.name + " casts Wish — Instant Health! All allies are freed from ailments!", true);
+				}
 			}
 			// ==== END ADDITIONAL SPELL HANDLERS ====
 			// ==== END UTILITY / BUFF SPELL HANDLERS ====

@@ -116,6 +116,18 @@ class combatant {
 	// Basic Rules 2024 Alter Self: Natural Weapons (concentration)
 	// Unarmed strikes deal 1d6 damage, use spellcasting ability mod.
 	bool alter_self_natural_weapons = false;
+	// Basic Rules 2024 Foresight (para 13025-13031): advantage on ALL d20 tests,
+	// attackers have disadvantage on attack rolls against this creature. 8 hours, NOT concentration.
+	bool foresight_active = false;
+	// Basic Rules 2024 Mind Blank (para 13755-13761): immunity to Psychic damage and
+	// the Charmed condition. 24 hours, NOT concentration.
+	bool mind_blank_active = false;
+	// Basic Rules 2024 Glibness (para 13139-13144): when making a CHA check, can
+	// replace the number rolled with a 15. 1 hour, NOT concentration.
+	bool glibness_active = false;
+	// Basic Rules 2024 Antilife Shell (para 11796-11803): 10ft emanation prevents
+	// non-Construct/non-Undead from passing or reaching through. Concentration.
+	bool antilife_shell_active = false;
 	bool searing_smite_pending = false;  // Searing Smite rider on next weapon hit
 	int searing_smite_dice = 0;          // Number of d6 to roll for Searing Smite damage
 	// Basic Rules 2024 Searing Smite (para 14881): repeating fire damage at turn start
@@ -1452,6 +1464,9 @@ class combatant {
 		// Heroes' Feast (Basic Rules 2024 para 13760): "advantage on Wisdom
 		// saving throws" for 24 hours. Approximated as +5 (matching Danger Sense).
 		if (heroes_feast_active and ability_id == ABILITY_WIS) mod += 5;
+		// Basic Rules 2024 Foresight (para 13025-13031): "the target has Advantage on
+		// D20 Tests" — covers ALL saving throws. Approximated as +5.
+		if (foresight_active) mod += 5;
 		return mod;
 	}
 
@@ -1486,6 +1501,9 @@ class combatant {
 		// can't Charm or Frighten" the warded creature. Blanket approximation
 		// (creature type check impractical at add_condition call site).
 		if (protection_from_evil_and_good_active and (cond_id == COND_CHARMED or cond_id == COND_FRIGHTENED)) return;
+		// Basic Rules 2024 Mind Blank (para 13755-13761): "Immunity to...
+		// the Charmed condition."
+		if (mind_blank_active and cond_id == COND_CHARMED) return;
 		// Monster condition immunities (SRD stat block immunities)
 		if (immune_poisoned and cond_id == COND_POISONED) return;
 		if (immune_frightened and cond_id == COND_FRIGHTENED) return;
@@ -2065,6 +2083,8 @@ class battle {
 		// Species/feat resistances and immunities
 		if (damage_type == DMG_COLD and target.cold_resistance and !ea_bypass) amount = (amount + 1) / 2;
 		if (damage_type == DMG_NECROTIC and target.necrotic_resistance) amount = (amount + 1) / 2;
+		// Basic Rules 2024 Mind Blank (para 13755-13761): "Immunity to Psychic damage"
+		if (damage_type == DMG_PSYCHIC and target.mind_blank_active) amount = 0;
 		if (damage_type == DMG_PSYCHIC and target.psychic_resistance) amount = (amount + 1) / 2;
 		// Tasha's Aberrant Mind L6 Psychic Defenses (para 3939-3941): psychic resistance
 		// is now granted via psychic_resistance flag on init, not double-halving here.
