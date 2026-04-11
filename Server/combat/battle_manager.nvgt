@@ -4354,6 +4354,8 @@ class battle_manager {
 		caster.globe_of_invulnerability_level = 5;
 		// Holy Aura: clear aura when concentration breaks
 		caster.holy_aura_active = false;
+		// Basic Rules 2024 Alter Self: clear Natural Weapons when concentration breaks
+		caster.alter_self_natural_weapons = false;
 		// Basic Rules 2024 Aura of Life (para 12166-12168): clear aura when concentration breaks.
 		// Remove aura-granted necrotic resistance from all allies who got it from this caster.
 		if (caster.aura_of_life_active) {
@@ -17104,7 +17106,18 @@ class battle_manager {
 			}
 			// Level 2
 			else if (spell.id == "alter_self") {
-				broadcast_announce(c.name + " casts Alter Self, transforming their form.", true);
+				// Basic Rules 2024 Alter Self: L2 Transmutation, Concentration, 1 hour.
+				// Combat-relevant option: Natural Weapons — unarmed strike deals 1d6
+				// (slashing/piercing/bludgeoning), uses spellcasting ability mod.
+				// Aquatic Adaptation has no combat effect in the arena.
+				// Implementation: auto-pick Natural Weapons (the only combat option).
+				c.is_concentrating = true;
+				c.concentration_spell = "Alter Self";
+				// Natural Weapons: override unarmed strike damage to 1d6
+				// This uses the unarmed_fighting_active flag and overrides the damage
+				// die to d6 with spellcasting ability mod instead of STR.
+				c.alter_self_natural_weapons = true;
+				broadcast_announce(c.name + " casts Alter Self, growing natural weapons! Unarmed strikes deal 1d6 damage using spellcasting ability.", true);
 			}
 			else if (spell.id == "arcane_lock") {
 				broadcast_announce(c.name + " casts Arcane Lock.", true);

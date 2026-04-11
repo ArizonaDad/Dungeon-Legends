@@ -113,6 +113,9 @@ class combatant {
 	// Gun Slinger Class Jam Weapon (para 736-738): weapon malfunction, can't attack
 	// until a Utilize action is taken to fix it.
 	bool weapon_jammed = false;
+	// Basic Rules 2024 Alter Self: Natural Weapons (concentration)
+	// Unarmed strikes deal 1d6 damage, use spellcasting ability mod.
+	bool alter_self_natural_weapons = false;
 	bool searing_smite_pending = false;  // Searing Smite rider on next weapon hit
 	int searing_smite_dice = 0;          // Number of d6 to roll for Searing Smite damage
 	// Basic Rules 2024 Searing Smite (para 14881): repeating fire damage at turn start
@@ -1842,6 +1845,9 @@ class battle {
 		c.has_action = true;
 		c.has_bonus_action = true;
 		c.movement_remaining = c.speed;
+		// Basic Rules 2024 Power Word Stun (para 14671-14673): >150 HP path —
+		// Speed = 0 until start of caster's next turn.
+		if (c.power_word_stun_speed_zero) c.movement_remaining = 0;
 		c.has_moved = false;
 		c.used_action = false;
 		c.used_bonus_action = false;
