@@ -706,18 +706,18 @@ Per-class audit of all 13 base class features against `basic_rules_full.txt` (Ba
 
 ### Subclass Combat Features (138 subclasses, 80+ with full combat logic)
 **Fully Implemented Subclasses with Combat Logic:**
-- **Barbarian**: Berserker, Wild Heart, World Tree, Zealot, Ancestral Guardian, Storm Herald, Path of the Carrion Raven, Path of the Glacier, Path of the Infernal
-- **Bard**: Glamour, Swords, Whispers, Creation, Lore, Valor, Eloquence, Spirits
-- **Cleric**: Life, Light, War, Forge, Grave, Peace, Twilight, Order, Festus, Inquisition, Astral
-- **Druid**: Moon, Spores, Dreams, Stars, Land, Wildfire, Sea, Unbroken, Dragons
+- **Barbarian**: Berserker, Wild Heart, World Tree, Zealot, Ancestral Guardian, Storm Herald, Shadow Gnawer, Path of the Carrion Raven, Path of the Glacier, Path of the Infernal
+- **Bard**: Glamour, Swords, Whispers, Creation, Lore, Valor, Eloquence, Spirits, Dance, Shadow, Dirge Singer
+- **Cleric**: Life, Light, War, Forge, Grave, Peace, Twilight, Order, Shadow Domain, Keeper, Festus, Inquisition, Astral
+- **Druid**: Moon, Spores, Dreams, Stars, Land, Wildfire, Shadows, Sea, Unbroken, Dragons
 - **Fighter**: Champion, Battle Master, Eldritch Knight, Psi Warrior, Samurai, Cavalier, Rune Knight, Arcane Archer, Echo Knight, Couatl Herald, Steel Hawk, Blade Breaker
-- **Monk**: Shadow, Mercy, Elements, Sun Soul, Kensei, Ascendant Dragon, Astral Self, Drunken Master, Open Hand, Celestial, Aether
+- **Monk**: Shadow, Mercy, Elements, Sun Soul, Kensei, Ascendant Dragon, Astral Self, Drunken Master, Open Hand, Prophet, Celestial, Aether
 - **Paladin**: Devotion, Glory, Ancients, Vengeance, Conquest, Watchers, Redemption, Hearth, Zeal
-- **Ranger**: Gloom Stalker, Fey Wanderer, Hunter, Horizon Walker, Swarmkeeper, Winter Trapper, Rocborne
-- **Rogue**: Assassin, Soulknife, Inquisitive, Mastermind, Thief, Swashbuckler, Phantom, Arcane Trickster, Scout, Misfortune Bringer, Runetagger, Grim Surgeon
-- **Sorcerer**: Draconic, Shadow Magic, Wild Magic, Aberrant, Storm, Clockwork, Divine Soul, Frost, Desert Soul
-- **Warlock**: Fiend, Celestial, Archfey, Hexblade, Great Old One, Fathomless, Genie, Undead, Astral Griffon, Many
-- **Wizard**: Abjurer, Diviner, Bladesinging, War Magic, Evoker, Illusionist, Order of Scribes, Materializer, Wand Lore
+- **Ranger**: Gloom Stalker, Fey Wanderer, Hunter, Horizon Walker, Swarmkeeper, Monster Slayer, Beast Master, Drakewarden, Winter Trapper, Rocborne
+- **Rogue**: Assassin, Soulknife, Inquisitive, Mastermind, Thief, Swashbuckler, Phantom, Arcane Trickster, Scout, Umbral Binder, Misfortune Bringer, Runetagger, Grim Surgeon
+- **Sorcerer**: Draconic, Shadow Magic, Wild Magic, Aberrant, Storm, Clockwork, Divine Soul, Light Weaver, Frost, Desert Soul
+- **Warlock**: Fiend, Celestial, Archfey, Hexblade, Great Old One, Fathomless, Genie, Undead, Astral Griffon, Many, Mother of Sorrows
+- **Wizard**: Abjurer, Diviner, Bladesinging, War Magic, Evoker, Illusionist, Order of Scribes, Shadow Arcane Tradition, Chronurgy, Graviturgy, Materializer, Wand Lore
 - **Artificer**: Alchemist, Armorer, Artillerist, Battle Smith, Cartographer
 - **Gunslinger**: Deadeye, High Roller, Secret Agent, Spellslinger, Trick Shot, White Hat
 
@@ -760,6 +760,11 @@ Per-class audit of all 13 base class features against `basic_rules_full.txt` (Ba
 - Aberrant Mind Psychic Defenses (advantage on charm/frighten saves at 12 spell save sites)
 - Druid L20 Archdruid Evergreen Wild Shape (regain 1 Wild Shape use on initiative if at 0)
 - Gunslinger White Hat Lay Down the Law (Risk Die temp HP + retaliation reaction)
+- College of Dance Dazzling Footwork (Unarmored Defense 10+DEX+CHA, +10ft speed, Bardic Die melee damage), Tandem Footwork (BI die to initiative for allies), Leading Evasion (L14 DEX save extends to nearby allies)
+- Mother of Sorrows Sickening Revenge (L6 EOT CON save poison), Touch of Sorrow (L14 paralysis on hit)
+- College of Shadow Shade Step (teleport on BI grant), Night Music (L14 reaction frighten)
+- Monster Slayer Supernatural Defense (+1d6 saves vs prey), Slayer's Counter (L15 reaction attack auto-succeeds save)
+- Rune Knight Runic Juggernaut (L18 Huge + d10 + reach), Runic Shield (reaction reroll), Master of Runes (double invoke pool)
 
 ### Feats with Combat Logic
 Origin feats: alert, crafter, healer, lucky, magic_initiate, musician, savage_attacker, skilled, tavern_brawler, tough
@@ -918,6 +923,31 @@ Epic Boon feats: combat_prowess, dimensional_travel, energy_resistance, fate, fo
 - **Supernatural Defense** (Monster Slayer L7): +1d6 to saves when Slayer's Prey target forces a save, wired in get_save_bonus
 - **Curving Shot** (Arcane Archer L7): BA redirect on ranged miss to different target within 60ft
 - **Magic Arrow** (Arcane Archer L7): arrows treated as magical at L7+ in apply_damage
+
+**Batch 13 subclass features (2026-04-11):**
+- **College of Dance** (Bard, full subclass):
+  - Dazzling Footwork (L3) — Unarmored Defense (10+DEX+CHA), +10ft speed, Bardic Die damage rider on melee hit 1/turn
+  - Tandem Footwork (L6) — BI die bonus to initiative for self and allies within 30ft
+  - Inspiring Movement (L6) — reaction grants BI die bonus to ally save within 60ft
+  - Leading Evasion (L14) — on DEX save success, nearby allies within 5ft also take no damage
+- **Mother of Sorrows** (Warlock, Ebon Tides):
+  - Sickening Revenge (L6) — end-of-turn CON save or take poison damage
+  - Touch of Sorrow (L14) — on-hit paralysis rider with CON save
+- **College of Shadow** (Bard, Ebon Tides):
+  - Shade Step — teleport rider on Bardic Inspiration grant
+  - Night Music (L14) — reaction frighten trigger after casting, WIS save or Frightened
+- **Drunken Master cleanup** — Redirect Attack (L6) rewritten as auto-resolve reaction on melee miss, Drunkard's Luck auto-cancel disadvantage for 2 FP
+
+**Batch 14 subclass features (2026-04-11):**
+- **Leap to Your Feet** (Drunken Master L6): prone stand costs 5ft instead of half speed
+- **Step of the Wind ally carry** (Monk L10 Heightened Focus): ally-carry targeting prompt when spending FP on Step of the Wind
+- **Runic Juggernaut** (Rune Knight L18): Giant's Might upgrades to Huge size, d10 damage die, +5ft reach
+- **Greater Divine Intervention** (Cleric L20): full-party buff action with mass heal + condition removal + temp HP
+- **Nature Magician** (Druid L20): convert Wild Shape uses to spell slot with player prompt, 1/long rest
+- **Distant Strike** (Fey Wanderer/Horizon Walker L11): 10ft teleport before each attack, extra attack on hitting 2+ different creatures
+- **Slayer's Counter** (Monster Slayer L15): reaction weapon attack when prey forces save; hit auto-succeeds the save
+- **Deft Explorer Expertise** (Ranger L2): Expertise in one skill with player choice prompt
+- **Ferocious Charger** (Cavalier L15): STR save or Prone after 10ft+ straight-line move before attack, 1/turn
 
 **Previously implemented:** combat_prowess (+1d6 weapon miss → hit 1/turn), fortitude (+40 HP), irresistible_offense (+2d10 force 1/turn), skill (+1d10 ability check 1/turn), speed (+30ft), the_night_spirit (300ft darkvision + see invisible), truesight (Truesight 60ft)
 

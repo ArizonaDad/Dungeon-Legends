@@ -351,6 +351,15 @@ class battle_manager {
 		c.monster_attack_damage_mod = dmg_mod;
 		c.extra_attacks = extra_attacks;
 		c.summoner_id = owner.id;
+		// Xanathar's Circle of the Shepherd L6 Mighty Summoner (para 886-889): "Any beast
+		// or fey summoned by a spell gains 2 extra HP per Hit Die and its natural weapons
+		// are considered magical." Use owner level as proxy for companion hit dice.
+		if (owner.mighty_summoner_active) {
+			int bonus_hp = 2 * owner.level;
+			c.max_hp += bonus_hp;
+			c.current_hp += bonus_hp;
+			c.magic_weapon_bonus = 1; // Makes attacks count as magical for B/P/S bypass
+		}
 		// Insert into combatants AFTER the owner so it acts on the same initiative tick
 		// when initiative is rolled (or right after if mid-round).
 		combat.combatants.insert_last(c);
@@ -5622,6 +5631,15 @@ class battle_manager {
 					broadcast_announce(prev.name + "'s Nature's Veil fades.", false);
 				}
 			}
+			// Tasha's Fey Wanderer L7 Ethereal Step (para 3388-3390): "The spell ends
+			// at the end of the current turn." Remove invisibility + hidden at turn end.
+			if (prev.ethereal_step_active) {
+				prev.ethereal_step_active = false;
+				prev.remove_condition(COND_INVISIBLE);
+				prev.is_hidden = false;
+				broadcast_to_battle({{"type", message_types::condition_removed}, {"target", prev.name}, {"condition", "Invisible"}});
+				broadcast_announce(prev.name + "'s Ethereal Step ends, returning to the material plane.", false);
+			}
 			// Tasha's Swarmkeeper L7 Writhing Tide: "This effect lasts for 1 minute
 			// or until you are incapacitated." Tick down on each of the Ranger's
 			// turn-ends. When it hits 0, deactivate.
@@ -5689,6 +5707,30 @@ class battle_manager {
 				if (prev.current_hp > prev.max_hp) prev.current_hp = prev.max_hp;
 				int actual_heal = prev.current_hp - old_hp;
 				if (actual_heal > 0) broadcast_announce(prev.name + "'s Protective Spirit heals " + actual_heal + " HP!", false);
+			}
+
+			// Xanathar's Circle of the Shepherd L10 Guardian Spirit (para 892-895):
+			// "Each creature of your choice that is a beast or fey and can see the spirit
+			// totem regains hit points equal to half your druid level." Fires at end of
+			// companion's turn if within 30ft of their Shepherd Druid owner.
+			if (prev.is_companion and !prev.is_dead and prev.current_hp > 0 and prev.current_hp < prev.max_hp) {
+				for (uint gsi = 0; gsi < combat.combatants.length(); gsi++) {
+					combatant@ gs_owner = combat.combatants[gsi];
+					if (@gs_owner == null or gs_owner.is_dead) continue;
+					if (gs_owner.id != prev.owner_id) continue;
+					if (!gs_owner.guardian_spirit_active) break;
+					int gs_dist = feet_distance(prev.x, prev.y, gs_owner.x, gs_owner.y);
+					if (gs_dist <= 30) {
+						int gs_heal = gs_owner.level / 2;
+						if (gs_heal < 1) gs_heal = 1;
+						int gs_old_hp = prev.current_hp;
+						prev.current_hp += gs_heal;
+						if (prev.current_hp > prev.max_hp) prev.current_hp = prev.max_hp;
+						int gs_actual = prev.current_hp - gs_old_hp;
+						if (gs_actual > 0) broadcast_announce(prev.name + " is healed for " + gs_actual + " HP by Guardian Spirit!", false);
+					}
+					break;
+				}
 			}
 
 			// Xanathar's Glamour Bard L6 Mantle of Majesty (para 558-561): "for 1 minute
@@ -7832,6 +7874,10 @@ class battle_manager {
 		if (c.class_name == "Ranger" and c.level >= 10 and c.exhaustion_level > 0) {
 			c.exhaustion_level--;
 			broadcast_announce(c.name + "'s Tireless reduces exhaustion to level " + c.exhaustion_level + ".", false);
+		}
+		// Tasha's Fey Wanderer L7 Ethereal Step: 1/SR-LR
+		if (c.class_name == "Ranger" and c.subclass == "Fey Wanderer" and c.level >= 7) {
+			c.ethereal_step_available = true;
 		}
 		// Rogue L20 Stroke of Luck: reset on SR
 		c.stroke_of_luck_available = (c.class_name == "Rogue" and c.level >= 20);
@@ -11915,7 +11961,9 @@ class battle_manager {
 				int ds_type = -1;
 				int ds_dmg = c.roll_divine_strike(ds_type);
 				if (ds_dmg > 0 and ds_type >= 0) {
-					string ds_name = (ds_type == DMG_NECROTIC) ? "necrotic" : "radiant";
+					string ds_name = "radiant";
+					if (ds_type == DMG_NECROTIC) ds_name = "necrotic";
+					else if (ds_type == DMG_FIRE) ds_name = "fire";
 					combat.apply_damage(target, ds_dmg, ds_type, c);
 					broadcast_announce(c.name + "'s Divine Strike deals " + ds_dmg + " extra " + ds_name + " damage!", false);
 				}

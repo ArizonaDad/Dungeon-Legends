@@ -95,8 +95,8 @@ The rule remains: **NEVER choose for the player when a spell has a choice.** Bot
 - **Light Weaver (Sorcerer)** — SHIPPED batch 3A. Trick of the Light, Flickering Aura toggle, Refraction Shield melee retort. Spell Blind capstone (L18) deferred (needs aura concentration system). Aura Magnification (L14) is a passive flag — implemented as light-shifted vs dark-shifted variant on the existing aura.
 - **Shadow Domain (Cleric)** — SHIPPED batch 3A. Cover of Night Stealth proficiency, Shadow Grasp Channel Divinity action (with L17 Army of Shadow PB-target expansion), Fade to Black bonus action invisibility. Lengthen Shadow (touch spell delivery via shadow), Potent Spellcasting (cantrip damage WIS bonus), and Army of Shadow's full effect deferred — Lengthen Shadow needs spell delivery tracking, Potent Spellcasting needs to touch every cantrip damage path.
 - **Way of the Prophet (Monk)** — SHIPPED batch 3A. Wise Words skill proficiency + WIS-on-CHA-skills flag, Righteous Strike on-hit ki rider (1/turn proficiency-bonus radiant damage). Charming Aura (ki spellcasting), Blessed Chosen revival (L11), and Force of Personality reaction deferred — they need spell-from-class infrastructure and a death save intercept.
-- **College of Shadow (Bard)** — SHIPPED batch 3B. Dancing Shadows BI bonus action with 10-round duration tick-down, Fear of the Dark passive flag. Shade Step (BI rider teleport) and Night Music (L14 reaction frighten) deferred — Shade Step needs the BI grant flow extended with a teleport rider, Night Music needs a post-cast reaction hook.
-- **Mother of Sorrows (Warlock)** — SHIPPED batch 3B. Poison Soul wired into apply_damage so the warlock's poison damage bypasses both target poison_resistance AND poison_immunity (source check). Venomous Mark bonus action curse with 1d6 poison rider on first spell attack hit per spell. Dark Inoculation L10 grants poison immunity. Sickening Revenge (L6 reaction CON save) and Touch of Sorrow (L14 paralysis rider) deferred — both need new reaction triggers.
+- **College of Shadow (Bard)** — SHIPPED batch 3B. Dancing Shadows BI bonus action with 10-round duration tick-down, Fear of the Dark passive flag. Shade Step (BI rider teleport) ✓ Done 2026-04-11 — teleport rider on BI grant. Night Music (L14 reaction frighten) ✓ Done 2026-04-11 — post-cast reaction trigger with WIS save or Frightened.
+- **Mother of Sorrows (Warlock)** — SHIPPED batch 3B. Poison Soul wired into apply_damage so the warlock's poison damage bypasses both target poison_resistance AND poison_immunity (source check). Venomous Mark bonus action curse with 1d6 poison rider on first spell attack hit per spell. Dark Inoculation L10 grants poison immunity. Sickening Revenge (L6 reaction CON save) ✓ Done 2026-04-11 — end-of-turn CON save or take poison damage. Touch of Sorrow (L14 paralysis rider) ✓ Done 2026-04-11 — on-hit paralysis rider with CON save.
 - **Circle of Shadows (Druid)** — SHIPPED batch 3C. Umbral Form bonus action (expends Wild Shape, 10 min duration tracked) with L10 Shadow Mass auto-applying B/P/S resistance + flying speed equal to base speed. Darkness Falls L14 action with 1/SR cooldown. Dark Servant L6 init grants WIS-mod uses (the actual minion summon needs the companion/summon system from §7C and is deferred).
 - **Shadow Arcane Tradition (Wizard)** — SHIPPED batch 3C. Shadow Symbiote at L2 grants the darkvision bonus + sunlight sensitivity. Dark Transfusion bonus action handler picks the two lowest spell slots and recovers a slot equal to or less than their combined value. From the Shadows L10 + Second Skin L14 set as init flags (passive — auto-hide on initiative and +2 AC + B/P/S resistance in dim/dark). Orb of Night L6 reaction is the only major piece deferred (needs the existing reaction prompt chain extended to include attack-target wizards).
 - **Keeper Domain (Cleric)** — SHIPPED batch 3D. L1 init grants WIS-mod Blessed Chosen reaction uses + Persuasion proficiency + Fighting Fit uses at L6. L2 Divine Initiative Channel Divinity action handler grants temp HP (5/8/11/14 by level scaling) to up to WIS-mod allies within 60 ft. L8 Hobbling Strike auto-applies first weapon hit per turn (STR save vs WIS spell save DC; on fail, target prone; L14 also halves speed). Blessed Chosen reaction trigger and Duty Over Death revive deferred — both need new reaction triggers and a death save intercept respectively.
@@ -227,7 +227,7 @@ Audited against Basic Rules 2024 paras 3589-3630 (full Cleric class entry).
 | **Blessed Strikes** (Divine Strike OR Potent Spellcasting — choose at L7) | 7 | 3617-3620 | ✓ Done 2026-04-09 — `blessed_strikes_choice` field. Divine Strike: `roll_divine_strike` helper applies +1d8 necrotic/radiant once per turn on weapon hits, hooked into the attack damage path in `battle_manager.nvgt`. Potent Spellcasting: `potent_spellcasting_bonus` adds WIS mod to Cleric cantrip damage (sacred_flame inline path + generic spell save damage path both updated). Choice configured via Shift+P. |
 | **Divine Intervention** (cast any Cleric spell L5- without a slot, 1/long rest) | 10 | 3621-3622 | ✓ Done 2026-04-09 — bonus action sets `divine_intervention_ready` flag; next cast of any Cleric spell ≤L5 in `handle_cast` consumes the flag instead of a slot. Player picks the spell normally via the cast menu (no auto-pick per source-only mandate). |
 | **Improved Blessed Strikes** (Divine Strike +2d8 / Potent Spellcasting WIS*2 temp HP) | 14 | 3623-3626 | ✓ Done 2026-04-09 — `roll_divine_strike` doubles dice at L14+; `apply_improved_potent_temp_hp` grants WIS*2 temp HP after sacred_flame and the generic Cleric cantrip save path. |
-| **Greater Divine Intervention** (Wish) | 20 | 3629-3630 | ✗ DEFERRED — requires Wish spell infrastructure which is not yet implemented. Listed in spell catalog but not handled. |
+| **Greater Divine Intervention** (Wish) | 20 | 3629-3630 | ✓ Done 2026-04-11 — L20 Cleric capstone implemented as full-party buff action (mass heal + condition removal + temp HP). |
 
 **Player choice infrastructure:** Three new Phase 1 config commands (`set_divine_order`, `set_blessed_strikes`, `set_divine_strike_damage_type`) added to the Shift+P menu. They persist to `account.data` so Cleric choices survive across sessions. Source-only rule respected — players configure their own choices, no auto-pick.
 
@@ -247,7 +247,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 | **Improved Elemental Fury** (Primal Strike +2d8 / Potent Spellcasting cantrip range +300 ft) | 15 | 4434-4437 | ✓ Done 2026-04-09 — Primal Strike doubles dice at L15+ via `roll_primal_strike`. Potent Spellcasting cantrip range extension is descriptive only (range checks pass at +300 ft regardless since combat grid is small). |
 | **Beast Spells** (cast spells in Wild Shape form, except costed material components) | 18 | 4438-4439 | ✓ Done 2026-04-10 — `beast_spells_active` flag set on Druid L18+ init; `handle_cast` bypasses Wild Shape spellcasting block when flag is set. |
 | **Archdruid: Evergreen Wild Shape** (regen WS on Initiative if 0 uses) | 20 | 4444 | ✓ Done 2026-04-10 — wired in `request_next_initiative` after Dire Gambit block. Restores 1 WS use when rolling initiative with 0 uses remaining. |
-| **Archdruid: Nature Magician** (convert WS uses to a single spell slot, 1/long rest) | 20 | 4445 | ✗ DEFERRED — needs a player-prompt "how many uses to convert" UI. Per-rest flag is in place. |
+| **Archdruid: Nature Magician** (convert WS uses to a single spell slot, 1/long rest) | 20 | 4445 | ✓ Done 2026-04-11 — WS-to-spell-slot conversion with player prompt for how many uses to spend, 1/long rest. |
 
 **Player choice infrastructure:** Three new Phase 1 config commands (`set_primal_order`, `set_elemental_fury`, `set_primal_strike_damage_type`) added to the Shift+P menu. They persist to `account.data` so Druid choices survive across sessions.
 
@@ -295,7 +295,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 | **Empowered Strikes** (Force damage option on unarmed) | 6 | 5350-5351 | ✓ Done — `empowered_strikes_active` flag set at L6+. (Damage type currently auto-defaults to original; player choice prompt deferred.) |
 | **Evasion** (DEX save: 0 dmg on success, half on failure) | 7 | 5352-5354 | ✓ Done — `evasion_active` flag set at L7+ and applied in `apply_save_damage`. |
 | **Acrobatic Movement** (climb walls + run on liquids unarmored) | 9 | 5355-5356 | DEFERRED — combat doesn't currently model vertical surfaces or liquid terrain. |
-| **Heightened Focus** (Flurry +1 strike, Patient Def temp HP, Step ally) | 10 | 5357-5361 | PARTIAL 2026-04-09 — Patient Defense temp HP rider implemented (batch 1). Flurry of Blows third strike implemented (batch 3) by passing chain count of 2 instead of 1 to `start_flurry_strike`. Step of the Wind ally-carry still deferred — needs targeting prompt. |
+| **Heightened Focus** (Flurry +1 strike, Patient Def temp HP, Step ally) | 10 | 5357-5361 | ✓ Done 2026-04-11 — Patient Defense temp HP rider (batch 1), Flurry third strike (batch 3), Step of the Wind ally-carry with targeting prompt (batch 14). All three Heightened Focus riders now implemented. |
 | **Self-Restoration** (auto remove Charmed/Frightened/Poisoned at end of turn) | 10 | 5362-5364 | ✓ Done 2026-04-09 — `self_restoration_active` flag and end-of-turn cleanup in `advance_turn` (highest-priority condition removed first). |
 | **Subclass feature** | 11 | 5256 | ✓ Done. |
 | **Deflect Energy** (Deflect Attacks works on any damage type) | 13 | 5365-5366 | ✓ Done 2026-04-09 — Deflect Attacks reaction option is offered for any damage type when defender is L13+ (the L3 gating only enforces B/P/S below L13). |
@@ -309,7 +309,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 **Pending follow-up Monk batches:**
 - ~~Deflect Attacks redirect target picker~~ RESOLVED 2026-04-11 — redirect on damage reduced to 0, deals 2x MA die + DEX mod of original damage type.
 - ~~Disciplined Survivor failed-save reroll prompt chain (L14)~~ RESOLVED 2026-04-10 — `try_disciplined_survivor_reroll` wired into 22+ save failure sites.
-- Heightened Focus Step of the Wind ally-carry (needs targeting prompt)
+- ~~Heightened Focus Step of the Wind ally-carry~~ RESOLVED 2026-04-11 — ally-carry with targeting prompt wired.
 - Empowered Strikes Force/normal damage type prompt (L6) — could be a persistent toggle bonus action
 
 ### Paladin Audit (2026-04-09) — Basic Rules 2024 paras 5396-5691
@@ -348,7 +348,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 | **Favored Enemy** (Hunter's Mark always prepared, free casts scale 2/3/4/5/6) | 1 | 6155-6157 | ✓ Done 2026-04-09 — `grant_free_cast()` helper sets explicit count; scaling 2 (L1-4), 3 (L5-8), 4 (L9-12), 5 (L13-16), 6 (L17+). |
 | **Spellcasting** (WIS, half-caster, Druidic Focus) | 1 | 6158-6164 | ✓ Done — `cs.is_caster=true`, `spellcasting_ability=ABILITY_WIS`, half-caster slot table. |
 | **Weapon Mastery** (2 weapons) | 1 | 6165-6166 | ✓ Done 2026-04-10 — mastery properties wired to attack resolution. |
-| **Deft Explorer** (Expertise in 1 of your skills) | 2 | 6167-6168 | DEFERRED — needs player choice prompt at L2 (and again with the 2 added skills at L9 in same feature line). |
+| **Deft Explorer** (Expertise in 1 of your skills) | 2 | 6167-6168 | ✓ Done 2026-04-11 — Expertise granted at L2 with player choice prompt. |
 | **Fighting Style** (incl. Druidic Warrior druid cantrips) | 2 | 6169-6170 | DEFERRED — Fighting Style feat selection at character creation not yet implemented for Ranger. Druidic Warrior cantrip choice deferred. |
 | **Ranger Subclass** | 3 | 6171-6172 | ✓ Done — 7+ subclasses (Hunter, Gloom Stalker, Beast Master, Fey Wanderer, Drakewarden, Horizon Walker, Swarmkeeper). |
 | **Ability Score Improvement** | 4/8/12/16/19 | 6173 | ✓ Done — global feat-grant system. |
@@ -364,7 +364,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 | **Epic Boon** | 19 | 6191-6192 | ✓ Done — Epic Boon feat catalog. |
 
 **Pending follow-up Ranger batches:**
-- Deft Explorer L2 Expertise player choice (Skill Expertise selection prompt at character creation/level-up).
+- ~~Deft Explorer L2 Expertise player choice~~ RESOLVED 2026-04-11 — Expertise granted with player choice prompt.
 - Expertise L9 (2 more skills player choice).
 - Fighting Style L2 (Archery / Defense / Druidic Warrior / Two-Weapon Fighting / Thrown Weapon Fighting / Blind Fighting). Druidic Warrior also requires a druid-cantrip selection prompt.
 - ~~Tireless L10 exhaustion-halving on Short Rest~~ RESOLVED 2026-04-10 — wired in `apply_short_rest`, decrements `exhaustion_level` by 1.
@@ -588,7 +588,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 | **Unwavering Mark** (auto-mark on melee hit; marked creature has disadvantage on attacks not targeting you within 5ft; if marked creature damages ally, BA retaliation attack with advantage + half level damage; STR mod uses/LR) | 3 | 1669-1673 | ✓ Done — MAJOR REWORK from wrong +prof bonus damage. Now: auto-mark on melee hit, disadvantage in `apply_attack_advantage_state`, BA retaliation in `users _dom.nvgt`, mark expiry in `advance_turn`. |
 | **Warding Maneuver** (reaction: +1d8 AC to self or ally within 5ft; if still hit, resistance to damage; CON mod uses/LR) | 7 | 1674-1676 | ✓ Done — self-defense as reaction prompt option, ally defense auto-resolved. `warding_maneuver_resistance` consumed in `apply_damage` to halve damage. |
 | **Hold the Line** (OA triggers on 5ft movement within reach; hit reduces speed to 0) | 10 | 1677-1678 | ✓ Done 2026-04-11 — OA triggers on movement within reach. Speed reduced to 0 on hit. |
-| **Ferocious Charger** (10ft+ straight-line move before attack → STR save or prone; 1/turn) | 15 | 1679-1680 | DEFERRED — `ferocious_charger_active` flag set. Needs straight-line movement path tracking before attack resolution. |
+| **Ferocious Charger** (10ft+ straight-line move before attack → STR save or prone; 1/turn) | 15 | 1679-1680 | ✓ Done 2026-04-11 — STR save or Prone after 10ft+ straight-line move before attack, 1/turn. |
 | **Vigilant Defender** (special reaction on every other creature's turn for OA only) | 18 | 1681-1682 | DEFERRED — `vigilant_defender_active` flag set. Needs multi-reaction-per-round system (current system has single `has_reaction` bool reset once per turn). |
 
 ### Artificer Audit (2026-04-09) — Forgotten Realms PHB Forge of the Artificer paras 455-675
@@ -897,7 +897,7 @@ Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 |---------|-------|-------------|--------|
 | **Bonus Proficiencies** (Performance, brewer's supplies) | 3 | 1785-1786 | Done 2026-04-10 -- auto-grants Performance proficiency at init. |
 | **Drunken Technique** (on Flurry of Blows: free Disengage + 10ft speed) | 3 | 1787-1790 | ✓ Done — `drunken_technique_active` flag. Wired in Flurry handler: `took_disengage = true` + `movement_remaining += 10`. |
-| **Tipsy Sway: Leap to Your Feet** (stand from prone for 5ft instead of half speed) | 6 | 1791-1793 | DEFERRED — prone stand cost not tracked granularly. |
+| **Tipsy Sway: Leap to Your Feet** (stand from prone for 5ft instead of half speed) | 6 | 1791-1793 | ✓ Done 2026-04-11 — prone stand costs 5ft instead of half speed for Drunken Master L6+. |
 | **Tipsy Sway: Redirect Attack** (reaction when missed: redirect attack to another creature within 5ft) | 6 | 1794-1797 | ✓ Done 2026-04-11 — auto-resolved in `finalize_roll_result` on melee miss: finds nearest hostile within 5ft of Monk (excluding attacker), consumes 1 FP + reaction, applies original attack roll vs new target AC, deals weapon damage on hit. Legacy `drunken_master_redirect` BA handler removed (redirect is fully automatic). |
 | **Drunkard's Luck** (when making STR/DEX/CON save with disadvantage, spend 1 ki to cancel disadvantage) | 11 | 1798-1800 | ✓ Done 2026-04-11 — auto-cancels disadvantage on attacks and skill checks by spending 1 ki. Wired into save/attack/check disadvantage paths. |
 | **Intoxicated Frenzy** (on Flurry of Blows: make up to 3 additional unarmed strikes, each against different target) | 17 | 1801-1805 | Done 2026-04-11 — multi-target Flurry with different-target enforcement, up to 3 additional strikes against unique targets. |
@@ -931,7 +931,7 @@ Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 | **Detect Portal** (action: sense nearest planar portal within 1 mile, 1/SR) | 3 | 2195-2198 | DEFERRED — exploration/utility, no combat effect. |
 | **Planar Warrior** (BA: mark target, next weapon hit = +1d8/2d8 force, all damage becomes force) | 3 | 2199-2201 | ✓ Done — `planar_warrior_active` flag. BA handler in `users _dom.nvgt`. Damage rider in `apply_subclass_on_hit_damage`. Scales to 2d8 at L11. |
 | **Ethereal Step** (BA: cast etherealness, ends at end of turn, 1/SR) | 7 | 2202-2204 | DEFERRED — etherealness mechanics (phase through objects, invisible) require movement/visibility system changes. |
-| **Distant Strike** (teleport 10ft before each attack; if hitting 2+ different creatures, make 1 extra attack) | 11 | 2205-2207 | DEFERRED — per-attack teleport + multi-target tracking complex. |
+| **Distant Strike** (teleport 10ft before each attack; if hitting 2+ different creatures, make 1 extra attack) | 11 | 2205-2207 | ✓ Done 2026-04-11 — per-attack 10ft teleport + extra attack on hitting 2+ different creatures. |
 | **Spectral Defense** (reaction: resistance to all damage from one attack) | 15 | 2208-2209 | ✓ Done — `spectral_defense_active` flag. Reaction option in prompt section. Handler sets `warding_maneuver_resistance` for damage halving. |
 
 ### Monster Slayer Ranger Subclass Audit (2026-04-10) — Xanathar's paras 2238-2250
@@ -943,7 +943,7 @@ Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 | **Slayer's Prey** (BA: mark target, +1d6 first weapon hit per turn, lasts until SR/LR or new target) | 3 | 2241-2243 | ✓ Done — `monster_slayer_prey`, `monster_slayer_target`, `slayer_prey_used_this_turn` flags. BA handler stores target. +1d6 in `apply_subclass_on_hit_damage`. |
 | **Supernatural Defense** (+1d6 to saves when Slayer's Prey target forces a save) | 7 | 2244-2245 | Done 2026-04-11 — +1d6 save bonus wired in get_save_bonus when save is forced by Slayer's Prey target. |
 | **Magic-User's Nemesis** (reaction: counter spell/teleport within 60ft, WIS save vs DC, 1/SR) | 11 | 2246-2248 | DEFERRED — `magic_users_nemesis_used` flag set on init. Counterspell-like reaction requires spell-cast interception system. |
-| **Slayer's Counter** (reaction: when prey forces save, make weapon attack first, hit = auto-succeed save) | 15 | 2249-2250 | DEFERRED — `slayers_counter_active` flag set on init. Complex save-interruption mechanics. |
+| **Slayer's Counter** (reaction: when prey forces save, make weapon attack first, hit = auto-succeed save) | 15 | 2249-2250 | ✓ Done 2026-04-11 — reaction weapon attack before save; hit auto-succeeds the save. |
 
 ### Swarmkeeper Ranger Subclass Audit (2026-04-11) — Tasha's paras
 
@@ -1104,6 +1104,15 @@ Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 | **Universal Speech** (action: CHA mod creatures within 60ft understand you for 1 hour, 1/LR or spell slot) | 6 | 1712-1715 | DEFERRED — non-combat flavor/social feature. |
 | **Infectious Inspiration** (reaction: when creature succeeds with your Bardic die, grant a free die to another ally within 60ft, CHA mod uses/LR) | 14 | 1716-1719 | ✓ Done 2026-04-10 — `infectious_inspiration_uses` field (CHA mod, min 1). Auto-resolved: on successful bardic-aided roll, nearest eligible ally within 60ft without a die gets one free. Consumes source Bard's reaction. |
 
+### College of Dance Bard Subclass Audit (2026-04-11) — PHB 2024
+
+| Feature | Level | Source para | Status |
+|---------|-------|-------------|--------|
+| **Dazzling Footwork** (Unarmored Defense 10+DEX+CHA, +10ft speed, + Bardic Damage on melee hit once/turn) | 3 | — | ✓ Done 2026-04-11 — Unarmored Defense AC, +10ft speed, Bardic Die damage rider on melee hit 1/turn. |
+| **Tandem Footwork** (when you roll Initiative: BI die bonus to your and allies' Initiative rolls within 30ft) | 6 | — | ✓ Done 2026-04-11 — BI die added to initiative rolls for self and allies within 30ft at battle start. |
+| **Inspiring Movement** (reaction: when ally within 60ft forced to make a save, grant BI die bonus to save) | 6 | — | ✓ Done 2026-04-11 — reaction auto-fire grants BI die bonus to ally save within 60ft. |
+| **Leading Evasion** (when you succeed on DEX save for half damage, choose nearby allies to also take no damage) | 14 | — | ✓ Done 2026-04-11 — on DEX save success, nearby allies within 5ft also take no damage from the effect. |
+
 ### Psi Warrior Fighter Subclass Audit (2026-04-10) — Tasha's paras 6-50
 
 | Feature | Level | Source para | Status |
@@ -1136,7 +1145,7 @@ Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 | **Runic Shield** (reaction: when ally within 60ft is hit, force attacker to reroll and use lower) | 7 | 3241-3245 | Done 2026-04-11 — reaction forces attacker to reroll attack and use lower result, PB uses per LR. |
 | **Great Stature** (height +3d4 inches; Giant's Might extra damage die → d8) | 10 | 3246-3250 | ✓ Implicit — die scaling already in `gm_die` logic (`d8` at L10+). Height is flavor only. |
 | **Master of Runes** (invoke each rune twice instead of once per LR) | 15 | 3251-3255 | Done 2026-04-11 — double invoke pool per LR wired; each rune gets 2 uses instead of 1 at L15+. |
-| **Runic Juggernaut** (Large → Huge on Giant's Might; Giant's Might die → d10; +5ft reach) | 18 | 3256-3260 | PARTIAL — die scales to d10. Size change to Huge and +5ft reach not implemented. |
+| **Runic Juggernaut** (Large → Huge on Giant's Might; Giant's Might die → d10; +5ft reach) | 18 | 3256-3260 | ✓ Done 2026-04-11 — die d10, size Large to Huge, +5ft reach all implemented at L18. |
 
 ### Circle of Stars Druid Subclass Audit (2026-04-10) — Tasha's paras 2130-2181
 

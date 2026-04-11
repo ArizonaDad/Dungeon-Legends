@@ -2533,6 +2533,12 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         if (cs.level >= 20) c.nature_magician_active = true;
         if (cs.subclass == "Circle of the Shepherd" and cs.level >= 2) {
             c.shepherd_circle_active = true;
+            // Xanathar's Shepherd L6 Mighty Summoner (para 886-889): summoned beasts/fey
+            // gain +2 HP per Hit Die and natural weapons count as magical.
+            if (cs.level >= 6) c.mighty_summoner_active = true;
+            // Xanathar's Shepherd L10 Guardian Spirit (para 892-895): beast/fey companions
+            // in spirit totem aura (30ft) regain (druid level / 2) HP at end of their turn.
+            if (cs.level >= 10) c.guardian_spirit_active = true;
         }
         // Book of Ebon Tides: Circle of Shadows
         // L2 Umbral Form (paras 1016-1021): bonus action expend Wild Shape to take umbral
@@ -3254,7 +3260,9 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
 
     // Xanathar's Forge Domain (paras 701-755)
     if (cs.class_name == "Cleric" and cs.subclass == "Forge Domain") {
-        // L1 Blessing of the Forge (para 738-740): +1 AC handled in calculate_ac (line ~455)
+        // L1 Blessing of the Forge (para 738-740): +1 AC handled in calculate_ac (line ~455).
+        // Flag tracks that the blessing is active (for reference / status display).
+        c.blessing_of_the_forge_active = true;
         // L1 Domain Spells (para 721-735): always prepared
         if (!c.knows_spell("searing_smite")) c.prepared_spells.insert_last("searing_smite");
         if (!c.knows_spell("heat_metal")) c.prepared_spells.insert_last("heat_metal");
@@ -3270,7 +3278,10 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
             }
         }
         // L8 Divine Strike (para 750-751): 1d8 fire at L8, 2d8 at L14 — handled via Blessed Strikes system
-        if (cs.level >= 8) c.blessed_strikes_choice = "divine_strike";
+        if (cs.level >= 8) {
+            c.blessed_strikes_choice = "divine_strike";
+            c.divine_strike_damage_type = "fire"; // Forge Domain uses fire damage per Xanathar's para 750
+        }
         // L17 Saint of Forge and Fire (para 752-755): fire resistance→immunity (approximated as resistance stays),
         // B/P/S resistance from nonmagical attacks while in heavy armor
         if (cs.level >= 17) {
@@ -3501,11 +3512,23 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
             // L15 Shadowy Dodge (para 2162-2163): reaction to impose disadvantage
             if (cs.level >= 15) c.shadowy_dodge_active = true;
         }
-        // PHB 2024 Fey Wanderer Ranger (para 6173-6195)
+        // PHB 2024 / Tasha's Fey Wanderer Ranger (para 6173-6195, Tasha's paras 3380-3395)
         if (cs.subclass == "Fey Wanderer") {
+            // L7 Ethereal Step (Tasha's para 3388-3390): "As a bonus action, you can
+            // cast Etherealness on yourself, with no spell slot or material components
+            // required. The spell ends at the end of the current turn." 1/SR-LR.
+            if (cs.level >= 7) c.ethereal_step_available = true;
             // L11 Distant Strike (para 6187-6190): teleport 10ft before each attack;
             // if 2+ different targets hit during Attack action, gain one additional attack.
             if (cs.level >= 11) c.distant_strike_active = true;
+            // L15 Misty Wanderer (Tasha's para 3393-3395): "You can cast Misty Step
+            // without expending a spell slot. You can do so a number of times equal to
+            // your Wisdom modifier (minimum of once)." Recovers on long rest.
+            if (cs.level >= 15) {
+                int wis_mod = (c.ability_scores[ABILITY_WIS] - 10) / 2;
+                if (wis_mod < 1) wis_mod = 1;
+                c.grant_free_cast("misty_step", wis_mod);
+            }
         }
         // Tasha's Swarmkeeper Ranger
         if (cs.subclass == "Swarmkeeper") {

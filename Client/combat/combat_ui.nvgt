@@ -210,6 +210,9 @@ bool my_sudden_strike_used = false;
 // PHB 2024 Ranger L10 Tireless / L14 Nature's Veil — synced from server
 int my_natures_veil_uses_remaining = 0;
 int my_tireless_temp_hp_uses_remaining = 0;
+// Tasha's Fey Wanderer L7 Ethereal Step — synced from server
+bool my_ethereal_step_available = false;
+bool my_ethereal_step_active = false;
 // Tasha's Swarmkeeper Ranger — synced from server
 string my_gathered_swarm_mode = "damage";
 int my_writhing_tide_uses = 0;
@@ -1317,6 +1320,8 @@ void show_bonus_action_menu() {
 	// PHB 2024 Ranger L10/L14 base class features
 	int natures_veil_opt = -1;
 	int tireless_temp_hp_opt = -1;
+	// Tasha's Fey Wanderer L7 Ethereal Step
+	int ethereal_step_opt = -1;
 	// PHB 2024 Rogue L3 Steady Aim (para 6550-6551)
 	int steady_aim_opt = -1;
 	// PHB 2024 Sorcerer L1 Innate Sorcery / L2 Font of Magic / L2 Metamagic
@@ -1787,6 +1792,11 @@ void show_bonus_action_menu() {
 	// Wis-mod uses per long rest.
 	if (lc == "ranger" and level >= 10 and my_tireless_temp_hp_uses_remaining > 0) {
 		tireless_temp_hp_opt = m.add_item("Tireless. Magic action. Gain 1d8 + WIS mod temporary hit points. Uses left: " + my_tireless_temp_hp_uses_remaining + ".");
+	}
+	// Tasha's Fey Wanderer L7 Ethereal Step (para 3388-3390): BA self-Etherealness,
+	// ends at end of current turn. 1/SR-LR.
+	if (lc == "ranger" and subclass == "Fey Wanderer" and level >= 7 and my_ethereal_step_available) {
+		ethereal_step_opt = m.add_item("Ethereal Step. Bonus action. Become invisible and hidden until end of turn. 1 per short or long rest.");
 	}
 	// PHB 2024 Ranger L14 Nature's Veil (para 6184-6186): "As a Bonus Action, you can
 	// give yourself the Invisible condition until the end of your next turn."
@@ -2367,6 +2377,11 @@ void show_bonus_action_menu() {
 	}
 	else if (empowered_strikes_toggle_opt >= 0 and res == empowered_strikes_toggle_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "empowered_strikes_toggle"}});
+	}
+	else if (ethereal_step_opt >= 0 and res == ethereal_step_opt) {
+		// Tasha's Fey Wanderer L7 Ethereal Step (para 3388-3390)
+		send({{"type", message_types::bonus_action}, {"feature", "ethereal_step"}});
+		speak("Ethereal Step! Stepping into the Ethereal Plane.", true);
 	}
 	else if (natures_veil_opt >= 0 and res == natures_veil_opt) {
 		// PHB 2024 Ranger L14 Nature's Veil (para 6184-6186)
@@ -4503,6 +4518,9 @@ void parse_game_state(json_object@ msg) {
 	my_lay_on_hands_pool = msg.exists("my_lay_on_hands_pool") ? int(msg["my_lay_on_hands_pool"]) : 0;
 	my_natures_veil_uses_remaining = msg.exists("my_natures_veil_uses_remaining") ? int(msg["my_natures_veil_uses_remaining"]) : 0;
 	my_tireless_temp_hp_uses_remaining = msg.exists("my_tireless_temp_hp_uses_remaining") ? int(msg["my_tireless_temp_hp_uses_remaining"]) : 0;
+	// Tasha's Fey Wanderer L7 Ethereal Step
+	my_ethereal_step_available = msg.exists("my_ethereal_step_available") ? bool(msg["my_ethereal_step_available"]) : false;
+	my_ethereal_step_active = msg.exists("my_ethereal_step_active") ? bool(msg["my_ethereal_step_active"]) : false;
 	// Tasha's Swarmkeeper
 	my_gathered_swarm_mode = msg.exists("my_gathered_swarm_mode") ? string(msg["my_gathered_swarm_mode"]) : "damage";
 	my_writhing_tide_uses = msg.exists("my_writhing_tide_uses") ? int(msg["my_writhing_tide_uses"]) : 0;
@@ -4846,6 +4864,8 @@ void reset_combat_state() {
 	my_lay_on_hands_pool = 0;
 	my_natures_veil_uses_remaining = 0;
 	my_tireless_temp_hp_uses_remaining = 0;
+	my_ethereal_step_available = false;
+	my_ethereal_step_active = false;
 	my_gathered_swarm_mode = "damage";
 	my_writhing_tide_uses = 0;
 	my_writhing_tide_active = false;

@@ -487,6 +487,10 @@ class combatant {
 	bool stalkers_flurry_active = false; // L11: on miss, make another weapon attack
 	bool stalkers_flurry_used_this_turn = false; // once per turn
 	bool shadowy_dodge_active = false; // L15: reaction to impose disadvantage
+	// Tasha's Fey Wanderer L7 Ethereal Step (para 3388-3390): BA Etherealness self,
+	// ends at end of current turn. 1/SR-LR.
+	bool ethereal_step_available = false;
+	bool ethereal_step_active = false; // currently in ethereal form (cleared at turn end)
 	// Xanathar's/Tasha's Fey Wanderer L11 Distant Strike: teleport 10ft before each
 	// attack; if 2+ different targets hit, grant one bonus attack.
 	bool distant_strike_active = false;
@@ -1150,6 +1154,15 @@ class combatant {
 	bool trickery_domain_active = false; // Trickery Domain Cleric - duplicate self
 	bool shepherd_circle_active = false; // Circle of the Shepherd Druid - spirit totems
 	int shepherd_totem_type = 0; // 0=bear (HP), 1=hawk (perception), 2=wolf (advantage)
+	// Xanathar's Circle of the Shepherd L6 Mighty Summoner (para 886-889): summoned beasts/fey
+	// gain +2 HP per Hit Die and natural weapons count as magical for B/P/S bypass.
+	bool mighty_summoner_active = false;
+	// Xanathar's Circle of the Shepherd L10 Guardian Spirit (para 892-895): beast/fey companions
+	// in spirit totem aura (30ft) regain (druid level / 2) HP at end of their turn.
+	bool guardian_spirit_active = false;
+	// Xanathar's Forge Domain L1 Blessing of the Forge (para 738-740): +1 AC already applied
+	// in calculate_ac. This flag tracks whether the blessing is active for reference.
+	bool blessing_of_the_forge_active = false;
 	bool college_choreography_active = false; // College of Choreography Bard
 	bool college_mercantile_active = false; // College of Mercantile Bard
 	bool blade_breaker_armor_crush = false; // armor reduction tracking
@@ -1800,7 +1813,10 @@ class combatant {
 		int total = 0;
 		for (int i = 0; i < dice; i++) total += random(1, 8);
 		divine_strike_used_this_turn = true;
-		out_damage_type = (divine_strike_damage_type == "necrotic") ? DMG_NECROTIC : DMG_RADIANT;
+		// Map damage type string to constant. Forge Domain uses "fire" per Xanathar's para 750.
+		if (divine_strike_damage_type == "necrotic") out_damage_type = DMG_NECROTIC;
+		else if (divine_strike_damage_type == "fire") out_damage_type = DMG_FIRE;
+		else out_damage_type = DMG_RADIANT;
 		return total;
 	}
 
@@ -3080,6 +3096,9 @@ class battle {
 				// PHB 2024 Ranger L10 Tireless / L14 Nature's Veil — broadcast use counts
 				state["my_natures_veil_uses_remaining"] = c.natures_veil_uses_remaining;
 				state["my_tireless_temp_hp_uses_remaining"] = c.tireless_temp_hp_uses_remaining;
+				// Tasha's Fey Wanderer L7 Ethereal Step — broadcast availability
+				state["my_ethereal_step_available"] = c.ethereal_step_available;
+				state["my_ethereal_step_active"] = c.ethereal_step_active;
 				// Tasha's Swarmkeeper: broadcast mode, writhing tide, swarming dispersal
 				state["my_gathered_swarm_mode"] = c.gathered_swarm_mode;
 				state["my_writhing_tide_uses"] = c.writhing_tide_uses;

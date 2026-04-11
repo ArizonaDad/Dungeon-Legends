@@ -1778,6 +1778,24 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.room.bm.broadcast_announce(c.name + " invokes Nature's Veil and vanishes from sight! (" + c.natures_veil_uses_remaining + " uses remaining)", true);
 			u.room.bm.broadcast_to_battle({{"type", message_types::condition_applied}, {"target", c.name}, {"condition", "Invisible"}});
 		}
+		else if (feature == "ethereal_step") {
+			// Tasha's Fey Wanderer L7 Ethereal Step (para 3388-3390): "As a bonus
+			// action, you can cast Etherealness on yourself, with no spell slot or
+			// material components required. The spell ends at the end of the current
+			// turn. Once you use this bonus action, you can't use it again until you
+			// finish a short or long rest."
+			if (c.class_name != "Ranger" or c.subclass != "Fey Wanderer" or c.level < 7) { u.send({{"type", message_types::announce}, {"text", "Only L7+ Fey Wanderer Rangers can use Ethereal Step."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			if (!c.ethereal_step_available) { u.send({{"type", message_types::announce}, {"text", "Ethereal Step is already used (recovers on short or long rest)."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.ethereal_step_available = false;
+			c.ethereal_step_active = true;
+			c.add_condition(COND_INVISIBLE);
+			c.is_hidden = true;
+			u.room.bm.broadcast_announce(c.name + " steps into the Ethereal Plane! Invisible and hidden until end of turn.", true);
+			u.room.bm.broadcast_to_battle({{"type", message_types::condition_applied}, {"target", c.name}, {"condition", "Invisible"}});
+		}
 		else if (feature == "tireless_temp_hp") {
 			// PHB 2024 Ranger L10 Tireless (para 6178-6180): "As a Magic action, you
 			// can give yourself a number of Temporary Hit Points equal to 1d8 plus
