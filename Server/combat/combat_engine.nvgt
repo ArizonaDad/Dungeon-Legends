@@ -1742,6 +1742,13 @@ class battle {
 		// Reaction resets at start of YOUR turn
 		c.has_reaction = true;
 
+		// Slow spell enforcement (PHB 2024 para 15047-15049):
+		// "it can't take Reactions" + "it can take EITHER an Action or a Bonus Action, not both"
+		if (c.slow_spell_caster_id != 0) {
+			c.has_reaction = false;
+			c.has_bonus_action = false; // Keep action, remove bonus action (more useful default)
+		}
+
 		// 2024 Exhaustion: reduce speed by 5 per level
 		c.movement_remaining -= c.exhaustion_level * 5;
 		if (c.movement_remaining < 0) c.movement_remaining = 0;

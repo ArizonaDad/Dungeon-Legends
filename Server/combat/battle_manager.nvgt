@@ -4131,6 +4131,8 @@ class battle_manager {
 				}
 			}
 		}
+		// Investiture of Flame: clear per-turn damage flag when concentration breaks
+		caster.investiture_flame_active = false;
 		// Slow: restore speed and AC for all affected targets when concentration breaks
 		if (conc == "Slow") {
 			for (uint sli = 0; sli < combat.combatants.length(); sli++) {
@@ -5549,6 +5551,18 @@ class battle_manager {
 					if (mb_dmg < 1) mb_dmg = 1;
 					combat.apply_damage(c, mb_dmg, DMG_RADIANT, ca_caster);
 					broadcast_announce(c.name + " takes " + mb_dmg + " radiant damage from " + ca_caster.name + "'s Moonbeam!", true);
+					if (c.is_dead) break;
+				}
+			}
+
+			// Investiture of Flame (Xanathar's para 4992-4993): 1d10 fire to adjacent creatures.
+			// "Any creature that moves within 5 feet of you for the first time on a turn or
+			// ends its turn there takes 1d10 fire damage." No save — automatic damage.
+			if (ca_caster.investiture_flame_active) {
+				if (feet_distance(ca_caster.x, ca_caster.y, c.x, c.y) <= 5) {
+					int inv_dmg = random(1, 10);
+					combat.apply_damage(c, inv_dmg, DMG_FIRE, ca_caster);
+					broadcast_announce(c.name + " takes " + inv_dmg + " fire damage from " + ca_caster.name + "'s Investiture of Flame!", true);
 					if (c.is_dead) break;
 				}
 			}
@@ -11970,9 +11984,13 @@ class battle_manager {
 			int bless_bonus = roll_bless_bonus(t);
 			int save_total = save_roll + save_bonus + bless_bonus;
 			bool saved = save_total >= cl_dc;
+			broadcast_roll(t.name, "DEX save vs Call Lightning", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+			if (!saved and try_arcane_deflection_save(t, cl_dc, save_total)) saved = true;
+			if (!saved) { int fg = try_flash_of_genius(t, cl_dc, save_total, "DEX save vs Call Lightning"); if (fg >= cl_dc) saved = true; }
+			if (!saved) { int bf = try_boon_of_fate_bonus(t, save_total, cl_dc); if (bf >= cl_dc) saved = true; }
+			if (!saved and try_stroke_of_luck_save(t, cl_dc, save_bonus + bless_bonus)) saved = true;
 			int dmg = saved ? total_damage / 2 : total_damage;
 			if (dmg < 1) dmg = 1;
-			broadcast_roll(t.name, "DEX save vs Call Lightning", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
 			combat.apply_damage(t, dmg, DMG_LIGHTNING, c);
 			check_concentration(t, dmg, c);
 		}
