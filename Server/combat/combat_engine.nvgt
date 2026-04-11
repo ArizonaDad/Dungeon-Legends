@@ -615,6 +615,8 @@ class combatant {
 	uint restrained_spell_caster_id = 0; // ID of caster who applied COND_RESTRAINED via Web/Entangle/Flesh to Stone
 	uint incap_spell_caster_id = 0; // ID of caster who applied COND_INCAPACITATED via Sleep/Confusion/Otto's Irresistible Dance
 	uint blinded_spell_caster_id = 0; // ID of caster who applied COND_BLINDED via Sunbeam
+	uint slow_spell_caster_id = 0;   // Slow spell: caster id for EOT saves + concentration cleanup
+	int slow_original_speed = 0;     // Slow spell: stored original speed to restore on end
 	bool wizardly_quill_active = false; // Order of Scribes Wizard
 	int awakened_spellbook_changes = 0; // Order of Scribes - replace damage type
 	// Gunslinger subclasses (Valda's Spire of Secrets paras 229-490)

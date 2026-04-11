@@ -4131,6 +4131,20 @@ class battle_manager {
 				}
 			}
 		}
+		// Slow: restore speed and AC for all affected targets when concentration breaks
+		if (conc == "Slow") {
+			for (uint sli = 0; sli < combat.combatants.length(); sli++) {
+				combatant@ sl_t = combat.combatants[sli];
+				if (@sl_t == null or sl_t.is_dead) continue;
+				if (sl_t.slow_spell_caster_id == caster.id) {
+					sl_t.speed = sl_t.slow_original_speed;
+					sl_t.armor_class += 2;
+					sl_t.slow_spell_caster_id = 0;
+					sl_t.slow_original_speed = 0;
+					broadcast_announce(sl_t.name + " is freed from the Slow effect!", true);
+				}
+			}
+		}
 		// Antimagic Field: clear flag when concentration breaks
 		caster.antimagic_field_active = false;
 	}
@@ -4835,6 +4849,7 @@ class battle_manager {
 						if (!saved) { int ff_total = try_fanatical_focus(prev, save_dc_val, save_total, save_bonus, "DEX save vs Web"); if (ff_total >= save_dc_val) saved = true; }
 						if (!saved) { int ds = try_disciplined_survivor_reroll(prev, save_dc_val, save_total, save_bonus, "DEX save vs Web"); if (ds >= save_dc_val) saved = true; }
 						if (!saved) { int new_total = try_flash_of_genius(prev, save_dc_val, save_total, "DEX save vs Web"); if (new_total >= save_dc_val) saved = true; }
+						if (!saved) { int bf = try_boon_of_fate_bonus(prev, save_total, save_dc_val); if (bf >= save_dc_val) saved = true; }
 						if (!saved and try_stroke_of_luck_save(prev, save_dc_val, save_bonus)) saved = true;
 						if (saved) {
 							prev.remove_condition(COND_RESTRAINED);
@@ -4981,6 +4996,75 @@ class battle_manager {
 						if (saved) {
 							prev.remove_condition(COND_CHARMED);
 							broadcast_to_battle({{"type", message_types::condition_removed}, {"target", prev.name}, {"condition", "Charmed"}});
+						}
+						break;
+					}
+				}
+			}
+			// Slow: WIS save at end of turn to end the effect on this target
+			// Basic Rules para 15047-15049: "An affected target can make a Wisdom saving
+			// throw at the end of each of its turns, ending the spell on itself on a success."
+			if (prev.slow_spell_caster_id != 0) {
+				for (uint ci = 0; ci < combat.combatants.length(); ci++) {
+					combatant@ caster = combat.combatants[ci];
+					if (@caster == null or caster.is_dead) continue;
+					if (caster.concentration_spell == "Slow" and caster.is_concentrating and prev.slow_spell_caster_id == caster.id) {
+						int save_roll = random(1, 20);
+						if (prev.staggering_blow_active) { int sb2 = random(1, 20); if (sb2 < save_roll) save_roll = sb2; prev.staggering_blow_active = false; broadcast_announce(prev.name + " has disadvantage from Staggering Blow!", false); }
+						apply_hound_save_disadvantage(prev, caster.id, save_roll);
+						int save_bonus = prev.get_save_bonus(ABILITY_WIS);
+						int bless_bonus = roll_bless_bonus(prev);
+						int save_dc_val = spell_save_dc(caster);
+						int save_total = save_roll + save_bonus + bless_bonus;
+						bool saved = save_total >= save_dc_val;
+						broadcast_roll(prev.name, "WIS save vs Slow (end of turn)", save_roll, save_bonus + bless_bonus, save_total, saved ? "Freed!" : "Still slowed!");
+						if (!saved and try_arcane_deflection_save(prev, save_dc_val, save_total)) saved = true;
+						if (!saved) { int ds = try_disciplined_survivor_reroll(prev, save_dc_val, save_total, save_bonus + bless_bonus, "WIS save vs Slow"); if (ds >= save_dc_val) saved = true; }
+						if (!saved) { int fg = try_flash_of_genius(prev, save_dc_val, save_total, "WIS save vs Slow"); if (fg >= save_dc_val) saved = true; }
+						if (!saved) { int mv = try_maverick_spirit(prev, save_dc_val, save_total, "WIS save vs Slow"); if (mv >= save_dc_val) saved = true; }
+						if (!saved and try_mage_slayer_guarded_mind(prev, ABILITY_WIS)) saved = true;
+						if (!saved) { int bf = try_boon_of_fate_bonus(prev, save_total, save_dc_val); if (bf >= save_dc_val) saved = true; }
+						if (!saved and try_stroke_of_luck_save(prev, save_dc_val, save_bonus + bless_bonus)) saved = true;
+						if (saved) {
+							prev.speed = prev.slow_original_speed;
+							prev.armor_class += 2;
+							prev.slow_spell_caster_id = 0;
+							prev.slow_original_speed = 0;
+							broadcast_announce(prev.name + " breaks free from the Slow spell!", true);
+						}
+						break;
+					}
+				}
+			}
+			// Confusion: WIS save at end of turn to end the effect on this target
+			// Basic Rules para 12510: "An affected target can make a Wisdom saving throw
+			// at the end of each of its turns. On a successful save, this effect ends for that target."
+			if (prev.has_condition(COND_INCAPACITATED) and prev.incap_spell_caster_id != 0) {
+				for (uint ci = 0; ci < combat.combatants.length(); ci++) {
+					combatant@ caster = combat.combatants[ci];
+					if (@caster == null or caster.is_dead) continue;
+					if (caster.concentration_spell == "Confusion" and caster.is_concentrating and prev.incap_spell_caster_id == caster.id) {
+						int save_roll = random(1, 20);
+						if (prev.staggering_blow_active) { int sb2 = random(1, 20); if (sb2 < save_roll) save_roll = sb2; prev.staggering_blow_active = false; broadcast_announce(prev.name + " has disadvantage from Staggering Blow!", false); }
+						apply_hound_save_disadvantage(prev, caster.id, save_roll);
+						int save_bonus = prev.get_save_bonus(ABILITY_WIS);
+						int bless_bonus = roll_bless_bonus(prev);
+						int save_dc_val = spell_save_dc(caster);
+						int save_total = save_roll + save_bonus + bless_bonus;
+						bool saved = save_total >= save_dc_val;
+						broadcast_roll(prev.name, "WIS save vs Confusion (end of turn)", save_roll, save_bonus + bless_bonus, save_total, saved ? "Freed!" : "Still confused!");
+						if (!saved and try_arcane_deflection_save(prev, save_dc_val, save_total)) saved = true;
+						if (!saved) { int ds = try_disciplined_survivor_reroll(prev, save_dc_val, save_total, save_bonus + bless_bonus, "WIS save vs Confusion"); if (ds >= save_dc_val) saved = true; }
+						if (!saved) { int fg = try_flash_of_genius(prev, save_dc_val, save_total, "WIS save vs Confusion"); if (fg >= save_dc_val) saved = true; }
+						if (!saved) { int mv = try_maverick_spirit(prev, save_dc_val, save_total, "WIS save vs Confusion"); if (mv >= save_dc_val) saved = true; }
+						if (!saved and try_mage_slayer_guarded_mind(prev, ABILITY_WIS)) saved = true;
+						if (!saved) { int bf = try_boon_of_fate_bonus(prev, save_total, save_dc_val); if (bf >= save_dc_val) saved = true; }
+						if (!saved and try_stroke_of_luck_save(prev, save_dc_val, save_bonus + bless_bonus)) saved = true;
+						if (saved) {
+							prev.remove_condition(COND_INCAPACITATED);
+							prev.incap_spell_caster_id = 0;
+							broadcast_announce(prev.name + " shakes off the Confusion!", true);
+							broadcast_to_battle({{"type", message_types::condition_removed}, {"target", prev.name}, {"condition", "Confused"}});
 						}
 						break;
 					}
@@ -15033,6 +15117,8 @@ class battle_manager {
 					if (!saved and try_stroke_of_luck_save(t, save_dc, save_bonus + bless_bonus)) saved = true;
 					broadcast_roll(t.name, "WIS save vs Slow", save_roll, save_bonus + bless_bonus, save_total, saved ? "Saved!" : "Slowed!");
 					if (!saved) {
+						t.slow_original_speed = t.speed;
+						t.slow_spell_caster_id = c.id;
 						t.speed = t.speed / 2;
 						t.armor_class -= 2;
 						t.has_reaction = false;
