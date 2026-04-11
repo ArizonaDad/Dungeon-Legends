@@ -1068,7 +1068,7 @@ void get_subclass_options(string class_name, string[]@ names, string[]@ descript
         add_text_pair(names, descriptions, "Path of the Battlerager", "Path of the Battlerager. Spiked armor melee rage. Dwarves only. (Sword Coast) — Coming Soon");
         add_text_pair(names, descriptions, "Shadow Gnawer", "Shadow Gnawer. Consume raw shadow to gain teleport, stealth smoke, and corrosive haze. (Book of Ebon Tides)");
     } else if (class_name == "Bard") {
-        add_text_pair(names, descriptions, "College of Dance", "College of Dance. Turn movement and rhythm into magical performance. — Coming Soon");
+        add_text_pair(names, descriptions, "College of Dance", "College of Dance. Unarmored Defense with DEX+CHA, Bardic Damage unarmed strikes, Tandem Footwork initiative bonus, Leading Evasion shared with allies. (PHB 2024)");
         add_text_pair(names, descriptions, "College of Glamour", "College of Glamour. Beguile and command with fey majesty.");
         add_text_pair(names, descriptions, "College of Lore", "College of Lore. Master wide-ranging knowledge and cutting words.");
         add_text_pair(names, descriptions, "College of Valor", "College of Valor. Support allies while fighting in the thick of battle.");

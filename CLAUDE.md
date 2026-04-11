@@ -882,6 +882,43 @@ Epic Boon feats: combat_prowess, dimensional_travel, energy_resistance, fate, fo
 - **Cosmic Omen** (Circle of Stars L6): At dawn/long rest, roll a die to determine Weal or Woe. Weal: reaction to add 1d6 to an ally's attack roll. Woe: reaction to subtract 1d6 from an enemy's attack roll
 - **Aura of the Guardian** (Redemption Paladin L7): Reaction to absorb damage dealt to an ally within 10ft, taking it unreduced in place of the ally
 
+**Batch 10 subclass features (2026-04-11):**
+- **Rune Knight** (Fighter):
+  - Cloud Rune invoke — redirect incoming attack to a different creature within 30ft, auto-fires
+  - Stone Rune invoke — WIS save or charmed + incapacitated, end-of-turn saves to break free
+  - Storm Rune invoke — BA prophetic state, reaction to force advantage/disadvantage on nearby rolls
+  - Runic Shield (L7) — reaction forces attacker to reroll and use lower result, PB uses/LR
+  - Master of Runes (L15) — double invoke pool; each rune gets 2 uses instead of 1 per LR
+- **Stars Druid** (Circle of Stars):
+  - Twinkling Constellations (L10) — form swap at turn start with player prompt in advance_turn
+  - Cosmic Omen (L6) — weal/woe smart-spend in attack resolution, reaction auto-fires d6 add/subtract
+  - Star Map free Guiding Bolt — tracked via free_cast system (Prof uses/LR, no spell slot consumed)
+- **Sun Soul** (Monk):
+  - Radiant Sun Bolt (L3) — full Attack action replacement at 30ft range, 1d4+DEX radiant, both player and bot paths
+  - Searing Arc Strike (L6) — post-Attack BA, spend 2+ ki for Burning Hands with scaling damage
+  - Searing Sunburst (L11) — AoE action 20ft-radius at 150ft, 2d6 radiant CON save, +2d6 per ki (up to 3)
+
+**Batch 11 subclass features (2026-04-11):**
+- **Psi Warrior** (Fighter):
+  - Protective Field (L3) — ally-scan auto-fire within 30ft, psionic die + INT mod damage reduction
+  - Guarded Mind (L10) — auto-clear Charmed/Frightened at turn start by spending psionic die
+- **Emissary of Redemption** (Redemption Paladin L20): per-creature exclusion tracked via emissary_exclusion_ids string
+- **Restore Balance** (Clockwork Soul L1): wider scope — ally-scan auto-fire within 60ft on any d20 test with advantage/disadvantage
+- **Intoxicated Frenzy** (Drunken Master L17): multi-target Flurry of Blows with different-target enforcement, up to 3 additional strikes
+- **Deflect Attacks redirect** (Monk L3): on damage reduced to 0, redirect deals 2x Martial Arts die + DEX mod of original damage type
+
+**Batch 12 subclass features (2026-04-11):**
+- **Eyes of the Dark** (Shadow Magic Sorcerer L3): SP-casting Darkness (2 SP) with see-through flag so caster sees through own Darkness
+- **Blade Flourish variants** (College of Swords Bard L3): all 3 wired — Defensive (+AC), Slashing (AoE), Mobile (push + reaction movement to pushed target)
+- **Mobile Flourish reaction movement**: reaction to move up to walking speed toward pushed target after Flourish push
+- **Clockwork Cavalcade dispel** (Clockwork Soul L18): breaks concentration on spells L6 or lower on affected creatures
+- **Rapid Strike** (Samurai L15): forgo advantage on one attack to gain an extra attack, 1/turn
+- **Sorcery Incarnate multi-metamagic** (Sorcerer L7): 2 metamagic options per spell while Innate Sorcery is active
+- **Arcane Archer 8 shots**: all 8 shot types (Banishing, Beguiling, Bursting, Enfeebling, Grasping, Piercing, Seeking, Shadow) with full effects, saves, and L18 upgrades
+- **Supernatural Defense** (Monster Slayer L7): +1d6 to saves when Slayer's Prey target forces a save, wired in get_save_bonus
+- **Curving Shot** (Arcane Archer L7): BA redirect on ranged miss to different target within 60ft
+- **Magic Arrow** (Arcane Archer L7): arrows treated as magical at L7+ in apply_damage
+
 **Previously implemented:** combat_prowess (+1d6 weapon miss → hit 1/turn), fortitude (+40 HP), irresistible_offense (+2d10 force 1/turn), skill (+1d10 ability check 1/turn), speed (+30ft), the_night_spirit (300ft darkvision + see invisible), truesight (Truesight 60ft)
 
 ### Audio System

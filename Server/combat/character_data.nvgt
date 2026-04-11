@@ -2382,9 +2382,40 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         }
     }
     if (cs.class_name == "Bard") {
+        // PHB 2024 College of Dance (subclass section after Bard Spell List):
+        // L3 Dazzling Footwork: Unarmored Defense (10 + DEX + CHA), Advantage on
+        // Performance checks involving dance, Agile Strikes (unarmed strike as
+        // part of BI action), Bardic Damage (DEX for unarmed, BI die + DEX mod).
+        // L6 Inspiring Movement: reaction when enemy ends turn within 5ft, expend
+        // BI to move half speed + ally within 30ft moves half speed, no OAs.
+        // L6 Tandem Footwork: expend BI on initiative, add die to self + allies
+        // within 30ft who can see/hear.
+        // L14 Leading Evasion: evasion that shares with creatures within 5ft.
         if (cs.subclass == "College of Dance" and cs.level >= 3) {
             c.college_of_dance_active = true;
-            c.armor_class += 1; // Mobile and graceful
+            // Dazzling Footwork: Unarmored Defense = 10 + DEX + CHA
+            // Only applies when not wearing armor or wielding a Shield.
+            if (cs.armor_type == "none") {
+                int dex_m = (cs.dexterity - 10) / 2;
+                int cha_m = (cs.charisma - 10) / 2;
+                int dance_ac = 10 + dex_m + cha_m;
+                if (dance_ac > c.armor_class) {
+                    c.armor_class = dance_ac;
+                }
+            }
+            // Advantage on Performance checks involving dancing
+            c.skill_check_advantage.insert_last("Performance");
+            // L6: Tandem Footwork flag (initiative bonus handled in battle_manager)
+            if (cs.level >= 6) {
+                c.dance_tandem_footwork_active = true;
+            }
+            // L14: Leading Evasion (improved evasion that shares with allies)
+            // L14: Otto's Irresistible Dance free cast 1/LR
+            if (cs.level >= 14) {
+                c.evasion_active = true;
+                c.dance_leading_evasion_active = true;
+                c.grant_free_cast("ottos_irresistible_dance", 1);
+            }
         }
         if (cs.subclass == "College of Requiems" and cs.level >= 3) {
             c.college_of_requiems_active = true;
@@ -2629,7 +2660,7 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
             if (!c.has_skill_proficiency("Performance")) c.skill_proficiencies.insert_last("Performance");
             // L3 Drunken Technique (para 1796-1797): Disengage + 10ft on Flurry
             if (cs.level >= 3) c.drunken_technique_active = true;
-            // L6 Tipsy Sway — Redirect Attack: handled via existing drunken_master_opportunity
+            // L6 Tipsy Sway — Redirect Attack: auto-resolved in finalize_roll_result on melee miss
             // L11 Drunkard's Luck (para 1798-1800): spend 1 FP to cancel save disadvantage
             if (cs.level >= 11) c.drunkards_luck_active = true;
             // L17 Intoxicated Frenzy: wired in users_dom flurry handler (5 strikes)

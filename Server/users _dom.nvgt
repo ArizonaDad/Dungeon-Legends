@@ -4353,16 +4353,9 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.room.bm.broadcast_announce(c.name + " sharpens their blade! +" + ki_to_spend + " to attack and damage rolls for 1 minute. (" + ki_to_spend + " Focus Points spent)", false);
 		}
 
-		else if (feature == "drunken_master_redirect") {
-			// Way of the Drunken Master: Redirect Attack reaction (forces attacker to redirect)
-			if (c.class_name != "Monk" or c.subclass != "Way of the Drunken Master") { u.send({{"type", message_types::announce}, {"text", "Only Drunken Master monks can Redirect Attack."}, {"interrupt", true}}); return; }
-			if (!c.has_reaction) { u.send({{"type", message_types::announce}, {"text", "No reaction available."}, {"interrupt", true}}); return; }
-			if (c.focus_points <= 0) { u.send({{"type", message_types::announce}, {"text", "No Focus Points remaining."}, {"interrupt", true}}); return; }
-			c.focus_points--;
-			c.has_reaction = false;
-			c.drunken_master_opportunity = true;
-			u.room.bm.broadcast_announce(c.name + " uses Redirect Attack!", false);
-		}
+		// REMOVED: drunken_master_redirect handler — Redirect Attack is now auto-resolved
+		// in finalize_roll_result (battle_manager.nvgt) when an enemy misses the Monk with
+		// a melee attack. No player action needed. See lines ~10259-10293 in battle_manager.
 
 		else if (feature == "breath_of_dragon") {
 			// Way of the Ascendant Dragon Monk: breath weapon

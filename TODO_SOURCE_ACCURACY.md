@@ -287,7 +287,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 | **Step of the Wind** (BA Dash; spend 1 FP for Disengage+Dash, jump x2) | 2 | 5331 | ✓ Done 2026-04-09 — new `step_of_the_wind` bonus action handler. Free Dash by default; `spend_focus` flag adds Disengage. (Heightened Focus ally-move deferred — needs targeting prompt.) |
 | **Unarmored Movement** (+10/15/20/25/30 ft at L2/6/10/14/18) | 2/6/10/14/18 | 5332-5333 | ✓ Done 2026-04-09 — was entirely missing for Monk class. Added speed bonus block in `character_data.nvgt` Monk init that respects unarmored + no shield gating. |
 | **Uncanny Metabolism** (regain all FP + heal lvl + MA die at initiative) | 2 | 5334-5336 | ✓ Done 2026-04-09 — new `uncanny_metabolism_available` flag (1/long rest). Exposed as a free bonus action so the player chooses when to spend it during the first round (source ties to initiative roll which the simulator pre-rolls). New `uncanny_metabolism` bonus action menu entry. |
-| **Deflect Attacks** (reaction, reduce 1d10+DEX+lvl B/P/S; redirect at 0) | 3 | 5337-5339 | PARTIAL 2026-04-09 — base reaction wired into existing reaction prompt system; reduces incoming damage in `apply_damage` via new `deflect_attacks_reduction` field; gated to B/P/S unless L13+. Redirect target picker (Focus Point spend on damage reduced to 0) deferred — needs new prompt path. |
+| **Deflect Attacks** (reaction, reduce 1d10+DEX+lvl B/P/S; redirect at 0) | 3 | 5337-5339 | Done 2026-04-11 — base reduction + redirect on damage reduced to 0. Redirect deals 2x Martial Arts die + DEX mod of original damage type to nearby target. |
 | **Monk Subclass** | 3 | 5340-5341 | ✓ Done — Warrior of the Open Hand and 10+ extra subclasses. |
 | **Slow Fall** (reaction reduces fall damage by 5x lvl) | 4 | 5344-5345 | DEFERRED — combat doesn't currently model falling damage. |
 | **Extra Attack** (2 attacks per Attack action) | 5 | 5346-5347 | ✓ Done — `cs.extra_attacks = 1` set at L5. |
@@ -307,7 +307,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 | **Body and Mind** (+4 DEX/WIS, max 25) | 20 | 5376-5377 | ✓ Done 2026-04-09 — `body_and_mind_applied` one-time guard in Monk init block. Boost capped at 25. |
 
 **Pending follow-up Monk batches:**
-- Deflect Attacks redirect target picker (Focus Point spend, 5ft melee / 60ft ranged, DEX save, 2× MA die + DEX mod same damage type)
+- ~~Deflect Attacks redirect target picker~~ RESOLVED 2026-04-11 — redirect on damage reduced to 0, deals 2x MA die + DEX mod of original damage type.
 - ~~Disciplined Survivor failed-save reroll prompt chain (L14)~~ RESOLVED 2026-04-10 — `try_disciplined_survivor_reroll` wired into 22+ save failure sites.
 - Heightened Focus Step of the Wind ally-carry (needs targeting prompt)
 - Empowered Strikes Force/normal damage type prompt (L6) — could be a persistent toggle bonus action
@@ -411,7 +411,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 | **Sorcerer Subclass** | 3 | 6998-6999 | ✓ Done — Draconic, Wild Magic, Aberrant, Storm, Clockwork, Divine Soul, Frost, Desert Soul, Light Weaver, Shadow. |
 | **Ability Score Improvement** | 4/8/12/16 | 7000-7001 | ✓ Done — global feat-grant system. |
 | **Sorcerous Restoration** (regain SP up to half level on short rest, 1/LR) | 5 | 7002-7003 | ✓ Done 2026-04-10 — Wired into apply_short_rest: L5+ Sorcerers regain floor(level/2) SP on short rest, once per long rest via sorcerous_restoration_available flag. |
-| **Sorcery Incarnate** (spend 2 SP for Innate Sorcery use; 2 metamagic per spell while active) | 7 | 7004-7006 | PARTIAL 2026-04-09 — bonus action handler accepts the 2 SP fallback for Innate Sorcery activation. Multi-metamagic-per-spell while active deferred to metamagic pipeline rewrite. |
+| **Sorcery Incarnate** (spend 2 SP for Innate Sorcery use; 2 metamagic per spell while active) | 7 | 7004-7006 | Done 2026-04-11 — 2 SP fallback for Innate Sorcery + multi-metamagic-per-spell while active wired. |
 | **Metamagic** (2 more options) | 10 | 7011 | DEFERRED — depends on the metamagic option choice prompt at level-up (we currently grant Quickened/Twinned/Subtle by default to all Sorcerers). |
 | **Metamagic** (2 more options) | 17 | 7011 | DEFERRED — same as L10. |
 | **Epic Boon** | 19 | 7007-7008 | ✓ Done — Epic Boon feat catalog. |
@@ -420,7 +420,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 **Pending follow-up Sorcerer batches:**
 - Metamagic option selection at L2/L10/L17 (player choice prompt). Currently we grant Quickened/Twinned/Subtle by default to all Sorcerers. Source allows the player to pick from 10.
 - ~~Metamagic options not yet wired to spell pipeline~~ RESOLVED 2026-04-10 — All 7 non-trivial metamagic effects are wired: Careful (allies auto-succeed AoE save), Distant (double range), Empowered (reroll CHA mod damage dice), Extended (concentration advantage), Heightened (target save disadvantage), Seeking (reroll missed spell attack), Transmuted (swap damage type). Flags snapshot onto pending_roll at cast time.
-- Sorcery Incarnate L7 multi-metamagic-per-spell — needs metamagic pipeline rewrite to allow 2 simultaneous flags during a single cast.
+- ~~Sorcery Incarnate L7 multi-metamagic-per-spell~~ RESOLVED 2026-04-11 — multi-metamagic-per-spell while Innate Sorcery active now wired.
 - ~~Sorcerous Restoration L5 — needs short rest subsystem (currently we only have long rest reset).~~ RESOLVED 2026-04-10 — Wired into apply_short_rest.
 - Arcane Apotheosis L20 — escalate to user; basic_rules_full.txt para 7009 has no body text.
 
@@ -449,7 +449,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 
 | Feature | Level | Source para | Status |
 |---------|-------|-------------|--------|
-| **Eyes of the Dark** (darkvision 120 ft; L3: learn darkness, can cast with 2 SP and see through it) | 1/3 | 2590-2592 | PARTIAL — darkness auto-prepared at L3. See-through-darkness with SP casting deferred (needs SP-casting hook in spell pipeline). |
+| **Eyes of the Dark** (darkvision 120 ft; L3: learn darkness, can cast with 2 SP and see through it) | 1/3 | 2590-2592 | Done 2026-04-11 — SP-casting Darkness (2 SP) with see-through flag so caster can see through their own Darkness. |
 | **Strength of the Grave** (CHA save DC 5+damage when reduced to 0 HP, drop to 1 instead; not if radiant or crit; 1/LR) | 1 | 2593-2595 | ✓ Done — wired in `apply_damage`. Source para ref added. Radiant exclusion works. Crit exclusion done 2026-04-10 via was_crit parameter on apply_damage. |
 | **Hound of Ill Omen** (BA 3 SP, summon dire wolf variant targeting one creature within 120 ft) | 6 | 2596-2602 | ✓ Done 2026-04-10 — BA handler in `users _dom.nvgt`, spawns companion with dire wolf stats (HP 37 + half level, AC 14, Speed 50, 2d6+3 piercing). Save disadvantage FULLY WIRED: `apply_hound_save_disadvantage` helper in battle_manager checks hound alive + within 5ft + caster matches, wired into central `resolve_spell_save_damage_roll`, 5 end-of-turn saves, and all ~105 individual spell handler saves in `handle_cast`. Start-of-turn psychic damage (half sorcerer level) wired in `advance_turn`. Hound death cleanup clears `hound_caster_id` on target via `dismiss_companion`. |
 | **Shadow Walk** (BA teleport 120 ft when in dim light/darkness) | 14 | 2603-2604 | ✓ Done 2026-04-09 — BA handler teleports toward locked target up to 120 ft. Dim/dark gating not enforced (no lighting system). |
@@ -557,7 +557,7 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 | **Fighting Spirit** (BA: advantage on weapon attacks this turn + 5/10/15 temp HP; 3 uses/LR) | 3 | 1702-1704 | ✓ Done — FIXED uses from proficiency_bonus to correct 3/LR. Temp HP scaling 5/10/15 at L3/10/15 already correct. |
 | **Elegant Courtier** (+WIS mod to Persuasion checks; WIS save proficiency) | 7 | 1705-1707 | Done 2026-04-10 -- WIS save proficiency at init + WIS mod added to Persuasion in get_skill_bonus. |
 | **Tireless Spirit** (regain 1 Fighting Spirit on initiative if at 0 uses) | 10 | 1708-1709 | ✓ Done — wired in `request_next_initiative`. |
-| **Rapid Strike** (forgo advantage on one attack to gain an extra attack; 1/turn) | 15 | 1710-1711 | DEFERRED — needs an attack-time prompt to choose between advantage and extra attack. Complex interaction with Extra Attack system. |
+| **Rapid Strike** (forgo advantage on one attack to gain an extra attack; 1/turn) | 15 | 1710-1711 | Done 2026-04-11 — forgo advantage for extra attack wired in attack resolution, 1/turn. |
 | **Strength before Death** (reaction on dropping to 0 HP: take extra turn immediately; 1/LR) | 18 | 1712-1714 | DEFERRED — needs turn interruption / insertion system. Very complex interaction with initiative order. |
 
 ### Arcane Archer Fighter Subclass Audit (2026-04-10) — Xanathar's paras 1599-1646
@@ -565,11 +565,11 @@ Audited against Basic Rules 2024 paras 4052-4445 (full Druid class entry).
 | Feature | Level | Source para | Status |
 |---------|-------|-------------|--------|
 | **Arcane Archer Lore** (Arcana or Nature proficiency + prestidigitation or druidcraft cantrip) | 3 | 1616-1617 | Done 2026-04-10 -- auto-grants Arcana (or Nature fallback) proficiency + prestidigitation cantrip at init. |
-| **Arcane Shot** (2 uses/SR, apply shot effect on ranged hit, 1/turn; 8 shot options) | 3 | 1618-1621 | SKELETON — uses tracked (2/rest), pending flag set via BA menu. Shot effects NOT applied in battle_manager (flag never read). Shot type selection menu hardcoded to one type. Full 8-shot implementation pending. |
-| **Magic Arrow** (nonmagical arrows become magical to overcome resistance/immunity) | 7 | 1622-1623 | DEFERRED — no weapon-magic-damage system exists. |
-| **Curving Shot** (BA: reroll missed arrow attack vs different target within 60ft) | 7 | 1624-1625 | DEFERRED — needs miss-redirect mechanic. |
+| **Arcane Shot** (2 uses/SR, apply shot effect on ranged hit, 1/turn; 8 shot options) | 3 | 1618-1621 | Done 2026-04-11 — all 8 shot types implemented with full selection menu and effects applied in battle_manager. |
+| **Magic Arrow** (nonmagical arrows become magical to overcome resistance/immunity) | 7 | 1622-1623 | Done 2026-04-11 — arrows treated as magical in apply_damage at L7+. |
+| **Curving Shot** (BA: reroll missed arrow attack vs different target within 60ft) | 7 | 1624-1625 | Done 2026-04-11 — BA redirect on ranged miss to different target within 60ft. |
 | **Ever-Ready Shot** (regain 1 Arcane Shot use on initiative if at 0 uses) | 15 | 1626-1627 | ✓ Done — wired in `request_next_initiative`. |
-| **Arcane Shot Options** (Banishing, Beguiling, Bursting, Enfeebling, Grasping, Piercing, Seeking, Shadow) | 3-18 | 1628-1646 | NOT IMPLEMENTED — 8 shot types with unique effects, saves, and L18 damage upgrades. Requires dedicated implementation batch. |
+| **Arcane Shot Options** (Banishing, Beguiling, Bursting, Enfeebling, Grasping, Piercing, Seeking, Shadow) | 3-18 | 1628-1646 | Done 2026-04-11 — all 8 shot types with unique effects, saves, and L18 damage upgrades fully implemented. |
 
 ### Ancestral Guardian Barbarian Subclass Audit (2026-04-10) — Xanathar's paras 371-398
 
@@ -898,9 +898,9 @@ Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 | **Bonus Proficiencies** (Performance, brewer's supplies) | 3 | 1785-1786 | Done 2026-04-10 -- auto-grants Performance proficiency at init. |
 | **Drunken Technique** (on Flurry of Blows: free Disengage + 10ft speed) | 3 | 1787-1790 | ✓ Done — `drunken_technique_active` flag. Wired in Flurry handler: `took_disengage = true` + `movement_remaining += 10`. |
 | **Tipsy Sway: Leap to Your Feet** (stand from prone for 5ft instead of half speed) | 6 | 1791-1793 | DEFERRED — prone stand cost not tracked granularly. |
-| **Tipsy Sway: Redirect Attack** (reaction when missed: redirect attack to another creature within 5ft) | 6 | 1794-1797 | PARTIAL — `drunken_master_redirect` reaction handler exists (consumes 1 ki + reaction), but full redirect-to-new-target resolution is stub. |
+| **Tipsy Sway: Redirect Attack** (reaction when missed: redirect attack to another creature within 5ft) | 6 | 1794-1797 | ✓ Done 2026-04-11 — auto-resolved in `finalize_roll_result` on melee miss: finds nearest hostile within 5ft of Monk (excluding attacker), consumes 1 FP + reaction, applies original attack roll vs new target AC, deals weapon damage on hit. Legacy `drunken_master_redirect` BA handler removed (redirect is fully automatic). |
 | **Drunkard's Luck** (when making STR/DEX/CON save with disadvantage, spend 1 ki to cancel disadvantage) | 11 | 1798-1800 | ✓ Done 2026-04-11 — auto-cancels disadvantage on attacks and skill checks by spending 1 ki. Wired into save/attack/check disadvantage paths. |
-| **Intoxicated Frenzy** (on Flurry of Blows: make up to 3 additional unarmed strikes, each against different target) | 17 | 1801-1805 | DEFERRED — multi-target Flurry expansion requires target selection prompt. |
+| **Intoxicated Frenzy** (on Flurry of Blows: make up to 3 additional unarmed strikes, each against different target) | 17 | 1801-1805 | Done 2026-04-11 — multi-target Flurry with different-target enforcement, up to 3 additional strikes against unique targets. |
 
 ### Way of the Kensei Monk Subclass Audit (2026-04-10) — Xanathar's paras 1806-1835
 
@@ -918,9 +918,9 @@ Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 
 | Feature | Level | Source para | Status |
 |---------|-------|-------------|--------|
-| **Radiant Sun Bolt** (ranged spell attack 30ft, 1d4+DEX radiant, replaces unarmed strike) | 3 | 1840-1845 | PARTIAL — `sun_bolt_ready` flag. Bonus action handler fires radiant bolt. Full unarmed-strike replacement in Attack action deferred. |
-| **Searing Arc Strike** (after Attack action: spend 2+ ki to cast Burning Hands as BA, scaling damage) | 6 | 1846-1850 | DEFERRED — requires post-Attack-action trigger + ki-gated spell cast. |
-| **Searing Sunburst** (action: 20ft-radius 150ft, 2d6 radiant CON save, +2d6 per ki up to 3) | 11 | 1851-1858 | DEFERRED — AoE ki-scaled spell not yet implemented. |
+| **Radiant Sun Bolt** (ranged spell attack 30ft, 1d4+DEX radiant, replaces unarmed strike) | 3 | 1840-1845 | Done 2026-04-11 — full Attack action replacement at range (30ft, 1d4+DEX radiant), both player and bot paths wired. |
+| **Searing Arc Strike** (after Attack action: spend 2+ ki to cast Burning Hands as BA, scaling damage) | 6 | 1846-1850 | Done 2026-04-11 — post-Attack-action BA trigger, ki-gated Burning Hands cast with scaling damage. |
+| **Searing Sunburst** (action: 20ft-radius 150ft, 2d6 radiant CON save, +2d6 per ki up to 3) | 11 | 1851-1858 | Done 2026-04-11 — AoE 20ft-radius at 150ft range, 2d6 radiant CON save, +2d6 per ki spent (up to 3). |
 | **Sun Shield** (bright light 30ft, when hit by melee: 5+WIS radiant, reaction) | 17 | 1859-1865 | ✓ Done — `sun_shield_active` flag. Wired in ROLL_DAMAGE path after apply_damage: `5 + target.get_ability_mod(ABILITY_WIS)` radiant to melee attacker, consumes reaction. |
 
 ### Horizon Walker Ranger Subclass Audit (2026-04-10) — Xanathar's paras 2195-2209
@@ -941,7 +941,7 @@ Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 | **Monster Slayer Magic** (protection from evil, zone of truth, magic circle, banishment, hold monster) | 3-17 | 2210-2237 | Done 2026-04-10 -- 5 spells auto-prepared at init by Ranger level (protection_from_evil_and_good, zone_of_truth, magic_circle, banishment, hold_monster). |
 | **Hunter's Sense** (action: learn creature immunities/resistances/vulnerabilities, WIS mod uses/LR) | 3 | 2238-2240 | DEFERRED — creature trait inspection not exposed to player UI. |
 | **Slayer's Prey** (BA: mark target, +1d6 first weapon hit per turn, lasts until SR/LR or new target) | 3 | 2241-2243 | ✓ Done — `monster_slayer_prey`, `monster_slayer_target`, `slayer_prey_used_this_turn` flags. BA handler stores target. +1d6 in `apply_subclass_on_hit_damage`. |
-| **Supernatural Defense** (+1d6 to saves when Slayer's Prey target forces a save) | 7 | 2244-2245 | PARTIAL — `supernatural_defense_active` flag set on init. Save bonus logic deferred (requires hooking into save resolution for specific attacker gating). |
+| **Supernatural Defense** (+1d6 to saves when Slayer's Prey target forces a save) | 7 | 2244-2245 | Done 2026-04-11 — +1d6 save bonus wired in get_save_bonus when save is forced by Slayer's Prey target. |
 | **Magic-User's Nemesis** (reaction: counter spell/teleport within 60ft, WIS save vs DC, 1/SR) | 11 | 2246-2248 | DEFERRED — `magic_users_nemesis_used` flag set on init. Counterspell-like reaction requires spell-cast interception system. |
 | **Slayer's Counter** (reaction: when prey forces save, make weapon attack first, hit = auto-succeed save) | 15 | 2249-2250 | DEFERRED — `slayers_counter_active` flag set on init. Complex save-interruption mechanics. |
 
@@ -962,9 +962,9 @@ Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 | **Oath Spells** (sanctuary, sleep, calm emotions, hold person, counterspell, hypnotic pattern, resilient sphere, stoneskin, hold monster, wall of force) | 3-17 | 2028-2042 | Done 2026-04-10 -- 10 spells auto-prepared at init (sanctuary, sleep, calm_emotions, hold_person, counterspell, hypnotic_pattern, resilient_sphere, stoneskin, hold_monster, wall_of_force). |
 | **CD: Emissary of Peace** (+5 Persuasion for 10 minutes) | 3 | 2045 | DEFERRED — non-combat social feature. |
 | **CD: Rebuke the Violent** (reaction when attacker damages ally within 30ft: WIS save, radiant damage = damage dealt, half on save) | 3 | 2046 | ✓ Done — `rebuke_violent_ready` flag. CD handler in `users _dom.nvgt`. Trigger auto-resolves in ROLL_DAMAGE path: scans for Redemption Paladin within 30ft, WIS save vs DC. |
-| **Aura of the Guardian** (reaction: take ally's damage within 10/30ft, unreducible) | 7 | 2047-2048 | PARTIAL — `aura_of_guardian_active` + `aura_of_guardian_range` set on init (10 at L7, 30 at L18). Damage-transfer reaction logic deferred. |
+| **Aura of the Guardian** (reaction: take ally's damage within 10/30ft, unreducible) | 7 | 2047-2048 | Done 2026-04-11 — damage redirect wired in apply_damage; Paladin takes ally's damage unreduced within aura range. |
 | **Protective Spirit** (end of turn: regain 1d6+half level HP if below half HP and not incapacitated) | 15 | 2050-2051 | ✓ Done — `protective_spirit_active` flag. Passive heal wired in `advance_turn` after Sharpen the Blade tickdown. |
-| **Emissary of Redemption** (resistance to all creature damage + radiant retaliation = half damage taken; lost vs creatures you attack) | 20 | 2052-2056 | PARTIAL 2026-04-10 -- resistance to all damage from other creatures + radiant retaliation (half damage dealt) wired in apply_damage. Per-creature exclusion tracking deferred. |
+| **Emissary of Redemption** (resistance to all creature damage + radiant retaliation = half damage taken; lost vs creatures you attack) | 20 | 2052-2056 | Done 2026-04-11 — per-creature exclusion tracked via emissary_exclusion_ids string; creatures you attack are excluded from resistance/retaliation. |
 
 ### Path of the Storm Herald Barbarian Subclass Audit (2026-04-10) — Xanathar's paras 416-434
 
@@ -990,7 +990,7 @@ Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 |---------|-------|-------------|--------|
 | **Bonus Proficiencies** (medium armor, scimitar) | 3 | 579-581 | N/A — proficiency tracking exists but not auto-granted by subclass. |
 | **Fighting Style** (Dueling or Two-Weapon Fighting) | 3 | 582-585 | PARTIAL — Dueling/TWF feat system exists; not auto-prompted at subclass selection for Swords Bard. |
-| **Blade Flourish** (on Attack action +10ft speed; on weapon hit spend 1 BI for extra damage + variant) | 3 | 586-591 | PARTIAL — `blade_flourish_active` BA handler spends BI for bonus BI-die damage. +10ft speed on Attack action wired 2026-04-10 via `blade_flourish_speed_applied`. Missing: 3 Flourish variants (Defensive=+AC, Slashing=AoE, Mobile=push+move) — needs player choice prompt. |
+| **Blade Flourish** (on Attack action +10ft speed; on weapon hit spend 1 BI for extra damage + variant) | 3 | 586-591 | Done 2026-04-11 — All 3 Flourish variants fully wired with player choice menu: Defensive (+AC equal to BI die roll), Slashing (AoE damage to adjacent enemies), Mobile (push target BI-die feet + reaction to move up to walking speed toward pushed target). |
 | **Extra Attack** (attack twice per Attack action) | 6 | 592-593 | ✓ Done — `c.extra_attacks = 1` at L6 in character_data.nvgt. |
 | **Master's Flourish** (Blade Flourish can roll d6 instead of spending BI) | 14 | 594-595 | Done 2026-04-10 -- At L14+, Blade Flourish rolls d6 instead of expending BI die. Handler bypasses BI spend; damage rider uses d6 at L14+. |
 
@@ -1089,10 +1089,10 @@ Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 | Feature | Level | Source para | Status |
 |---------|-------|-------------|--------|
 | **Clockwork Magic** (auto-prepared abjuration/transmutation spells by level) | 1 | 3958-3974 | ✓ Done — protection_from_evil_and_good, aid, lesser_restoration, dispel_magic, protection_from_energy, greater_restoration, wall_of_force. L7 freedom_of_movement + summon_construct skipped (not in spell catalog). Alarm skipped (non-combat). |
-| **Restore Balance** (reaction: cancel advantage/disadvantage on d20 test within 60ft, PB uses/LR) | 1 | 3993-3996 | PARTIAL — reaction fires only on attacks against self with advantage (source allows any creature within 60ft on any d20 test). Fixed 2026-04-10: now gated on `has_effective_advantage` and rerolls a flat d20 instead of the old -5 flat penalty. |
+| **Restore Balance** (reaction: cancel advantage/disadvantage on d20 test within 60ft, PB uses/LR) | 1 | 3993-3996 | Done 2026-04-11 — ally-scan auto-fire within 60ft on any d20 test with advantage/disadvantage, cancels to flat roll. |
 | **Bastion of Law** (action: 1-5 SP, create Nd8 ward dice on self/ally within 30ft) | 6 | 3997-4000 | ✓ Done — ward dice absorb damage in `apply_damage` (auto-optimal one-at-a-time spend). Source says creature chooses how many dice to spend; auto-optimization is acceptable. |
 | **Trance of Order** (BA 1 min: attacks against you can't benefit from advantage, d20 ≤9→10 on attack/check/save, 1/LR or 5 SP) | 14 | 4001-4004 | ✓ Fixed 2026-04-10 — was missing 1/LR tracking entirely (unlimited free uses). Added `trance_of_order_used` field. Handler now properly gates: first use free, subsequent uses cost 5 SP. Anti-advantage in `apply_attack_advantage_state`, d20 clamp in `finalize_roll_result`, duration tickdown in `advance_turn` all verified. |
-| **Clockwork Cavalcade** (action: 30ft cube, 100 HP heal split among chosen + dispel ≤6th level spells, 1/LR or 7 SP) | 18 | 4005-4011 | PARTIAL — 100 HP healing correctly distributed among allies within 30ft, 1/LR with 7 SP reuse. Dispel effect ("every spell of 6th level or lower ends") is NOT implemented (requires spell tracking on creatures). |
+| **Clockwork Cavalcade** (action: 30ft cube, 100 HP heal split among chosen + dispel ≤6th level spells, 1/LR or 7 SP) | 18 | 4005-4011 | Done 2026-04-11 — 100 HP healing distributed among allies + dispel breaks concentration on spells L6 or lower. |
 
 ### College of Eloquence Bard Subclass Audit (2026-04-10) — Tasha's paras 1703-1719
 
@@ -1110,10 +1110,10 @@ Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 |---------|-------|-------------|--------|
 | **Psionic Power** (Psionic Energy dice pool = 2×proficiency bonus, die scaling d6 L3 / d8 L5 / d10 L11 / d12 L17) | 3 | 6-13 | ✓ Fixed 2026-04-10 — was `prof` (half), corrected to `prof * 2`. Die size scaling via `psionic_die_size` field set on init. |
 | **Psionic Strike** (on hit: spend 1 die, deal die + INT mod force damage) | 3 | 14-17 | ✓ Fixed 2026-04-10 — now uses `psionic_die_size` instead of hardcoded d6. |
-| **Protective Field** (reaction: when you or ally within 30ft takes damage, reduce by die + INT mod) | 3 | 18-21 | DEFERRED — needs reaction prompt extension for damage-reduction reactions. |
+| **Protective Field** (reaction: when you or ally within 30ft takes damage, reduce by die + INT mod) | 3 | 18-21 | Done 2026-04-11 — ally-scan auto-fire within 30ft, psionic die + INT mod damage reduction. |
 | **Telekinetic Movement** (action: move Large or smaller object/creature 30ft) | 3 | 22-25 | DEFERRED — non-combat utility; needs position-picker UI for combat use. |
 | **Telekinetic Thrust** (on Psionic Strike hit: STR save or pushed 10ft + prone) | 7 | 26-29 | ✓ Done 2026-04-11 — STR save + 10ft push + Prone rider wired on Psionic Strike hit at L7+. |
-| **Guarded Mind** (psychic resistance; spend die to end charmed/frightened) | 10 | 30-33 | PARTIAL — `psychic_resistance = true` set on init at L10. Condition-clearing spend not implemented. |
+| **Guarded Mind** (psychic resistance; spend die to end charmed/frightened) | 10 | 30-33 | Done 2026-04-11 — psychic resistance + auto-clear Charmed/Frightened at turn start by spending psionic die. |
 | **Bulwark of Force** (BA: grant half cover to INT mod allies within 30ft, concentration 1 min) | 15 | 34-40 | DEFERRED — cover system not in combat grid. |
 | **Telekinetic Master** (cast Telekinesis free 1/LR or spend 7 Psionic Energy dice) | 18 | 41-50 | DEFERRED — Telekinesis spell not fully implemented. |
 
@@ -1132,22 +1132,22 @@ Current catalog size in game: 128 items (was 35 at session start 2026-04-08).
 | Feature | Level | Source para | Status |
 |---------|-------|-------------|--------|
 | **Giant's Might** (BA: become Large for 1 min, +1d6 weapon damage once/turn, ADV on STR checks/saves, Prof uses/LR) | 3 | 3200-3210 | ✓ Fixed 2026-04-10 — damage die now scales (d6 L3 / d8 L10 / d10 L18). Added `is_first_hit_this_turn` gate for once-per-turn. STR check/save advantage not yet wired. |
-| **Rune Carver** (learn 2 runes at L3, +1 at L7/10/15; invoke each 1/LR) | 3 | 3211-3240 | ✓ Done 2026-04-11 — 6 rune passives (Cloud, Fire, Frost, Stone, Hill, Storm) + 3 invocation handlers (Fire: +2d6 fire on hit, Frost: STR save or restrained, Hill: resistance to B/P/S). |
-| **Runic Shield** (reaction: when ally within 60ft is hit, force attacker to reroll and use lower) | 7 | 3241-3245 | DEFERRED — needs reaction prompt extension. |
+| **Rune Carver** (learn 2 runes at L3, +1 at L7/10/15; invoke each 1/LR) | 3 | 3211-3240 | Done 2026-04-11 — 6 rune passives + all 6 invocation handlers: Fire (+2d6 fire on hit), Frost (STR save or restrained), Hill (resistance to B/P/S), Cloud (redirect attack to different creature within 30ft, auto-fires), Stone (WIS save or charmed + incapacitated, EOT saves), Storm (BA prophetic state, reaction to force advantage/disadvantage on rolls). |
+| **Runic Shield** (reaction: when ally within 60ft is hit, force attacker to reroll and use lower) | 7 | 3241-3245 | Done 2026-04-11 — reaction forces attacker to reroll attack and use lower result, PB uses per LR. |
 | **Great Stature** (height +3d4 inches; Giant's Might extra damage die → d8) | 10 | 3246-3250 | ✓ Implicit — die scaling already in `gm_die` logic (`d8` at L10+). Height is flavor only. |
-| **Master of Runes** (invoke each rune twice instead of once per LR) | 15 | 3251-3255 | PARTIAL — Rune Carver now implemented (2026-04-11). Double-invoke per LR not yet wired. |
+| **Master of Runes** (invoke each rune twice instead of once per LR) | 15 | 3251-3255 | Done 2026-04-11 — double invoke pool per LR wired; each rune gets 2 uses instead of 1 at L15+. |
 | **Runic Juggernaut** (Large → Huge on Giant's Might; Giant's Might die → d10; +5ft reach) | 18 | 3256-3260 | PARTIAL — die scales to d10. Size change to Huge and +5ft reach not implemented. |
 
 ### Circle of Stars Druid Subclass Audit (2026-04-10) — Tasha's paras 2130-2181
 
 | Feature | Level | Source para | Status |
 |---------|-------|-------------|--------|
-| **Star Map** (learn Guidance cantrip + Guiding Bolt free; Guiding Bolt free casts = Prof/LR) | 2 | 2130-2140 | PARTIAL — auto-adds Guidance + Guiding Bolt to prepared spells. Free cast tracking not implemented (uses spell slots). |
+| **Star Map** (learn Guidance cantrip + Guiding Bolt free; Guiding Bolt free casts = Prof/LR) | 2 | 2130-2140 | Done 2026-04-11 — free Guiding Bolt casts tracked via free_cast system (Prof uses/LR), no spell slot consumed. |
 | **Starry Form: Archer** (BA ranged spell attack 60ft, 1d8+WIS radiant; scales to 2d8 at L10) | 2 | 2141-2150 | ✓ Done 2026-04-11 — BA ranged spell attack handler, 1d8+WIS radiant (2d8 at L10+), 60ft range. |
 | **Starry Form: Chalice** (when you cast a heal spell with spell slot, bonus 1d8+WIS heal to another creature within 30ft; 2d8 at L10) | 2 | 2151-2155 | ✓ Done 2026-04-11 — auto-heals nearest injured ally within 30ft after healing spells, 1d8+WIS (2d8 at L10+). |
 | **Starry Form: Dragon** (INT/WIS checks and concentration saves: treat d20 ≤9 as 10) | 2 | 2156-2160 | ✓ Done 2026-04-10 — clamp in `finalize_roll_result` for `ROLL_ABILITY_CHECK` (INT/WIS) and `ROLL_CONCENTRATION`. |
-| **Cosmic Omen** (after LR: roll die → Woe or Weal; reaction to subtract/add d6 from creature's attack/save/check within 30ft, Prof uses/LR) | 6 | 2161-2168 | DEFERRED — needs reaction prompt for triggered buff/debuff on ally/enemy rolls. |
-| **Twinkling Constellations** (change Starry Form at start of each turn; Archer/Chalice heal dice → 2d8) | 10 | 2169-2173 | PARTIAL — Archer/Chalice now implemented (2026-04-11). Die scaling to 2d8 at L10 wired. Form-swap at start of turn still deferred (advance_turn hook needed). |
+| **Cosmic Omen** (after LR: roll die → Woe or Weal; reaction to subtract/add d6 from creature's attack/save/check within 30ft, Prof uses/LR) | 6 | 2161-2168 | Done 2026-04-11 — weal/woe smart-spend in attack resolution, reaction auto-fires to add/subtract d6. |
+| **Twinkling Constellations** (change Starry Form at start of each turn; Archer/Chalice heal dice → 2d8) | 10 | 2169-2173 | Done 2026-04-11 — form swap at start of turn with player prompt wired in advance_turn. Die scaling to 2d8 at L10. |
 | **Full of Stars** (while in Starry Form: resistance to B/P/S damage) | 14 | 2179-2181 | ✓ Done 2026-04-10 — `apply_damage` halves B/P/S when `starry_form_active and level >= 14`. |
 
 ---

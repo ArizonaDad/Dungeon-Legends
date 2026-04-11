@@ -540,7 +540,7 @@ class combatant {
 	int runic_shield_uses_max = 0;
 	bool wrath_of_storms_available = false; // Storm Sorcerer
 	bool emboldening_bond_active = false; // Peace Domain Cleric
-	bool drunken_master_opportunity = false; // Way of the Drunken Master
+	bool drunken_master_opportunity = false; // DEPRECATED: Redirect Attack is now auto-resolved in finalize_roll_result
 	bool drunkards_luck_active = false; // Drunken Master L11: spend 1 ki to cancel save disadvantage
 	array<uint> flurry_targets_hit; // Xanathar's Drunken Master L17 Intoxicated Frenzy: track IDs of targets already hit this flurry
 	bool arcane_shot_pending = false; // Arcane Archer Fighter
@@ -1035,8 +1035,10 @@ class combatant {
 	uint venomous_mark_target_id = 0;       // L1 Venomous Mark: cursed target (1 minute)
 	int venomous_mark_rounds = 0;           // Remaining duration in rounds
 	bool sickening_revenge_used = false;    // L6 Sickening Revenge: 1/SR or LR
+	uint sickening_revenge_source_id = 0;   // L6 Sickening Revenge: caster who poisoned this target (for EOT save)
 	bool dark_inoculation = false;          // L10 Dark Inoculation: immunity to disease, poison damage, poisoned
 	bool touch_of_sorrow_used = false;      // L14 Touch of Sorrow: 1/SR or LR
+	uint touch_of_sorrow_source_id = 0;     // L14 Touch of Sorrow: caster who applied effect (for save DC tracking)
 	// --- Book of Ebon Tides: Circle of Shadows Druid ---
 	bool circle_of_shadows_active = false;  // L2 origin
 	bool umbral_form_active = false;        // L2 Umbral Form alternative wild shape
@@ -1123,6 +1125,14 @@ class combatant {
 	bool path_of_glacier_active = false; // Barbarian Path of the Glacier
 	bool path_of_infernal_active = false; // Barbarian Path of the Infernal
 	bool college_of_dance_active = false; // Bard College of Dance
+	// PHB 2024 College of Dance L6: Tandem Footwork — roll BI die on initiative,
+	// add to initiative for self and allies within 30 ft.
+	bool dance_tandem_footwork_active = false;
+	// PHB 2024 College of Dance L14: Leading Evasion — evasion that shares with
+	// allies within 5 ft on the same DEX save.
+	bool dance_leading_evasion_active = false;
+	// PHB 2024 College of Dance L14: Irresistible Dance free cast 1/LR
+	bool dance_irresistible_dance_free_used = false;
 	bool college_of_requiems_active = false; // Bard College of Requiems
 	bool trickery_domain_active = false; // Trickery Domain Cleric - duplicate self
 	bool shepherd_circle_active = false; // Circle of the Shepherd Druid - spirit totems
@@ -2573,6 +2583,34 @@ class battle {
 					source.current_hp -= retribution;
 				}
 			}
+		}
+
+		// Book of Ebon Tides Mother of Sorrows Warlock L6 Sickening Revenge (para 1141):
+		// "When you take damage, you can use your reaction to attempt to poison the
+		// creature that damaged you. The triggering creature must make a Constitution
+		// saving throw against your warlock spell save DC or become poisoned for
+		// 1 minute. An affected creature can repeat the saving throw at the end of
+		// each of its turns, ending the condition on a success."
+		// Once per short or long rest. Auto-fires like other auto-resolved reactions.
+		if (target.mother_of_sorrows_active and target.level >= 6
+			and !target.sickening_revenge_used and target.has_reaction
+			and @source != null and !source.is_dead and source.id != target.id and amount > 0) {
+			target.has_reaction = false;
+			target.sickening_revenge_used = true;
+			int sr_dc = 8 + target.proficiency + target.get_ability_mod(ABILITY_CHA);
+			int sr_save = random(1, 20) + source.get_save_bonus(ABILITY_CON);
+			if (sr_save < sr_dc) {
+				source.add_condition(COND_POISONED);
+				source.sickening_revenge_source_id = target.id;
+			}
+		}
+
+		// Book of Ebon Tides Mother of Sorrows Warlock L14 Touch of Sorrow (para 1141):
+		// "A paralyzed creature is no longer paralyzed if it takes any damage or if
+		// it is no longer poisoned." Damage breaks the paralysis but NOT the poison.
+		if (amount > 0 and target.touch_of_sorrow_source_id != 0 and target.has_condition(COND_PARALYZED)) {
+			target.remove_condition(COND_PARALYZED);
+			// Note: Poisoned condition remains active per source.
 		}
 
 		if (target.wild_shape_active and target.current_hp <= 0) {
