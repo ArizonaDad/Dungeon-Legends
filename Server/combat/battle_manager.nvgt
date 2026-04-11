@@ -5802,6 +5802,23 @@ class battle_manager {
 					broadcast_announce(prev.name + "'s Trance of Order ends.", false);
 				}
 			}
+			// Tasha's Aberrant Mind L14 Psychic Emission (para 3942-3948): "frightened
+			// until the end of your next turn." Tick down on the caster's turn end for
+			// all creatures that were frightened by this caster's Psychic Emission.
+			if (prev.revelation_in_flesh_active) {
+				for (uint pe_i = 0; pe_i < combat.combatants.length(); pe_i++) {
+					combatant@ pe_t = combat.combatants[pe_i];
+					if (@pe_t == null or pe_t.is_dead) continue;
+					if (pe_t.psychic_emission_frightened_rounds > 0 and pe_t.frightened_source_id == prev.id) {
+						pe_t.psychic_emission_frightened_rounds--;
+						if (pe_t.psychic_emission_frightened_rounds <= 0) {
+							pe_t.remove_condition(COND_FRIGHTENED);
+							pe_t.frightened_source_id = 0;
+							broadcast_announce(pe_t.name + " is no longer frightened by the psychic emission.", false);
+						}
+					}
+				}
+			}
 			// Tasha's Rune Knight Frost Rune invoke (para 3222-3224): "10 minutes"
 			// = 100 rounds. +2 to STR/CON checks and saves.
 			if (prev.frost_rune_active and prev.frost_rune_rounds > 0) {
@@ -7256,6 +7273,8 @@ class battle_manager {
 		}
 		// Reset first hit tracking for subclass on-hit effects
 		c.is_first_hit_this_turn = true;
+		// Ravenloft Undead Warlock L10 Form of Dread frighten: once per turn reset.
+		c.form_of_dread_frighten_used_this_turn = false;
 		// PHB 2024 Rogue L1 Sneak Attack (para 6537): "Once per turn" — reset.
 		c.sneak_attack_used_this_turn = false;
 		// PHB 2024 Bonus Action Spell rule (para 7986-7989): per-turn tracking.
@@ -7275,6 +7294,15 @@ class battle_manager {
 		c.steady_aim_pending = false;
 		// PHB 2024 Blade Ward (cantrip): resistance expires at the start of the caster's next turn.
 		c.blade_ward_active = false;
+		// Tasha's Aberrant Mind L18 Warping Implosion (para 3949-3952): Stunned duration
+		// ticks down at the stunned creature's turn start. Remove when expired.
+		if (c.warping_implosion_stunned_rounds > 0) {
+			c.warping_implosion_stunned_rounds--;
+			if (c.warping_implosion_stunned_rounds <= 0) {
+				c.remove_condition(COND_STUNNED);
+				broadcast_announce(c.name + " recovers from the Warping Implosion stun.", false);
+			}
+		}
 		// Basic Rules 2024 Shillelagh (para 14966-14974): 1 minute duration countdown.
 		if (c.shillelagh_active) {
 			c.shillelagh_rounds--;
@@ -8353,8 +8381,19 @@ class battle_manager {
 			if (enemy.id == mover.id) continue;
 			// Must be on the opposite side (in PvP, all players are enemies to each other).
 			if (!combat.are_hostile(enemy, mover)) continue;
-			// Must have reaction available.
-			if (!enemy.has_reaction) continue;
+			// Must have reaction available (normal reaction OR Vigilant Defender special reaction).
+			// Xanathar's Cavalier L18 Vigilant Defender (para 1681-1682): "you get a
+			// special reaction that you can take once on every other creature's turn,
+			// except your own. You can use this special reaction only to make an
+			// opportunity attack."
+			bool use_vigilant_defender = false;
+			if (!enemy.has_reaction) {
+				if (enemy.vigilant_defender_active and enemy.vigilant_defender_reaction_available) {
+					use_vigilant_defender = true;
+				} else {
+					continue;
+				}
+			}
 			// Must have been in melee range before the move (5ft = adjacent tile).
 			int old_dist = feet_distance(old_x, old_y, enemy.x, enemy.y);
 			int new_dist = feet_distance(new_x, new_y, enemy.x, enemy.y);
@@ -8370,6 +8409,8 @@ class battle_manager {
 			bool leaving_reach = (old_dist <= reach and new_dist > reach);
 			bool entering_reach = (old_dist > reach and new_dist <= reach and enemy.has_feat("polearm_master") and !enemy.main_hand_is_ranged);
 			bool moving_in_reach = (old_dist <= reach and new_dist <= reach and enemy.hold_the_line_active);
+			// Hold the Line: prevent multiple OA triggers on same target per round
+			if (moving_in_reach and enemy.hold_the_line_stopped_id == mover.id) moving_in_reach = false;
 			if (leaving_reach or entering_reach or moving_in_reach) {
 				if (enemy.main_hand_is_ranged) continue;
 				// Swashbuckler Rogue: Fancy Footwork — enemies attacked by Swashbuckler can't make OA
@@ -8387,8 +8428,14 @@ class battle_manager {
 					}
 					if (attacked_this_enemy) continue;
 				}
-				enemy.has_reaction = false;
-				broadcast_announce(enemy.name + " makes an opportunity attack against " + mover.name + "!");
+				// Consume the appropriate reaction type
+				if (use_vigilant_defender) {
+					enemy.vigilant_defender_reaction_available = false;
+					broadcast_announce(enemy.name + " uses Vigilant Defender to make an opportunity attack against " + mover.name + "!");
+				} else {
+					enemy.has_reaction = false;
+					broadcast_announce(enemy.name + " makes an opportunity attack against " + mover.name + "!");
+				}
 				// Calculate attack bonus.
 			int atk_bonus = get_attack_bonus_for_roll(enemy, false);
 			bool adv = false;
@@ -8448,6 +8495,8 @@ class battle_manager {
 						// "the creature's speed becomes 0 until the end of the current turn."
 						if (enemy.hold_the_line_active) {
 							mover.movement_remaining = 0;
+							mover.speed = 0; // Speed reduced to 0 for the rest of the turn
+							enemy.hold_the_line_stopped_id = mover.id; // Prevent repeat OAs on same target
 							if (!enemy.has_feat("sentinel")) // Avoid double announce
 								broadcast_announce(enemy.name + " holds the line! " + mover.name + "'s speed drops to 0!", false);
 						}
@@ -10321,6 +10370,37 @@ class battle_manager {
 			}
 		}
 
+		// Ravenloft Undead Warlock L10 Form of Dread frighten (Ravenloft paras approx):
+		// "Once per turn when you hit a creature with an attack roll, you can force it
+		// to make a Wisdom saving throw, and if the saving throw fails, the target is
+		// frightened of you until the end of your next turn." Requires Form of Dread
+		// active and level 10+.
+		if (attacker.class_name == "Warlock" and attacker.subclass == "The Undead"
+			and attacker.level >= 10 and attacker.form_of_dread_active
+			and !attacker.form_of_dread_frighten_used_this_turn
+			and !target.is_dead and is_weapon_attack) {
+			attacker.form_of_dread_frighten_used_this_turn = true;
+			int fod_dc = spell_save_dc(attacker);
+			int fod_bonus = target.get_save_bonus(ABILITY_WIS);
+			int fod_save = random(1, 20) + fod_bonus;
+			bool fod_saved = fod_save >= fod_dc;
+			// Save failure chain
+			if (!fod_saved and try_arcane_deflection_save(target, fod_dc, fod_save)) fod_saved = true;
+			if (!fod_saved) { if (try_countercharm_reroll(target, fod_dc, fod_bonus, "WIS save vs Form of Dread")) fod_saved = true; }
+			if (!fod_saved) { int fg = try_flash_of_genius(target, fod_dc, fod_save, "WIS save vs Form of Dread"); if (fg >= fod_dc) fod_saved = true; }
+			if (!fod_saved) { int ms = try_maverick_spirit(target, fod_dc, fod_save, "WIS save vs Form of Dread"); if (ms >= fod_dc) fod_saved = true; }
+			if (!fod_saved and try_mage_slayer_guarded_mind(target, ABILITY_WIS)) fod_saved = true;
+			if (!fod_saved) { int bf = try_boon_of_fate_bonus(target, fod_save, fod_dc); if (bf > 0) fod_saved = true; }
+			if (!fod_saved and try_stroke_of_luck_save(target, fod_dc, fod_bonus)) fod_saved = true;
+			if (!fod_saved) {
+				target.add_condition(COND_FRIGHTENED);
+				target.frightened_source_id = attacker.id;
+				broadcast_announce(target.name + " is Frightened by " + attacker.name + "'s Form of Dread! (WIS save " + fod_save + " vs DC " + fod_dc + ")", true);
+			} else {
+				broadcast_announce(target.name + " resists " + attacker.name + "'s Form of Dread fear! (WIS save " + fod_save + " vs DC " + fod_dc + ")", false);
+			}
+		}
+
 		// Mark first hit used
 		if (bonus > 0 or is_weapon_attack) {
 			attacker.is_first_hit_this_turn = false;
@@ -11270,6 +11350,23 @@ class battle_manager {
 				if (target.spectral_defense_active) {
 					reaction_options.insert_last("spectral_defense");
 				}
+				// Xanathar's Mastermind L13 Misdirection (para 2359-2360): "When you are
+				// targeted by an attack while a creature within 5 feet of you is granting
+				// you cover, you can use your reaction to have the attack target that
+				// creature instead of you." Simplified: any OTHER player ally within 5ft.
+				if (target.misdirection_active and @combat != null) {
+					bool has_adjacent_ally = false;
+					for (uint mai = 0; mai < combat.combatants.length(); mai++) {
+						combatant@ ma = combat.combatants[mai];
+						if (@ma == null or ma.is_dead or ma.id == target.id) continue;
+						if (ma.is_player != target.is_player) continue; // Must be same side
+						if (feet_distance(target.x, target.y, ma.x, ma.y) <= 5) {
+							has_adjacent_ally = true;
+							break;
+						}
+					}
+					if (has_adjacent_ally) reaction_options.insert_last("misdirection");
+				}
 
 				if (reaction_options.length() > 0) {
 					user@ def_user = find_user_for_combatant(target);
@@ -11307,6 +11404,7 @@ class battle_manager {
 							else if (reaction_options[oi] == "storms_fury") opts += "Storm's Fury (" + target.level + " lightning damage to attacker + STR save or pushed 20 ft)";
 						else if (reaction_options[oi] == "shadowy_dodge") opts += "Shadowy Dodge (impose disadvantage on the attack)";
 							else if (reaction_options[oi] == "spectral_defense") opts += "Spectral Defense (resistance to all damage from this attack)";
+							else if (reaction_options[oi] == "misdirection") opts += "Misdirection (redirect attack to adjacent ally)";
 						}
 						def_user.send({{"type", message_types::reaction_prompt}, {"attacker", c.name}, {"options", opts}, {"options_csv", opts_csv}});
 						return; // Pause — wait for reaction_response
@@ -12104,6 +12202,19 @@ class battle_manager {
 				broadcast_announce(c.name + "'s weapon damage is halved by Enfeebling Arrow! (" + total_damage + " damage)", true);
 			}
 			combat.apply_damage(target, total_damage, pr.damage_type, c, pr.is_crit);
+			// Xanathar's Shepherd Druid L14 Faithful Summons (para 896-899): deferred
+			// spawn after apply_damage. The flag is set in combat_engine when a Shepherd
+			// Druid is reduced to 0 HP. We consume the flag here and spawn 4 beasts.
+			for (uint fsi = 0; fsi < combat.combatants.length(); fsi++) {
+				combatant@ fs_c = combat.combatants[fsi];
+				if (@fs_c != null and fs_c.faithful_summons_pending) {
+					fs_c.faithful_summons_pending = false;
+					for (int fsb = 0; fsb < 4; fsb++) {
+						spawn_companion(fs_c, "faithful_summons", fs_c.name + "'s Faithful Beast", 30, 14, 30, fs_c.proficiency + fs_c.get_ability_mod(ABILITY_WIS), 1, 8, 3, DMG_SLASHING, 0);
+					}
+					broadcast_announce(fs_c.name + "'s Faithful Summons conjures 4 spirit beasts!", true);
+				}
+			}
 
 			// PHB 2024 Fey Wanderer L11 Distant Strike (para 6187-6190): track unique
 			// targets hit during the Attack action. If 2+ different targets are hit,
@@ -12471,6 +12582,8 @@ class battle_manager {
 				// "the target's speed is reduced to 0 until the end of the current turn."
 				if (c.hold_the_line_active) {
 					target.movement_remaining = 0;
+					target.speed = 0; // Speed reduced to 0 for the rest of the turn
+					c.hold_the_line_stopped_id = target.id; // Prevent repeat OAs on same target
 					if (!c.has_feat("sentinel")) // Avoid double announce
 						broadcast_announce(c.name + " holds the line! " + target.name + "'s speed drops to 0!", false);
 				}
@@ -13716,6 +13829,67 @@ class battle_manager {
 					} else {
 						broadcast_announce(attacker.name + " resists the push (STR save " + str_save + " vs DC " + spell_dc + ").", false);
 					}
+				}
+			}
+		}
+
+		else if (choice == "misdirection" and defender.is_player) {
+			// Xanathar's Mastermind L13 Misdirection (para 2359-2360): "you can use
+			// your reaction to have the attack target that creature instead of you."
+			// Find nearest player ally within 5ft and redirect the attack to them.
+			if (defender.misdirection_active and @combat != null) {
+				combatant@ redirect_target = null;
+				int best_dist = 999;
+				for (uint mdi = 0; mdi < combat.combatants.length(); mdi++) {
+					combatant@ md = combat.combatants[mdi];
+					if (@md == null or md.is_dead or md.id == defender.id) continue;
+					if (md.is_player != defender.is_player) continue; // Must be same side
+					int md_dist = feet_distance(defender.x, defender.y, md.x, md.y);
+					if (md_dist <= 5 and md_dist < best_dist) {
+						best_dist = md_dist;
+						@redirect_target = md;
+					}
+				}
+				if (@redirect_target != null) {
+					defender.has_reaction = false;
+					broadcast_announce(defender.name + " uses Misdirection! The attack is redirected to " + redirect_target.name + "!", true);
+					// Reroll attack vs the new target's AC
+					int new_total = rp.attack_total; // Same attack roll, just vs new AC
+					bool new_hit = false;
+					bool new_crit = (rp.natural_roll >= get_critical_threshold(attacker, rp.attack_roll));
+					bool new_fumble = (rp.natural_roll == 1);
+					if (new_crit) new_hit = true;
+					else if (new_fumble) new_hit = false;
+					else new_hit = new_total >= redirect_target.armor_class;
+					if (new_hit) {
+						// Apply damage to the redirect target
+						int dmg_mod = get_damage_modifier_for_attack(attacker, false);
+						int base_dice = get_attack_damage_count(attacker, false);
+						int dmg_dice = new_crit ? base_dice * 2 : base_dice;
+						int dmg_sides = get_attack_damage_dice(attacker, false);
+						int total_damage = 0;
+						for (int d = 0; d < dmg_dice; d++) total_damage += random(1, dmg_sides);
+						total_damage += dmg_mod;
+						if (total_damage < 1) total_damage = 1;
+						string dmg_type_name = "damage";
+						int dtype = attacker.main_hand_damage_type;
+						if (dtype >= 0 and dtype < int(DAMAGE_TYPE_NAMES.length())) {
+							dmg_type_name = DAMAGE_TYPE_NAMES[dtype] + " damage";
+						}
+						broadcast_announce(attacker.name + "'s redirected attack hits " + redirect_target.name + " for " + total_damage + " " + dmg_type_name + "!", true);
+						combat.apply_damage(redirect_target, total_damage, dtype, attacker);
+						check_concentration(redirect_target, total_damage, attacker);
+						if (redirect_target.is_dead) {
+							broadcast_announce(redirect_target.name + " has been slain!", true);
+							broadcast_to_battle({{"type", message_types::creature_died}, {"name", redirect_target.name}, {"id", redirect_target.id}, {"killed_by", attacker.name}, {"was_full_hp", false}, {"was_overkill", total_damage >= redirect_target.max_hp * 2}, {"was_stealth", false}});
+						}
+					} else {
+						broadcast_announce(attacker.name + "'s redirected attack misses " + redirect_target.name + " (AC " + redirect_target.armor_class + ").", false);
+					}
+					broadcast_state();
+					check_battle_end();
+					// Misdirection fully resolved the attack — don't resume normal attack flow
+					return;
 				}
 			}
 		}

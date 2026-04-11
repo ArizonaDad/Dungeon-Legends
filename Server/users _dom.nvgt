@@ -2179,8 +2179,8 @@ void handle_user_message(user@ u, json_object@ msg)
 		else if (feature == "warping_implosion") {
 			// Tasha's Aberrant Mind L18 Warping Implosion (para 3949-3952): "As an action,
 			// you can teleport to an unoccupied space you can see within 120 feet. Immediately
-			// after, each creature within 30 feet of the space you left must make a STR save
-			// vs spell DC. Fail: 3d10 force + pulled. Success: half + no pull."
+			// after, each creature within 30 feet of the space you left must make a CON save
+			// vs spell DC. Fail: 9d10 force + Stunned (2 rounds). Success: half + no stun."
 			// 1/LR or 5 SP to reuse.
 			if (c.class_name != "Sorcerer" or c.subclass != "Aberrant Sorcery" or c.level < 18) {
 				u.send({{"type", message_types::announce}, {"text", "Your character cannot use Warping Implosion."}, {"interrupt", true}});
@@ -2213,9 +2213,9 @@ void handle_user_message(user@ u, json_object@ msg)
 					c.y = wi_target.y;
 				}
 			}
-			// AoE: 30ft around old position — 3d10 force + STR save
-			int spell_dc = 8 + c.proficiency + c.get_ability_mod(ABILITY_CHA);
-			int total_damage = random(1, 10) + random(1, 10) + random(1, 10);
+			// AoE: 30ft around old position — 9d10 force + CON save
+			int spell_dc = spell_save_dc(c);
+			int total_damage = 0; for (int dd = 0; dd < 9; dd++) total_damage += random(1, 10);
 			string cost_note = used_sp ? " (5 SP)" : "";
 			u.room.bm.broadcast_announce(c.name + " unleashes Warping Implosion" + cost_note + " — teleporting 120 ft and causing a space-warping anomaly!", true);
 			for (uint i = 0; i < u.room.bm.combat.combatants.length(); i++) {
@@ -2223,18 +2223,29 @@ void handle_user_message(user@ u, json_object@ msg)
 				if (@t == null or t.is_dead or t.id == c.id) continue;
 				if (t.is_player == c.is_player) continue; // Skip allies — only hit enemies
 				// Check distance from OLD position
-				float dx = float(t.x - old_x);
-				float dy = float(t.y - old_y);
-				float d = sqrt(dx * dx + dy * dy) * 5.0f;
+				int d = feet_distance(t.x, t.y, old_x, old_y);
 				if (d <= 30) {
-					int str_save = random(1, 20) + t.get_ability_mod(ABILITY_STR);
-					if (str_save >= spell_dc) {
+					int save_bonus = t.get_save_bonus(ABILITY_CON);
+					int save_roll = random(1, 20);
+					int save_total = save_roll + save_bonus;
+					bool saved = save_total >= spell_dc;
+					// Full save failure chain
+					if (!saved and u.room.bm.try_arcane_deflection_save(t, spell_dc, save_total)) saved = true;
+					if (!saved) { int ds = u.room.bm.try_disciplined_survivor_reroll(t, spell_dc, save_total, save_bonus, "CON save vs Warping Implosion"); if (ds >= spell_dc) saved = true; }
+					if (!saved) { int fg = u.room.bm.try_flash_of_genius(t, spell_dc, save_total, "CON save vs Warping Implosion"); if (fg >= spell_dc) saved = true; }
+					if (!saved) { int mv = u.room.bm.try_maverick_spirit(t, spell_dc, save_total, "CON save vs Warping Implosion"); if (mv >= spell_dc) saved = true; }
+					if (!saved and u.room.bm.try_mage_slayer_guarded_mind(t, ABILITY_CON)) saved = true;
+					if (!saved) { int bf = u.room.bm.try_boon_of_fate_bonus(t, save_total, spell_dc); if (bf >= spell_dc) saved = true; }
+					if (!saved and u.room.bm.try_stroke_of_luck_save(t, spell_dc, save_bonus)) saved = true;
+					if (saved) {
 						int half = (total_damage + 1) / 2;
 						u.room.bm.combat.apply_damage(t, half, DMG_FORCE, c);
-						u.room.bm.broadcast_announce(t.name + " resists the implosion! STR save " + str_save + " vs DC " + spell_dc + " — takes " + half + " force damage.", false);
+						u.room.bm.broadcast_announce(t.name + " resists the implosion! CON save " + save_total + " vs DC " + spell_dc + " — takes " + half + " force damage.", false);
 					} else {
 						u.room.bm.combat.apply_damage(t, total_damage, DMG_FORCE, c);
-						u.room.bm.broadcast_announce(t.name + " is pulled by the implosion! STR save " + str_save + " vs DC " + spell_dc + " — takes " + total_damage + " force damage!", true);
+						t.add_condition(COND_STUNNED);
+						t.warping_implosion_stunned_rounds = 2;
+						u.room.bm.broadcast_announce(t.name + " is pulled by the implosion! CON save " + save_total + " vs DC " + spell_dc + " — takes " + total_damage + " force damage and is Stunned!", true);
 					}
 				}
 			}
@@ -2266,7 +2277,7 @@ void handle_user_message(user@ u, json_object@ msg)
 			// action, you can enter this state for 1 minute. For the duration, attack rolls
 			// against you can't benefit from advantage, and whenever you make an attack roll,
 			// an ability check, or a saving throw, you can treat a roll of 9 or lower on
-			// the d20 as a 10." 1/LR or 5 SP.
+			// the d20 as a 10." Uses = proficiency bonus per LR, or 5 SP to reuse.
 			if (c.class_name != "Sorcerer" or c.subclass != "Clockwork Sorcery" or c.level < 14) {
 				u.send({{"type", message_types::announce}, {"text", "Your character cannot use Trance of Order."}, {"interrupt", true}});
 				return;
@@ -2280,21 +2291,20 @@ void handle_user_message(user@ u, json_object@ msg)
 			// again until you finish a long rest, unless you spend 5 sorcery points to
 			// use it again."
 			bool used_sp = false;
-			if (c.trance_of_order_used) {
-				if (c.sorcery_points >= 5) {
-					c.sorcery_points -= 5;
-					used_sp = true;
-				} else {
-					u.send({{"type", message_types::announce}, {"text", "Trance of Order already used this rest. Costs 5 SP to reuse."}, {"interrupt", true}});
-					return;
-				}
+			if (c.trance_of_order_uses > 0) {
+				c.trance_of_order_uses--;
+			} else if (c.sorcery_points >= 5) {
+				c.sorcery_points -= 5;
+				used_sp = true;
+			} else {
+				u.send({{"type", message_types::announce}, {"text", "No Trance of Order uses remaining. Costs 5 SP to reuse."}, {"interrupt", true}});
+				return;
 			}
 			c.has_bonus_action = false;
 			c.used_bonus_action = true;
 			c.trance_of_order_active = true;
 			c.trance_of_order_rounds = 10;
-			if (!used_sp) c.trance_of_order_used = true;
-			string cost_note = used_sp ? " (5 SP)" : "";
+			string cost_note = used_sp ? " (5 SP)" : " (" + c.trance_of_order_uses + " uses left)";
 			u.room.bm.broadcast_announce(c.name + " enters a Trance of Order" + cost_note + " — attacks can't benefit from advantage, and d20 rolls of 9 or lower are treated as 10!", true);
 		}
 		else if (feature == "clockwork_cavalcade") {
@@ -4202,6 +4212,41 @@ void handle_user_message(user@ u, json_object@ msg)
 			c.used_bonus_action = true;
 			c.inquisitive_target = target_id;
 			u.room.bm.broadcast_announce(c.name + " studies a target with Insightful Fighting!", false);
+		}
+
+		else if (feature == "eye_for_detail") {
+			// Xanathar's Inquisitive Rogue L3 Eye for Detail (para 2334-2335):
+			// "You can use a bonus action to make a Wisdom (Perception) check to
+			// spot a hidden creature."
+			if (c.class_name != "Rogue" or c.subclass != "Inquisitive") { u.send({{"type", message_types::announce}, {"text", "Only Inquisitive rogues can use Eye for Detail."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			// Roll Perception check vs each hidden hostile's Stealth DC (default 15)
+			int perception_bonus = c.get_skill_bonus("Perception", ABILITY_WIS);
+			bool found_any = false;
+			if (@u.room.bm.combat != null) {
+				for (uint efi = 0; efi < u.room.bm.combat.combatants.length(); efi++) {
+					combatant@ hidden_target = u.room.bm.combat.combatants[efi];
+					if (@hidden_target == null or hidden_target.is_dead) continue;
+					if (!hidden_target.is_hidden) continue;
+					if (!u.room.bm.combat.are_hostile(c, hidden_target)) continue;
+					// Roll Perception vs the hidden creature's Stealth DC (default 15)
+					int stealth_dc = 15;
+					int perception_roll = random(1, 20);
+					int perception_total = perception_roll + perception_bonus;
+					bool spotted = perception_total >= stealth_dc;
+					u.room.bm.broadcast_roll(c.name, "Perception check (Eye for Detail) vs " + hidden_target.name, perception_roll, perception_bonus, perception_total, spotted ? "Spotted!" : "Not found.");
+					if (spotted) {
+						hidden_target.is_hidden = false;
+						u.room.bm.broadcast_announce(c.name + " spots " + hidden_target.name + " with Eye for Detail!", true);
+						found_any = true;
+					}
+				}
+			}
+			if (!found_any) {
+				u.room.bm.broadcast_announce(c.name + " uses Eye for Detail but finds no hidden creatures.", false);
+			}
 		}
 
 		else if (feature == "mastermind_help") {

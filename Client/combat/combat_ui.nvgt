@@ -262,6 +262,7 @@ int my_bastion_of_law_dice = 0;
 bool my_trance_of_order_active = false;
 int my_trance_of_order_rounds = 0;
 bool my_trance_of_order_used = false;
+int my_trance_of_order_uses = 0;
 bool my_clockwork_cavalcade_available = false;
 // Xanathar's War Magic (paras 2915-2944) — synced from server
 bool my_tactical_wit_active = false;
@@ -1013,6 +1014,13 @@ void show_action_menu() {
 		if (!currently_wild_shaped and subclass != "Circle of the Moon") wild_shape_opt = m.add_item("Wild Shape. Action. Transform into a beast.");
 	}
 
+	// Tasha's Aberrant Mind L18 Warping Implosion (para 3949-3952) — Action, not bonus action
+	int warping_implosion_action_opt = -1;
+	if (lc == "sorcerer" and subclass == "Aberrant Sorcery" and level >= 18) {
+		string wi_label = my_warping_implosion_available ? "Warping Implosion. Action. Teleport 120ft + 30ft AoE 9d10 force + Stunned. 1/LR." : "Warping Implosion. Action. 5 SP to reuse.";
+		warping_implosion_action_opt = m.add_item(wi_label);
+	}
+
 	int end_opt = m.add_item("End turn.");
 	int status_opt = m.add_item("Check status. Hear your current stats.");
 
@@ -1135,6 +1143,11 @@ void show_action_menu() {
 		send({{"type", message_types::bonus_action}, {"feature", "divine_smite"}});
 		speak("Divine Smite prepared. Your next melee hit deals extra 2d8 radiant.", true);
 	}
+	else if (warping_implosion_action_opt >= 0 and res == warping_implosion_action_opt) {
+		// Tasha's Aberrant Mind L18 Warping Implosion — send as bonus_action feature
+		// (server handler is in the bonus_action dispatch in users_dom)
+		send({{"type", message_types::bonus_action}, {"feature", "warping_implosion"}, {"target_id", current_target_id}});
+	}
 }
 
 void show_bonus_action_menu() {
@@ -1211,6 +1224,7 @@ void show_bonus_action_menu() {
 	int arcane_shot_opt = -1;
 	int abjure_extraplanar_opt = -1;
 	int insightful_fighting_opt = -1;
+	int eye_for_detail_opt = -1;
 	int mastermind_help_opt = -1;
 	int fast_hands_opt = -1;
 	int sun_bolt_opt = -1;
@@ -1419,11 +1433,7 @@ void show_bonus_action_menu() {
 	if (lc == "sorcerer" and subclass == "Aberrant Sorcery" and level >= 14) {
 		revelation_in_flesh_opt = m.add_item("Revelation in Flesh. Bonus action. 1+ SP: see invisible 60ft, or fly speed = walk speed, or both (2 SP).");
 	}
-	// Tasha's Aberrant Mind L18 Warping Implosion (para 3949-3952)
-	if (lc == "sorcerer" and subclass == "Aberrant Sorcery" and level >= 18) {
-		string wi_label = my_warping_implosion_available ? "Warping Implosion. Action. Teleport 120ft + 30ft AoE 3d10 force. 1/LR." : "Warping Implosion. Action. 5 SP to reuse.";
-		warping_implosion_opt = m.add_item(wi_label);
-	}
+	// Tasha's Aberrant Mind L18 Warping Implosion (para 3949-3952) — moved to F-menu (action menu)
 	// Tasha's Clockwork Soul L6 Bastion of Law (para 3997-4000)
 	if (lc == "sorcerer" and subclass == "Clockwork Sorcery" and level >= 6) {
 		string bol_label = "Bastion of Law. Action. 1-5 SP: create d8 ward dice on self or ally to absorb damage.";
@@ -1433,7 +1443,8 @@ void show_bonus_action_menu() {
 	// Tasha's Clockwork Soul L14 Trance of Order (para 4001-4004)
 	if (lc == "sorcerer" and subclass == "Clockwork Sorcery" and level >= 14 and !my_trance_of_order_active) {
 		string trance_label = "Trance of Order. Bonus action. 1 min: no advantage vs you + d20 9- treated as 10.";
-		if (my_trance_of_order_used) trance_label += " (5 SP to reuse)";
+		if (my_trance_of_order_uses > 0) trance_label += " (" + my_trance_of_order_uses + " uses left)";
+		else trance_label += " (5 SP to reuse)";
 		trance_of_order_opt = m.add_item(trance_label);
 	}
 	// Tasha's Clockwork Soul L18 Clockwork Cavalcade (para 4005-4011)
@@ -1712,6 +1723,7 @@ void show_bonus_action_menu() {
 	}
 	if (lc == "rogue" and subclass == "Inquisitive") {
 		insightful_fighting_opt = m.add_item("Insightful Fighting. Study a target to enable Sneak Attack without advantage.");
+		eye_for_detail_opt = m.add_item("Eye for Detail. Bonus action Perception check to spot hidden creatures.");
 	}
 	if (lc == "rogue" and subclass == "Mastermind") {
 		mastermind_help_opt = m.add_item("Mastermind Help. Help an ally at 30 feet as a bonus action.");
@@ -2290,10 +2302,7 @@ void show_bonus_action_menu() {
 			send({{"type", message_types::bonus_action}, {"feature", "revelation_in_flesh"}, {"option", opt}});
 		}
 	}
-	else if (warping_implosion_opt >= 0 and res == warping_implosion_opt) {
-		// Tasha's Aberrant Mind L18 Warping Implosion (para 3949-3952)
-		send({{"type", message_types::bonus_action}, {"feature", "warping_implosion"}, {"target_id", current_target_id}});
-	}
+	// Warping Implosion moved to F-menu (action menu)
 	else if (bastion_of_law_opt >= 0 and res == bastion_of_law_opt) {
 		// Tasha's Clockwork Soul L6 Bastion of Law (para 3997-4000)
 		menu@ bm = setup_sub_menu("Choose SP to spend on Bastion of Law ward (1-5 d8 dice):");
@@ -2751,6 +2760,10 @@ void show_bonus_action_menu() {
 		}
 		send({{"type", message_types::bonus_action}, {"feature", "insightful_fighting"}, {"target_id", current_target_id}});
 		speak("Insightful Fighting. Studying your target.", true);
+	}
+	else if (eye_for_detail_opt >= 0 and res == eye_for_detail_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "eye_for_detail"}});
+		speak("Eye for Detail. Scanning for hidden creatures.", true);
 	}
 	else if (mastermind_help_opt >= 0 and res == mastermind_help_opt) {
 		if (current_target_id == 0) {
@@ -4574,6 +4587,7 @@ void parse_game_state(json_object@ msg) {
 	my_trance_of_order_active = msg.exists("my_trance_of_order_active") ? bool(msg["my_trance_of_order_active"]) : false;
 	my_trance_of_order_rounds = msg.exists("my_trance_of_order_rounds") ? int(msg["my_trance_of_order_rounds"]) : 0;
 	my_trance_of_order_used = msg.exists("my_trance_of_order_used") ? bool(msg["my_trance_of_order_used"]) : false;
+	my_trance_of_order_uses = msg.exists("my_trance_of_order_uses") ? int(msg["my_trance_of_order_uses"]) : 0;
 	my_clockwork_cavalcade_available = msg.exists("my_clockwork_cavalcade_available") ? bool(msg["my_clockwork_cavalcade_available"]) : false;
 	// Xanathar's War Magic (paras 2915-2944)
 	my_tactical_wit_active = msg.exists("my_tactical_wit_active") ? bool(msg["my_tactical_wit_active"]) : false;
@@ -4910,6 +4924,7 @@ void reset_combat_state() {
 	my_trance_of_order_active = false;
 	my_trance_of_order_rounds = 0;
 	my_trance_of_order_used = false;
+	my_trance_of_order_uses = 0;
 	my_clockwork_cavalcade_available = false;
 	my_tactical_wit_active = false;
 	my_power_surge_charges = 0;

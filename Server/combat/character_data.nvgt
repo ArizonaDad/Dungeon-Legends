@@ -1514,6 +1514,12 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
     // Paladin subclasses
     if (cs.class_name == "Paladin") {
         c.channel_divinity_uses = cs.channel_divinity_uses;
+        // PHB 2024 Paladin L2 Fighting Style (para 5637): Paladins gain a Fighting
+        // Style at L2. If no fighting style was chosen at level-up, default to Defense
+        // (most common Paladin pick).
+        if (cs.level >= 2 and cs.fighting_style == "") {
+            if (!c.has_feat("defense")) c.feats.insert_last("defense");
+        }
     }
 
     // Cleric subclasses
@@ -1720,8 +1726,9 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
             // (activation handled via bonus action handler)
         }
         if (cs.level >= 14) {
-            // L14 Trance of Order (para 4001-4004): BA 1 min, no advantage vs you, d20 ≤9 → 10
-            // (activation handled via bonus action handler)
+            // Tasha's Clockwork Soul L14 Trance of Order (para 4001-4004): BA 1 min, no
+            // advantage vs you, d20 ≤9 → 10. Uses = proficiency bonus per LR.
+            c.trance_of_order_uses = proficiency_bonus(cs.level);
         }
         if (cs.level >= 18) {
             // L18 Clockwork Cavalcade (para 4005-4011): action, 100 HP heal + dispel L6-
@@ -1791,6 +1798,21 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         if (cs.level >= 17) c.master_duelist_active = true;
     }
 
+    // Xanathar's Mastermind Rogue (paras 2350-2363)
+    if (cs.class_name == "Rogue" and cs.subclass == "Mastermind") {
+        // L3 Master of Tactics: BA Help at 30ft — already wired via mastermind_help
+        // L13 Misdirection (para 2359-2360): "When you are targeted by an attack
+        // while a creature within 5 feet of you is granting you cover, you can use
+        // your reaction to have the attack target that creature instead of you."
+        if (cs.level >= 13) c.misdirection_active = true;
+    }
+
+    // Xanathar's Inquisitive Rogue (paras 2334-2345)
+    if (cs.class_name == "Rogue" and cs.subclass == "Inquisitive") {
+        // L3 Eye for Detail: BA Perception check to spot hidden creatures
+        c.eye_for_detail_active = true;
+    }
+
     // College of Creation Bard: Mote of Potential
     if (cs.class_name == "Bard" and cs.subclass == "College of Creation" and cs.level >= 3) {
         c.mote_of_potential_active = true;
@@ -1853,9 +1875,11 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
             c.charm_frighten_save_advantage = true;
         }
         if (cs.level >= 14) {
-            // L14 Revelation in Flesh (para 3942-3948): BA 1+ SP for 10 min
-            // transformation with multiple options
+            // Tasha's Aberrant Mind L14 Revelation in Flesh (para 3942-3948): BA 1+ SP for 10 min
+            // transformation with multiple options. Passive: +10 ft speed (Aquatic Adaptation
+            // movement benefit approximation) and Psychic Emission flag for auto-trigger.
             c.revelation_in_flesh_active = false; // activated via BA
+            c.speed += 10; // Approximation of Aquatic Adaptation movement benefit
         }
         if (cs.level >= 18) {
             // L18 Warping Implosion (para 3949-3952): action teleport 120ft +
@@ -2539,6 +2563,9 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
             // Xanathar's Shepherd L10 Guardian Spirit (para 892-895): beast/fey companions
             // in spirit totem aura (30ft) regain (druid level / 2) HP at end of their turn.
             if (cs.level >= 10) c.guardian_spirit_active = true;
+            // Xanathar's Shepherd L14 Faithful Summons (para 896-899): when reduced to 0 HP,
+            // immediately conjure 4 beasts of CR 2 or lower (9th-level Conjure Animals).
+            if (cs.level >= 14) c.faithful_summons_available = true;
         }
         // Book of Ebon Tides: Circle of Shadows
         // L2 Umbral Form (paras 1016-1021): bonus action expend Wild Shape to take umbral
@@ -2895,6 +2922,19 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
             c.signature_spell_a_id = cs.signature_spell_a_id;
             c.signature_spell_b_id = cs.signature_spell_b_id;
         }
+        // PHB 2024 Wizard L2 Scholar (paras 8601-8603): "You gain Expertise in one
+        // of the following skills of your choice: Arcana, History, Investigation,
+        // Medicine, Nature, or Religion." Auto-grant expertise in the first
+        // knowledge skill found in skill_proficiencies.
+        if (cs.level >= 2) {
+            string[] knowledge_skills = {"Arcana", "History", "Investigation", "Medicine", "Nature", "Religion"};
+            for (uint ks_i = 0; ks_i < knowledge_skills.length(); ks_i++) {
+                if (c.skill_proficiencies.find(knowledge_skills[ks_i]) >= 0 and c.skill_expertise.find(knowledge_skills[ks_i]) < 0) {
+                    c.skill_expertise.insert_last(knowledge_skills[ks_i]);
+                    break;
+                }
+            }
+        }
         if (cs.subclass == "Materializer" and cs.level >= 2) {
             c.materializer_object = true;
         }
@@ -3237,6 +3277,11 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         }
         if (cs.subclass == "College of Swords" and cs.level >= 6) {
             c.extra_attacks = 1;
+        }
+        // PHB 2024 College of Swords L3 Fighting Style: Swords Bards gain Dueling
+        // fighting style at L3 (most common pick for Swords Bard).
+        if (cs.subclass == "College of Swords" and cs.level >= 3) {
+            if (!c.has_feat("dueling")) c.feats.insert_last("dueling");
         }
         // Tasha's College of Eloquence Bard (paras 1703-1719)
         if (cs.subclass == "College of Eloquence" and cs.level >= 3) {
