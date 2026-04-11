@@ -404,6 +404,9 @@ void handle_message(json_object@ msg)
 		level_up_new_spells = msg.exists("new_spells") ? int(msg["new_spells"]) : 0;
 		level_up_is_caster = msg.exists("is_caster") ? bool(msg["is_caster"]) : false;
 		level_up_vestige_announcement = msg.exists("vestige_announcement") ? string(msg["vestige_announcement"]) : "";
+		level_up_fighting_style_needed = msg.exists("fighting_style_needed") ? bool(msg["fighting_style_needed"]) : false;
+		level_up_pact_boon_needed = msg.exists("pact_boon_needed") ? bool(msg["pact_boon_needed"]) : false;
+		level_up_metamagic_count = msg.exists("metamagic_count") ? int(msg["metamagic_count"]) : 0;
 	}
 	else if (msg_type == message_types::game_end_battle) {
 		string result = msg.exists("result") ? string(msg["result"]) : "";

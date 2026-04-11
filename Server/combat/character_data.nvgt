@@ -123,6 +123,11 @@ class character_sheet {
     // PHB 2024 Wizard L20 Signature Spells (para 8634-8635): designated spells.
     string signature_spell_a_id = "";
     string signature_spell_b_id = "";
+    // Level-up selection choices (persisted to account JSON)
+    string fighting_style = "";     // Fighter L1, Paladin L2, Ranger L2
+    string pact_boon = "";          // Warlock L3+ Pact Boon (blade/chain/tome/talisman)
+    string[] metamagic_choices;     // Sorcerer L2+ selected options (ids)
+    string[] invocation_choices;    // Warlock L1+ selected invocations (ids)
 }
 
 int bardic_inspiration_die_for_level(int level) {
@@ -773,6 +778,10 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
     c.save_proficiencies = cs.save_profs;
     c.initiative_bonus = ability_modifier(cs.dexterity);
     c.feats = cs.feats;
+    // Level-up fighting style choice: add as feat if not already present
+    if (cs.fighting_style != "" and !c.has_feat(cs.fighting_style)) {
+        c.feats.insert_last(cs.fighting_style);
+    }
     c.skill_proficiencies = cs.skill_proficiencies;
     c.tool_proficiencies = cs.tool_proficiencies;
     c.spellcasting_override_spells = cs.spellcasting_override_spells;
@@ -3200,10 +3209,13 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         if (cs.level >= 16) inv_count = 9;
         if (cs.level >= 18) inv_count = 10;
         c.eldritch_invocations_known = inv_count;
-        // PHB 2024 Warlock L3 Pact Boon: 4 options (Blade/Chain/Tome/Talisman). Default
-        // to Pact of the Tome (broadest utility) since the source mandates a player choice.
+        // PHB 2024 Warlock L3 Pact Boon: 4 options (Blade/Chain/Tome/Talisman).
+        // Uses player's level-up choice if stored, otherwise defaults to Tome.
         if (cs.level >= 3) {
-            c.pact_of_the_tome = true;
+            if (cs.pact_boon == "blade") c.pact_of_the_blade = true;
+            else if (cs.pact_boon == "chain") c.pact_of_the_chain = true;
+            else if (cs.pact_boon == "talisman") c.pact_of_the_talisman = true;
+            else c.pact_of_the_tome = true; // default fallback
         }
         // PHB 2024 Warlock L2 Magical Cunning (paras 7782-7783): 1/LR esoteric rite.
         if (cs.level >= 2) {

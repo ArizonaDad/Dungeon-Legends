@@ -1393,6 +1393,23 @@ void handle_user_message(user@ u, json_object@ msg)
 						for (uint i = 0; i < new_spells.length(); i++) existing.add(new_spells[i]);
 					}
 				}
+				// Level-up selection choices: Fighting Style, Pact Boon, Metamagic
+				if (msg.exists("fighting_style") and string(msg["fighting_style"]) != "") {
+					character["fighting_style"] = msg["fighting_style"];
+				}
+				if (msg.exists("pact_boon") and string(msg["pact_boon"]) != "") {
+					character["pact_boon"] = msg["pact_boon"];
+				}
+				if (msg.exists("metamagic_choices")) {
+					json_array@ mc = msg["metamagic_choices"];
+					if (@mc != null and mc.length() > 0) {
+						// Append to existing metamagic choices
+						json_array@ existing_mc = null;
+						if (character.exists("metamagic_choices")) @existing_mc = character["metamagic_choices"];
+						if (@existing_mc == null) { json_array arr; character["metamagic_choices"] = arr; @existing_mc = character["metamagic_choices"]; }
+						for (uint i = 0; i < mc.length(); i++) existing_mc.add(mc[i]);
+					}
+				}
 				u.account.commit();
 				send_character_profile_to_user(u, GAME_TYPE_ADVENTURE);
 				u.send({{"type", message_types::announce}, {"text", "Level-up choices saved!"}, {"interrupt", false}});

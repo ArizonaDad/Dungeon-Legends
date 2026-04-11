@@ -1040,6 +1040,36 @@ class battle_manager {
 		msg["new_cantrips"] = new_cantrips;
 		msg["new_spells"] = new_spells;
 
+		// Level-up selection prompts: Fighting Style, Pact Boon, Metamagic
+		string existing_fs = character.exists("fighting_style") ? string(character["fighting_style"]) : "";
+		bool fs_needed = false;
+		if (existing_fs == "") {
+			if (class_name == "Fighter" and new_level >= 1) fs_needed = true;
+			if (class_name == "Paladin" and new_level >= 2) fs_needed = true;
+			if (class_name == "Ranger" and new_level >= 2) fs_needed = true;
+		}
+		msg["fighting_style_needed"] = fs_needed;
+
+		string existing_pb = character.exists("pact_boon") ? string(character["pact_boon"]) : "";
+		bool pb_needed = (class_name == "Warlock" and new_level >= 3 and existing_pb == "");
+		msg["pact_boon_needed"] = pb_needed;
+
+		// Sorcerer Metamagic: 2 at L2, 4 at L10, 6 at L17
+		int metamagic_total = 0;
+		if (class_name == "Sorcerer") {
+			if (new_level >= 17) metamagic_total = 6;
+			else if (new_level >= 10) metamagic_total = 4;
+			else if (new_level >= 2) metamagic_total = 2;
+		}
+		int metamagic_existing = 0;
+		if (character.exists("metamagic_choices")) {
+			json_array@ mc = character["metamagic_choices"];
+			if (@mc != null) metamagic_existing = int(mc.length());
+		}
+		int metamagic_new = metamagic_total - metamagic_existing;
+		if (metamagic_new < 0) metamagic_new = 0;
+		msg["metamagic_count"] = metamagic_new;
+
 		// Wildemount Vestige of Divergence advancement announcement
 		// (Wildemount para 9071): "A Vestige of Divergence typically remains
 		// dormant until its wielder achieves 9th level. It becomes awakened
@@ -3910,6 +3940,17 @@ class battle_manager {
 					if (ch.exists("spell_mastery_l2_spell_id")) cs.spell_mastery_l2_spell_id = string(ch["spell_mastery_l2_spell_id"]);
 					if (ch.exists("signature_spell_a_id")) cs.signature_spell_a_id = string(ch["signature_spell_a_id"]);
 					if (ch.exists("signature_spell_b_id")) cs.signature_spell_b_id = string(ch["signature_spell_b_id"]);
+					// Level-up selection choices
+					if (ch.exists("fighting_style")) cs.fighting_style = string(ch["fighting_style"]);
+					if (ch.exists("pact_boon")) cs.pact_boon = string(ch["pact_boon"]);
+					if (ch.exists("metamagic_choices")) {
+						json_array@ mc = ch["metamagic_choices"];
+						if (@mc != null) { for (uint mci = 0; mci < mc.length(); mci++) cs.metamagic_choices.insert_last(string(mc[mci])); }
+					}
+					if (ch.exists("invocation_choices")) {
+						json_array@ ic = ch["invocation_choices"];
+						if (@ic != null) { for (uint ici = 0; ici < ic.length(); ici++) cs.invocation_choices.insert_last(string(ic[ici])); }
+					}
 					has_char = true;
 				} else if (lobby_game_type == GAME_TYPE_SANDBOX and data.exists(ACCOUNT_KEY_LEGACY_CHARACTER)) {
 					json_object@ ch = data[ACCOUNT_KEY_LEGACY_CHARACTER];

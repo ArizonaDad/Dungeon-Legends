@@ -105,6 +105,9 @@ int level_up_new_cantrips = 0;
 int level_up_new_spells = 0;
 bool level_up_is_caster = false;
 string level_up_vestige_announcement = "";
+bool level_up_fighting_style_needed = false;
+bool level_up_pact_boon_needed = false;
+int level_up_metamagic_count = 0;
 
 // Loot & inventory state
 json_array@ pending_loot = null;
@@ -4748,6 +4751,9 @@ void combat_game_loop() {
 	int saved_level_up_new_spells = level_up_new_spells;
 	bool saved_level_up_is_caster = level_up_is_caster;
 	string saved_level_up_vestige_announcement = level_up_vestige_announcement;
+	bool saved_level_up_fs = level_up_fighting_style_needed;
+	bool saved_level_up_pb = level_up_pact_boon_needed;
+	int saved_level_up_mm = level_up_metamagic_count;
 
 	// Reset combat state FIRST so any new game messages arriving
 	// during post-battle screens won't be wiped.
@@ -4785,6 +4791,9 @@ void combat_game_loop() {
 		level_up_new_spells = saved_level_up_new_spells;
 		level_up_is_caster = saved_level_up_is_caster;
 		level_up_vestige_announcement = saved_level_up_vestige_announcement;
+		level_up_fighting_style_needed = saved_level_up_fs;
+		level_up_pact_boon_needed = saved_level_up_pb;
+		level_up_metamagic_count = saved_level_up_mm;
 		show_level_up_screen();
 	}
 }
@@ -4887,11 +4896,105 @@ void show_level_up_screen() {
 		}
 	}
 
+	// Fighting Style selection (Fighter L1, Paladin L2, Ranger L2)
+	string chosen_fighting_style = "";
+	if (level_up_fighting_style_needed) {
+		speak("Choose a Fighting Style.", true);
+		wait(300);
+		menu@ fsm = setup_sub_menu("Choose your Fighting Style.");
+		string[] fs_ids = {"archery", "blind_fighting", "defense", "dueling", "great_weapon_fighting", "interception", "protection", "thrown_weapon_fighting", "two_weapon_fighting", "unarmed_fighting"};
+		string[] fs_labels = {
+			"Archery. Plus 2 to attack rolls with ranged weapons.",
+			"Blind Fighting. Blindsight 10 feet.",
+			"Defense. Plus 1 AC while wearing armor.",
+			"Dueling. Plus 2 damage with one-handed melee weapon, no other weapon.",
+			"Great Weapon Fighting. Reroll 1 or 2 on damage dice with two-handed weapons.",
+			"Interception. Reduce damage to nearby ally by 1d10 plus proficiency as a reaction.",
+			"Protection. Impose disadvantage on attack vs adjacent ally as a reaction. Requires shield.",
+			"Thrown Weapon Fighting. Plus 2 damage with thrown weapons.",
+			"Two-Weapon Fighting. Add ability modifier to off-hand damage.",
+			"Unarmed Fighting. 1d6 unarmed strike damage, or 1d8 with free hand."
+		};
+		for (uint i = 0; i < fs_labels.length(); i++) fsm.add_item(fs_labels[i]);
+		int pick = fsm.run();
+		if (pick >= 0 and pick < int(fs_ids.length())) {
+			chosen_fighting_style = fs_ids[pick];
+			string[] fs_names = {"Archery", "Blind Fighting", "Defense", "Dueling", "Great Weapon Fighting", "Interception", "Protection", "Thrown Weapon Fighting", "Two-Weapon Fighting", "Unarmed Fighting"};
+			speak("You chose " + fs_names[pick] + "!", true);
+		}
+	}
+
+	// Pact Boon selection (Warlock L3)
+	string chosen_pact_boon = "";
+	if (level_up_pact_boon_needed) {
+		speak("Choose your Pact Boon.", true);
+		wait(300);
+		menu@ pbm = setup_sub_menu("Choose your Pact Boon.");
+		string[] pb_ids = {"blade", "chain", "tome", "talisman"};
+		string[] pb_labels = {
+			"Pact of the Blade. Conjure a pact weapon, use it for Eldritch Smite and blade invocations.",
+			"Pact of the Chain. Gain a familiar that can attack and scout.",
+			"Pact of the Tome. Gain 3 extra cantrips and ritual casting.",
+			"Pact of the Talisman. A talisman adds 1d4 to failed ability checks."
+		};
+		for (uint i = 0; i < pb_labels.length(); i++) pbm.add_item(pb_labels[i]);
+		int pick = pbm.run();
+		if (pick >= 0 and pick < int(pb_ids.length())) {
+			chosen_pact_boon = pb_ids[pick];
+			string[] pb_names = {"Blade", "Chain", "Tome", "Talisman"};
+			speak("You chose Pact of the " + pb_names[pick] + "!", true);
+		}
+	}
+
+	// Metamagic selection (Sorcerer L2/L10/L17)
+	json_array new_metamagic;
+	if (level_up_metamagic_count > 0) {
+		speak("Choose " + level_up_metamagic_count + " Metamagic option" + (level_up_metamagic_count > 1 ? "s" : "") + ".", true);
+		wait(300);
+		string[] mm_ids = {"careful", "distant", "empowered", "extended", "heightened", "quickened", "seeking", "subtle", "transmuted", "twinned"};
+		string[] mm_labels = {
+			"Careful Spell. 1 SP: allies auto-succeed on your AoE spell saves.",
+			"Distant Spell. 1 SP: double the range of a spell.",
+			"Empowered Spell. 1 SP: reroll CHA mod damage dice on a spell.",
+			"Extended Spell. 1 SP: double spell duration, advantage on concentration saves.",
+			"Heightened Spell. 2 SP: one target has disadvantage on spell save.",
+			"Quickened Spell. 2 SP: cast an action spell as a bonus action.",
+			"Seeking Spell. 1 SP: reroll a missed spell attack roll.",
+			"Subtle Spell. 1 SP: cast without verbal or somatic components.",
+			"Transmuted Spell. 1 SP: change damage type to acid, cold, fire, lightning, or thunder.",
+			"Twinned Spell. SP equal to spell level: target a second creature with the same spell."
+		};
+		string[] already_chosen;
+		for (int mi = 0; mi < level_up_metamagic_count; mi++) {
+			menu@ mmm = setup_sub_menu("Choose Metamagic option " + (mi + 1) + " of " + level_up_metamagic_count + ".");
+			string[] available_mm;
+			for (uint j = 0; j < mm_ids.length(); j++) {
+				bool taken = false;
+				for (uint k = 0; k < already_chosen.length(); k++) {
+					if (already_chosen[k] == mm_ids[j]) { taken = true; break; }
+				}
+				if (!taken) {
+					available_mm.insert_last(mm_ids[j]);
+					mmm.add_item(mm_labels[j]);
+				}
+			}
+			int pick = mmm.run();
+			if (pick >= 0 and pick < int(available_mm.length())) {
+				already_chosen.insert_last(available_mm[pick]);
+				new_metamagic.add(available_mm[pick]);
+				speak("Learned " + available_mm[pick] + " Metamagic!", true);
+			}
+		}
+	}
+
 	json_object response;
 	response["type"] = message_types::level_up_response;
 	if (chosen_subclass != "") response["subclass"] = chosen_subclass;
 	if (new_cantrip_names.length() > 0) response["new_cantrips"] = new_cantrip_names;
 	if (new_spell_names.length() > 0) response["new_spells"] = new_spell_names;
+	if (chosen_fighting_style != "") response["fighting_style"] = chosen_fighting_style;
+	if (chosen_pact_boon != "") response["pact_boon"] = chosen_pact_boon;
+	if (new_metamagic.length() > 0) response["metamagic_choices"] = new_metamagic;
 	send(response);
 	speak("Level-up complete!", true);
 }
