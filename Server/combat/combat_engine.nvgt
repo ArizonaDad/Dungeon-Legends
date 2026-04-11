@@ -534,6 +534,12 @@ class combatant {
 	int storm_aura_damage_type = 0; // DMG_FIRE=desert, DMG_LIGHTNING=sea, DMG_COLD=tundra
 	bool storm_aura_used_this_turn = false; // BA activation once per turn
 	int wails_from_grave_uses = 0; // Phantom Rogue
+	// Tasha's Phantom Rogue L9 Tokens of the Departed (paras 3454-3460)
+	int soul_trinkets = 0;                 // Current soul trinkets held
+	int soul_trinkets_max = 0;             // Max = proficiency bonus
+	// Tasha's Phantom Rogue L13 Ghost Walk (para 3470)
+	bool ghost_walk_active = false;        // Spectral form: fly 10, disadv on attacks vs you
+	bool ghost_walk_available = true;      // 1/LR or destroy a soul trinket
 	bool mote_of_potential_active = false; // College of Creation Bard
 	bool steel_defender_active = false; // Battle Smith Artificer
 	bool eldritch_cannon_active = false; // Artillerist Artificer
@@ -578,6 +584,18 @@ class combatant {
 	bool scout_skirmisher = false; // Scout Rogue
 	bool master_duelist_active = false; // Swashbuckler L17
 	bool master_duelist_used = false; // 1/SR reroll
+	// Xanathar's Swashbuckler L9 Panache (paras 2423-2426)
+	uint panache_source_id = 0;            // Who panached this target (hostile: disadv + no OA vs others)
+	int panache_rounds = 0;                // Rounds remaining (10 = 1 minute)
+	// Xanathar's Swashbuckler L13 Elegant Maneuver (paras 2427-2428)
+	bool elegant_maneuver_active = false;  // BA advantage on next Acrobatics/Athletics this turn
+	// Xanathar's Scout Rogue L17 Sudden Strike (paras 2400-2401)
+	bool sudden_strike_used_this_turn = false; // BA extra attack with SA on different target
+	// Xanathar's Storm Herald L10 Shielding Storm (para 428)
+	bool shielding_storm_resistance = false;   // Ally gains barbarian's Storm Soul resistance
+	int shielding_storm_type = 0;              // DMG type of the resistance granted
+	// Xanathar's Storm Herald L14 Raging Storm (paras 429-434)
+	bool raging_storm_used_this_turn = false;  // Desert/Sea reaction 1/turn
 	bool starry_form_active = false; // Circle of Stars Druid
 	string starry_form_type = ""; // Archer/Chalice/Dragon
 	bool land_stride_active = false; // Circle of the Land
@@ -1306,6 +1324,18 @@ class combatant {
 	bool trip_attack_pending = false;
 	bool precision_attack_pending = false;
 	bool riposte_ready = false;
+	// PHB 2024 Battle Master additional maneuvers (paras 6028-6057)
+	bool menacing_attack_pending = false;   // Para 6042: +1d8, WIS save or Frightened
+	bool goading_attack_pending = false;    // Para 6036: +1d8, WIS save or disadv attacks vs others
+	bool pushing_attack_pending = false;    // Para 6048: +1d8, STR save or pushed 15ft
+	bool disarming_attack_pending = false;  // Para 6028: +1d8, STR save or drop weapon (weapon_jammed)
+	bool distracting_strike_pending = false;// Para 6030: +1d8, next attack vs target has advantage
+	bool sweeping_attack_pending = false;   // Para 6054: on hit, adjacent creature takes die damage
+	bool parry_ready = false;               // Para 6044: reaction reduce melee damage by d8+DEX/STR
+	uint goading_attack_source_id = 0;      // Who goaded this target
+	int goading_attack_turns = 0;           // 2-tick expiry at end of goader's next turn
+	bool distracting_strike_marked = false; // Target marked — next attack by another has advantage
+	uint distracting_strike_source_id = 0;  // Who applied Distracting Strike
 	bool assassinate_available = false;
 	bool war_magic_used = false;
 	int warding_flare_uses = 0;
@@ -1500,6 +1530,9 @@ class combatant {
 		// Basic Rules 2024 Foresight (para 13025-13031): "the target has Advantage on
 		// D20 Tests" — covers ALL saving throws. Approximated as +5.
 		if (foresight_active) mod += 5;
+		// Tasha's Phantom Rogue L9 Tokens of the Departed (para 3454-3460): "you have
+		// advantage on death saving throws and Constitution saving throws."
+		if (soul_trinkets > 0 and ability_id == ABILITY_CON) mod += 5;
 		// Xanathar's Monster Slayer L7 Supernatural Defense (para 2243-2244): "Whenever
 		// the target of your Slayer's Prey forces you to make a saving throw... add 1d6
 		// to your roll." Approximated as blanket +1d6 when prey is active (source-tracking
@@ -2067,6 +2100,42 @@ class battle {
 		if (target.warding_maneuver_resistance) {
 			amount = amount / 2;
 			target.warding_maneuver_resistance = false;
+		}
+
+		// PHB 2024 Battle Master Parry (para 6044-6045): "When another creature damages
+		// you with a melee attack, you can expend one Superiority Die to reduce the
+		// damage by the number rolled plus your Strength or Dexterity modifier."
+		if (target.parry_ready and target.superiority_dice > 0 and target.has_reaction and @source != null) {
+			int parry_mod = target.get_ability_mod(ABILITY_STR) > target.get_ability_mod(ABILITY_DEX) ? target.get_ability_mod(ABILITY_STR) : target.get_ability_mod(ABILITY_DEX);
+			int parry_reduce = random(1, 8) + parry_mod;
+			if (parry_reduce < 0) parry_reduce = 0;
+			amount -= parry_reduce;
+			if (amount < 0) amount = 0;
+			target.superiority_dice--;
+			target.has_reaction = false;
+			target.parry_ready = false;
+		}
+
+		// Xanathar's Storm Herald L14 Raging Storm Desert (para 429-430): "Immediately
+		// after a creature in your aura hits you with an attack, you can use your
+		// reaction to force that creature to make a DEX save. On fail: fire damage
+		// equal to half your barbarian level."
+		if (target.class_name == "Barbarian" and target.subclass == "Storm Herald" and target.level >= 14
+			and target.storm_aura_active and target.storm_aura_damage_type == DMG_FIRE
+			and target.has_reaction and !target.raging_storm_used_this_turn
+			and @source != null and !source.is_dead) {
+			int sd = feet_distance(target.x, target.y, source.x, source.y);
+			if (sd <= 10) {
+				target.has_reaction = false;
+				target.raging_storm_used_this_turn = true;
+				int storm_dc = 8 + target.proficiency + target.get_ability_mod(ABILITY_CON);
+				int dex_save = random(1, 20) + source.get_save_bonus(ABILITY_DEX);
+				int fire_dmg = target.level / 2;
+				if (fire_dmg < 1) fire_dmg = 1;
+				if (dex_save < storm_dc) {
+					apply_damage(source, fire_dmg, DMG_FIRE, target);
+				}
+			}
 		}
 
 		// Heavy Armor Master: reduce B/P/S damage by Proficiency Bonus when wearing heavy armor
@@ -2749,6 +2818,14 @@ class battle {
 				// Subclass state
 				state["my_superiority_dice"] = c.superiority_dice;
 				state["my_superiority_dice_max"] = c.superiority_dice_max;
+				// Batch 3: new subclass fields
+				state["my_soul_trinkets"] = c.soul_trinkets;
+				state["my_soul_trinkets_max"] = c.soul_trinkets_max;
+				state["my_ghost_walk_active"] = c.ghost_walk_active;
+				state["my_ghost_walk_available"] = c.ghost_walk_available;
+				state["my_panache_rounds"] = c.panache_rounds > 0 ? 1 : 0;
+				state["my_elegant_maneuver_active"] = c.elegant_maneuver_active;
+				state["my_sudden_strike_used"] = c.sudden_strike_used_this_turn;
 				state["my_psionic_strike_uses"] = c.psionic_strike_uses;
 				state["my_assassinate_available"] = c.assassinate_available;
 				state["my_warding_flare_uses"] = c.warding_flare_uses;

@@ -1449,6 +1449,45 @@ class battle_manager {
 
 	// Xanathar's Storm Herald L3 Storm Aura (paras 416-422): Apply aura effect
 	// based on environment choice. Called on rage entry + as BA each turn.
+	// Xanathar's Storm Herald L10 Shielding Storm (para 428): "Each creature of your
+	// choice has the damage resistance you gained from the Storm Soul feature while
+	// the creature is in your Storm Aura." Called at turn start for refresh.
+	void apply_shielding_storm(combatant@ c) {
+		if (@c == null or @combat == null or !c.storm_aura_active or c.level < 10) return;
+		for (uint si = 0; si < combat.combatants.length(); si++) {
+			combatant@ ally = combat.combatants[si];
+			if (@ally == null or ally.is_dead or ally.id == c.id) continue;
+			if (ally.is_player != c.is_player) continue; // allies only
+			if (feet_distance(c.x, c.y, ally.x, ally.y) > 10) continue;
+			// Grant matching resistance
+			if (c.storm_aura_damage_type == DMG_FIRE and !ally.shielding_storm_resistance) {
+				ally.shielding_storm_resistance = true;
+				ally.shielding_storm_type = DMG_FIRE;
+				ally.fire_resistance = true;
+			} else if (c.storm_aura_damage_type == DMG_LIGHTNING and !ally.shielding_storm_resistance) {
+				ally.shielding_storm_resistance = true;
+				ally.shielding_storm_type = DMG_LIGHTNING;
+				ally.lightning_resistance = true;
+			} else if (c.storm_aura_damage_type == DMG_COLD and !ally.shielding_storm_resistance) {
+				ally.shielding_storm_resistance = true;
+				ally.shielding_storm_type = DMG_COLD;
+				ally.cold_resistance = true;
+			}
+		}
+		// Remove resistance from allies who moved out of aura
+		for (uint si = 0; si < combat.combatants.length(); si++) {
+			combatant@ ally = combat.combatants[si];
+			if (@ally == null or ally.id == c.id or !ally.shielding_storm_resistance) continue;
+			if (ally.is_player != c.is_player or feet_distance(c.x, c.y, ally.x, ally.y) > 10 or ally.is_dead) {
+				ally.shielding_storm_resistance = false;
+				if (ally.shielding_storm_type == DMG_FIRE) ally.fire_resistance = false;
+				else if (ally.shielding_storm_type == DMG_LIGHTNING) ally.lightning_resistance = false;
+				else if (ally.shielding_storm_type == DMG_COLD) ally.cold_resistance = false;
+				ally.shielding_storm_type = 0;
+			}
+		}
+	}
+
 	void apply_storm_aura_effect(combatant@ c) {
 		if (@c == null or @combat == null or !c.storm_aura_active) return;
 		int save_dc = 8 + c.proficiency + c.get_ability_mod(ABILITY_CON);
@@ -1512,6 +1551,31 @@ class battle_manager {
 				if (t.temp_hp < temp) { t.temp_hp = temp; hits++; }
 			}
 			if (hits > 0) broadcast_announce(c.name + "'s Tundra Storm Aura grants " + temp + " temp HP to " + hits + " allies!", true);
+			// Xanathar's Storm Herald L14 Raging Storm Tundra (para 433-434): "you can
+			// choose one creature you can see in the aura. That creature must succeed on
+			// a Strength saving throw, or its speed is reduced to 0 until the start of
+			// your next turn, as magical frost covers it."
+			if (c.level >= 14) {
+				combatant@ frost_target = null;
+				int frost_best = 999;
+				for (uint fi = 0; fi < combat.combatants.length(); fi++) {
+					combatant@ ft = combat.combatants[fi];
+					if (@ft == null or ft.is_dead or ft.id == c.id) continue;
+					if (ft.is_player == c.is_player) continue; // enemies only
+					int d = feet_distance(c.x, c.y, ft.x, ft.y);
+					if (d <= 10 and d < frost_best) { frost_best = d; @frost_target = ft; }
+				}
+				if (@frost_target != null) {
+					int frost_save = random(1, 20) + frost_target.get_save_bonus(ABILITY_STR);
+					if (frost_save < save_dc) {
+						frost_target.speed = 0;
+						frost_target.movement_remaining = 0;
+						broadcast_announce(c.name + "'s Raging Storm freezes " + frost_target.name + " in place! Speed reduced to 0.", false);
+					} else {
+						broadcast_announce(frost_target.name + " resists the Raging Storm's frost.", false);
+					}
+				}
+			}
 		}
 	}
 
@@ -1820,6 +1884,26 @@ class battle_manager {
 					attacker.temp_hp = td_temp;
 					broadcast_announce(attacker.name + "'s Touch of Death grants " + td_temp + " temp HP!", false);
 				}
+			}
+		}
+
+		// Tasha's Phantom Rogue L9 Tokens of the Departed (para 3454-3460): "as a
+		// reaction when a creature you can see dies within 30 feet of you, you can
+		// open your free hand and cause a Tiny trinket to appear." Max = proficiency.
+		// Also scan ALL Phantom Rogues, not just the attacker.
+		if (target.is_dead) {
+			for (uint st = 0; st < combat.combatants.length(); st++) {
+				combatant@ phantom = combat.combatants[st];
+				if (@phantom == null or phantom.is_dead) continue;
+				if (phantom.class_name != "Rogue" or phantom.subclass != "Phantom") continue;
+				if (phantom.level < 9) continue;
+				if (phantom.soul_trinkets >= phantom.soul_trinkets_max) continue;
+				if (!phantom.has_reaction) continue;
+				int pd = feet_distance(phantom.x, phantom.y, target.x, target.y);
+				if (pd > 30) continue;
+				phantom.soul_trinkets++;
+				phantom.has_reaction = false;
+				broadcast_announce(phantom.name + " claims a soul trinket from " + target.name + "'s departing soul! (" + phantom.soul_trinkets + "/" + phantom.soul_trinkets_max + " trinkets)", false);
 			}
 		}
 
@@ -2838,6 +2922,22 @@ class battle_manager {
 		// Xanathar's Scout L13 Ambush Master (para 2399): "attack rolls against that
 		// target have advantage until the start of your next turn."
 		if (target.ambush_master_marked_by != 0) adv = true;
+		// PHB 2024 Battle Master Goading Attack (para 6036-6037): goaded target has
+		// disadvantage on attacks against anyone other than the goader.
+		if (attacker.goading_attack_source_id != 0 and attacker.goading_attack_turns > 0 and @target != null and target.id != attacker.goading_attack_source_id) disadv = true;
+		// PHB 2024 Battle Master Distracting Strike (para 6030-6031): next attack by
+		// another creature against the target has advantage. Consumed on use.
+		if (target.distracting_strike_marked and attacker.id != target.distracting_strike_source_id) {
+			adv = true;
+			target.distracting_strike_marked = false;
+			target.distracting_strike_source_id = 0;
+		}
+		// Xanathar's Swashbuckler L9 Panache (para 2423-2426): hostile panached target
+		// has disadvantage on attacks against anyone other than the Swashbuckler.
+		if (attacker.panache_source_id != 0 and attacker.panache_rounds > 0 and @target != null and target.id != attacker.panache_source_id) disadv = true;
+		// Tasha's Phantom Rogue L13 Ghost Walk (para 3470): "attack rolls have
+		// disadvantage against you" while in spectral form.
+		if (target.ghost_walk_active) disadv = true;
 
 		// Xanathar's Zealot L10 Zealous Presence (para 445-447): "Up to ten other
 		// creatures of your choice within 60 feet of you that can hear you gain advantage
@@ -6544,6 +6644,47 @@ class battle_manager {
 		c.power_surge_used_this_turn = false;
 		// Xanathar's Grave Domain L17 Keeper of Souls (para 802-803): once per round.
 		c.keeper_of_souls_used_this_turn = false;
+		// PHB 2024 Battle Master maneuver per-turn flags reset
+		c.menacing_attack_pending = false;
+		c.goading_attack_pending = false;
+		c.pushing_attack_pending = false;
+		c.disarming_attack_pending = false;
+		c.distracting_strike_pending = false;
+		c.sweeping_attack_pending = false;
+		// Goading Attack expiry: 2-tick counter decremented on goader's turn start
+		if (c.class_name == "Fighter" and c.subclass == "Battle Master") {
+			for (uint gai = 0; gai < combat.combatants.length(); gai++) {
+				combatant@ gt = combat.combatants[gai];
+				if (@gt == null or gt.goading_attack_source_id != c.id) continue;
+				gt.goading_attack_turns--;
+				if (gt.goading_attack_turns <= 0) {
+					gt.goading_attack_source_id = 0;
+					gt.goading_attack_turns = 0;
+				}
+			}
+		}
+		// Xanathar's Scout L17 Sudden Strike per-turn flag reset
+		c.sudden_strike_used_this_turn = false;
+		// Xanathar's Storm Herald L14 Raging Storm per-turn flag reset
+		c.raging_storm_used_this_turn = false;
+		// Xanathar's Storm Herald L10 Shielding Storm (para 428): refresh resistance on allies
+		if (c.class_name == "Barbarian" and c.subclass == "Storm Herald" and c.storm_aura_active and c.level >= 10) {
+			apply_shielding_storm(c);
+		}
+		// Xanathar's Swashbuckler L13 Elegant Maneuver per-turn flag reset
+		c.elegant_maneuver_active = false;
+		// Xanathar's Swashbuckler L9 Panache rounds tickdown on panache source's turn
+		if (c.class_name == "Rogue" and c.subclass == "Swashbuckler") {
+			for (uint pi = 0; pi < combat.combatants.length(); pi++) {
+				combatant@ pt = combat.combatants[pi];
+				if (@pt == null or pt.panache_source_id != c.id) continue;
+				pt.panache_rounds--;
+				if (pt.panache_rounds <= 0) {
+					pt.panache_source_id = 0;
+					pt.panache_rounds = 0;
+				}
+			}
+		}
 		// Xanathar's Ancestral Guardian L3 Ancestral Protectors expiry (para 389):
 		// "Until the start of your next turn." Clear marks at start of barbarian's turn.
 		if (c.class_name == "Barbarian" and c.subclass == "Ancestral Guardian") {
@@ -7389,6 +7530,9 @@ class battle_manager {
 				if (enemy.main_hand_is_ranged) continue;
 				// Swashbuckler Rogue: Fancy Footwork — enemies attacked by Swashbuckler can't make OA
 				if (mover.class_name == "Rogue" and mover.subclass == "Swashbuckler" and enemy.swashbuckler_attacked_this_turn) continue;
+				// Xanathar's Swashbuckler L9 Panache (para 2423-2426): panached creature
+				// "can't make opportunity attacks against targets other than you."
+				if (enemy.panache_source_id != 0 and enemy.panache_rounds > 0 and mover.id != enemy.panache_source_id) continue;
 				// PHB 2024 Mobile feat (para 7635): "When you make a melee attack against
 				// a creature, you don't provoke Opportunity Attacks from that creature for
 				// the rest of the turn, whether you hit or not."
@@ -8219,19 +8363,145 @@ class battle_manager {
 			broadcast_announce(attacker.name + "'s Psionic Strike deals " + psi_dmg + " force damage! (" + attacker.psionic_strike_uses + " dice remain)", false);
 		}
 
-		// Battle Master: Trip Attack (if pending, apply extra d8 and knock prone)
+		// Battle Master maneuver save DC: PHB 2024 para 6005 — "8 plus your Strength
+		// or Dexterity modifier (your choice) and Proficiency Bonus"
+		// We auto-pick the higher of STR/DEX for the player.
+		// Trip Attack (para 6058-6059): +1d8, Large or smaller STR save or Prone
 		if (attacker.class_name == "Fighter" and attacker.subclass == "Battle Master" and attacker.trip_attack_pending and is_weapon_attack) {
 			int trip_dmg = random(1, 8);
 			bonus += trip_dmg;
 			attacker.trip_attack_pending = false;
-			// Target must make STR save or be knocked prone
-			int save_dc = 8 + attacker.proficiency + attacker.get_ability_mod(ABILITY_STR);
+			attacker.superiority_dice--;
+			int bm_mod = attacker.get_ability_mod(ABILITY_STR) > attacker.get_ability_mod(ABILITY_DEX) ? attacker.get_ability_mod(ABILITY_STR) : attacker.get_ability_mod(ABILITY_DEX);
+			int save_dc = 8 + attacker.proficiency + bm_mod;
+			int save_roll = target.apply_indomitable_might(random(1, 20) + target.get_save_bonus(ABILITY_STR), ABILITY_STR);
+			if (save_roll < save_dc and target.size <= SIZE_LARGE) {
+				target.add_condition(COND_PRONE);
+				broadcast_announce(attacker.name + "'s Trip Attack deals " + trip_dmg + " extra damage and knocks " + target.name + " prone! (" + attacker.superiority_dice + " dice remain)", false);
+			} else {
+				broadcast_announce(attacker.name + "'s Trip Attack deals " + trip_dmg + " extra damage, but " + target.name + " stays standing! (" + attacker.superiority_dice + " dice remain)", false);
+			}
+		}
+
+		// PHB 2024 Battle Master: Menacing Attack (para 6042-6043)
+		// +1d8 damage, WIS save or Frightened until end of attacker's next turn
+		if (attacker.class_name == "Fighter" and attacker.subclass == "Battle Master" and attacker.menacing_attack_pending and is_weapon_attack) {
+			int men_dmg = random(1, 8);
+			bonus += men_dmg;
+			attacker.menacing_attack_pending = false;
+			attacker.superiority_dice--;
+			int bm_mod = attacker.get_ability_mod(ABILITY_STR) > attacker.get_ability_mod(ABILITY_DEX) ? attacker.get_ability_mod(ABILITY_STR) : attacker.get_ability_mod(ABILITY_DEX);
+			int save_dc = 8 + attacker.proficiency + bm_mod;
+			int save_roll = random(1, 20) + target.get_save_bonus(ABILITY_WIS);
+			if (save_roll < save_dc) {
+				target.add_condition(COND_FRIGHTENED);
+				target.frightened_source_id = attacker.id;
+				broadcast_announce(attacker.name + "'s Menacing Attack deals " + men_dmg + " extra damage and Frightens " + target.name + "! (" + attacker.superiority_dice + " dice remain)", false);
+			} else {
+				broadcast_announce(attacker.name + "'s Menacing Attack deals " + men_dmg + " extra damage, but " + target.name + " resists the fear! (" + attacker.superiority_dice + " dice remain)", false);
+			}
+		}
+
+		// PHB 2024 Battle Master: Goading Attack (para 6036-6037)
+		// +1d8 damage, WIS save or disadvantage on attacks vs others until end of attacker's next turn
+		if (attacker.class_name == "Fighter" and attacker.subclass == "Battle Master" and attacker.goading_attack_pending and is_weapon_attack) {
+			int goad_dmg = random(1, 8);
+			bonus += goad_dmg;
+			attacker.goading_attack_pending = false;
+			attacker.superiority_dice--;
+			int bm_mod = attacker.get_ability_mod(ABILITY_STR) > attacker.get_ability_mod(ABILITY_DEX) ? attacker.get_ability_mod(ABILITY_STR) : attacker.get_ability_mod(ABILITY_DEX);
+			int save_dc = 8 + attacker.proficiency + bm_mod;
+			int save_roll = random(1, 20) + target.get_save_bonus(ABILITY_WIS);
+			if (save_roll < save_dc) {
+				target.goading_attack_source_id = attacker.id;
+				target.goading_attack_turns = 2; // expires at end of attacker's next turn
+				broadcast_announce(attacker.name + "'s Goading Attack deals " + goad_dmg + " extra damage! " + target.name + " has disadvantage on attacks against anyone except " + attacker.name + ". (" + attacker.superiority_dice + " dice remain)", false);
+			} else {
+				broadcast_announce(attacker.name + "'s Goading Attack deals " + goad_dmg + " extra damage, but " + target.name + " resists the goad! (" + attacker.superiority_dice + " dice remain)", false);
+			}
+		}
+
+		// PHB 2024 Battle Master: Pushing Attack (para 6048-6049)
+		// +1d8 damage, Large or smaller STR save or pushed 15ft away
+		if (attacker.class_name == "Fighter" and attacker.subclass == "Battle Master" and attacker.pushing_attack_pending and is_weapon_attack) {
+			int push_dmg = random(1, 8);
+			bonus += push_dmg;
+			attacker.pushing_attack_pending = false;
+			attacker.superiority_dice--;
+			int bm_mod = attacker.get_ability_mod(ABILITY_STR) > attacker.get_ability_mod(ABILITY_DEX) ? attacker.get_ability_mod(ABILITY_STR) : attacker.get_ability_mod(ABILITY_DEX);
+			int save_dc = 8 + attacker.proficiency + bm_mod;
+			int save_roll = target.apply_indomitable_might(random(1, 20) + target.get_save_bonus(ABILITY_STR), ABILITY_STR);
+			if (save_roll < save_dc and target.size <= SIZE_LARGE) {
+				// Push 15 ft (3 tiles) directly away from attacker
+				int dx = target.x - attacker.x;
+				int dy = target.y - attacker.y;
+				if (dx == 0 and dy == 0) dy = 1;
+				int push_tiles = 3; // 15ft / 5ft per tile
+				if (dx != 0) target.x += (dx > 0 ? push_tiles : -push_tiles);
+				if (dy != 0) target.y += (dy > 0 ? push_tiles : -push_tiles);
+				broadcast_announce(attacker.name + "'s Pushing Attack deals " + push_dmg + " extra damage and shoves " + target.name + " 15 feet away! (" + attacker.superiority_dice + " dice remain)", false);
+			} else {
+				broadcast_announce(attacker.name + "'s Pushing Attack deals " + push_dmg + " extra damage, but " + target.name + " holds their ground! (" + attacker.superiority_dice + " dice remain)", false);
+			}
+		}
+
+		// PHB 2024 Battle Master: Disarming Attack (para 6028-6029)
+		// +1d8 damage, STR save or drop weapon (weapon_jammed as approximation)
+		if (attacker.class_name == "Fighter" and attacker.subclass == "Battle Master" and attacker.disarming_attack_pending and is_weapon_attack) {
+			int dis_dmg = random(1, 8);
+			bonus += dis_dmg;
+			attacker.disarming_attack_pending = false;
+			attacker.superiority_dice--;
+			int bm_mod = attacker.get_ability_mod(ABILITY_STR) > attacker.get_ability_mod(ABILITY_DEX) ? attacker.get_ability_mod(ABILITY_STR) : attacker.get_ability_mod(ABILITY_DEX);
+			int save_dc = 8 + attacker.proficiency + bm_mod;
 			int save_roll = target.apply_indomitable_might(random(1, 20) + target.get_save_bonus(ABILITY_STR), ABILITY_STR);
 			if (save_roll < save_dc) {
-				target.add_condition(COND_PRONE);
-				broadcast_announce(attacker.name + "'s Trip Attack deals " + trip_dmg + " extra damage and knocks " + target.name + " prone!", false);
+				target.weapon_jammed = true; // Approximation: must use action to recover weapon
+				broadcast_announce(attacker.name + "'s Disarming Attack deals " + dis_dmg + " extra damage and forces " + target.name + " to drop their weapon! (Use action to recover) (" + attacker.superiority_dice + " dice remain)", false);
 			} else {
-				broadcast_announce(attacker.name + "'s Trip Attack deals " + trip_dmg + " extra damage, but " + target.name + " stays standing!", false);
+				broadcast_announce(attacker.name + "'s Disarming Attack deals " + dis_dmg + " extra damage, but " + target.name + " keeps hold of their weapon! (" + attacker.superiority_dice + " dice remain)", false);
+			}
+		}
+
+		// PHB 2024 Battle Master: Distracting Strike (para 6030-6031)
+		// +1d8 damage, next attack roll by another against target has Advantage
+		if (attacker.class_name == "Fighter" and attacker.subclass == "Battle Master" and attacker.distracting_strike_pending and is_weapon_attack) {
+			int dist_dmg = random(1, 8);
+			bonus += dist_dmg;
+			attacker.distracting_strike_pending = false;
+			attacker.superiority_dice--;
+			target.distracting_strike_marked = true;
+			target.distracting_strike_source_id = attacker.id;
+			broadcast_announce(attacker.name + "'s Distracting Strike deals " + dist_dmg + " extra damage! The next attack against " + target.name + " by another creature has advantage. (" + attacker.superiority_dice + " dice remain)", false);
+		}
+
+		// PHB 2024 Battle Master: Sweeping Attack (para 6054-6055)
+		// On hit, choose another creature within 5ft of target and within reach.
+		// If original attack roll would hit it, deal Superiority Die damage.
+		if (attacker.class_name == "Fighter" and attacker.subclass == "Battle Master" and attacker.sweeping_attack_pending and is_weapon_attack and @combat != null) {
+			attacker.sweeping_attack_pending = false;
+			attacker.superiority_dice--;
+			int sweep_dmg = random(1, 8);
+			// Find nearest hostile within 5ft of target (and within attacker's reach)
+			combatant@ sweep_target = null;
+			int sweep_best = 999;
+			for (uint si = 0; si < combat.combatants.length(); si++) {
+				combatant@ st = combat.combatants[si];
+				if (@st == null or st.is_dead or st.id == target.id or st.id == attacker.id) continue;
+				if (st.is_player == attacker.is_player) continue; // skip allies
+				int d_to_target = feet_distance(st.x, st.y, target.x, target.y);
+				int d_to_attacker = feet_distance(st.x, st.y, attacker.x, attacker.y);
+				int reach = attacker.main_hand_is_ranged ? 5 : (attacker.has_feat("polearm_master") ? 10 : 5);
+				if (d_to_target <= 5 and d_to_attacker <= reach and d_to_target < sweep_best) {
+					sweep_best = d_to_target;
+					@sweep_target = st;
+				}
+			}
+			if (@sweep_target != null) {
+				combat.apply_damage(sweep_target, sweep_dmg, attacker.main_hand_damage_type, attacker);
+				broadcast_announce(attacker.name + "'s Sweeping Attack cleaves into " + sweep_target.name + " for " + sweep_dmg + " damage! (" + attacker.superiority_dice + " dice remain)", false);
+			} else {
+				broadcast_announce(attacker.name + "'s Sweeping Attack finds no adjacent enemy to cleave. (" + attacker.superiority_dice + " dice remain)", false);
 			}
 		}
 
@@ -8475,6 +8745,27 @@ class battle_manager {
 			int rune_dmg = random(1, 6);
 			bonus += rune_dmg;
 			broadcast_announce(attacker.name + "'s Rune Tag adds " + rune_dmg + " force damage!", false);
+		}
+
+		// Xanathar's Storm Herald L14 Raging Storm Sea (para 431-432): "When you hit
+		// a creature in your aura with an attack, you can use your reaction to force
+		// that creature to make a Strength saving throw. On a failed save, the creature
+		// is knocked prone, as if struck by a wave."
+		if (attacker.class_name == "Barbarian" and attacker.subclass == "Storm Herald" and attacker.level >= 14
+			and attacker.storm_aura_active and attacker.storm_aura_damage_type == DMG_LIGHTNING
+			and attacker.has_reaction and !attacker.raging_storm_used_this_turn
+			and is_weapon_attack and @target != null and !target.is_dead
+			and feet_distance(attacker.x, attacker.y, target.x, target.y) <= 10) {
+			attacker.has_reaction = false;
+			attacker.raging_storm_used_this_turn = true;
+			int storm_dc = 8 + attacker.proficiency + attacker.get_ability_mod(ABILITY_CON);
+			int str_save = target.apply_indomitable_might(random(1, 20) + target.get_save_bonus(ABILITY_STR), ABILITY_STR);
+			if (str_save < storm_dc) {
+				target.add_condition(COND_PRONE);
+				broadcast_announce(attacker.name + "'s Raging Storm wave knocks " + target.name + " prone!", false);
+			} else {
+				broadcast_announce(target.name + " withstands the Raging Storm wave.", false);
+			}
 		}
 
 		// Grim Surgeon Rogue: precision strikes deal bonus damage
@@ -11226,6 +11517,14 @@ class battle_manager {
 			int beacon_chosen = natural_roll > beacon_second ? natural_roll : beacon_second;
 			broadcast_announce(c.name + "'s Beacon of Hope grants advantage — rolled " + natural_roll + " and " + beacon_second + ", using " + beacon_chosen + ".", false);
 			natural_roll = beacon_chosen;
+		}
+		// Tasha's Phantom Rogue L9 Tokens of the Departed (para 3454-3460):
+		// "you have advantage on death saving throws" while holding soul trinkets.
+		if (pr.roll_type == ROLL_DEATH_SAVE and c.soul_trinkets > 0) {
+			int trinket_second = random(1, 20);
+			int trinket_chosen = natural_roll > trinket_second ? natural_roll : trinket_second;
+			broadcast_announce(c.name + "'s soul trinkets grant advantage — rolled " + natural_roll + " and " + trinket_second + ", using " + trinket_chosen + ".", false);
+			natural_roll = trinket_chosen;
 		}
 		int bless_bonus = 0;
 		if (c.blessed and (pr.roll_type == ROLL_ATTACK or pr.roll_type == ROLL_CONCENTRATION or pr.roll_type == ROLL_DEATH_SAVE)) {

@@ -3123,6 +3123,177 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.room.bm.broadcast_announce(c.name + " readies Riposte! If an enemy misses, " + c.name + " will counterattack with an extra 1d8 damage.", false);
 		}
 
+		else if (feature == "menacing_attack") {
+			// PHB 2024 Battle Master: Menacing Attack (para 6042-6043)
+			if (c.class_name != "Fighter" or c.subclass != "Battle Master") { u.send({{"type", message_types::announce}, {"text", "Only Battle Masters can use Menacing Attack."}, {"interrupt", true}}); return; }
+			if (c.superiority_dice <= 0) { u.send({{"type", message_types::announce}, {"text", "No superiority dice remaining."}, {"interrupt", true}}); return; }
+			c.menacing_attack_pending = true;
+			u.room.bm.broadcast_announce(c.name + " prepares Menacing Attack! Next weapon hit adds 1d8 damage and may Frighten the target. (" + c.superiority_dice + " dice remain)", false);
+		}
+
+		else if (feature == "goading_attack") {
+			// PHB 2024 Battle Master: Goading Attack (para 6036-6037)
+			if (c.class_name != "Fighter" or c.subclass != "Battle Master") { u.send({{"type", message_types::announce}, {"text", "Only Battle Masters can use Goading Attack."}, {"interrupt", true}}); return; }
+			if (c.superiority_dice <= 0) { u.send({{"type", message_types::announce}, {"text", "No superiority dice remaining."}, {"interrupt", true}}); return; }
+			c.goading_attack_pending = true;
+			u.room.bm.broadcast_announce(c.name + " prepares Goading Attack! Next hit adds 1d8 and forces the target to focus attacks on " + c.name + ". (" + c.superiority_dice + " dice remain)", false);
+		}
+
+		else if (feature == "pushing_attack") {
+			// PHB 2024 Battle Master: Pushing Attack (para 6048-6049)
+			if (c.class_name != "Fighter" or c.subclass != "Battle Master") { u.send({{"type", message_types::announce}, {"text", "Only Battle Masters can use Pushing Attack."}, {"interrupt", true}}); return; }
+			if (c.superiority_dice <= 0) { u.send({{"type", message_types::announce}, {"text", "No superiority dice remaining."}, {"interrupt", true}}); return; }
+			c.pushing_attack_pending = true;
+			u.room.bm.broadcast_announce(c.name + " prepares Pushing Attack! Next hit adds 1d8 and may push the target 15 feet. (" + c.superiority_dice + " dice remain)", false);
+		}
+
+		else if (feature == "disarming_attack") {
+			// PHB 2024 Battle Master: Disarming Attack (para 6028-6029)
+			if (c.class_name != "Fighter" or c.subclass != "Battle Master") { u.send({{"type", message_types::announce}, {"text", "Only Battle Masters can use Disarming Attack."}, {"interrupt", true}}); return; }
+			if (c.superiority_dice <= 0) { u.send({{"type", message_types::announce}, {"text", "No superiority dice remaining."}, {"interrupt", true}}); return; }
+			c.disarming_attack_pending = true;
+			u.room.bm.broadcast_announce(c.name + " prepares Disarming Attack! Next hit adds 1d8 and may force the target to drop its weapon. (" + c.superiority_dice + " dice remain)", false);
+		}
+
+		else if (feature == "distracting_strike") {
+			// PHB 2024 Battle Master: Distracting Strike (para 6030-6031)
+			if (c.class_name != "Fighter" or c.subclass != "Battle Master") { u.send({{"type", message_types::announce}, {"text", "Only Battle Masters can use Distracting Strike."}, {"interrupt", true}}); return; }
+			if (c.superiority_dice <= 0) { u.send({{"type", message_types::announce}, {"text", "No superiority dice remaining."}, {"interrupt", true}}); return; }
+			c.distracting_strike_pending = true;
+			u.room.bm.broadcast_announce(c.name + " prepares Distracting Strike! Next hit adds 1d8 and the next attack against the target has advantage. (" + c.superiority_dice + " dice remain)", false);
+		}
+
+		else if (feature == "sweeping_attack") {
+			// PHB 2024 Battle Master: Sweeping Attack (para 6054-6055)
+			if (c.class_name != "Fighter" or c.subclass != "Battle Master") { u.send({{"type", message_types::announce}, {"text", "Only Battle Masters can use Sweeping Attack."}, {"interrupt", true}}); return; }
+			if (c.superiority_dice <= 0) { u.send({{"type", message_types::announce}, {"text", "No superiority dice remaining."}, {"interrupt", true}}); return; }
+			c.sweeping_attack_pending = true;
+			u.room.bm.broadcast_announce(c.name + " prepares Sweeping Attack! Next hit will also damage an adjacent enemy. (" + c.superiority_dice + " dice remain)", false);
+		}
+
+		else if (feature == "parry") {
+			// PHB 2024 Battle Master: Parry (para 6044-6045) — readied reaction
+			if (c.class_name != "Fighter" or c.subclass != "Battle Master") { u.send({{"type", message_types::announce}, {"text", "Only Battle Masters can use Parry."}, {"interrupt", true}}); return; }
+			if (c.superiority_dice <= 0) { u.send({{"type", message_types::announce}, {"text", "No superiority dice remaining."}, {"interrupt", true}}); return; }
+			if (!c.has_reaction) { u.send({{"type", message_types::announce}, {"text", "No reaction available."}, {"interrupt", true}}); return; }
+			c.parry_ready = true;
+			u.room.bm.broadcast_announce(c.name + " readies Parry! Will reduce the next melee hit by 1d8 + " + (c.get_ability_mod(ABILITY_DEX) > c.get_ability_mod(ABILITY_STR) ? c.get_ability_mod(ABILITY_DEX) : c.get_ability_mod(ABILITY_STR)) + ".", false);
+		}
+
+		else if (feature == "rally") {
+			// PHB 2024 Battle Master: Rally (para 6050-6051) — BA temp HP to ally
+			if (c.class_name != "Fighter" or c.subclass != "Battle Master") { u.send({{"type", message_types::announce}, {"text", "Only Battle Masters can use Rally."}, {"interrupt", true}}); return; }
+			if (c.superiority_dice <= 0) { u.send({{"type", message_types::announce}, {"text", "No superiority dice remaining."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			// Find nearest ally within 30 ft
+			combatant@ rally_target = null;
+			int best_dist = 999;
+			for (uint ri = 0; ri < u.room.bm.combat.combatants.length(); ri++) {
+				combatant@ ally = u.room.bm.combat.combatants[ri];
+				if (@ally == null or ally.is_dead or ally.id == c.id) continue;
+				if (ally.is_player != c.is_player) continue; // same team
+				int d = feet_distance(c.x, c.y, ally.x, ally.y);
+				if (d <= 30 and d < best_dist) { best_dist = d; @rally_target = ally; }
+			}
+			if (@rally_target == null) { u.send({{"type", message_types::announce}, {"text", "No ally within 30 feet for Rally."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.superiority_dice--;
+			// PHB 2024 para 6050: "Superiority Die roll plus half your Fighter level (round down)"
+			int rally_hp = random(1, 8) + (c.level / 2);
+			if (rally_hp > rally_target.temp_hp) rally_target.temp_hp = rally_hp;
+			u.room.bm.broadcast_announce(c.name + " uses Rally on " + rally_target.name + "! " + rally_hp + " temporary HP granted. (" + c.superiority_dice + " dice remain)", true);
+		}
+
+		else if (feature == "panache") {
+			// Xanathar's Swashbuckler L9 Panache (paras 2423-2426): Action, CHA(Persuasion)
+			// vs target WIS(Insight). Hostile: disadv attacks vs others + no OA vs others.
+			if (c.class_name != "Rogue" or c.subclass != "Swashbuckler") { u.send({{"type", message_types::announce}, {"text", "Only Swashbucklers can use Panache."}, {"interrupt", true}}); return; }
+			if (c.level < 9) { u.send({{"type", message_types::announce}, {"text", "Panache requires level 9."}, {"interrupt", true}}); return; }
+			if (!c.has_action) { u.send({{"type", message_types::announce}, {"text", "No action remaining."}, {"interrupt", true}}); return; }
+			combatant@ target = u.room.bm.combat.get_combatant(target_id);
+			if (@target == null or target.is_dead) { u.send({{"type", message_types::announce}, {"text", "Choose a valid target."}, {"interrupt", true}}); return; }
+			c.has_action = false;
+			// Contested check: CHA(Persuasion) vs WIS(Insight)
+			int cha_roll = random(1, 20) + c.get_ability_mod(ABILITY_CHA) + (c.has_skill_proficiency("Persuasion") ? c.proficiency : 0) + (c.has_skill_expertise("Persuasion") ? c.proficiency : 0);
+			int wis_roll = random(1, 20) + target.get_ability_mod(ABILITY_WIS) + (target.has_skill_proficiency("Insight") ? target.proficiency : 0);
+			if (cha_roll >= wis_roll) {
+				// Success: hostile target gets disadvantage on attacks vs others + no OA vs others
+				target.panache_source_id = c.id;
+				target.panache_rounds = 10; // 1 minute
+				u.room.bm.broadcast_announce(c.name + " uses Panache on " + target.name + "! (" + cha_roll + " vs " + wis_roll + ") " + target.name + " has disadvantage on attacks against anyone except " + c.name + " for 1 minute.", true);
+			} else {
+				u.room.bm.broadcast_announce(c.name + " attempts Panache on " + target.name + " but fails! (" + cha_roll + " vs " + wis_roll + ")", true);
+			}
+		}
+
+		else if (feature == "elegant_maneuver") {
+			// Xanathar's Swashbuckler L13 Elegant Maneuver (paras 2427-2428): BA, advantage
+			// on next Acrobatics or Athletics check this turn.
+			if (c.class_name != "Rogue" or c.subclass != "Swashbuckler") { u.send({{"type", message_types::announce}, {"text", "Only Swashbucklers can use Elegant Maneuver."}, {"interrupt", true}}); return; }
+			if (c.level < 13) { u.send({{"type", message_types::announce}, {"text", "Elegant Maneuver requires level 13."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.elegant_maneuver_active = true;
+			u.room.bm.broadcast_announce(c.name + " uses Elegant Maneuver! Advantage on next Acrobatics or Athletics check this turn.", false);
+		}
+
+		else if (feature == "sudden_strike") {
+			// Xanathar's Scout L17 Sudden Strike (paras 2400-2401): "If you take the
+			// Attack action on your turn, you can make one additional attack as a bonus
+			// action. This attack can benefit from your Sneak Attack even if you have
+			// already used it this turn, but you can't use Sneak Attack against the same
+			// target more than once in a turn."
+			if (c.class_name != "Rogue" or c.subclass != "Scout") { u.send({{"type", message_types::announce}, {"text", "Only Scout Rogues can use Sudden Strike."}, {"interrupt", true}}); return; }
+			if (c.level < 17) { u.send({{"type", message_types::announce}, {"text", "Sudden Strike requires level 17."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			if (c.sudden_strike_used_this_turn) { u.send({{"type", message_types::announce}, {"text", "Already used Sudden Strike this turn."}, {"interrupt", true}}); return; }
+			combatant@ target = u.room.bm.combat.get_combatant(target_id);
+			if (@target == null or target.is_dead) { u.send({{"type", message_types::announce}, {"text", "Choose a valid target."}, {"interrupt", true}}); return; }
+			int dist = feet_distance(c.x, c.y, target.x, target.y);
+			int range = c.main_hand_is_ranged ? c.main_hand_range : 5;
+			if (dist > range) { u.send({{"type", message_types::announce}, {"text", "Target is out of range."}, {"interrupt", true}}); return; }
+			c.has_bonus_action = false;
+			c.used_bonus_action = true;
+			c.sudden_strike_used_this_turn = true;
+			u.room.bm.broadcast_announce(c.name + " launches a Sudden Strike!", false);
+			if (!u.room.bm.start_flurry_strike(c, target, 0)) {
+				c.has_bonus_action = true;
+				c.used_bonus_action = false;
+				c.sudden_strike_used_this_turn = false;
+				u.send({{"type", message_types::announce}, {"text", "Cannot make that attack right now."}, {"interrupt", true}});
+				return;
+			}
+		}
+
+		else if (feature == "ghost_walk") {
+			// Tasha's Phantom Rogue L13 Ghost Walk (para 3470): BA toggle spectral form
+			if (c.class_name != "Rogue" or c.subclass != "Phantom") { u.send({{"type", message_types::announce}, {"text", "Only Phantom Rogues can use Ghost Walk."}, {"interrupt", true}}); return; }
+			if (c.level < 13) { u.send({{"type", message_types::announce}, {"text", "Ghost Walk requires level 13."}, {"interrupt", true}}); return; }
+			if (!c.has_bonus_action) { u.send({{"type", message_types::announce}, {"text", "No bonus action remaining."}, {"interrupt", true}}); return; }
+			if (c.ghost_walk_active) {
+				// End Ghost Walk
+				c.ghost_walk_active = false;
+				c.has_bonus_action = false;
+				c.used_bonus_action = true;
+				u.room.bm.broadcast_announce(c.name + " ends Ghost Walk, returning to corporeal form.", true);
+			} else {
+				// Activate Ghost Walk
+				if (!c.ghost_walk_available and c.soul_trinkets <= 0) { u.send({{"type", message_types::announce}, {"text", "Ghost Walk unavailable. Need a long rest or a soul trinket."}, {"interrupt", true}}); return; }
+				c.has_bonus_action = false;
+				c.used_bonus_action = true;
+				c.ghost_walk_active = true;
+				if (!c.ghost_walk_available) {
+					c.soul_trinkets--; // Destroy a trinket to fuel Ghost Walk
+					u.room.bm.broadcast_announce(c.name + " destroys a soul trinket and enters Ghost Walk! Spectral form: fly 10 ft, attacks have disadvantage against " + c.name + ". (" + c.soul_trinkets + " trinkets remain)", true);
+				} else {
+					c.ghost_walk_available = false;
+					u.room.bm.broadcast_announce(c.name + " enters Ghost Walk! Spectral form: fly 10 ft, attacks have disadvantage against " + c.name + ".", true);
+				}
+			}
+		}
+
 		else if (feature == "shadow_step") {
 			// Shadow Monk: teleport 60 ft to dim/dark location, advantage on next melee
 			if (c.class_name != "Monk" or c.subclass != "Way of Shadow") { u.send({{"type", message_types::announce}, {"text", "Only Shadow monks can use Shadow Step."}, {"interrupt", true}}); return; }

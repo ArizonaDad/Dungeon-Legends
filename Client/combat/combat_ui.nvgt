@@ -197,6 +197,12 @@ int my_wholeness_of_body_uses_max = 0;
 bool my_quivering_palm_pending = false;
 uint my_quivering_palm_target_id = 0;
 int my_lay_on_hands_pool = 0;
+// Batch 3: new subclass state — synced from server
+int my_soul_trinkets = 0;
+int my_soul_trinkets_max = 0;
+bool my_ghost_walk_active = false;
+bool my_ghost_walk_available = false;
+bool my_sudden_strike_used = false;
 // PHB 2024 Ranger L10 Tireless / L14 Nature's Veil — synced from server
 int my_natures_veil_uses_remaining = 0;
 int my_tireless_temp_hp_uses_remaining = 0;
@@ -1452,11 +1458,23 @@ void show_bonus_action_menu() {
 	if (my_expeditious_retreat_active) exp_retreat_opt = m.add_item("Dash (Expeditious Retreat). Bonus action. Double your movement.");
 
 	// Subclass-specific bonus actions
+	int menacing_opt = -1, goading_opt = -1, pushing_opt = -1, disarming_opt = -1;
+	int distracting_opt = -1, sweeping_opt = -1, parry_opt = -1, rally_opt = -1;
+	int panache_opt = -1, elegant_maneuver_opt = -1, sudden_strike_opt = -1;
+	int ghost_walk_opt = -1;
 	if (lc == "fighter") {
 		if (subclass == "Battle Master") {
-			trip_opt = m.add_item("Trip Attack. Use a superiority die. Your next hit knocks the target prone.");
-			precision_opt = m.add_item("Precision Attack. Add a d8 to your next attack roll.");
-			riposte_opt = m.add_item("Riposte. Ready a reaction attack when an enemy misses you.");
+			trip_opt = m.add_item("Trip Attack. Next hit: +1d8 and knock prone.");
+			precision_opt = m.add_item("Precision Attack. Add d8 to next attack roll.");
+			riposte_opt = m.add_item("Riposte. Readied reaction counterattack on miss.");
+			menacing_opt = m.add_item("Menacing Attack. Next hit: +1d8 and Frighten.");
+			goading_opt = m.add_item("Goading Attack. Next hit: +1d8, target must focus you.");
+			pushing_opt = m.add_item("Pushing Attack. Next hit: +1d8, push 15 feet.");
+			disarming_opt = m.add_item("Disarming Attack. Next hit: +1d8, disarm weapon.");
+			distracting_opt = m.add_item("Distracting Strike. Next hit: +1d8, advantage for ally.");
+			sweeping_opt = m.add_item("Sweeping Attack. Next hit also damages adjacent foe.");
+			parry_opt = m.add_item("Parry. Readied reaction: reduce melee damage by d8+mod.");
+			rally_opt = m.add_item("Rally. Grant temp HP to nearest ally within 30 ft.");
 		}
 		// Psi Warrior Strike auto-triggers on hit; no menu option needed.
 	}
@@ -1468,6 +1486,19 @@ void show_bonus_action_menu() {
 	if (lc == "rogue") {
 		if (subclass == "Soulknife") {
 			psychic_blade_opt = m.add_item("Psychic Blades. Bonus action. Strike with a psychic blade for 1d4 psychic damage.");
+		}
+		if (subclass == "Swashbuckler" and level >= 9) {
+			panache_opt = m.add_item("Panache. Action. Charm or taunt a target (CHA vs WIS).");
+		}
+		if (subclass == "Swashbuckler" and level >= 13) {
+			elegant_maneuver_opt = m.add_item("Elegant Maneuver. Advantage on next Athletics/Acrobatics.");
+		}
+		if (subclass == "Scout" and level >= 17 and !my_sudden_strike_used) {
+			sudden_strike_opt = m.add_item("Sudden Strike. Bonus action extra attack (can Sneak Attack).");
+		}
+		if (subclass == "Phantom" and level >= 13) {
+			string gw_label = my_ghost_walk_active ? "End Ghost Walk." : ("Ghost Walk. Spectral form: fly, disadvantage on attacks vs you." + (my_ghost_walk_available ? "" : " (costs trinket, " + my_soul_trinkets + " left)"));
+			ghost_walk_opt = m.add_item(gw_label);
 		}
 	}
 	if (lc == "paladin") {
@@ -2288,6 +2319,62 @@ void show_bonus_action_menu() {
 	else if (riposte_opt >= 0 and res == riposte_opt) {
 		send({{"type", message_types::bonus_action}, {"feature", "riposte"}});
 		speak("Riposte readied. You will counterattack when an enemy misses you.", true);
+	}
+	else if (menacing_opt >= 0 and res == menacing_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "menacing_attack"}});
+		speak("Menacing Attack prepared. Next hit frightens the target.", true);
+	}
+	else if (goading_opt >= 0 and res == goading_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "goading_attack"}});
+		speak("Goading Attack prepared. Target must focus attacks on you.", true);
+	}
+	else if (pushing_opt >= 0 and res == pushing_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "pushing_attack"}});
+		speak("Pushing Attack prepared. Next hit pushes target 15 feet.", true);
+	}
+	else if (disarming_opt >= 0 and res == disarming_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "disarming_attack"}});
+		speak("Disarming Attack prepared. Next hit disarms the target.", true);
+	}
+	else if (distracting_opt >= 0 and res == distracting_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "distracting_strike"}});
+		speak("Distracting Strike prepared. Next hit gives advantage to an ally's attack.", true);
+	}
+	else if (sweeping_opt >= 0 and res == sweeping_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "sweeping_attack"}});
+		speak("Sweeping Attack prepared. Next hit also damages an adjacent foe.", true);
+	}
+	else if (parry_opt >= 0 and res == parry_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "parry"}});
+		speak("Parry readied. Next melee hit will be reduced.", true);
+	}
+	else if (rally_opt >= 0 and res == rally_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "rally"}});
+		speak("Rally! Granting temporary hit points to the nearest ally.", true);
+	}
+	else if (panache_opt >= 0 and res == panache_opt) {
+		if (current_target_id == 0) {
+			speak("No target selected. Scan with I J K L and press Enter to lock a target.", true);
+			return;
+		}
+		send({{"type", message_types::bonus_action}, {"feature", "panache"}, {"target_id", current_target_id}});
+		speak("Panache! Charming or taunting the target.", true);
+	}
+	else if (elegant_maneuver_opt >= 0 and res == elegant_maneuver_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "elegant_maneuver"}});
+		speak("Elegant Maneuver! Advantage on next Athletics or Acrobatics.", true);
+	}
+	else if (sudden_strike_opt >= 0 and res == sudden_strike_opt) {
+		if (current_target_id == 0) {
+			speak("No target selected. Scan with I J K L and press Enter to lock a target.", true);
+			return;
+		}
+		send({{"type", message_types::bonus_action}, {"feature", "sudden_strike"}, {"target_id", current_target_id}});
+		speak("Sudden Strike! Extra attack with Sneak Attack potential.", true);
+	}
+	else if (ghost_walk_opt >= 0 and res == ghost_walk_opt) {
+		send({{"type", message_types::bonus_action}, {"feature", "ghost_walk"}});
+		speak(my_ghost_walk_active ? "Ending Ghost Walk." : "Entering Ghost Walk! Spectral form.", true);
 	}
 	else if (frenzy_opt >= 0 and res == frenzy_opt) {
 		if (current_target_id == 0) {
@@ -4345,6 +4432,12 @@ void parse_game_state(json_object@ msg) {
 	my_wholeness_of_body_uses_max = msg.exists("my_wholeness_of_body_uses_max") ? int(msg["my_wholeness_of_body_uses_max"]) : 0;
 	my_quivering_palm_pending = msg.exists("my_quivering_palm_pending") ? bool(msg["my_quivering_palm_pending"]) : false;
 	my_quivering_palm_target_id = msg.exists("my_quivering_palm_target_id") ? uint(msg["my_quivering_palm_target_id"]) : 0;
+	// Batch 3: new subclass state deserialization
+	my_soul_trinkets = msg.exists("my_soul_trinkets") ? int(msg["my_soul_trinkets"]) : 0;
+	my_soul_trinkets_max = msg.exists("my_soul_trinkets_max") ? int(msg["my_soul_trinkets_max"]) : 0;
+	my_ghost_walk_active = msg.exists("my_ghost_walk_active") ? bool(msg["my_ghost_walk_active"]) : false;
+	my_ghost_walk_available = msg.exists("my_ghost_walk_available") ? bool(msg["my_ghost_walk_available"]) : false;
+	my_sudden_strike_used = msg.exists("my_sudden_strike_used") ? bool(msg["my_sudden_strike_used"]) : false;
 	// Horizon Walker / Monster Slayer / Oath of Redemption
 	my_spectral_defense_active = msg.exists("my_spectral_defense_active") ? bool(msg["my_spectral_defense_active"]) : false;
 	my_supernatural_defense_active = msg.exists("my_supernatural_defense_active") ? bool(msg["my_supernatural_defense_active"]) : false;

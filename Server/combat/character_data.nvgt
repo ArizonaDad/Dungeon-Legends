@@ -1687,6 +1687,16 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
         // L3 Wails from the Grave (para 3454-3457): "a number of times equal to
         // your proficiency bonus" per long rest
         c.wails_from_grave_uses = proficiency_bonus(cs.level);
+        // L9 Tokens of the Departed (para 3454-3460): "You can have a maximum number
+        // of soul trinkets equal to your proficiency bonus"
+        if (cs.level >= 9) {
+            c.soul_trinkets_max = proficiency_bonus(cs.level);
+            c.soul_trinkets = 0; // Start with none; gained via reaction on kill
+        }
+        // L13 Ghost Walk (para 3470): BA spectral form, 1/LR or destroy trinket
+        if (cs.level >= 13) {
+            c.ghost_walk_available = true;
+        }
     }
 
     // Xanathar's Scout Rogue (paras 2391-2401)
@@ -1698,12 +1708,19 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
             if (c.skill_expertise.find("Nature") < 0) c.skill_expertise.insert_last("Nature");
             if (c.skill_expertise.find("Survival") < 0) c.skill_expertise.insert_last("Survival");
         }
+        // L3 Skirmisher (para 2392-2393): reaction move half speed on enemy end adj
+        // (wired in advance_turn / end-of-turn enemy check — no init needed, always available)
         // L9 Superior Mobility (para 2396-2397): "+10 feet to your walking speed"
         if (cs.level >= 9) c.speed += 10;
+        // L13 Ambush Master already wired in battle_manager initiative + on-hit marking
+        // L17 Sudden Strike: no init needed, always available via BA menu
     }
 
     // Xanathar's Swashbuckler Rogue (paras 2418-2430)
     if (cs.class_name == "Rogue" and cs.subclass == "Swashbuckler") {
+        // L3 Fancy Footwork + Rakish Audacity already wired
+        // L9 Panache: no init needed, uses action
+        // L13 Elegant Maneuver: no init needed, uses BA
         // L17 Master Duelist (para 2429-2430): "reroll a missed attack with advantage, 1/SR"
         if (cs.level >= 17) c.master_duelist_active = true;
     }
