@@ -154,6 +154,7 @@ uint64 next_tactical_mind_prompt_reminder = 0;
 bool waiting_for_smite_prompt = false;
 string smite_prompt_text = "";
 string smite_slots_info = "";
+string smite_type = "divine";       // "divine" or "eldritch" — set by server prompt
 uint64 next_smite_prompt_reminder = 0;
 bool waiting_for_reaction_prompt = false;
 string reaction_prompt_text = "";
@@ -513,10 +514,11 @@ void prompt_tactical_mind_choice(string text) {
 	speak(text, true);
 }
 
-void prompt_smite_choice(string text, string slots) {
+void prompt_smite_choice(string text, string slots, string type = "divine") {
 	waiting_for_smite_prompt = true;
 	smite_prompt_text = text;
 	smite_slots_info = slots;
+	smite_type = type;
 	next_smite_prompt_reminder = ticks() + 4000;
 	speak(text, true);
 }
@@ -659,7 +661,10 @@ bool check_smite_prompt_input() {
 			waiting_for_smite_prompt = false;
 			next_smite_prompt_reminder = 0;
 			send({{"type", message_types::smite_response}, {"slot", sl}});
-			speak("Divine Smite! Level " + sl + " slot.", true);
+			if (smite_type == "eldritch")
+				speak("Eldritch Smite! Level " + sl + " slot.", true);
+			else
+				speak("Divine Smite! Level " + sl + " slot.", true);
 			return true;
 		}
 	}

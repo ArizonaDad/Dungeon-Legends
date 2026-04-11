@@ -276,9 +276,14 @@ void handle_message(json_object@ msg)
 		string slots = msg.exists("slots") ? string(msg["slots"]) : "";
 		bool is_crit = msg.exists("is_crit") ? bool(msg["is_crit"]) : false;
 		string target_name = msg.exists("target") ? string(msg["target"]) : "the target";
-		string text = "You hit " + target_name + "! Divine Smite? " + slots + ". Press 1 through 5 for slot level, or Escape to skip.";
-		if (is_crit) text = "Critical hit on " + target_name + "! Divine Smite? (dice doubled!) " + slots + ". Press 1 through 5 for slot level, or Escape to skip.";
-		prompt_smite_choice(text, slots);
+		string stype = msg.exists("smite_type") ? string(msg["smite_type"]) : "divine";
+		string smite_label = (stype == "eldritch") ? "Eldritch Smite" : "Divine Smite";
+		string text;
+		if (is_crit)
+			text = "Critical hit on " + target_name + "! " + smite_label + "? (dice doubled!) " + slots + ". Press 1 through 5 for slot level, or Escape to skip.";
+		else
+			text = "You hit " + target_name + "! " + smite_label + "? " + slots + ". Press 1 through 5 for slot level, or Escape to skip.";
+		prompt_smite_choice(text, slots, stype);
 	}
 	else if (msg_type == message_types::reaction_prompt) {
 		string attacker = msg.exists("attacker") ? string(msg["attacker"]) : "an enemy";

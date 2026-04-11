@@ -116,6 +116,7 @@ class pending_smite_prompt {
 	pending_roll@ damage_roll;       // The damage roll to resume after smite choice
 	bool is_crit = false;
 	int highest_slot = 0;            // Highest available slot for smite
+	string smite_type = "divine";    // "divine" or "eldritch"
 }
 
 class pending_reaction_prompt {
@@ -3829,6 +3830,13 @@ class battle_manager {
 		// be handled separately if positional tracking is added later).
 		caster.fog_cloud_active = false;
 		caster.darkness_active = false;
+		// Conjure Minor Elementals cleanup
+		caster.conjure_minor_elementals_active = false;
+		caster.conjure_minor_elementals_slot_level = 0;
+		// Conjure Woodland Beings cleanup
+		caster.conjure_woodland_active = false;
+		caster.conjure_woodland_slot_level = 0;
+		caster.conjure_woodland_disengage = false;
 		// Polymorph: restore original HP/AC when concentration breaks.
 		// Basic Rules 2024 Polymorph (para 14624-14626): "The creature reverts to
 		// its normal form when it drops to 0 Hit Points or the spell ends."
@@ -4999,6 +5007,35 @@ class battle_manager {
 					if (ic_dmg < 1) ic_dmg = 1;
 					combat.apply_damage(c, ic_dmg, DMG_FIRE, ca_caster);
 					broadcast_announce(c.name + " takes " + ic_dmg + " fire damage from " + ca_caster.name + "'s Incendiary Cloud!", true);
+					if (c.is_dead) break;
+				}
+			}
+
+			// Conjure Woodland Beings: caster-centered 10ft emanation, per-turn WIS save
+			else if (ca_caster.concentration_spell == "Conjure Woodland Beings" and ca_caster.conjure_woodland_active) {
+				if (ca_caster.id != c.id and combat.are_hostile(ca_caster, c) and feet_distance(ca_caster.x, ca_caster.y, c.x, c.y) <= 10) {
+					int cwb_dc = spell_save_dc(ca_caster, "conjure_woodland_beings");
+					int cwb_dice = 5 + (ca_caster.conjure_woodland_slot_level - 4);
+					if (cwb_dice < 5) cwb_dice = 5;
+					int cwb_roll = random(1, 20);
+					apply_hound_save_disadvantage(c, ca_caster.id, cwb_roll);
+					int cwb_bonus = c.get_save_bonus(ABILITY_WIS);
+					int cwb_bless = roll_bless_bonus(c);
+					int cwb_total = cwb_roll + cwb_bonus + cwb_bless;
+					bool cwb_saved = cwb_total >= cwb_dc;
+					broadcast_roll(c.name, "WIS save vs Conjure Woodland Beings", cwb_roll, cwb_bonus + cwb_bless, cwb_total, cwb_saved ? "Half damage!" : "Full damage!");
+					if (!cwb_saved and try_arcane_deflection_save(c, cwb_dc, cwb_total)) cwb_saved = true;
+					if (!cwb_saved) { int fg = try_flash_of_genius(c, cwb_dc, cwb_total, "WIS save vs CWB"); if (fg >= cwb_dc) cwb_saved = true; }
+					if (!cwb_saved) { int ms = try_maverick_spirit(c, cwb_dc, cwb_total, "WIS save vs CWB"); if (ms >= cwb_dc) cwb_saved = true; }
+					if (!cwb_saved and try_mage_slayer_guarded_mind(c, ABILITY_WIS)) cwb_saved = true;
+					if (!cwb_saved) { int bf = try_boon_of_fate_bonus(c, cwb_total, cwb_dc); if (bf > 0) cwb_saved = true; }
+					if (!cwb_saved and try_stroke_of_luck_save(c, cwb_dc, cwb_bonus + cwb_bless)) cwb_saved = true;
+					int cwb_dmg = 0;
+					for (int d = 0; d < cwb_dice; d++) cwb_dmg += random(1, 8);
+					if (cwb_saved) cwb_dmg /= 2;
+					if (cwb_dmg < 1) cwb_dmg = 1;
+					combat.apply_damage(c, cwb_dmg, DMG_FORCE, ca_caster);
+					broadcast_announce(c.name + " takes " + cwb_dmg + " force damage from " + ca_caster.name + "'s Conjure Woodland Beings!", true);
 					if (c.is_dead) break;
 				}
 			}
@@ -7281,19 +7318,34 @@ class battle_manager {
 			broadcast_announce(attacker.name + "'s Lifedrinker deals " + ld_dmg + " necrotic damage and heals " + ld_heal + " HP!", false);
 		}
 
+		// Basic Rules 2024 Conjure Minor Elementals: +2d8 elemental damage on attack hits
+		// within 15ft caster-centered emanation. +2d8 per upcast level above 4.
+		if (attacker.conjure_minor_elementals_active and attacker.conjure_minor_elementals_slot_level > 0) {
+			int dist_to_target = feet_distance(attacker.x, attacker.y, target.x, target.y);
+			if (dist_to_target <= 15) {
+				int cme_dice = 2 + 2 * (attacker.conjure_minor_elementals_slot_level - 4);
+				if (cme_dice < 2) cme_dice = 2;
+				int cme_dmg = 0;
+				for (int d = 0; d < cme_dice; d++) cme_dmg += random(1, 8);
+				bonus += cme_dmg;
+				broadcast_announce(attacker.name + "'s elemental spirits deal " + cme_dmg + " extra damage!", false);
+			}
+		}
+
 		// PHB 2024 Eldritch Invocation: Eldritch Smite (para 7766-7768): "Once per turn
 		// when you hit a creature with your pact weapon, you can expend a Pact Magic spell
 		// slot to deal an extra 1d8 Force damage, plus 1d8 per level of the spell slot,
 		// and give the target the Prone condition if Huge or smaller."
-		// Auto-applied for bots. Player prompt deferred (TODO: add smite-style prompt).
+		// Auto-applied for bots/NPCs only. Real players get a smite prompt (like Divine Smite).
 		if (attacker.eldritch_smite and attacker.pact_of_the_blade and is_weapon_attack
-			and !attacker.eldritch_smite_used_this_turn and !target.is_dead) {
+			and !attacker.eldritch_smite_used_this_turn and !target.is_dead
+			and (!attacker.is_player or combatant_is_controlled_by_bot(attacker))) {
 			// Find highest available spell slot (Pact Magic)
 			int smite_slot = -1;
 			for (int sl = 5; sl >= 1; sl--) {
 				if (attacker.spell_slots_current[sl] > 0) { smite_slot = sl; break; }
 			}
-			// Bots auto-smite; players auto-smite (prompt deferred until smite prompt system extended)
+			// Bots/NPCs auto-smite with highest available slot
 			if (smite_slot > 0) {
 				attacker.eldritch_smite_used_this_turn = true;
 				attacker.spell_slots_current[smite_slot]--;
@@ -8026,6 +8078,7 @@ class battle_manager {
 							@sp.damage_roll = dmg_pr;
 							sp.is_crit = is_crit;
 							sp.highest_slot = highest_slot;
+							sp.smite_type = "divine";
 							@current_smite_prompt = sp;
 							// Build slot info for prompt
 							string slots_info = "";
@@ -8037,8 +8090,49 @@ class battle_manager {
 									slots_info += "Level " + sl + " (" + smite_dice + "d8, " + c.spell_slots_current[sl] + " slots)";
 								}
 							}
-							su.send({{"type", message_types::smite_prompt}, {"slots", slots_info}, {"is_crit", is_crit}, {"target", target.name}});
+							su.send({{"type", message_types::smite_prompt}, {"slots", slots_info}, {"is_crit", is_crit}, {"target", target.name}, {"smite_type", "divine"}});
 							return; // Wait for smite_response before continuing
+						}
+					}
+				}
+
+				// Eldritch Smite on-hit prompt: Warlock with Pact of the Blade + Eldritch Smite invocation
+				// Only fires for real players (bots auto-smite above). Skips if Paladin already got Divine Smite prompt.
+				if (c.eldritch_smite and c.pact_of_the_blade and c.is_player and pr.is_weapon_attack
+					and !pr.is_spell_effect and !c.eldritch_smite_used_this_turn and !target.is_dead) {
+					// Check that this player is NOT a Paladin who would have gotten a Divine Smite prompt
+					// (Paladin/Warlock multiclass gets Divine Smite first, then Eldritch Smite chains after)
+					bool paladin_got_prompt = (c.class_name == "Paladin" and !c.divine_smite_pending
+						and !c.main_hand_is_ranged and get_attack_range(c, false) <= 5);
+					if (!paladin_got_prompt) {
+						int es_highest_slot = 0;
+						for (int sl = 5; sl >= 1; sl--) {
+							if (c.spell_slots_current[sl] > 0) { es_highest_slot = sl; break; }
+						}
+						if (es_highest_slot > 0) {
+							user@ esu = find_user_for_combatant(c);
+							if (@esu != null and !esu.is_bot) {
+								// Pause damage resolution, prompt for Eldritch Smite
+								pending_smite_prompt esp;
+								esp.player_username = c.player_username;
+								@esp.damage_roll = dmg_pr;
+								esp.is_crit = is_crit;
+								esp.highest_slot = es_highest_slot;
+								esp.smite_type = "eldritch";
+								@current_smite_prompt = esp;
+								// Build slot info for prompt
+								string es_slots_info = "";
+								for (int sl = 1; sl <= 5; sl++) {
+									if (c.spell_slots_current[sl] > 0) {
+										int es_dice = 1 + sl; // 1d8 base + 1d8 per slot level
+										if (is_crit) es_dice *= 2;
+										if (es_slots_info != "") es_slots_info += ", ";
+										es_slots_info += "Level " + sl + " (" + es_dice + "d8 force + Prone, " + c.spell_slots_current[sl] + " slots)";
+									}
+								}
+								esu.send({{"type", message_types::smite_prompt}, {"slots", es_slots_info}, {"is_crit", is_crit}, {"target", target.name}, {"smite_type", "eldritch"}});
+								return; // Wait for smite_response before continuing
+							}
 						}
 					}
 				}
@@ -9554,7 +9648,7 @@ class battle_manager {
 		}
 	}
 
-	// ---- Divine Smite Response ----
+	// ---- Smite Response (Divine + Eldritch) ----
 	void handle_smite_response(user@ u, json_object@ msg) {
 		if (@current_smite_prompt == null or @u == null) return;
 		if (current_smite_prompt.player_username != u.username) return;
@@ -9568,21 +9662,121 @@ class battle_manager {
 		if (@c == null) return;
 
 		int slot_used = msg.exists("slot") ? int(msg["slot"]) : 0;
-		if (slot_used >= 1 and slot_used <= 5 and c.spell_slots_current[slot_used] > 0) {
-			c.spell_slots_current[slot_used]--;
-			// Divine Smite: (slot_level + 1)d8 radiant, doubled on crit
-			int smite_dice = slot_used + 1;
-			if (smite_dice > 5) smite_dice = 5; // Cap at 5d8
-			if (sp.is_crit) smite_dice *= 2;
-			// Add smite as extra damage on the pending damage roll
-			dmg_pr.extra_damage_dice_count += smite_dice;
-			dmg_pr.extra_damage_dice_sides = 8;
-			dmg_pr.extra_damage_type = DMG_RADIANT;
-			broadcast_announce(c.name + " channels Divine Smite! (" + smite_dice + "d8 radiant, level " + slot_used + " slot)", true);
+		bool smite_was_used = false;
+
+		if (sp.smite_type == "divine") {
+			// ---- Divine Smite resolution ----
+			if (slot_used >= 1 and slot_used <= 5 and c.spell_slots_current[slot_used] > 0) {
+				c.spell_slots_current[slot_used]--;
+				// Divine Smite: (slot_level + 1)d8 radiant, doubled on crit
+				int smite_dice = slot_used + 1;
+				if (smite_dice > 5) smite_dice = 5; // Cap at 5d8
+				if (sp.is_crit) smite_dice *= 2;
+				// Add smite as extra damage on the pending damage roll
+				dmg_pr.extra_damage_dice_count += smite_dice;
+				dmg_pr.extra_damage_dice_sides = 8;
+				dmg_pr.extra_damage_type = DMG_RADIANT;
+				broadcast_announce(c.name + " channels Divine Smite! (" + smite_dice + "d8 radiant, level " + slot_used + " slot)", true);
+				smite_was_used = true;
+			}
+			// Remove old divine_smite_pending flag if it was set
+			c.divine_smite_pending = false;
+			c.divine_smite_slot_level = 0;
+
+			// Chain: after Divine Smite resolves, check if Eldritch Smite is also available
+			// Only chain if the player actually used a smite (slot_used > 0 means they engaged, not skipped)
+			if (slot_used > 0 and c.eldritch_smite and c.pact_of_the_blade
+				and dmg_pr.is_weapon_attack and !c.eldritch_smite_used_this_turn) {
+				combatant@ chain_target = combat.get_combatant(dmg_pr.target_id);
+				if (@chain_target != null and !chain_target.is_dead) {
+					int es_highest = 0;
+					for (int sl = 5; sl >= 1; sl--) {
+						if (c.spell_slots_current[sl] > 0) { es_highest = sl; break; }
+					}
+					if (es_highest > 0) {
+						user@ esu = find_user_for_combatant(c);
+						if (@esu != null and !esu.is_bot) {
+							pending_smite_prompt esp;
+							esp.player_username = c.player_username;
+							@esp.damage_roll = dmg_pr;
+							esp.is_crit = sp.is_crit;
+							esp.highest_slot = es_highest;
+							esp.smite_type = "eldritch";
+							@current_smite_prompt = esp;
+							string es_slots = "";
+							for (int sl = 1; sl <= 5; sl++) {
+								if (c.spell_slots_current[sl] > 0) {
+									int es_dice = 1 + sl;
+									if (sp.is_crit) es_dice *= 2;
+									if (es_slots != "") es_slots += ", ";
+									es_slots += "Level " + sl + " (" + es_dice + "d8 force + Prone, " + c.spell_slots_current[sl] + " slots)";
+								}
+							}
+							esu.send({{"type", message_types::smite_prompt}, {"slots", es_slots}, {"is_crit", sp.is_crit}, {"target", chain_target.name}, {"smite_type", "eldritch"}});
+							return; // Wait for second smite_response
+						}
+					}
+				}
+			}
+		} else if (sp.smite_type == "eldritch") {
+			// ---- Eldritch Smite resolution ----
+			if (slot_used >= 1 and slot_used <= 5 and c.spell_slots_current[slot_used] > 0) {
+				c.eldritch_smite_used_this_turn = true;
+				c.spell_slots_current[slot_used]--;
+				// Eldritch Smite: (1 + slot_level)d8 force damage
+				int smite_dice = 1 + slot_used;
+				if (sp.is_crit) smite_dice *= 2;
+				// Add smite as extra damage on the pending damage roll
+				dmg_pr.extra_damage_dice_count += smite_dice;
+				dmg_pr.extra_damage_dice_sides = 8;
+				dmg_pr.extra_damage_type = DMG_FORCE;
+				broadcast_announce(c.name + " unleashes Eldritch Smite! (" + smite_dice + "d8 force, level " + slot_used + " slot)", true);
+				// Prone if target is Huge or smaller
+				combatant@ es_target = combat.get_combatant(dmg_pr.target_id);
+				if (@es_target != null and es_target.size <= SIZE_HUGE and !es_target.has_condition(COND_PRONE)) {
+					es_target.add_condition(COND_PRONE);
+					broadcast_announce(es_target.name + " is knocked prone by the Eldritch Smite!", true);
+				}
+				smite_was_used = true;
+			}
+
+			// Chain: after Eldritch Smite resolves, check if Divine Smite is also available
+			// Only chain if the player actually used a smite (slot_used > 0)
+			if (slot_used > 0 and c.class_name == "Paladin" and !c.divine_smite_pending
+				and dmg_pr.is_weapon_attack and !c.main_hand_is_ranged and get_attack_range(c, false) <= 5) {
+				int ds_highest = 0;
+				for (int sl = 5; sl >= 1; sl--) {
+					if (c.spell_slots_current[sl] > 0) { ds_highest = sl; break; }
+				}
+				if (ds_highest > 0) {
+					combatant@ chain_target2 = combat.get_combatant(dmg_pr.target_id);
+					if (@chain_target2 != null and !chain_target2.is_dead) {
+						user@ dsu = find_user_for_combatant(c);
+						if (@dsu != null and !dsu.is_bot) {
+							pending_smite_prompt dsp;
+							dsp.player_username = c.player_username;
+							@dsp.damage_roll = dmg_pr;
+							dsp.is_crit = sp.is_crit;
+							dsp.highest_slot = ds_highest;
+							dsp.smite_type = "divine";
+							@current_smite_prompt = dsp;
+							string ds_slots = "";
+							for (int sl = 1; sl <= 5; sl++) {
+								if (c.spell_slots_current[sl] > 0) {
+									int ds_dice = sl + 1;
+									if (ds_dice > 5) ds_dice = 5;
+									if (sp.is_crit) ds_dice *= 2;
+									if (ds_slots != "") ds_slots += ", ";
+									ds_slots += "Level " + sl + " (" + ds_dice + "d8, " + c.spell_slots_current[sl] + " slots)";
+								}
+							}
+							dsu.send({{"type", message_types::smite_prompt}, {"slots", ds_slots}, {"is_crit", sp.is_crit}, {"target", chain_target2.name}, {"smite_type", "divine"}});
+							return; // Wait for second smite_response
+						}
+					}
+				}
+			}
 		}
-		// Remove old divine_smite_pending flag if it was set
-		c.divine_smite_pending = false;
-		c.divine_smite_slot_level = 0;
 
 		// Resume damage roll
 		@current_roll = dmg_pr;
@@ -15170,7 +15364,24 @@ class battle_manager {
 			}
 			// Level 5
 			else if (spell.id == "animate_objects") {
-				broadcast_announce(c.name + " casts Animate Objects, animating up to 10 Tiny objects!", true);
+				// Basic Rules 2024 Animate Objects (para 11917): spawn Animated Object constructs
+				// equal to spellcasting ability modifier (Tiny size, AC 14, HP 20).
+				int spell_mod = c.get_ability_mod(ABILITY_INT);
+				if (c.class_name == "Bard" or c.class_name == "Sorcerer" or c.class_name == "Warlock") spell_mod = c.get_ability_mod(ABILITY_CHA);
+				else if (c.class_name == "Druid" or c.class_name == "Cleric" or c.class_name == "Ranger") spell_mod = c.get_ability_mod(ABILITY_WIS);
+				if (spell_mod < 1) spell_mod = 1;
+				if (spell_mod > 10) spell_mod = 10;
+				c.is_concentrating = true;
+				c.concentration_spell = "Animate Objects";
+				c.add_condition(COND_CONCENTRATING);
+				int ao_spawned = 0;
+				for (int aoi = 0; aoi < spell_mod; aoi++) {
+					combatant@ obj = spawn_companion(c, "animate_objects", "Animated Object", 20, 14, 30, c.proficiency + 4, 1, 4, 4, DMG_BLUDGEONING);
+					if (@obj != null) ao_spawned++;
+				}
+				broadcast_announce(c.name + " casts Animate Objects! " + ao_spawned + " Tiny constructs spring to life!", true);
+				broadcast_state();
+				return;
 			}
 			else if (spell.id == "commune") {
 				broadcast_announce(c.name + " casts Commune.", true);
@@ -15784,10 +15995,61 @@ class battle_manager {
 				return;
 			}
 			else if (spell.id == "conjure_minor_elementals") {
-				broadcast_announce(c.name + " casts Conjure Minor Elementals, summoning elemental spirits to flit around them.", true);
+				// Basic Rules 2024 Conjure Minor Elementals: 15ft caster-centered emanation,
+				// +2d8 elemental damage on your attack hits within emanation, concentration.
+				// +2d8 per upcast level above 4.
+				c.conjure_minor_elementals_active = true;
+				c.conjure_minor_elementals_slot_level = cast_slot_level;
+				c.is_concentrating = true;
+				c.concentration_spell = "Conjure Minor Elementals";
+				c.add_condition(COND_CONCENTRATING);
+				broadcast_announce(c.name + " casts Conjure Minor Elementals! Elemental spirits swirl in a 15-foot emanation — attacks deal extra 2d8 elemental damage to creatures in the aura.", true);
+				broadcast_state();
+				return;
 			}
 			else if (spell.id == "conjure_woodland_beings") {
-				broadcast_announce(c.name + " casts Conjure Woodland Beings, summoning fey nature spirits.", true);
+				// Basic Rules 2024 Conjure Woodland Beings: 10ft caster-centered emanation,
+				// WIS save or 5d8+upcast force damage (half on save), concentration.
+				// Also grants Disengage as bonus action.
+				c.conjure_woodland_active = true;
+				c.conjure_woodland_slot_level = cast_slot_level;
+				c.conjure_woodland_disengage = true;
+				c.is_concentrating = true;
+				c.concentration_spell = "Conjure Woodland Beings";
+				c.add_condition(COND_CONCENTRATING);
+				broadcast_announce(c.name + " casts Conjure Woodland Beings! Fey nature spirits swirl in a 10-foot emanation.", true);
+				// Immediately apply to enemies already in range
+				int cwb_dc = spell_save_dc(c, "conjure_woodland_beings");
+				int cwb_dice = 5 + (cast_slot_level - 4);
+				if (cwb_dice < 5) cwb_dice = 5;
+				for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+					combatant@ t = combat.combatants[ti];
+					if (@t == null or t.is_dead or t.id == c.id) continue;
+					if (!combat.are_hostile(c, t)) continue;
+					if (feet_distance(c.x, c.y, t.x, t.y) > 10) continue;
+					int save_roll = random(1, 20);
+					apply_hound_save_disadvantage(t, c.id, save_roll);
+					int save_bonus = t.get_save_bonus(ABILITY_WIS);
+					int bless_bonus = roll_bless_bonus(t);
+					int save_total = save_roll + save_bonus + bless_bonus;
+					bool saved = save_total >= cwb_dc;
+					broadcast_roll(t.name, "WIS save vs Conjure Woodland Beings", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+					if (!saved and try_arcane_deflection_save(t, cwb_dc, save_total)) saved = true;
+					if (!saved) { int fg = try_flash_of_genius(t, cwb_dc, save_total, "WIS save vs Conjure Woodland Beings"); if (fg >= cwb_dc) saved = true; }
+					if (!saved) { int ms = try_maverick_spirit(t, cwb_dc, save_total, "WIS save vs Conjure Woodland Beings"); if (ms >= cwb_dc) saved = true; }
+					if (!saved and try_mage_slayer_guarded_mind(t, ABILITY_WIS)) saved = true;
+					if (!saved) { int bf = try_boon_of_fate_bonus(t, save_total, cwb_dc); if (bf > 0) saved = true; }
+					if (!saved and try_stroke_of_luck_save(t, cwb_dc, save_bonus + bless_bonus)) saved = true;
+					int cwb_dmg = 0;
+					for (int d = 0; d < cwb_dice; d++) cwb_dmg += random(1, 8);
+					if (saved) cwb_dmg /= 2;
+					if (cwb_dmg < 1) cwb_dmg = 1;
+					combat.apply_damage(t, cwb_dmg, DMG_FORCE, c);
+					broadcast_announce(t.name + " takes " + cwb_dmg + " force damage from the woodland spirits!", true);
+					if (t.is_dead) continue;
+				}
+				broadcast_state();
+				return;
 			}
 			else if (spell.id == "dominate_beast" and @target != null) {
 				int save_roll = random(1, 20);
@@ -15818,7 +16080,25 @@ class battle_manager {
 				broadcast_announce(c.name + " casts Fabricate, transforming raw materials into a finished product.", true);
 			}
 			else if (spell.id == "giant_insect") {
-				broadcast_announce(c.name + " casts Giant Insect, summoning an enormous arthropod ally.", true);
+				// Basic Rules 2024 Giant Insect: AC 14+PB, HP 10*spell_level+20, Speed 40,
+				// Multiattack (2 attacks), +spell_attack to hit, 1d6+3+PB piercing.
+				int gi_hp = 10 * cast_slot_level + 20;
+				int gi_ac = 14 + c.proficiency;
+				int gi_atk = c.proficiency + c.get_ability_mod(ABILITY_WIS);
+				if (c.class_name == "Wizard" or c.class_name == "Artificer") gi_atk = c.proficiency + c.get_ability_mod(ABILITY_INT);
+				else if (c.class_name == "Bard" or c.class_name == "Sorcerer" or c.class_name == "Warlock") gi_atk = c.proficiency + c.get_ability_mod(ABILITY_CHA);
+				int gi_dmg_mod = 3 + c.proficiency;
+				c.is_concentrating = true;
+				c.concentration_spell = "Giant Insect";
+				c.add_condition(COND_CONCENTRATING);
+				combatant@ insect = spawn_companion(c, "giant_insect", "Giant Insect", gi_hp, gi_ac, 40, gi_atk, 1, 6, gi_dmg_mod, DMG_PIERCING, 1);
+				if (@insect != null) {
+					broadcast_announce(c.name + " casts Giant Insect! A massive arthropod appears (HP " + gi_hp + ", AC " + gi_ac + ", 2 attacks per turn)!", true);
+				} else {
+					broadcast_announce(c.name + " casts Giant Insect, summoning an enormous arthropod ally.", true);
+				}
+				broadcast_state();
+				return;
 			}
 			else if (spell.id == "hallucinatory_terrain") {
 				broadcast_announce(c.name + " casts Hallucinatory Terrain, disguising the surrounding landscape.", true);

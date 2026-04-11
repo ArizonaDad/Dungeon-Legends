@@ -649,6 +649,15 @@ class combatant {
 	// Moonbeam: single-column radiant damage, can move with action
 	bool moonbeam_active = false;
 	int moonbeam_x = 0; int moonbeam_y = 0; int moonbeam_slot_level = 0;
+	// Basic Rules 2024 Conjure Minor Elementals (para 12493): caster-centered 15ft emanation,
+	// +2d8 elemental damage on attacks, +2d8 per upcast level.
+	bool conjure_minor_elementals_active = false;
+	int conjure_minor_elementals_slot_level = 0;
+	// Basic Rules 2024 Conjure Woodland Beings: caster-centered 10ft emanation,
+	// 5d8+upcast force damage (WIS save half) per turn to enemies.
+	bool conjure_woodland_active = false;
+	int conjure_woodland_slot_level = 0;
+	bool conjure_woodland_disengage = false; // Caster can Disengage as BA
 	bool fog_cloud_active = false;
 	bool darkness_active = false;
 	// Fire Shield variant
