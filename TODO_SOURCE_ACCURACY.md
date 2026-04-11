@@ -134,6 +134,18 @@ Phase 1 notes that the PHB file is missing spell descriptions. Basic Rules file 
 - Storm of Vengeance: DEX → CON + AoE radius 300 (source: "must make a CON save... 2d6 Thunder + Deafened")
 - See commit `3e3f5ab` for full source quotes.
 
+### Smite spell fixes — RESOLVED 2026-04-10:
+- **Searing Smite** (Basic Rules para 14881): Was one-shot fire damage only. Added repeating fire DOT at target's turn start + CON save to end. Concentration. Full DOT cleanup in `clear_concentration_effects`.
+- **Shining Smite** (Basic Rules para 14976): Was announce-only. Now 2d6+upcast radiant on hit + advantage on all attacks vs target (`shining_smite_debuff` in `apply_attack_advantage_state`) + invisibility block. 10-round concentration. Full cleanup.
+- **Ballistic Smite** (Gun Slinger Class para 724): Was announce-only. Now 2d6+upcast force on next ranged hit. Instantaneous.
+
+### Missing smite spell descriptions (Paladin spell list only, NO full descriptions in Basic Rules):
+- **Thunderous Smite** (L1) — listed in Paladin spell table (para 5739) but full description not in Basic Rules. Cannot implement per source mandate.
+- **Wrathful Smite** (L1) — listed in Paladin spell table (para 5742) but full description not in Basic Rules. Cannot implement per source mandate.
+- **Branding Smite** (L2) — NOT listed in Basic Rules Paladin table. May be 2014-only.
+- **Staggering Smite** (L4) — listed in Paladin spell table (para 5835) but full description not in Basic Rules. Cannot implement per source mandate.
+- **Banishing Smite** (L5) — listed in Paladin spell table (para 5842) but full description not in Basic Rules. Cannot implement per source mandate.
+
 ### Generic spell resolver gaps:
 - AoE healing spells work (Mass Cure Wounds fixed in batch 20)
 - AoE damage spells work via the generic save loop

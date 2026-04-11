@@ -2668,6 +2668,9 @@ class battle_manager {
 		}
 		// PHB 2024 Crusher (para 7579): crit advantage on attacks against target
 		if (target.crusher_crit_advantage) adv = true;
+		// Basic Rules 2024 Shining Smite (para 14976-14983): "attack rolls against
+		// it have Advantage" while the smite aura persists on the target.
+		if (target.shining_smite_debuff) adv = true;
 		// PHB 2024 Slasher (para 7597): crit disadvantage on target's attacks
 		if (attacker.slasher_crit_disadvantage) disadv = true;
 		if (target.has_condition(COND_PRONE) and !attack_is_ranged and dist <= 5) adv = true;
@@ -3976,6 +3979,28 @@ class battle_manager {
 		}
 		// Ensnaring Strike: pending weapon hit rider (concentration)
 		caster.ensnaring_strike_pending = false;
+		// Basic Rules 2024 Searing Smite (para 14881): clear repeating DOT on targets
+		caster.searing_smite_pending = false;
+		caster.searing_smite_dice = 0;
+		for (uint ssi = 0; ssi < combat.combatants.length(); ssi++) {
+			combatant@ ss_t = combat.combatants[ssi];
+			if (@ss_t != null and ss_t.searing_smite_caster_id == caster.id) {
+				ss_t.searing_smite_caster_id = 0;
+				ss_t.searing_smite_dot_dice = 0;
+			}
+		}
+		// Basic Rules 2024 Shining Smite (para 14976): clear debuff on targets
+		caster.shining_smite_pending = false;
+		caster.shining_smite_dice = 0;
+		for (uint shi = 0; shi < combat.combatants.length(); shi++) {
+			combatant@ sh_t = combat.combatants[shi];
+			if (@sh_t != null and sh_t.shining_smite_debuff_source_id == caster.id) {
+				sh_t.shining_smite_debuff = false;
+				sh_t.shining_smite_debuff_source_id = 0;
+				sh_t.shining_smite_debuff_rounds = 0;
+				sh_t.starry_wisp_no_invis = false; // Clear shared invisibility block
+			}
+		}
 		// Sanctuary: protection aura on target (concentration)
 		// Clear any sanctuary sourced by this caster on all combatants
 		for (uint sci = 0; sci < combat.combatants.length(); sci++) {
@@ -5500,6 +5525,50 @@ class battle_manager {
 				// Half movement speed within aura
 				c.speed = c.speed / 2 > 5 ? c.speed / 2 : 5;
 				break;
+			}
+		}
+
+		// Basic Rules 2024 Searing Smite (para 14881-14888): "At the start of each
+		// of its turns until the spell ends, the target takes 1d6 Fire damage and
+		// then makes a Constitution saving throw. On a failed save, the spell
+		// continues. On a successful save, the spell ends."
+		if (c.searing_smite_caster_id != 0 and c.searing_smite_dot_dice > 0) {
+			combatant@ ss_caster = combat.get_combatant(c.searing_smite_caster_id);
+			if (@ss_caster != null and !ss_caster.is_dead and ss_caster.is_concentrating and ss_caster.concentration_spell == "Searing Smite") {
+				int ss_dot_dmg = 0;
+				for (int sd = 0; sd < c.searing_smite_dot_dice; sd++) ss_dot_dmg += random(1, 6);
+				combat.apply_damage(c, ss_dot_dmg, DMG_FIRE, ss_caster);
+				broadcast_announce(c.name + " takes " + ss_dot_dmg + " fire damage from Searing Smite!", true);
+				// CON save to end the effect
+				int ss_save_roll = random(1, 20);
+				int ss_save_bonus = c.get_save_bonus(ABILITY_CON);
+				int ss_dc = spell_save_dc(ss_caster, "searing_smite");
+				bool ss_saved = (ss_save_roll + ss_save_bonus) >= ss_dc;
+				broadcast_roll(c.name, "CON save vs Searing Smite", ss_save_roll, ss_save_bonus, ss_save_roll + ss_save_bonus, ss_saved ? "Saved! Fire extinguished." : "Failed! Fire continues.");
+				if (ss_saved) {
+					c.searing_smite_caster_id = 0;
+					c.searing_smite_dot_dice = 0;
+					ss_caster.is_concentrating = false;
+					ss_caster.concentration_spell = "";
+				}
+			} else {
+				// Caster dead or lost concentration — clear DOT
+				c.searing_smite_caster_id = 0;
+				c.searing_smite_dot_dice = 0;
+			}
+		}
+
+		// Basic Rules 2024 Shining Smite (para 14976-14983): "Until the spell ends,
+		// the target sheds Bright Light in a 5-foot radius, attack rolls against it
+		// have Advantage, and it can't benefit from the Invisible condition."
+		// Tick down duration on the debuffed target's turn start.
+		if (c.shining_smite_debuff and c.shining_smite_debuff_rounds > 0) {
+			c.shining_smite_debuff_rounds--;
+			if (c.shining_smite_debuff_rounds <= 0) {
+				c.shining_smite_debuff = false;
+				c.shining_smite_debuff_source_id = 0;
+				c.starry_wisp_no_invis = false; // Clear the shared invisibility block
+				broadcast_announce(c.name + "'s Shining Smite aura fades.", false);
 			}
 		}
 
@@ -9369,16 +9438,55 @@ class battle_manager {
 				total_damage += df_dmg;
 				broadcast_announce(c.name + "'s Divine Favor adds " + df_dmg + " radiant damage.", false);
 			}
-			// Searing Smite (Basic Rules para 14887): pending rider applied on the next
-			// melee weapon hit. The Searing Smite spell consumes itself and applies extra
-			// fire damage equal to (1+upcast)d6.
+			// Basic Rules 2024 Searing Smite (para 14881-14888): pending rider on next
+			// melee hit. Extra fire damage + repeating DOT at target's turn start.
 			if (c.searing_smite_pending and !pr.is_spell_effect and pr.is_weapon_attack and !c.main_hand_is_ranged) {
 				int ss_dmg = 0;
 				for (int d = 0; d < c.searing_smite_dice; d++) ss_dmg += random(1, 6);
 				total_damage += ss_dmg;
+				// Set up repeating fire DOT on the target
+				target.searing_smite_caster_id = c.id;
+				target.searing_smite_dot_dice = c.searing_smite_dice;
 				c.searing_smite_pending = false;
 				c.searing_smite_dice = 0;
-				broadcast_announce(c.name + "'s Searing Smite ignites " + target.name + " for " + ss_dmg + " fire damage!", true);
+				// Searing Smite is concentration — set on caster
+				c.is_concentrating = true;
+				c.concentration_spell = "Searing Smite";
+				broadcast_announce(c.name + "'s Searing Smite ignites " + target.name + " for " + ss_dmg + " fire damage! Fire persists each turn.", true);
+			}
+			// Basic Rules 2024 Shining Smite (para 14976-14983): pending rider on next
+			// weapon hit. 2d6+upcast radiant + advantage + invisibility block on target.
+			if (c.shining_smite_pending and !pr.is_spell_effect and pr.is_weapon_attack) {
+				int sh_dmg = 0;
+				for (int d = 0; d < c.shining_smite_dice; d++) sh_dmg += random(1, 6);
+				total_damage += sh_dmg;
+				// Apply debuff on target
+				target.shining_smite_debuff = true;
+				target.shining_smite_debuff_source_id = c.id;
+				target.shining_smite_debuff_rounds = 10; // 1 minute
+				// Strip invisibility
+				if (target.has_condition(COND_INVISIBLE)) {
+					target.remove_condition(COND_INVISIBLE);
+					target.is_hidden = false;
+					target.greater_invisibility_active = false;
+				}
+				target.starry_wisp_no_invis = true; // Reuse the invisibility block
+				c.shining_smite_pending = false;
+				c.shining_smite_dice = 0;
+				// Shining Smite is concentration
+				c.is_concentrating = true;
+				c.concentration_spell = "Shining Smite";
+				broadcast_announce(c.name + "'s Shining Smite sears " + target.name + " for " + sh_dmg + " radiant damage! Target sheds bright light.", true);
+			}
+			// Gun Slinger Class Ballistic Smite: pending rider on next ranged hit.
+			// 2d6+upcast force damage.
+			if (c.ballistic_smite_pending and !pr.is_spell_effect and pr.is_weapon_attack and c.main_hand_is_ranged) {
+				int bs_dmg = 0;
+				for (int d = 0; d < c.ballistic_smite_dice; d++) bs_dmg += random(1, 6);
+				total_damage += bs_dmg;
+				c.ballistic_smite_pending = false;
+				c.ballistic_smite_dice = 0;
+				broadcast_announce(c.name + "'s Ballistic Smite blasts " + target.name + " for " + bs_dmg + " extra force damage!", true);
 			}
 			// Mother of Sorrows Venomous Mark (Book of Ebon Tides para 1137):
 			// "Until the curse ends, you deal an extra 1d6 poison damage to the target
@@ -17548,7 +17656,11 @@ class battle_manager {
 			}
 			// Level 1
 			else if (spell.id == "ballistic_smite") {
-				broadcast_announce(c.name + " casts Ballistic Smite. Their next attack will deal extra force damage.", true);
+				// Gun Slinger Class (para 724-729): "The target hit by the attack takes
+				// an extra 2d6 damage. Using a Higher-Level Spell Slot: +1d6 per level."
+				c.ballistic_smite_pending = true;
+				c.ballistic_smite_dice = 2 + upcast_levels;
+				broadcast_announce(c.name + " casts Ballistic Smite — next ranged hit deals +" + c.ballistic_smite_dice + "d6 extra force damage.", true);
 			}
 			else if (spell.id == "concussive_burst") {
 				broadcast_announce(c.name + " casts Concussive Burst, releasing a pulse of force!", true);
@@ -17670,7 +17782,13 @@ class battle_manager {
 				return;
 			}
 			else if (spell.id == "shining_smite") {
-				broadcast_announce(c.name + " casts Shining Smite. Their next strike will radiate light and deal radiant damage.", true);
+				// Basic Rules 2024 Shining Smite (para 14976-14983): "The target hit by
+				// the strike takes an extra 2d6 Radiant damage. Until the spell ends,
+				// the target sheds Bright Light, attack rolls against it have Advantage,
+				// and it can't benefit from the Invisible condition."
+				c.shining_smite_pending = true;
+				c.shining_smite_dice = 2 + upcast_levels;
+				broadcast_announce(c.name + " casts Shining Smite — next weapon hit deals +" + c.shining_smite_dice + "d6 radiant damage with light aura.", true);
 			}
 			else if (spell.id == "warding_bond" and @target != null) {
 				// Basic Rules 2024 Warding Bond (para 15561): touch range, 1 hour, non-conc.

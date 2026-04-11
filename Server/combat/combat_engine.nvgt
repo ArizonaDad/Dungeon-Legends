@@ -93,6 +93,20 @@ class combatant {
 	bool counterspell_pending = false;   // Counterspell readied as a reaction (intercept the next enemy spell)
 	bool searing_smite_pending = false;  // Searing Smite rider on next weapon hit
 	int searing_smite_dice = 0;          // Number of d6 to roll for Searing Smite damage
+	// Basic Rules 2024 Searing Smite (para 14881): repeating fire damage at turn start
+	uint searing_smite_target_id = 0;    // Target taking repeating fire damage
+	int searing_smite_dot_dice = 0;      // Dice count for DOT (1+upcast per d6)
+	uint searing_smite_caster_id = 0;    // Caster who applied the DOT (for save DC)
+	// Basic Rules 2024 Shining Smite (para 14976): radiant damage + advantage + invis block
+	bool shining_smite_pending = false;  // Pending rider on next weapon hit
+	int shining_smite_dice = 0;          // Number of d6 for Shining Smite damage (2+upcast)
+	// Shining Smite debuff on TARGET
+	bool shining_smite_debuff = false;   // Target sheds light, adv on attacks vs it, can't be invis
+	uint shining_smite_debuff_source_id = 0;
+	int shining_smite_debuff_rounds = 0; // Duration in rounds (10 = 1 minute)
+	// Gun Slinger Class Ballistic Smite: ranged smite damage
+	bool ballistic_smite_pending = false;
+	int ballistic_smite_dice = 0;        // Number of d6 for Ballistic Smite (2+upcast)
 	bool investiture_flame_active = false; // Investiture of Flame: 1d10 fire to adjacent creatures
 	uint bless_source_id = 0;
 	bool guiding_bolt_advantage = false;
