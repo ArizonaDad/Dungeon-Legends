@@ -210,7 +210,7 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 
 - Cantrip scaling at levels 5/11/17
 
-- Concentration management (drop old when casting new). Full cleanup in `clear_concentration_effects()`: clears Spirit Guardians, Divine Favor, Holy Weapon, Fire Shield, Stoneskin, Fly, Ensnaring Strike, Sanctuary, Venomous Mark, Fog Cloud, Darkness, Hunter's Mark, Hex, Bane, Bless, Haste, Heroism, Pass Without Trace, Adjust Density, Silence, Blur, Conjure Minor Elementals, Conjure Woodland Beings, Polymorph, Heat Metal, Call Lightning, Flaming Sphere, Swift Quiver, Extended Spell, Enhance Ability, Guidance, Resistance, Protection from Energy, Protection from Evil and Good, Expeditious Retreat, Levitate, Compulsion, Antimagic Field, Faerie Fire, Charm/Dominate/Hypnotic Pattern/Enthrall, Hold Person/Monster, Tasha's Hideous Laughter, Fear/Phantasmal Killer/Eyebite, Web/Entangle/Flesh to Stone, Sleep/Confusion/Otto's Irresistible Dance, Sunbeam, Slow (restore speed + AC), Investiture of Flame, Durable Magic AC bonus, and all concentration-spell companions (Animate Objects, Giant Insect, Bigby's Hand, Conjure Animals/Elemental/Fey/Celestial, Summon Dragon).
+- Concentration management (drop old when casting new). Full cleanup in `clear_concentration_effects()`: clears Spirit Guardians, Divine Favor, Holy Weapon, Fire Shield, Stoneskin, Fly, Ensnaring Strike, Sanctuary, Venomous Mark, Fog Cloud, Darkness, Hunter's Mark, Hex, Bane, Bless, Haste, Heroism, Pass Without Trace, Adjust Density, Silence, Blur, Conjure Minor Elementals, Conjure Woodland Beings, Polymorph, Heat Metal, Call Lightning, Flaming Sphere, Swift Quiver, Extended Spell, Enhance Ability, Guidance, Resistance, Protection from Energy, Protection from Evil and Good, Expeditious Retreat, Levitate, Compulsion, Antimagic Field, Faerie Fire, Charm/Dominate/Hypnotic Pattern/Enthrall, Hold Person/Monster, Tasha's Hideous Laughter, Fear/Phantasmal Killer/Eyebite, Web/Entangle/Flesh to Stone, Sleep/Confusion/Otto's Irresistible Dance, Sunbeam, Slow (restore speed + AC), Investiture of Flame, Durable Magic AC bonus, Shield of Faith (AC -2 on target), Beacon of Hope (clear max-healing flag), and all concentration-spell companions (Animate Objects, Giant Insect, Bigby's Hand, Conjure Animals/Elemental/Fey/Celestial, Summon Dragon).
 
 - Spirit Guardians: 15ft aura, 3d8+ radiant damage on enemies starting turn within range OR entering the aura on movement (once per turn via `spirit_guardians_damaged_this_turn` flag). Halved movement while in aura. Movement entry trigger wired into both `handle_move` (player) and monster AI loop.
 
@@ -252,7 +252,13 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 
 - **Protection from Energy** (L3, concentration): Uses `pending_spell_choice` for 5 damage type options (Acid/Cold/Fire/Lightning/Thunder). Sets `protection_from_energy_active` + `protection_from_energy_type`. Half damage for matching type in `apply_damage`.
 
-- **Protection from Evil and Good** (L1, concentration): Sets `protection_from_evil_and_good_active` on target with `pfeg_source_id`. Creatures of type aberration/celestial/elemental/fey/fiend/undead have disadvantage on attacks against target (in `apply_attack_advantage_state`). Heroes' Feast blocks charm/fright from those types. `creature_type` field on combatant tracks type (default "humanoid", set from `monster_def.type` for monsters).
+- **Protection from Evil and Good** (L1, concentration): Sets `protection_from_evil_and_good_active` on target with `pfeg_source_id`. Creatures of type aberration/celestial/elemental/fey/fiend/undead have disadvantage on attacks against target (in `apply_attack_advantage_state`). Charm/Frighten immunity enforced in `add_condition()` (blanket approximation — blocks COND_CHARMED and COND_FRIGHTENED on warded targets regardless of source creature type). `creature_type` field on combatant tracks type (default "humanoid", set from `monster_def.type` for monsters).
+
+- **Shield of Faith** (L1, concentration): Basic Rules 2024 para 15004. Uses dedicated `shield_of_faith_active` + `shield_of_faith_caster_id` fields on combatant (NOT `shield_active`/`shield_ac_bonus` which are shared with Shield reaction and cleared at turn start). Applies `armor_class += 2` on cast. Concentration cleanup removes +2 AC via per-caster tracking. Self-cast and ally-cast variants. Re-casting replaces old bond.
+
+- **Beacon of Hope** (L3, concentration): Basic Rules 2024 para 12201. Sets `beacon_of_hope_active` + `beacon_of_hope_caster_id` on all allies within 30ft. When active, healing spells restore maximum possible HP instead of rolling dice (Cure Wounds d8→8, Healing Word d4→4, Mass Healing Word d4→4, Prayer of Healing d8→8, Mass Cure Wounds d8→8). Multi-target heals check beacon per-target. Concentration cleanup clears per-caster.
+
+- **Heroism Frightened Immunity**: Basic Rules 2024 para 13767. Ongoing `heroism_source_id != 0` blocks COND_FRIGHTENED in `add_condition()`. Previously only removed Frightened on initial cast.
 
 - **See Invisibility** (L2, NOT concentration): Sets `see_invisibility_active`. Bypasses invisible disadvantage in `apply_attack_advantage_state` and `can_see`. No range limit.
 
@@ -404,6 +410,8 @@ When a caster's concentration breaks, `clear_concentration_effects()` must remov
 | `slow_spell_caster_id` | Speed halved + AC −2 + no reactions (restores `slow_original_speed` + AC +2) | Slow |
 | `enlarge_reduce_caster_id` | Size change + STR adv/disadv + weapon damage modifier (restores `enlarge_original_size`, clears `enlarge_active`/`reduce_active`) | Enlarge/Reduce |
 | `bestow_curse_source_id` | Curse effect (varies: extra damage, attack disadv, forced dodge, ability disadv). Clears `bestow_curse_type` + `bestow_curse_source_id` on target | Bestow Curse |
+| `shield_of_faith_caster_id` | `shield_of_faith_active` + `armor_class -= 2` (dedicated AC field, NOT shield_active) | Shield of Faith |
+| `beacon_of_hope_caster_id` | `beacon_of_hope_active` (max-healing flag, no condition) | Beacon of Hope |
 
 **Pattern for new concentration spells:** In the spell handler, set the tracking field on the target (`target.xxx_caster_id = c.id`). In `clear_concentration_effects()`, add a name-matched block that loops combatants and removes the condition where the tracking ID matches. Compulsion uses blanket-clear (no per-target tracking) as a fallback.
 

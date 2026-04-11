@@ -4266,6 +4266,33 @@ class battle_manager {
 				broadcast_announce(bct.name + "'s curse from Bestow Curse fades!", true);
 			}
 		}
+		// Shield of Faith: remove +2 AC from target when concentration breaks
+		// Basic Rules 2024 Shield of Faith (para 15004): concentration, 10 min.
+		if (caster.concentration_spell == "Shield of Faith") {
+			for (uint sfi = 0; sfi < combat.combatants.length(); sfi++) {
+				combatant@ sft = combat.combatants[sfi];
+				if (@sft == null) continue;
+				if (sft.shield_of_faith_active and sft.shield_of_faith_caster_id == caster.id) {
+					sft.armor_class -= 2;
+					if (sft.armor_class < 0) sft.armor_class = 0;
+					sft.shield_of_faith_active = false;
+					sft.shield_of_faith_caster_id = 0;
+					broadcast_announce("Shield of Faith fades from " + sft.name + ".", true);
+				}
+			}
+		}
+		// Beacon of Hope: clear max-healing flag from all affected allies
+		// Basic Rules 2024 Beacon of Hope (para 12201): concentration, 1 min.
+		if (caster.concentration_spell == "Beacon of Hope") {
+			for (uint bhi = 0; bhi < combat.combatants.length(); bhi++) {
+				combatant@ bht = combat.combatants[bhi];
+				if (@bht == null) continue;
+				if (bht.beacon_of_hope_active and bht.beacon_of_hope_caster_id == caster.id) {
+					bht.beacon_of_hope_active = false;
+					bht.beacon_of_hope_caster_id = 0;
+				}
+			}
+		}
 	}
 
 	// ---- Swarming Modifier Helper ----
@@ -14559,7 +14586,13 @@ class battle_manager {
 				// Points equal to 2d8 plus your spellcasting ability modifier."
 				int dice_count = 2 + (upcast_levels * 2);
 				int heal = 0;
-				for (int d = 0; d < dice_count; d++) heal += random(1, 8);
+				// Basic Rules 2024 Beacon of Hope (para 12201): "regains the maximum
+				// number of Hit Points possible from any healing."
+				if (target.beacon_of_hope_active) {
+					heal = dice_count * 8;
+				} else {
+					for (int d = 0; d < dice_count; d++) heal += random(1, 8);
+				}
 				heal += get_spellcasting_ability_mod(c);
 				heal += get_life_domain_healing_bonus(c, spell, cast_slot_level);
 				if (heal < 1) heal = 1;
@@ -15311,7 +15344,12 @@ class battle_manager {
 				// range regains Hit Points equal to 2d4 plus your spellcasting ability modifier."
 				int dice_count = 2 + (upcast_levels * 2);
 				int heal = 0;
-				for (int d = 0; d < dice_count; d++) heal += random(1, 4);
+				// Basic Rules 2024 Beacon of Hope (para 12201): max healing
+				if (target.beacon_of_hope_active) {
+					heal = dice_count * 4;
+				} else {
+					for (int d = 0; d < dice_count; d++) heal += random(1, 4);
+				}
 				heal += get_spellcasting_ability_mod(c);
 				if (heal < 1) heal = 1;
 				int effective = combat.apply_healing(target, heal);
@@ -15328,13 +15366,16 @@ class battle_manager {
 				for (int d = 0; d < dice_count; d++) heal += random(1, 4);
 				heal += get_spellcasting_ability_mod(c);
 				if (heal < 1) heal = 1;
+				// Basic Rules 2024 Beacon of Hope (para 12201): per-target max healing
+				int heal_beacon = dice_count * 4 + get_spellcasting_ability_mod(c);
+				if (heal_beacon < 1) heal_beacon = 1;
 				int healed = 0;
 				for (uint mi = 0; mi < combat.combatants.length() and healed < 6; mi++) {
 					combatant@ ally = combat.combatants[mi];
 					if (@ally == null or ally.is_dead) continue;
 					if (ally.is_player != c.is_player and ally.id != c.id) continue;
 					if (feet_distance(c.x, c.y, ally.x, ally.y) > 60) continue;
-					int effective = combat.apply_healing(ally, heal);
+					int effective = combat.apply_healing(ally, ally.beacon_of_hope_active ? heal_beacon : heal);
 					record_effective_healing(c.player_username, effective);
 					healed++;
 				}
@@ -15822,6 +15863,7 @@ class battle_manager {
 					if (ally.is_player != c.is_player) continue;
 					if (feet_distance(c.x, c.y, ally.x, ally.y) > 30) continue;
 					ally.beacon_of_hope_active = true;
+					ally.beacon_of_hope_caster_id = c.id;
 					affected++;
 				}
 				broadcast_announce(c.name + " casts Beacon of Hope, granting " + affected + " ally" + (affected == 1 ? "" : "ies") + " advantage on Wisdom and Death saves and maximum healing.", true);
@@ -16404,14 +16446,31 @@ class battle_manager {
 				broadcast_announce(c.name + " casts Purify Food and Drink.", true);
 			}
 			else if (spell.id == "shield_of_faith" and @target != null) {
-				// +2 AC for 10 minutes (concentration)
-				target.shield_active = true;
-				target.shield_ac_bonus += 2;
+				// Basic Rules 2024 Shield of Faith (para 15004): "A shimmering field
+				// appears and surrounds a creature of your choice within range,
+				// granting it a +2 bonus to AC for the duration."
+				// Uses dedicated fields — shield_active/shield_ac_bonus are shared
+				// with Shield reaction and cleared at turn start.
+				if (target.shield_of_faith_active) {
+					target.armor_class -= 2;
+					target.shield_of_faith_active = false;
+					target.shield_of_faith_caster_id = 0;
+				}
+				target.armor_class += 2;
+				target.shield_of_faith_active = true;
+				target.shield_of_faith_caster_id = c.id;
 				broadcast_announce(c.name + " casts Shield of Faith on " + target.name + ". Their AC increases by 2.", true);
 			}
 			else if (spell.id == "shield_of_faith") {
-				c.shield_active = true;
-				c.shield_ac_bonus += 2;
+				// Self-cast variant
+				if (c.shield_of_faith_active) {
+					c.armor_class -= 2;
+					c.shield_of_faith_active = false;
+					c.shield_of_faith_caster_id = 0;
+				}
+				c.armor_class += 2;
+				c.shield_of_faith_active = true;
+				c.shield_of_faith_caster_id = c.id;
 				broadcast_announce(c.name + " casts Shield of Faith, gaining +2 AC.", true);
 			}
 			else if (spell.id == "silent_image") {
@@ -18228,13 +18287,16 @@ class battle_manager {
 				heal += get_spellcasting_ability_mod(c);
 				heal += get_life_domain_healing_bonus(c, spell, cast_slot_level);
 				if (heal < 1) heal = 1;
+				// Basic Rules 2024 Beacon of Hope (para 12201): per-target max healing
+				int heal_beacon = dice_count * 8 + get_spellcasting_ability_mod(c) + get_life_domain_healing_bonus(c, spell, cast_slot_level);
+				if (heal_beacon < 1) heal_beacon = 1;
 				int healed = 0;
 				for (uint mi = 0; mi < combat.combatants.length() and healed < 6; mi++) {
 					combatant@ ally = combat.combatants[mi];
 					if (@ally == null or ally.is_dead) continue;
 					if (ally.is_player != c.is_player and ally.id != c.id) continue;
 					if (feet_distance(c.x, c.y, ally.x, ally.y) > 30) continue;
-					int effective = combat.apply_healing(ally, heal);
+					int effective = combat.apply_healing(ally, ally.beacon_of_hope_active ? heal_beacon : heal);
 					record_effective_healing(c.player_username, effective);
 					healed++;
 				}
@@ -18440,13 +18502,16 @@ class battle_manager {
 				heal += get_spellcasting_ability_mod(c);
 				heal += get_life_domain_healing_bonus(c, spell, cast_slot_level);
 				if (heal < 1) heal = 1;
+				// Basic Rules 2024 Beacon of Hope (para 12201): per-target max healing
+				int heal_beacon = dice_count * 8 + get_spellcasting_ability_mod(c) + get_life_domain_healing_bonus(c, spell, cast_slot_level);
+				if (heal_beacon < 1) heal_beacon = 1;
 				int healed = 0;
 				for (uint mi = 0; mi < combat.combatants.length() and healed < 6; mi++) {
 					combatant@ ally = combat.combatants[mi];
 					if (@ally == null or ally.is_dead) continue;
 					if (ally.is_player != c.is_player and ally.id != c.id) continue;
 					if (feet_distance(c.x, c.y, ally.x, ally.y) > 60) continue;
-					int effective = combat.apply_healing(ally, heal);
+					int effective = combat.apply_healing(ally, ally.beacon_of_hope_active ? heal_beacon : heal);
 					record_effective_healing(c.player_username, effective);
 					healed++;
 				}

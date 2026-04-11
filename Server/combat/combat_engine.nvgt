@@ -128,6 +128,7 @@ class combatant {
 	int blindsight_range = 0;   // PHB Blind Fighting feat (10 ft) and various species/subclass effects
 	bool unarmed_fighting_active = false; // PHB Unarmed Fighting feat: 1d6+STR unarmed damage
 	bool beacon_of_hope_active = false; // Beacon of Hope spell: max healing + adv on WIS/death saves
+	uint beacon_of_hope_caster_id = 0; // Per-caster tracking for concentration cleanup
 	bool death_ward_active = false; // Death Ward spell: first 0 HP becomes 1 HP and ends spell
 	bool holy_weapon_active = false; // Xanathar's Holy Weapon: +2d8 radiant on weapon hits
 	// Basic Rules 2024 Guidance (para 13659): "Once before the spell ends, the target
@@ -646,6 +647,11 @@ class combatant {
 	bool vicious_mockery_disadv = false;
 	// Basic Rules 2024 Bane (para 12032): per-caster tracking for concentration cleanup
 	uint bane_source_id = 0;
+	// Basic Rules 2024 Shield of Faith (para 15004): "+2 bonus to AC for the duration."
+	// Dedicated fields — shield_active/shield_ac_bonus are shared with Shield reaction
+	// and cleared at turn start in advance_turn, so Shield of Faith MUST NOT use them.
+	bool shield_of_faith_active = false;
+	uint shield_of_faith_caster_id = 0;
 	bool wizardly_quill_active = false; // Order of Scribes Wizard
 	int awakened_spellbook_changes = 0; // Order of Scribes - replace damage type
 	// Gunslinger subclasses (Valda's Spire of Secrets paras 229-490)
@@ -1411,6 +1417,14 @@ class combatant {
 		// Heroes' Feast (Basic Rules 2024 para 13760): "Immunity to the Frightened
 		// and Poisoned conditions" for 24 hours.
 		if (heroes_feast_active and (cond_id == COND_FRIGHTENED or cond_id == COND_POISONED)) return;
+		// Basic Rules 2024 Heroism (para 13767): "the target can't have the
+		// Frightened condition" for the spell's duration.
+		if (cond_id == COND_FRIGHTENED and heroism_source_id != 0) return;
+		// Basic Rules 2024 Protection from Evil and Good (para 14664):
+		// "aberrations, celestials, elementals, fey, fiends, and undead...
+		// can't Charm or Frighten" the warded creature. Blanket approximation
+		// (creature type check impractical at add_condition call site).
+		if (protection_from_evil_and_good_active and (cond_id == COND_CHARMED or cond_id == COND_FRIGHTENED)) return;
 		// Monster condition immunities (SRD stat block immunities)
 		if (immune_poisoned and cond_id == COND_POISONED) return;
 		if (immune_frightened and cond_id == COND_FRIGHTENED) return;
