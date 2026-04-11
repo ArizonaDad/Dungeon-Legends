@@ -4917,6 +4917,65 @@ class battle_manager {
 				}
 			}
 
+			// Flaming Sphere (Basic Rules para 13310-13312): DEX save, 2d6+upcast fire, half on save.
+			// "Any creature that ends its turn within 5 feet of the sphere makes a DEX saving throw"
+			else if (ca_caster.concentration_spell == "Flaming Sphere" and ca_caster.conc_aoe_slot_level > 0) {
+				if (feet_distance(ca_caster.conc_aoe_x, ca_caster.conc_aoe_y, c.x, c.y) <= 5) {
+					int fs_dice = 2 + (ca_caster.conc_aoe_slot_level - 2);
+					if (fs_dice < 2) fs_dice = 2;
+					int fs_dc = spell_save_dc(ca_caster, "flaming_sphere");
+					int fs_roll = random(1, 20);
+					int fs_bonus = c.get_save_bonus(ABILITY_DEX);
+					bool fs_saved = (fs_roll + fs_bonus) >= fs_dc;
+					broadcast_roll(c.name, "DEX save vs Flaming Sphere", fs_roll, fs_bonus, fs_roll + fs_bonus, fs_saved ? "Half damage!" : "Full damage!");
+					int fs_dmg = 0;
+					for (int d = 0; d < fs_dice; d++) fs_dmg += random(1, 6);
+					if (fs_saved) fs_dmg /= 2;
+					if (fs_dmg < 1) fs_dmg = 1;
+					combat.apply_damage(c, fs_dmg, DMG_FIRE, ca_caster);
+					broadcast_announce(c.name + " takes " + fs_dmg + " fire damage from " + ca_caster.name + "'s Flaming Sphere!", true);
+					if (c.is_dead) break;
+				}
+			}
+
+			// Blade Barrier (Basic Rules para 12214): DEX save, 6d10 slashing, half on save.
+			// "A creature also makes that save if it ends its turn there."
+			else if (ca_caster.concentration_spell == "Blade Barrier" and ca_caster.conc_aoe_slot_level > 0) {
+				if (feet_distance(ca_caster.conc_aoe_x, ca_caster.conc_aoe_y, c.x, c.y) <= 10) {
+					int bb_dc = spell_save_dc(ca_caster, "blade_barrier");
+					int bb_roll = random(1, 20);
+					int bb_bonus = c.get_save_bonus(ABILITY_DEX);
+					bool bb_saved = (bb_roll + bb_bonus) >= bb_dc;
+					broadcast_roll(c.name, "DEX save vs Blade Barrier", bb_roll, bb_bonus, bb_roll + bb_bonus, bb_saved ? "Half damage!" : "Full damage!");
+					int bb_dmg = 0;
+					for (int d = 0; d < 6; d++) bb_dmg += random(1, 10);
+					if (bb_saved) bb_dmg /= 2;
+					if (bb_dmg < 1) bb_dmg = 1;
+					combat.apply_damage(c, bb_dmg, DMG_SLASHING, ca_caster);
+					broadcast_announce(c.name + " takes " + bb_dmg + " slashing damage from " + ca_caster.name + "'s Blade Barrier!", true);
+					if (c.is_dead) break;
+				}
+			}
+
+			// Incendiary Cloud (Basic Rules): DEX save, 10d8 fire, half on save.
+			// "A creature must also make this save when it ends its turn there."
+			else if (ca_caster.concentration_spell == "Incendiary Cloud" and ca_caster.conc_aoe_slot_level > 0) {
+				if (feet_distance(ca_caster.conc_aoe_x, ca_caster.conc_aoe_y, c.x, c.y) <= 20) {
+					int ic_dc = spell_save_dc(ca_caster, "incendiary_cloud");
+					int ic_roll = random(1, 20);
+					int ic_bonus = c.get_save_bonus(ABILITY_DEX);
+					bool ic_saved = (ic_roll + ic_bonus) >= ic_dc;
+					broadcast_roll(c.name, "DEX save vs Incendiary Cloud", ic_roll, ic_bonus, ic_roll + ic_bonus, ic_saved ? "Half damage!" : "Full damage!");
+					int ic_dmg = 0;
+					for (int d = 0; d < 10; d++) ic_dmg += random(1, 8);
+					if (ic_saved) ic_dmg /= 2;
+					if (ic_dmg < 1) ic_dmg = 1;
+					combat.apply_damage(c, ic_dmg, DMG_FIRE, ca_caster);
+					broadcast_announce(c.name + " takes " + ic_dmg + " fire damage from " + ca_caster.name + "'s Incendiary Cloud!", true);
+					if (c.is_dead) break;
+				}
+			}
+
 			// Moonbeam (Basic Rules): 5ft cylinder, CON save, 2d10+upcast radiant, half on save
 			if (ca_caster.moonbeam_active and ca_caster.moonbeam_slot_level > 0) {
 				if (feet_distance(ca_caster.moonbeam_x, ca_caster.moonbeam_y, c.x, c.y) <= 5) {
@@ -16214,6 +16273,9 @@ class battle_manager {
 				if (dmg < 1) dmg = 1;
 				broadcast_roll(target.name, "DEX save vs Flaming Sphere", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
 				combat.apply_damage(target, dmg, DMG_FIRE, c);
+				c.conc_aoe_x = target.x;
+				c.conc_aoe_y = target.y;
+				c.conc_aoe_slot_level = cast_slot_level;
 				broadcast_state();
 				check_battle_end();
 				return;
@@ -16626,6 +16688,9 @@ class battle_manager {
 					broadcast_roll(t.name, "DEX save vs Blade Barrier", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
 					combat.apply_damage(t, dmg, DMG_SLASHING, c);
 				}
+				c.conc_aoe_x = center_x;
+				c.conc_aoe_y = center_y;
+				c.conc_aoe_slot_level = cast_slot_level;
 				broadcast_state();
 				check_battle_end();
 				return;
@@ -16779,6 +16844,9 @@ class battle_manager {
 					broadcast_roll(t.name, "DEX save vs Incendiary Cloud", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
 					combat.apply_damage(t, dmg, DMG_FIRE, c);
 				}
+				c.conc_aoe_x = center_x;
+				c.conc_aoe_y = center_y;
+				c.conc_aoe_slot_level = cast_slot_level;
 				broadcast_state();
 				check_battle_end();
 				return;
