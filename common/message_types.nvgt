@@ -77,6 +77,9 @@ namespace message_types
 	const string action_stabilize = "action_stabilize";         // Client attempts to stabilize a dying ally.
 	const string action_call_lightning = "action_call_lightning"; // Client uses action to call another lightning bolt.
 	const string action_flame_blade = "action_flame_blade";     // Client uses action to attack with Flame Blade.
+	const string action_investiture_ice = "action_investiture_ice";       // Client uses action for Investiture of Ice cone.
+	const string action_investiture_stone = "action_investiture_stone";   // Client uses action for Investiture of Stone earthquake.
+	const string action_investiture_wind = "action_investiture_wind";     // Client uses action for Investiture of Wind blast.
 	const string bonus_action = "bonus_action";               // Client uses bonus action.
 	const string reaction_opportunity = "reaction_opp";       // Server triggers opportunity attack.
 	const string reaction_spell = "reaction_spell";           // Client uses a reaction spell.

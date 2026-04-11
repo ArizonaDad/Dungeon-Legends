@@ -6136,6 +6136,21 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.room.bm.handle_flame_blade_attack(u, msg);
 		}
 	}
+	else if (msg_type == message_types::action_investiture_ice) {
+		if (@u.room != null and @u.room.bm != null) {
+			u.room.bm.handle_investiture_ice_cone(u, msg);
+		}
+	}
+	else if (msg_type == message_types::action_investiture_stone) {
+		if (@u.room != null and @u.room.bm != null) {
+			u.room.bm.handle_investiture_stone_quake(u);
+		}
+	}
+	else if (msg_type == message_types::action_investiture_wind) {
+		if (@u.room != null and @u.room.bm != null) {
+			u.room.bm.handle_investiture_wind_blast(u, msg);
+		}
+	}
 	else if (msg_type == "action_unjam_weapon") {
 		if (@u.room != null and @u.room.bm != null) {
 			u.room.bm.handle_unjam_weapon(u);

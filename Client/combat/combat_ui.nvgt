@@ -346,6 +346,9 @@ bool my_spiritual_weapon_active = false;
 bool my_heat_metal_active = false;
 bool my_call_lightning_active = false;
 bool my_flame_blade_active = false;
+bool my_investiture_ice_active = false;
+bool my_investiture_stone_active = false;
+bool my_investiture_wind_active = false;
 bool my_weapon_jammed = false;
 bool my_flaming_sphere_active = false;
 bool my_conjure_woodland_disengage = false;
@@ -898,6 +901,18 @@ void show_action_menu() {
 	if (my_flame_blade_active) {
 		flame_blade_opt = m.add_item("Flame Blade Attack. Melee spell attack with your fiery blade (5 ft range).");
 	}
+	int investiture_ice_opt = -1;
+	if (my_investiture_ice_active) {
+		investiture_ice_opt = m.add_item("Ice Cone. 15-foot cone of freezing wind dealing 4d6 cold damage (CON save for half).");
+	}
+	int investiture_stone_opt = -1;
+	if (my_investiture_stone_active) {
+		investiture_stone_opt = m.add_item("Earthquake. 15-foot radius earthquake. Creatures must succeed DEX save or be knocked prone.");
+	}
+	int investiture_wind_opt = -1;
+	if (my_investiture_wind_active) {
+		investiture_wind_opt = m.add_item("Wind Blast. 15-foot cube of wind dealing 2d10 bludgeoning (CON save for half). Pushes on fail.");
+	}
 	int unjam_opt = -1;
 	if (my_weapon_jammed) {
 		unjam_opt = m.add_item("Unjam Weapon. Spend your action to fix your malfunctioning weapon.");
@@ -1000,6 +1015,23 @@ void show_action_menu() {
 		}
 		speak("You strike with your fiery blade!", true);
 		send({{"type", message_types::action_flame_blade}, {"target_id", current_target_id}});
+	} else if (investiture_ice_opt >= 0 and res == investiture_ice_opt) {
+		if (current_target_id == 0) {
+			speak("No target selected. Scan with I J K L and press Enter to lock a target.", true);
+			return;
+		}
+		speak("You unleash a cone of freezing wind!", true);
+		send({{"type", message_types::action_investiture_ice}, {"target_id", current_target_id}});
+	} else if (investiture_stone_opt >= 0 and res == investiture_stone_opt) {
+		speak("You slam the ground, causing an earthquake!", true);
+		send({{"type", message_types::action_investiture_stone}});
+	} else if (investiture_wind_opt >= 0 and res == investiture_wind_opt) {
+		if (current_target_id == 0) {
+			speak("No target selected. Scan with I J K L and press Enter to lock a target.", true);
+			return;
+		}
+		speak("You conjure a blast of swirling wind!", true);
+		send({{"type", message_types::action_investiture_wind}, {"target_id", current_target_id}});
 	} else if (unjam_opt >= 0 and res == unjam_opt) {
 		speak("You spend your action fixing your jammed weapon.", true);
 		send({{"type", "action_unjam_weapon"}});
@@ -4255,6 +4287,9 @@ void parse_game_state(json_object@ msg) {
 	my_heat_metal_active = msg.exists("my_heat_metal_active") ? bool(msg["my_heat_metal_active"]) : false;
 	my_call_lightning_active = msg.exists("my_call_lightning_active") ? bool(msg["my_call_lightning_active"]) : false;
 	my_flame_blade_active = msg.exists("my_flame_blade_active") ? bool(msg["my_flame_blade_active"]) : false;
+	my_investiture_ice_active = msg.exists("my_investiture_ice_active") ? bool(msg["my_investiture_ice_active"]) : false;
+	my_investiture_stone_active = msg.exists("my_investiture_stone_active") ? bool(msg["my_investiture_stone_active"]) : false;
+	my_investiture_wind_active = msg.exists("my_investiture_wind_active") ? bool(msg["my_investiture_wind_active"]) : false;
 	my_weapon_jammed = msg.exists("my_weapon_jammed") ? bool(msg["my_weapon_jammed"]) : false;
 	my_flaming_sphere_active = msg.exists("my_flaming_sphere_active") ? bool(msg["my_flaming_sphere_active"]) : false;
 	my_conjure_woodland_disengage = msg.exists("my_conjure_woodland_disengage") ? bool(msg["my_conjure_woodland_disengage"]) : false;
@@ -4537,6 +4572,9 @@ void reset_combat_state() {
 	my_heat_metal_active = false;
 	my_call_lightning_active = false;
 	my_flame_blade_active = false;
+	my_investiture_ice_active = false;
+	my_investiture_stone_active = false;
+	my_investiture_wind_active = false;
 	my_weapon_jammed = false;
 	my_flaming_sphere_active = false;
 	my_conjure_woodland_disengage = false;

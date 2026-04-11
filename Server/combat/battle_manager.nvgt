@@ -10595,9 +10595,12 @@ class battle_manager {
 				c.arcane_shot_pending = false;
 				int as_dc = 8 + c.proficiency + c.get_ability_mod(ABILITY_INT);
 				string shot = c.arcane_shot_type;
+				// Xanathar's Arcane Archer L18 (para 1647): "extra damage increases to 4d6"
+				int shot_dice = c.level >= 18 ? 4 : 2;
 				if (shot == "bursting") {
-					// Bursting Arrow (Evocation): 2d6 force to all creatures within 10ft of target
-					int burst_dmg = random(1, 6) + random(1, 6);
+					// Bursting Arrow (Evocation, para 1630): 2d6 force to all within 10ft
+					int burst_dmg = 0;
+					for (int bd = 0; bd < shot_dice; bd++) burst_dmg += random(1, 6);
 					broadcast_announce(c.name + "'s Bursting Arrow explodes for " + burst_dmg + " force damage!", true);
 					if (@combat != null) {
 						for (uint bi = 0; bi < combat.combatants.length(); bi++) {
@@ -10610,60 +10613,115 @@ class battle_manager {
 						}
 					}
 				} else if (shot == "beguiling") {
-					// Beguiling Arrow (Enchantment): 2d6 psychic + WIS save or charmed
-					int beg_dmg = random(1, 6) + random(1, 6);
+					// Beguiling Arrow (Enchantment, para 1628): 2d6 psychic + WIS save or charmed
+					int beg_dmg = 0;
+					for (int bd = 0; bd < shot_dice; bd++) beg_dmg += random(1, 6);
 					combat.apply_damage(target, beg_dmg, DMG_PSYCHIC, c);
-					int beg_save = random(1, 20) + target.get_save_bonus(ABILITY_WIS);
-					if (beg_save < as_dc) {
-						target.add_condition(COND_CHARMED);
-						broadcast_announce(c.name + "'s Beguiling Arrow deals " + beg_dmg + " psychic and charms " + target.name + "! (save " + beg_save + " vs DC " + as_dc + ")", true);
-					} else {
-						broadcast_announce(c.name + "'s Beguiling Arrow deals " + beg_dmg + " psychic but " + target.name + " resists the charm (save " + beg_save + " vs DC " + as_dc + ").", false);
+					if (!target.is_dead) {
+						int beg_nat = random(1, 20);
+						apply_hound_save_disadvantage(target, c.id, beg_nat);
+						int beg_bonus = target.get_save_bonus(ABILITY_WIS);
+						int beg_bless = roll_bless_bonus(target);
+						int beg_total = beg_nat + beg_bonus + beg_bless;
+						bool beg_saved = beg_total >= as_dc;
+						broadcast_roll(target.name, "WIS save vs Beguiling Arrow", beg_nat, beg_bonus + beg_bless, beg_total, beg_saved ? "Resists!" : "Charmed!");
+						if (!beg_saved and try_arcane_deflection_save(target, as_dc, beg_total)) beg_saved = true;
+						if (!beg_saved and try_countercharm_reroll(target, as_dc, beg_bonus + beg_bless, "WIS save vs Beguiling Arrow")) beg_saved = true;
+						if (!beg_saved) { int fg = try_flash_of_genius(target, as_dc, beg_total, "WIS save vs Beguiling Arrow"); if (fg >= as_dc) beg_saved = true; }
+						if (!beg_saved) { int mv = try_maverick_spirit(target, as_dc, beg_total, "WIS save vs Beguiling Arrow"); if (mv >= as_dc) beg_saved = true; }
+						if (!beg_saved and (ABILITY_WIS == ABILITY_INT or ABILITY_WIS == ABILITY_WIS or ABILITY_WIS == ABILITY_CHA) and try_mage_slayer_guarded_mind(target, ABILITY_WIS)) beg_saved = true;
+						if (!beg_saved) { int bf = try_boon_of_fate_bonus(target, beg_total, as_dc); if (bf >= as_dc) beg_saved = true; }
+						if (!beg_saved and try_stroke_of_luck_save(target, as_dc, beg_bonus + beg_bless)) beg_saved = true;
+						if (!beg_saved) {
+							target.add_condition(COND_CHARMED);
+							target.charm_spell_caster_id = c.id;
+							broadcast_announce(target.name + " is charmed by Beguiling Arrow!", true);
+						}
 					}
 				} else if (shot == "shadow") {
-					// Shadow Arrow (Illusion): 2d6 psychic + WIS save or blinded
-					int sha_dmg = random(1, 6) + random(1, 6);
+					// Shadow Arrow (Illusion, para 1642): 2d6 psychic + WIS save or blinded
+					int sha_dmg = 0;
+					for (int sd = 0; sd < shot_dice; sd++) sha_dmg += random(1, 6);
 					combat.apply_damage(target, sha_dmg, DMG_PSYCHIC, c);
-					int sha_save = random(1, 20) + target.get_save_bonus(ABILITY_WIS);
-					if (sha_save < as_dc) {
-						target.add_condition(COND_BLINDED);
-						broadcast_announce(c.name + "'s Shadow Arrow deals " + sha_dmg + " psychic and blinds " + target.name + "! (save " + sha_save + " vs DC " + as_dc + ")", true);
-					} else {
-						broadcast_announce(c.name + "'s Shadow Arrow deals " + sha_dmg + " psychic but " + target.name + " resists (save " + sha_save + " vs DC " + as_dc + ").", false);
+					if (!target.is_dead) {
+						int sha_nat = random(1, 20);
+						apply_hound_save_disadvantage(target, c.id, sha_nat);
+						int sha_bonus = target.get_save_bonus(ABILITY_WIS);
+						int sha_bless = roll_bless_bonus(target);
+						int sha_total = sha_nat + sha_bonus + sha_bless;
+						bool sha_saved = sha_total >= as_dc;
+						broadcast_roll(target.name, "WIS save vs Shadow Arrow", sha_nat, sha_bonus + sha_bless, sha_total, sha_saved ? "Resists!" : "Blinded!");
+						if (!sha_saved and try_arcane_deflection_save(target, as_dc, sha_total)) sha_saved = true;
+						if (!sha_saved) { int fg = try_flash_of_genius(target, as_dc, sha_total, "WIS save vs Shadow Arrow"); if (fg >= as_dc) sha_saved = true; }
+						if (!sha_saved) { int mv = try_maverick_spirit(target, as_dc, sha_total, "WIS save vs Shadow Arrow"); if (mv >= as_dc) sha_saved = true; }
+						if (!sha_saved and try_mage_slayer_guarded_mind(target, ABILITY_WIS)) sha_saved = true;
+						if (!sha_saved) { int bf = try_boon_of_fate_bonus(target, sha_total, as_dc); if (bf >= as_dc) sha_saved = true; }
+						if (!sha_saved and try_stroke_of_luck_save(target, as_dc, sha_bonus + sha_bless)) sha_saved = true;
+						if (!sha_saved) {
+							target.add_condition(COND_BLINDED);
+							broadcast_announce(target.name + " is blinded by Shadow Arrow!", true);
+						}
 					}
 				} else if (shot == "banishing") {
-					// Banishing Arrow (Abjuration): CHA save or incapacitated + speed 0
-					int ban_save = random(1, 20) + target.get_save_bonus(ABILITY_CHA);
-					if (ban_save < as_dc) {
-						target.add_condition(COND_INCAPACITATED);
-						target.movement_remaining = 0;
-						target.arcane_banish_source = c.id;
-						broadcast_announce(c.name + "'s Banishing Arrow banishes " + target.name + "! Incapacitated and speed 0 until end of their next turn. (save " + ban_save + " vs DC " + as_dc + ")", true);
-					} else {
-						broadcast_announce(c.name + "'s Banishing Arrow fails — " + target.name + " resists (save " + ban_save + " vs DC " + as_dc + ").", false);
+					// Banishing Arrow (Abjuration, para 1625): 2d6 force + CHA save or banished
+					int ban_dmg = 0;
+					for (int bd = 0; bd < shot_dice; bd++) ban_dmg += random(1, 6);
+					combat.apply_damage(target, ban_dmg, DMG_FORCE, c);
+					if (!target.is_dead) {
+						int ban_nat = random(1, 20);
+						apply_hound_save_disadvantage(target, c.id, ban_nat);
+						int ban_bonus = target.get_save_bonus(ABILITY_CHA);
+						int ban_bless = roll_bless_bonus(target);
+						int ban_total = ban_nat + ban_bonus + ban_bless;
+						bool ban_saved = ban_total >= as_dc;
+						broadcast_roll(target.name, "CHA save vs Banishing Arrow", ban_nat, ban_bonus + ban_bless, ban_total, ban_saved ? "Resists!" : "Banished!");
+						if (!ban_saved and try_arcane_deflection_save(target, as_dc, ban_total)) ban_saved = true;
+						if (!ban_saved) { int fg = try_flash_of_genius(target, as_dc, ban_total, "CHA save vs Banishing Arrow"); if (fg >= as_dc) ban_saved = true; }
+						if (!ban_saved) { int mv = try_maverick_spirit(target, as_dc, ban_total, "CHA save vs Banishing Arrow"); if (mv >= as_dc) ban_saved = true; }
+						if (!ban_saved) { int bf = try_boon_of_fate_bonus(target, ban_total, as_dc); if (bf >= as_dc) ban_saved = true; }
+						if (!ban_saved and try_stroke_of_luck_save(target, as_dc, ban_bonus + ban_bless)) ban_saved = true;
+						if (!ban_saved) {
+							target.add_condition(COND_INCAPACITATED);
+							target.movement_remaining = 0;
+							target.arcane_banish_source = c.id;
+							broadcast_announce(target.name + " is banished! Incapacitated, speed 0 until start of " + c.name + "'s next turn.", true);
+						}
 					}
 				} else if (shot == "enfeebling") {
-					// Enfeebling Arrow (Necromancy): 2d6 necrotic + CON save or weapon damage halved
-					int enf_dmg = random(1, 6) + random(1, 6);
+					// Enfeebling Arrow (Necromancy, para 1632): 2d6 necrotic + CON save or halved
+					int enf_dmg = 0;
+					for (int ed = 0; ed < shot_dice; ed++) enf_dmg += random(1, 6);
 					combat.apply_damage(target, enf_dmg, DMG_NECROTIC, c);
-					int enf_save = random(1, 20) + target.get_save_bonus(ABILITY_CON);
-					if (enf_save < as_dc) {
-						target.arcane_enfeeble_source = c.id;
-						broadcast_announce(c.name + "'s Enfeebling Arrow deals " + enf_dmg + " necrotic and enfeebles " + target.name + "! Weapon damage halved. (save " + enf_save + " vs DC " + as_dc + ")", true);
-					} else {
-						broadcast_announce(c.name + "'s Enfeebling Arrow deals " + enf_dmg + " necrotic but " + target.name + " resists the enfeebling (save " + enf_save + " vs DC " + as_dc + ").", false);
+					if (!target.is_dead) {
+						int enf_nat = random(1, 20);
+						apply_hound_save_disadvantage(target, c.id, enf_nat);
+						int enf_bonus = target.get_save_bonus(ABILITY_CON);
+						int enf_bless = roll_bless_bonus(target);
+						int enf_total = enf_nat + enf_bonus + enf_bless;
+						bool enf_saved = enf_total >= as_dc;
+						broadcast_roll(target.name, "CON save vs Enfeebling Arrow", enf_nat, enf_bonus + enf_bless, enf_total, enf_saved ? "Resists!" : "Enfeebled!");
+						if (!enf_saved and try_arcane_deflection_save(target, as_dc, enf_total)) enf_saved = true;
+						if (!enf_saved) { int fg = try_flash_of_genius(target, as_dc, enf_total, "CON save vs Enfeebling Arrow"); if (fg >= as_dc) enf_saved = true; }
+						if (!enf_saved) { int bf = try_boon_of_fate_bonus(target, enf_total, as_dc); if (bf >= as_dc) enf_saved = true; }
+						if (!enf_saved and try_stroke_of_luck_save(target, as_dc, enf_bonus + enf_bless)) enf_saved = true;
+						if (!enf_saved) {
+							target.arcane_enfeeble_source = c.id;
+							broadcast_announce(target.name + " is enfeebled! Weapon damage halved until start of " + c.name + "'s next turn.", true);
+						}
 					}
 				} else if (shot == "grasping") {
-					// Grasping Arrow (Conjuration): 2d6 poison + -10ft speed, 1 minute
-					int gra_dmg = random(1, 6) + random(1, 6);
+					// Grasping Arrow (Conjuration, para 1634): 2d6 poison + -10ft speed + move dmg
+					int gra_dmg = 0;
+					for (int gd = 0; gd < shot_dice; gd++) gra_dmg += random(1, 6);
 					combat.apply_damage(target, gra_dmg, DMG_POISON, c);
-					target.arcane_grasping_active = true;
-					target.arcane_grasping_source = c.id;
-					target.arcane_grasping_rounds = 10;
-					if (target.speed >= 10) target.speed -= 10;
-					broadcast_announce(c.name + "'s Grasping Arrow deals " + gra_dmg + " poison and ensnares " + target.name + " in thorny brambles! Speed reduced by 10ft for 1 minute.", true);
+					if (!target.is_dead) {
+						target.arcane_grasping_active = true;
+						target.arcane_grasping_source = c.id;
+						target.arcane_grasping_rounds = 10;
+						if (target.speed >= 10) target.speed -= 10;
+						broadcast_announce(c.name + "'s Grasping Arrow deals " + gra_dmg + " poison and ensnares " + target.name + " in thorny brambles! Speed -10ft for 1 minute.", true);
+					}
 				} else {
-					// Default/unknown shot type: just announce
 					broadcast_announce(c.name + "'s Arcane Shot (" + shot + ") strikes " + target.name + "!", false);
 				}
 			}
@@ -13161,6 +13219,190 @@ class battle_manager {
 		} else {
 			process_roll_result(random(1, 20));
 		}
+	}
+
+	// Xanathar's Investiture of Ice action ability: "As an action, you can create a
+	// 15-foot cone of freezing wind extending from your outstretched hand. Each
+	// creature in the cone must make a Constitution saving throw. A creature takes
+	// 4d6 cold damage on a failed save, or half as much on a successful one."
+	void handle_investiture_ice_cone(user@ u, json_object@ msg) {
+		if (@combat == null or @u == null or @msg == null) return;
+		combatant@ c = combat.current_combatant();
+		if (@c == null or !c.is_player or c.player_username != u.username) return;
+		if (!c.investiture_ice_active) {
+			u.send({{"type", message_types::error}, {"text", "You don't have an active Investiture of Ice."}});
+			return;
+		}
+		if (!c.has_action) {
+			u.send({{"type", message_types::error}, {"text", "You've already used your action this turn."}});
+			return;
+		}
+		if (c.is_incapacitated_check()) {
+			u.send({{"type", message_types::announce}, {"text", "You are incapacitated and cannot take actions."}, {"interrupt", true}});
+			return;
+		}
+		uint target_id = 0;
+		if (msg.exists("target_id")) target_id = uint(msg["target_id"]);
+		combatant@ target = combat.get_combatant(target_id);
+		if (@target == null or target.is_dead) {
+			u.send({{"type", message_types::error}, {"text", "Invalid target."}});
+			return;
+		}
+		c.has_action = false;
+		c.used_action = true;
+		// 15ft cone from caster toward target — hit all hostiles within 15ft in that direction
+		int ice_dc = spell_save_dc(c, "investiture_of_ice");
+		int total_damage = 0;
+		for (int d = 0; d < 4; d++) total_damage += random(1, 6);
+		broadcast_announce(c.name + " unleashes a 15-foot cone of freezing wind!", true);
+		for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+			combatant@ t = combat.combatants[ti];
+			if (@t == null or t.is_dead or t.id == c.id) continue;
+			if (!combat.are_hostile(c, t)) continue;
+			if (feet_distance(c.x, c.y, t.x, t.y) > 15) continue;
+			int save_roll = random(1, 20);
+			apply_hound_save_disadvantage(t, c.id, save_roll);
+			int save_bonus = t.get_save_bonus(ABILITY_CON);
+			int bless_bonus = roll_bless_bonus(t);
+			int save_total = save_roll + save_bonus + bless_bonus;
+			bool saved = save_total >= ice_dc;
+			broadcast_roll(t.name, "CON save vs Investiture of Ice", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage!");
+			if (!saved and try_arcane_deflection_save(t, ice_dc, save_total)) saved = true;
+			if (!saved) { int fg = try_flash_of_genius(t, ice_dc, save_total, "CON save vs Investiture of Ice"); if (fg >= ice_dc) { saved = true; save_total = fg; } }
+			if (!saved) { int mv = try_maverick_spirit(t, ice_dc, save_total, "CON save vs Investiture of Ice"); if (mv >= ice_dc) { saved = true; save_total = mv; } }
+			if (!saved) { int bf = try_boon_of_fate_bonus(t, save_total, ice_dc); if (bf >= ice_dc) { saved = true; save_total = bf; } }
+			if (!saved and try_stroke_of_luck_save(t, ice_dc, save_bonus + bless_bonus)) saved = true;
+			int dmg = saved ? total_damage / 2 : total_damage;
+			if (dmg < 1) dmg = 1;
+			combat.apply_damage(t, dmg, DMG_COLD, c);
+			check_concentration(t, dmg, c);
+		}
+		broadcast_state();
+		check_battle_end();
+	}
+
+	// Xanathar's Investiture of Stone action ability: "As an action, you can create
+	// a small earthquake on the ground in a 15-foot radius centered on you. Other
+	// creatures on that ground must succeed on a Dexterity saving throw or be
+	// knocked prone."
+	void handle_investiture_stone_quake(user@ u) {
+		if (@combat == null or @u == null) return;
+		combatant@ c = combat.current_combatant();
+		if (@c == null or !c.is_player or c.player_username != u.username) return;
+		if (!c.investiture_stone_active) {
+			u.send({{"type", message_types::error}, {"text", "You don't have an active Investiture of Stone."}});
+			return;
+		}
+		if (!c.has_action) {
+			u.send({{"type", message_types::error}, {"text", "You've already used your action this turn."}});
+			return;
+		}
+		if (c.is_incapacitated_check()) {
+			u.send({{"type", message_types::announce}, {"text", "You are incapacitated and cannot take actions."}, {"interrupt", true}});
+			return;
+		}
+		c.has_action = false;
+		c.used_action = true;
+		int stone_dc = spell_save_dc(c, "investiture_of_stone");
+		broadcast_announce(c.name + " slams the ground, causing a localized earthquake!", true);
+		for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+			combatant@ t = combat.combatants[ti];
+			if (@t == null or t.is_dead or t.id == c.id) continue;
+			if (feet_distance(c.x, c.y, t.x, t.y) > 15) continue;
+			int save_roll = random(1, 20);
+			apply_hound_save_disadvantage(t, c.id, save_roll);
+			int save_bonus = t.get_save_bonus(ABILITY_DEX);
+			int bless_bonus = roll_bless_bonus(t);
+			int save_total = save_roll + save_bonus + bless_bonus;
+			bool saved = save_total >= stone_dc;
+			broadcast_roll(t.name, "DEX save vs Investiture of Stone", save_roll, save_bonus + bless_bonus, save_total, saved ? "Keeps footing!" : "Prone!");
+			if (!saved and try_arcane_deflection_save(t, stone_dc, save_total)) saved = true;
+			if (!saved) { int fg = try_flash_of_genius(t, stone_dc, save_total, "DEX save vs Investiture of Stone"); if (fg >= stone_dc) { saved = true; save_total = fg; } }
+			if (!saved) { int mv = try_maverick_spirit(t, stone_dc, save_total, "DEX save vs Investiture of Stone"); if (mv >= stone_dc) { saved = true; save_total = mv; } }
+			if (!saved) { int bf = try_boon_of_fate_bonus(t, save_total, stone_dc); if (bf >= stone_dc) { saved = true; save_total = bf; } }
+			if (!saved and try_stroke_of_luck_save(t, stone_dc, save_bonus + bless_bonus)) saved = true;
+			if (!saved) {
+				t.add_condition(COND_PRONE);
+				broadcast_announce(t.name + " is knocked prone by the earthquake!", false);
+			}
+		}
+		broadcast_state();
+	}
+
+	// Xanathar's Investiture of Wind action ability: "As an action, you can create a
+	// 15-foot cube of swirling wind centered on a point you can see within 60 feet.
+	// Each creature in that area must make a Constitution saving throw. A creature
+	// takes 2d10 bludgeoning damage on a failed save, or half on a successful one.
+	// If a Large or smaller creature fails the save, it is also pushed up to 10
+	// feet away from the center of the cube."
+	void handle_investiture_wind_blast(user@ u, json_object@ msg) {
+		if (@combat == null or @u == null or @msg == null) return;
+		combatant@ c = combat.current_combatant();
+		if (@c == null or !c.is_player or c.player_username != u.username) return;
+		if (!c.investiture_wind_active) {
+			u.send({{"type", message_types::error}, {"text", "You don't have an active Investiture of Wind."}});
+			return;
+		}
+		if (!c.has_action) {
+			u.send({{"type", message_types::error}, {"text", "You've already used your action this turn."}});
+			return;
+		}
+		if (c.is_incapacitated_check()) {
+			u.send({{"type", message_types::announce}, {"text", "You are incapacitated and cannot take actions."}, {"interrupt", true}});
+			return;
+		}
+		uint target_id = 0;
+		if (msg.exists("target_id")) target_id = uint(msg["target_id"]);
+		combatant@ target = combat.get_combatant(target_id);
+		if (@target == null or target.is_dead) {
+			u.send({{"type", message_types::error}, {"text", "Invalid target."}});
+			return;
+		}
+		int dist = feet_distance(c.x, c.y, target.x, target.y);
+		if (dist > 60) {
+			u.send({{"type", message_types::error}, {"text", "Target is " + dist + " feet away. Maximum range is 60 feet."}});
+			return;
+		}
+		c.has_action = false;
+		c.used_action = true;
+		int wind_dc = spell_save_dc(c, "investiture_of_wind");
+		int total_damage = random(1, 10) + random(1, 10);
+		int center_x = target.x;
+		int center_y = target.y;
+		broadcast_announce(c.name + " conjures a 15-foot cube of swirling wind!", true);
+		for (uint ti = 0; ti < combat.combatants.length(); ti++) {
+			combatant@ t = combat.combatants[ti];
+			if (@t == null or t.is_dead or t.id == c.id) continue;
+			if (feet_distance(center_x, center_y, t.x, t.y) > 15) continue;
+			int save_roll = random(1, 20);
+			apply_hound_save_disadvantage(t, c.id, save_roll);
+			int save_bonus = t.get_save_bonus(ABILITY_CON);
+			int bless_bonus = roll_bless_bonus(t);
+			int save_total = save_roll + save_bonus + bless_bonus;
+			bool saved = save_total >= wind_dc;
+			broadcast_roll(t.name, "CON save vs Investiture of Wind", save_roll, save_bonus + bless_bonus, save_total, saved ? "Half damage!" : "Full damage + push!");
+			if (!saved and try_arcane_deflection_save(t, wind_dc, save_total)) saved = true;
+			if (!saved) { int fg = try_flash_of_genius(t, wind_dc, save_total, "CON save vs Investiture of Wind"); if (fg >= wind_dc) { saved = true; save_total = fg; } }
+			if (!saved) { int mv = try_maverick_spirit(t, wind_dc, save_total, "CON save vs Investiture of Wind"); if (mv >= wind_dc) { saved = true; save_total = mv; } }
+			if (!saved) { int bf = try_boon_of_fate_bonus(t, save_total, wind_dc); if (bf >= wind_dc) { saved = true; save_total = bf; } }
+			if (!saved and try_stroke_of_luck_save(t, wind_dc, save_bonus + bless_bonus)) saved = true;
+			int dmg = saved ? total_damage / 2 : total_damage;
+			if (dmg < 1) dmg = 1;
+			combat.apply_damage(t, dmg, DMG_BLUDGEONING, c);
+			check_concentration(t, dmg, c);
+			// Push Large or smaller creatures 10ft away from center on failed save
+			if (!saved and t.size <= SIZE_LARGE and !t.is_dead) {
+				int dx = t.x - center_x;
+				int dy = t.y - center_y;
+				if (dx == 0 and dy == 0) dx = 1; // Default push direction
+				int push_dist = 10 / FEET_PER_TILE;
+				if (dx != 0) t.x += (dx > 0 ? push_dist : -push_dist);
+				else t.y += (dy > 0 ? push_dist : -push_dist);
+				broadcast_announce(t.name + " is pushed 10 feet by the wind blast!", false);
+			}
+		}
+		broadcast_state();
+		check_battle_end();
 	}
 
 	// ---- Consumable Usage ----
@@ -17312,7 +17554,27 @@ class battle_manager {
 				broadcast_announce(c.name + " casts Feather Fall, slowing the descent of up to 5 creatures.", true);
 			}
 			else if (spell.id == "find_familiar") {
-				broadcast_announce(c.name + " casts Find Familiar, summoning a spirit companion.", true);
+				// Basic Rules 2024 Find Familiar (para 13276-13290): "You gain the
+				// service of a familiar, a spirit that takes an animal form you choose."
+				// Familiar can't attack but aids in combat. Approximated as a low-HP
+				// companion with a nominal 1 damage attack (Help action effect from
+				// adjacency granting allies advantage is handled by pack_tactics-like
+				// proximity — companions count as allies for flanking checks).
+				// Dismiss any existing familiar first
+				for (uint ff = 0; ff < combat.combatants.length(); ff++) {
+					combatant@ old_fam = combat.combatants[ff];
+					if (@old_fam != null and old_fam.is_companion and old_fam.owner_id == c.id and old_fam.companion_subclass == "find_familiar") {
+						dismiss_companion(old_fam, true);
+						break;
+					}
+				}
+				int fam_hp = 1 + c.level; // Scales slightly with caster level
+				int fam_ac = 11 + c.proficiency;
+				combatant@ familiar = spawn_companion(c, "find_familiar", c.name + "'s Familiar", fam_hp, fam_ac, 30, c.proficiency, 1, 1, 0, DMG_BLUDGEONING, 0);
+				if (@familiar != null) {
+					familiar.size = SIZE_TINY;
+					broadcast_announce(c.name + " summons a spirit familiar! HP " + fam_hp + ", AC " + fam_ac + ". The familiar aids nearby allies.", true);
+				}
 			}
 			else if (spell.id == "goodberry") {
 				// Basic Rules 2024 Goodberry (para 13617): "Ten berries appear in your
@@ -17485,7 +17747,27 @@ class battle_manager {
 				broadcast_announce(c.name + " casts Enhance Ability on themselves, gaining advantage on all ability checks.", true);
 			}
 			else if (spell.id == "find_steed") {
-				broadcast_announce(c.name + " casts Find Steed, summoning a spirit mount.", true);
+				// Basic Rules 2024 Find Steed (para 13291-13297): "You summon a spirit
+				// that assumes the form of an Otherworldly Steed." HP = 5+5*level,
+				// AC = 10+spellcasting mod, Speed 60, Hooves 1d8+spell_mod.
+				// NOT concentration. Dismiss existing steed first.
+				for (uint fs = 0; fs < combat.combatants.length(); fs++) {
+					combatant@ old_steed = combat.combatants[fs];
+					if (@old_steed != null and old_steed.is_companion and old_steed.owner_id == c.id and (old_steed.companion_subclass == "find_steed" or old_steed.companion_subclass == "find_greater_steed")) {
+						dismiss_companion(old_steed, true);
+						break;
+					}
+				}
+				int spell_mod = get_spellcasting_ability_mod(c);
+				int steed_hp = 5 + 5 * c.level;
+				int steed_ac = 10 + spell_mod;
+				if (steed_ac < 10) steed_ac = 10;
+				int steed_atk = c.proficiency + spell_mod;
+				combatant@ steed = spawn_companion(c, "find_steed", c.name + "'s Steed", steed_hp, steed_ac, 60, steed_atk, 1, 8, spell_mod, DMG_BLUDGEONING, 0);
+				if (@steed != null) {
+					steed.size = SIZE_LARGE;
+					broadcast_announce(c.name + " summons an otherworldly steed! HP " + steed_hp + ", AC " + steed_ac + ", Speed 60ft, Hooves 1d8+" + spell_mod + " bludgeoning.", true);
+				}
 			}
 			else if (spell.id == "find_traps") {
 				broadcast_announce(c.name + " casts Find Traps.", true);
@@ -17641,7 +17923,25 @@ class battle_manager {
 				broadcast_announce(c.name + " casts Nondetection.", true);
 			}
 			else if (spell.id == "phantom_steed") {
-				broadcast_announce(c.name + " casts Phantom Steed.", true);
+				// Basic Rules 2024 Phantom Steed (para 14583-14590): "A Large quasi-real
+				// horse-like creature appears on the ground. The creature uses the
+				// Otherworldly Steed stat block with Speed 100 feet." Lasts 1 hour,
+				// NOT concentration. Primarily a mount — in combat context, spawned
+				// as a fast companion with decent HP.
+				for (uint ps = 0; ps < combat.combatants.length(); ps++) {
+					combatant@ old_ps = combat.combatants[ps];
+					if (@old_ps != null and old_ps.is_companion and old_ps.owner_id == c.id and old_ps.companion_subclass == "phantom_steed") {
+						dismiss_companion(old_ps, true);
+						break;
+					}
+				}
+				int ps_hp = 1;  // Source: quasi-real, disappears when hit
+				int ps_ac = 13;
+				combatant@ phantom = spawn_companion(c, "phantom_steed", c.name + "'s Phantom Steed", ps_hp, ps_ac, 100, c.proficiency, 1, 6, 0, DMG_BLUDGEONING, 0);
+				if (@phantom != null) {
+					phantom.size = SIZE_LARGE;
+					broadcast_announce(c.name + " conjures a phantom steed! AC 13, Speed 100ft. The steed vanishes when struck.", true);
+				}
 			}
 			else if (spell.id == "protection_from_energy" and @target != null) {
 				// Basic Rules 2024 Protection from Energy (para 14707): "the willing

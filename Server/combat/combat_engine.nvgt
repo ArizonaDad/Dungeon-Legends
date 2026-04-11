@@ -2708,6 +2708,9 @@ class battle {
 				state["my_heat_metal_active"] = c.heat_metal_active;
 				state["my_call_lightning_active"] = c.call_lightning_active;
 				state["my_flame_blade_active"] = c.flame_blade_active;
+				state["my_investiture_ice_active"] = c.investiture_ice_active;
+				state["my_investiture_stone_active"] = c.investiture_stone_active;
+				state["my_investiture_wind_active"] = c.investiture_wind_active;
 				state["my_weapon_jammed"] = c.weapon_jammed;
 				state["my_swift_quiver_active"] = c.swift_quiver_active;
 				state["my_flaming_sphere_active"] = c.flaming_sphere_active;
