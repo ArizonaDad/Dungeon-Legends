@@ -247,6 +247,8 @@ Multiplayer accessible D&D 5e combat arena for blind players built in **NVGT** (
 
 - **Feign Death** (Basic Rules 2024 para 13203-13212): L3 Necromancy, Touch, NOT concentration. Target appears dead. `feign_death_active` flag: Blinded + Incapacitated, Speed = 0, Resistance to all damage except Psychic (in `apply_damage`). No save (willing targets). `feign_death_original_speed` for restoration.
 
+- **Psionic Sorcery** (Aberrant Mind L6): Psionic spells (from Psionic Spells list) can be cast using Sorcery Points instead of spell slots, at a cost of 1 SP per spell level. SP-cast psionic spells require no verbal or somatic components.
+
 - **Geas** (Basic Rules 2024 para 13062-13072): L5 Enchantment, NOT concentration. WIS save with full chain (Arcane Deflection, Countercharm, Disciplined Survivor, Flash of Genius, Maverick Spirit, Mage Slayer, Boon of Fate, Stroke of Luck). On fail: COND_CHARMED + `geas_source_id` on target. Punishment: 5d10 psychic damage when charmed creature attacks (wired into `handle_attack` before range check).
 
 - **Plane Shift** (Basic Rules 2024 para 14601-14608): L7 Conjuration, Touch. Melee spell attack + CHA save or banished from combat (removed). Save failure chain. Touch range (5ft) enforced.
@@ -589,11 +591,11 @@ Adding a new prompted spell or feature: in `handle_cast` (or the relevant action
 
 - **Monk**: Flurry of Blows + Shadow Step, Hands of Healing, Elemental Burst, Kensei's Shot (+1d4 ranged), Sharpen the Blade (+1/2/3 attack/damage)
 
-- **Bard**: Bardic Inspiration + Mantle of Inspiration (Glamour)
+- **Bard**: Bardic Inspiration + Mantle of Inspiration (Glamour) + Mantle of Majesty (Glamour L6, concentration free Command each turn as BA)
 
-- **Warlock**: Healing Light (Celestial), Fey Presence (Archfey)
+- **Warlock**: Healing Light (Celestial), Fey Presence (Archfey), Celestial Resilience (Celestial L10, distribute temp HP to 5 allies at battle start)
 
-- **Druid** (level 2+): Wild Shape
+- **Druid** (level 2+): Wild Shape + Starry Form Archer (Stars L2, BA ranged spell attack 1d8+WIS, 2d8 at L10) + Starry Form Chalice (Stars L2, auto-heal ally 1d8+WIS after healing spells)
 
 - **Any class**: Spiritual Weapon (if active)
 
@@ -840,6 +842,45 @@ Epic Boon feats: combat_prowess, dimensional_travel, energy_resistance, fate, fo
   - Desert: When hit by creature in aura, deals half-level fire damage (DEX save for half)
   - Sea: On weapon hit while target in aura, STR save or Prone
   - Tundra: On aura activation, nearest enemy STR save or speed=0
+
+**Batch 4 subclass features (2026-04-11):**
+- **Elegant Maneuver** (Swashbuckler L13): Wired into `request_skill_check` — grants advantage on next Acrobatics or Athletics check this turn
+- **Scout Skirmisher** (Scout L3): Reaction movement in `advance_turn` — move up to half speed without provoking OAs when an enemy ends its turn within 5ft
+- **Divine Soul Empowered Healing** (Divine Soul L6): Reroll below-average healing dice for 1 SP. Fires on healing spells when any die rolls below its average
+
+**Batch 5 subclass features (2026-04-11):**
+- **Telekinetic Thrust** (Psi Warrior L7): On Psionic Strike hit, target makes STR save or pushed 10ft + knocked Prone
+- **Celestial Resilience** (Celestial Warlock L10): Distributes temp HP to up to 5 allies at battle start (level + CHA mod to self, half that to allies)
+- **Drunkard's Luck** (Drunken Master L11): Cancel disadvantage on attacks or ability checks for 2 FP
+
+**Batch 6 subclass features (2026-04-11):**
+- **Starry Form Archer** (Circle of Stars L2): BA ranged spell attack dealing 1d8+WIS radiant damage (scales to 2d8 at L10). Available while in Starry Form
+- **Starry Form Chalice** (Circle of Stars L2): After casting a healing spell, auto-heal an ally for 1d8+WIS HP. Available while in Starry Form
+
+**Batch 7 subclass features (2026-04-11):**
+- **Mantle of Majesty** (Glamour Bard L6): Concentration, free Command spell each turn as BA without expending a spell slot
+- **Unbreakable Majesty** (Glamour Bard L14): CHA save or attacker's attack is cancelled and must choose a new target or waste the attack
+- **Rune Knight Runes** (Rune Knight L3+): 6 runes with passive effects and invocable abilities (1/SR each):
+  - Cloud Rune — passive: advantage on Deception/Sleight of Hand; invoke: redirect attack to different creature within 30ft
+  - Fire Rune — passive: double proficiency on tool checks; invoke: extra 2d6 fire + Restrained (STR save at end of turn)
+  - Frost Rune — passive: advantage on Animal Handling/Intimidation; invoke: +2 STR/CON saves for 10 min
+  - Stone Rune — passive: advantage on Insight/darkvision 120ft; invoke: WIS save or Charmed (incapacitated, 0 speed)
+  - Hill Rune — passive: advantage vs Poison/resistance to poison damage; invoke: resistance to B/P/S for 1 min
+  - Storm Rune — passive: advantage on Arcana/can't be surprised; invoke: advantage or disadvantage on any attack/save/check within 60ft
+
+**Batch 8 subclass features (2026-04-11):**
+- **Psionic Sorcery** (Aberrant Mind L6): Cast psionic spells using SP instead of spell slots (1 SP per spell level), no verbal/somatic components required
+- **Hold the Line** (Cavalier L10): Opportunity attacks reduce target's speed to 0 on hit for the rest of the turn
+- **Swarmkeeper Ranger** (full subclass):
+  - Gathered Swarm (L3) — 3 modes on weapon hit: deal 1d6 piercing, push target 15ft (STR save), or move self 5ft without OA
+  - Writhing Tide (L7) — BA hover with 10ft fly speed for 1 min
+  - Mighty Swarm (L11) — Gathered Swarm upgrade: damage becomes 1d8, push knocks Prone on failed save, self-move grants half cover
+  - Swarming Dispersal (L15) — reaction on taking damage: become swarm, resist damage, teleport 30ft
+
+**Batch 9 subclass features (2026-04-11):**
+- **Redirect Attack** (Drunken Master L6): When an enemy misses the Monk with a melee attack, auto-redirect that attack to another enemy within 5ft of the Monk
+- **Cosmic Omen** (Circle of Stars L6): At dawn/long rest, roll a die to determine Weal or Woe. Weal: reaction to add 1d6 to an ally's attack roll. Woe: reaction to subtract 1d6 from an enemy's attack roll
+- **Aura of the Guardian** (Redemption Paladin L7): Reaction to absorb damage dealt to an ally within 10ft, taking it unreduced in place of the ally
 
 **Previously implemented:** combat_prowess (+1d6 weapon miss → hit 1/turn), fortitude (+40 HP), irresistible_offense (+2d10 force 1/turn), skill (+1d10 ability check 1/turn), speed (+30ft), the_night_spirit (300ft darkvision + see invisible), truesight (Truesight 60ft)
 

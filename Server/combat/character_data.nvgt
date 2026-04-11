@@ -1478,9 +1478,11 @@ combatant@ create_player_combatant(character_sheet@ cs, string player_username, 
             else if (cs.level >= 11) c.psionic_die_size = 10;
             else if (cs.level >= 5) c.psionic_die_size = 8;
             else c.psionic_die_size = 6;
-            // L10 Guarded Mind (para 34-36): resistance to psychic damage
+            // L10 Guarded Mind (para 30-36): resistance to psychic damage + spend Psionic
+            // Energy die at turn start to end Charmed/Frightened conditions.
             if (cs.level >= 10) {
                 c.psychic_resistance = true;
+                c.psi_warrior_guarded_mind = true;
             }
         }
     }

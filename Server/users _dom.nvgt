@@ -2323,6 +2323,41 @@ void handle_user_message(user@ u, json_object@ msg)
 				u.room.bm.combat.apply_healing(t, heal);
 				u.room.bm.broadcast_announce(t.name + " is restored for " + heal + " HP by the Clockwork Cavalcade.", false);
 			}
+			// Tasha's Clockwork Soul L18 Clockwork Cavalcade (para 4005-4011): "Every spell
+			// of 6th level or lower ends on creatures and objects of your choice in the cube."
+			// Dispel effect: break concentration on spells L6 or lower for enemies in range.
+			int dispelled = 0;
+			for (uint di = 0; di < u.room.bm.combat.combatants.length(); di++) {
+				combatant@ dt = u.room.bm.combat.combatants[di];
+				if (@dt == null or dt.is_dead) continue;
+				if (dt.is_player == c.is_player) continue; // Only dispel enemies
+				float ddx = float(dt.x - c.x); float ddy = float(dt.y - c.y);
+				float dd = sqrt(ddx * ddx + ddy * ddy) * 5.0f;
+				if (dd > 30) continue;
+				if (dt.is_concentrating and dt.concentration_spell != "") {
+					// Look up spell level from catalog
+					int conc_level = 0;
+					for (uint dsi = 0; dsi < SPELL_DEFS.length(); dsi++) {
+						if (SPELL_DEFS[dsi].name == dt.concentration_spell) {
+							conc_level = SPELL_DEFS[dsi].level;
+							break;
+						}
+					}
+					if (conc_level < 1) conc_level = 3; // fallback if not found
+					if (conc_level <= 6) {
+						string ended = dt.concentration_spell;
+						u.room.bm.clear_concentration_effects(dt);
+						dt.is_concentrating = false;
+						dt.remove_condition(COND_CONCENTRATING);
+						dt.concentration_spell = "";
+						u.room.bm.broadcast_announce(dt.name + "'s " + ended + " is dispelled by the Clockwork Cavalcade!", false);
+						dispelled++;
+					}
+				}
+			}
+			if (dispelled > 0) {
+				u.room.bm.broadcast_announce("Clockwork Cavalcade dispels " + dispelled + " spell" + (dispelled == 1 ? "" : "s") + " of 6th level or lower!", false);
+			}
 		}
 		else if (feature == "font_of_magic_to_slot") {
 			// PHB 2024 Sorcerer L2 Font of Magic — Creating Spell Slots (para 6973-6993):

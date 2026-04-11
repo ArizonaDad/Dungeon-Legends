@@ -6191,6 +6191,31 @@ class battle_manager {
 			broadcast_announce(c.name + " gains " + c.heroism_temp_hp_amount + " temporary hit points from Heroism.", false);
 		}
 
+		// Tasha's Psi Warrior L10 Guarded Mind (para 30-33): "If you start your turn
+		// Charmed or Frightened, you can expend a Psionic Energy die and end every
+		// effect on yourself subjecting you to those conditions."
+		if (c.psi_warrior_guarded_mind and c.psionic_strike_uses > 0 and c.is_alive()
+			and (c.has_condition(COND_CHARMED) or c.has_condition(COND_FRIGHTENED))) {
+			c.psionic_strike_uses--;
+			bool had_charmed = c.has_condition(COND_CHARMED);
+			bool had_frightened = c.has_condition(COND_FRIGHTENED);
+			if (had_charmed) {
+				c.remove_condition(COND_CHARMED);
+				c.charm_spell_caster_id = 0;
+				broadcast_to_battle({{"type", message_types::condition_removed}, {"target", c.name}, {"condition", "Charmed"}});
+			}
+			if (had_frightened) {
+				c.remove_condition(COND_FRIGHTENED);
+				c.frightened_source_id = 0;
+				broadcast_to_battle({{"type", message_types::condition_removed}, {"target", c.name}, {"condition", "Frightened"}});
+			}
+			string cleared = "";
+			if (had_charmed and had_frightened) cleared = "Charmed and Frightened";
+			else if (had_charmed) cleared = "Charmed";
+			else cleared = "Frightened";
+			broadcast_announce(c.name + " uses Guarded Mind (Psionic Energy die) to end " + cleared + "! (" + c.psionic_strike_uses + " dice remain)", true);
+		}
+
 		// Tick potion buff durations
 		if (c.potion_damage_rounds > 0) {
 			c.potion_damage_rounds--;

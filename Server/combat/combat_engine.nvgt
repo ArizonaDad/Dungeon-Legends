@@ -1366,6 +1366,7 @@ class combatant {
 	bool rage_beyond_death_active = false; // Xanathar's Zealot L14 (para 448-450)
 	int psionic_strike_uses = 0; // Tasha's Psi Warrior (para 6-13): Psionic Energy dice pool (2×prof)
 	int psionic_die_size = 6;   // Tasha's Psi Warrior: d6(L3), d8(L5), d10(L11), d12(L17)
+	bool psi_warrior_guarded_mind = false; // Tasha's Psi Warrior L10 (para 30-33): spend die to end Charmed/Frightened at turn start
 	int superiority_dice = 0;
 	int superiority_dice_max = 0;
 	bool trip_attack_pending = false;
