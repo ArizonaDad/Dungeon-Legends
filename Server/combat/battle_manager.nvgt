@@ -4105,6 +4105,9 @@ class battle_manager {
 		// Call Lightning: per-turn bolt action ends with concentration
 		caster.call_lightning_active = false;
 		caster.call_lightning_dice_count = 0;
+		// Flame Blade: persistent weapon ends with concentration
+		caster.flame_blade_active = false;
+		caster.flame_blade_dice = 0;
 		// Flaming Sphere: BA re-damage ends with concentration
 		caster.flaming_sphere_active = false;
 		caster.flaming_sphere_dice_count = 0;
@@ -12687,6 +12690,72 @@ class battle_manager {
 		check_battle_end();
 	}
 
+	// Basic Rules 2024 Flame Blade (para 13334-13343): "As a Magic action, you can
+	// make a melee spell attack with the fiery blade. On a hit, the target takes
+	// Fire damage equal to 3d6 plus your spellcasting ability modifier."
+	void handle_flame_blade_attack(user@ u, json_object@ msg) {
+		if (@combat == null or @u == null or @msg == null) return;
+		combatant@ c = combat.current_combatant();
+		if (@c == null or !c.is_player or c.player_username != u.username) return;
+		if (!c.flame_blade_active or c.flame_blade_dice == 0) {
+			u.send({{"type", message_types::error}, {"text", "You don't have an active Flame Blade."}});
+			return;
+		}
+		if (!c.has_action) {
+			u.send({{"type", message_types::error}, {"text", "You've already used your action this turn."}});
+			return;
+		}
+		if (c.is_incapacitated_check()) {
+			u.send({{"type", message_types::announce}, {"text", "You are incapacitated and cannot take actions."}, {"interrupt", true}});
+			return;
+		}
+		uint target_id = 0;
+		if (msg.exists("target_id")) target_id = uint(msg["target_id"]);
+		combatant@ target = combat.get_combatant(target_id);
+		if (@target == null or target.is_dead) {
+			u.send({{"type", message_types::error}, {"text", "Invalid target."}});
+			return;
+		}
+		int dist = feet_distance(c.x, c.y, target.x, target.y);
+		if (dist > 5) {
+			u.send({{"type", message_types::error}, {"text", "Target is " + dist + " feet away. Flame Blade is a melee attack (5 ft range)."}});
+			return;
+		}
+		c.has_action = false;
+		c.used_action = true;
+		// Queue melee spell attack roll
+		int spell_atk = spell_attack_bonus(c);
+		bool adv = false, disadv = false;
+		apply_attack_advantage_state(c, target, dist, false, adv, disadv, true);
+		int spell_mod = get_spellcasting_ability_mod(c);
+		pending_roll pr;
+		pr.combatant_id = c.id;
+		pr.player_username = c.player_username;
+		pr.roll_type = ROLL_ATTACK;
+		pr.dice_sides = 20;
+		pr.modifier = spell_atk;
+		pr.reason = "Flame Blade melee spell attack against " + target.name;
+		pr.target_id = target.id;
+		pr.has_advantage = adv;
+		pr.has_disadvantage = disadv;
+		pr.is_spell_effect = true;
+		pr.spell_uses_attack_roll = true;
+		pr.spell_id = "flame_blade";
+		pr.attack_name = "Flame Blade";
+		pr.damage_dice_count = c.flame_blade_dice;
+		pr.damage_dice_sides = 6;
+		pr.damage_modifier = spell_mod;
+		pr.damage_type = DMG_FIRE;
+		pr.is_weapon_attack = false;
+		pr.resolution_tag = "flame_blade";
+		@current_roll = pr;
+		if (@u != null and !u.is_bot and c.is_player) {
+			send_roll_request(u, pr);
+		} else {
+			process_roll_result(random(1, 20));
+		}
+	}
+
 	// ---- Consumable Usage ----
 
 	void handle_use_consumable(user@ u, json_object@ msg) {
@@ -17870,7 +17939,14 @@ class battle_manager {
 				return;
 			}
 			else if (spell.id == "flame_blade") {
-				broadcast_announce(c.name + " casts Flame Blade, evoking a fiery scimitar (3d6 fire).", true);
+				// Basic Rules 2024 Flame Blade (para 13334-13343): "You evoke a fiery blade
+				// in your free hand." Bonus action cast, concentration, 10 minutes.
+				// "As a Magic action, you can make a melee spell attack with the fiery blade."
+				c.flame_blade_active = true;
+				c.flame_blade_dice = 3 + (cast_slot_level > 2 ? cast_slot_level - 2 : 0);
+				c.is_concentrating = true;
+				c.concentration_spell = "Flame Blade";
+				broadcast_announce(c.name + " casts Flame Blade, evoking a fiery scimitar (" + c.flame_blade_dice + "d6 fire). Use your action to attack with it!", true);
 			}
 			else if (spell.id == "homunculus_servant") {
 				broadcast_announce(c.name + " casts Homunculus Servant, summoning a tiny construct ally.", true);

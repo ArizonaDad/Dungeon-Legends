@@ -6131,6 +6131,11 @@ void handle_user_message(user@ u, json_object@ msg)
 			u.room.bm.handle_call_lightning_bolt(u, msg);
 		}
 	}
+	else if (msg_type == message_types::action_flame_blade) {
+		if (@u.room != null and @u.room.bm != null) {
+			u.room.bm.handle_flame_blade_attack(u, msg);
+		}
+	}
 	else if (msg_type == message_types::set_target) {
 		if (@u.room != null and @u.room.bm != null) {
 			u.room.bm.handle_set_target(u, msg);

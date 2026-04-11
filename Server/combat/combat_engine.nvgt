@@ -98,6 +98,9 @@ class combatant {
 	bool shillelagh_active = false;      // Club/Quarterstaff enhanced
 	int shillelagh_rounds = 0;           // Duration remaining (10 = 1 minute)
 	int shillelagh_damage_die = 8;       // d8 base, scales at L5/11/17
+	// Basic Rules 2024 Flame Blade (para 13334-13343): persistent melee spell attack
+	bool flame_blade_active = false;     // Fiery blade evoked, can attack with action
+	int flame_blade_dice = 3;            // 3d6 base, +1d6 per upcast above L2
 	bool searing_smite_pending = false;  // Searing Smite rider on next weapon hit
 	int searing_smite_dice = 0;          // Number of d6 to roll for Searing Smite damage
 	// Basic Rules 2024 Searing Smite (para 14881): repeating fire damage at turn start
@@ -2642,6 +2645,7 @@ class battle {
 				state["my_spiritual_weapon_active"] = c.spiritual_weapon_active;
 				state["my_heat_metal_active"] = c.heat_metal_active;
 				state["my_call_lightning_active"] = c.call_lightning_active;
+				state["my_flame_blade_active"] = c.flame_blade_active;
 				state["my_swift_quiver_active"] = c.swift_quiver_active;
 				state["my_flaming_sphere_active"] = c.flaming_sphere_active;
 				state["my_conjure_woodland_disengage"] = c.conjure_woodland_disengage;
