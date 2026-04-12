@@ -2,7 +2,7 @@
 
 ## STRICT SOURCE-ACCURACY MANDATE
 
-**All game content MUST come from the user's source files at `C:\Users\16239\Downloads\Sources_clean\Source Books and rules\`.** Never invent rules. Never approximate mechanics unless the required subsystem is genuinely missing, and in that case flag the approximation in `TODO_SOURCE_ACCURACY.md`.
+**All game content MUST come from the user's source files at `C:\Users\16239\Documents\Dungeon Legends\sources\` (34 source books, updated 2026-04-12).** When a docx source is missing info, 5e.tools may be used as a fallback — flag in TODO what came from 5e.tools. Never invent rules. Never approximate mechanics unless the required subsystem is genuinely missing, and in that case flag the approximation in `TODO_SOURCE_ACCURACY.md`.
 
 ### Rules:
 1. **Before implementing any feature**, open the actual docx file and extract the exact source text.
@@ -630,7 +630,7 @@ All 9 Phase 1 sub-systems from the master directive are now implemented as data-
 - `query_phase1` — show full Phase 1 status report
 
 ### Source Audit Status (2026-04-08) — Post-Audit Additions
-All batches 15-21 implementations were audited against actual source docx files in `C:\Users\16239\Downloads\Sources_clean\Source Books and rules\`. Additionally batches 22-25 added new subclasses extracted directly from the source files.
+All batches 15-21 implementations were audited against actual source docx files in `C:\Users\16239\Documents\Dungeon Legends\sources\`. Additionally batches 22-25 added new subclasses extracted directly from the source files.
 
 **Batch 22-25 additions (extracted from actual source files):**
 - **Wildemount (Explorer's Guide)**: Echo Knight (Manifest Echo + Unleash Incarnation), Chronurgy Magic (Chronal Shift, Temporal Awareness, Momentary Stasis), Graviturgy Magic (Adjust Density, Gravity Well, Violent Attraction, Event Horizon)
