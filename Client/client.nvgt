@@ -12,6 +12,9 @@ const string CLIENT_VERSION = "1.0.3";
 bool game = false;
 bool start_game_pending = false;
 bool is_new_account = false;
+
+// Glory system gate — must match server-side GLORY_SYSTEM_ENABLED
+bool GLORY_SYSTEM_ENABLED = false;
 string pending_view = "";
 tts_voice v;
 settings config;
@@ -501,8 +504,12 @@ void main_menu()
 		string intro = "Main Menu.";
 		if (cached_level > 0) intro += " Level " + cached_level + ".";
 		int menu_gold = @cached_stats != null and cached_stats.exists("gold") ? int(cached_stats["gold"]) : 0;
-		int menu_glory = @cached_stats != null and cached_stats.exists("glory") ? int(cached_stats["glory"]) : 0;
-		if (menu_gold > 0 or menu_glory > 0) intro += " Gold: " + menu_gold + ". Glory: " + menu_glory + ".";
+		if (GLORY_SYSTEM_ENABLED) {
+			int menu_glory = @cached_stats != null and cached_stats.exists("glory") ? int(cached_stats["glory"]) : 0;
+			if (menu_gold > 0 or menu_glory > 0) intro += " Gold: " + menu_gold + ". Glory: " + menu_glory + ".";
+		} else {
+			if (menu_gold > 0) intro += " Gold: " + menu_gold + ".";
+		}
 		menu@ m = setup_menu(intro);
 		@m = main_screen;
 		int play_btn = m.add_item("Play. 1 of 8");
@@ -640,12 +647,17 @@ void show_social_menu() {
 
 // ---- Sub-Menu: Shop ----
 void show_shop_menu() {
-	menu@ m = setup_sub_menu("Shop.");
-	m.add_item("Item Shop. Buy potions, scrolls, and throwables with gold. 1 of 2.");
-	m.add_item("Glory Shop. Buy titles and exclusive items with glory. 2 of 2.");
-	int pick = m.run();
-	if (pick == 0) { show_shop(); }
-	else if (pick == 1) { show_glory_shop(); }
+	if (GLORY_SYSTEM_ENABLED) {
+		menu@ m = setup_sub_menu("Shop.");
+		m.add_item("Item Shop. Buy potions, scrolls, and throwables with gold. 1 of 2.");
+		m.add_item("Glory Shop. Buy titles and exclusive items with glory. 2 of 2.");
+		int pick = m.run();
+		if (pick == 0) { show_shop(); }
+		else if (pick == 1) { show_glory_shop(); }
+	} else {
+		// Glory system disabled — go directly to Item Shop
+		show_shop();
+	}
 }
 
 // ---- Sub-Menu: Challenges ----
@@ -1206,8 +1218,8 @@ void show_player_stats() {
 		text += "Total XP earned: " + get_stat_int(s, "total_xp") + ". ";
 		int prestige = get_stat_int(s, "prestige_rank");
 		if (prestige > 0) text += "Prestige rank " + prestige + ": " + get_stat_str(s, "prestige_title") + ". ";
-		text += "Gold: " + get_stat_int(s, "gold") + ". ";
-		text += "Glory: " + get_stat_int(s, "glory") + ".";
+		text += "Gold: " + get_stat_int(s, "gold") + ".";
+		if (GLORY_SYSTEM_ENABLED) text += " Glory: " + get_stat_int(s, "glory") + ".";
 		speak(text, true);
 	}
 	else if (pick == 2) {
@@ -1360,7 +1372,7 @@ void show_player_context_menu(string target_name, bool show_kick)
 			text += get_stat_str(cached_inspect_data, "char_race") + " " + get_stat_str(cached_inspect_data, "char_class") + ". ";
 			text += "Kills: " + get_stat_int(cached_inspect_data, "monster_kills") + ". ";
 			text += "Victories: " + get_stat_int(cached_inspect_data, "victories") + ". ";
-			text += "Glory: " + get_stat_int(cached_inspect_data, "glory") + ". ";
+			if (GLORY_SYSTEM_ENABLED) text += "Glory: " + get_stat_int(cached_inspect_data, "glory") + ". ";
 			text += "Endless best: " + get_stat_int(cached_inspect_data, "endless_best_wave") + ".";
 			speak(text, true);
 		} else {
@@ -1647,15 +1659,27 @@ void show_daily_dungeon() {
 
 void show_leaderboards() {
 	menu@ cat_menu = setup_sub_menu("Choose a leaderboard category.");
-	cat_menu.add_item("Glory Points.");
+	string[] categories;
+	string[] cat_names;
+	if (GLORY_SYSTEM_ENABLED) {
+		cat_menu.add_item("Glory Points.");
+		categories.insert_last("glory");
+		cat_names.insert_last("Glory Points");
+	}
 	cat_menu.add_item("Endless Best Wave.");
+	categories.insert_last("endless");
+	cat_names.insert_last("Endless Best Wave");
 	cat_menu.add_item("Monster Kills.");
+	categories.insert_last("kills");
+	cat_names.insert_last("Monster Kills");
 	cat_menu.add_item("Prestige Rank.");
+	categories.insert_last("prestige");
+	cat_names.insert_last("Prestige Rank");
 	cat_menu.add_item("Dungeons Cleared.");
+	categories.insert_last("dungeons");
+	cat_names.insert_last("Dungeons Cleared");
 	int cat = cat_menu.run();
 	if (cat < 0) return;
-	string[] categories = {"glory", "endless", "kills", "prestige", "dungeons"};
-	string[] cat_names = {"Glory Points", "Endless Best Wave", "Monster Kills", "Prestige Rank", "Dungeons Cleared"};
 	send({{"type", message_types::leaderboard_request}, {"category", categories[cat]}});
 	@cached_leaderboard = null;
 	wait(500);
@@ -1771,7 +1795,7 @@ void show_guild_menu() {
 		if (@cached_guild_info != null) {
 			info += " Leader: " + (cached_guild_info.exists("leader") ? string(cached_guild_info["leader"]) : "Unknown") + ".";
 			info += " Members: " + (cached_guild_info.exists("member_count") ? string(cached_guild_info["member_count"]) : "0") + ".";
-			info += " Total Glory: " + (cached_guild_info.exists("total_glory") ? string(cached_guild_info["total_glory"]) : "0") + ".";
+			if (GLORY_SYSTEM_ENABLED) info += " Total Glory: " + (cached_guild_info.exists("total_glory") ? string(cached_guild_info["total_glory"]) : "0") + ".";
 		}
 
 		menu@ m = setup_sub_menu(info);

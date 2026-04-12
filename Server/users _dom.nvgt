@@ -7372,14 +7372,18 @@ void handle_user_message(user@ u, json_object@ msg)
 
 		u.account.commit();
 
-		u.send({{"type", message_types::announce}, {"text", "You have prestiged! You are now " + title + " (Rank " + new_rank + "). Level reset to 1. +" + glory_reward + " Glory!"}, {"interrupt", true}});
+		string prestige_text = "You have prestiged! You are now " + title + " (Rank " + new_rank + "). Level reset to 1.";
+		if (GLORY_SYSTEM_ENABLED) prestige_text += " +" + glory_reward + " Glory!";
+		u.send({{"type", message_types::announce}, {"text", prestige_text}, {"interrupt", true}});
 		send_character_profile_to_user(u, GAME_TYPE_ADVENTURE);
 		send_adventure_progress_to_user(u, "Prestige complete! Rank " + new_rank + ": " + title + ".");
-		u.send({
-			{"type", message_types::glory_update},
-			{"glory", get_glory(u.account)},
-			{"gained", glory_reward}
-		});
+		if (GLORY_SYSTEM_ENABLED) {
+			u.send({
+				{"type", message_types::glory_update},
+				{"glory", get_glory(u.account)},
+				{"gained", glory_reward}
+			});
+		}
 	}
 
 	// ---- TRADING SYSTEM ----

@@ -1,5 +1,14 @@
 const string GAME_TYPE_SANDBOX = "sandbox";
 const string GAME_TYPE_ADVENTURE = "adventure";
+
+// Phase progression caps (max character level per phase)
+const int PHASE_1_MAX = 5;
+const int PHASE_2_MAX = 10;
+const int PHASE_3_MAX = 15;
+const int PHASE_4_MAX = 20;
+
+// Glory system gate — set to true when Glory content is ready for players
+bool GLORY_SYSTEM_ENABLED = false;
 const string ACCOUNT_KEY_LEGACY_CHARACTER = "character";
 const string ACCOUNT_KEY_SANDBOX_CHARACTER = "sandbox_character";
 const string ACCOUNT_KEY_ADVENTURE_CHARACTER = "adventure_character";
@@ -170,6 +179,10 @@ void ensure_account_progression(account@ acct) {
 	// Gold currency
 	if (!progress.exists("gold")) progress["gold"] = 0;
 	ensure_json_array_field(data, "adventure_consumables");
+
+	// Player level (account-wide, distinct from character D&D level)
+	// Computed from total XP across characters + achievements; initialized from existing level for backward compatibility
+	if (!progress.exists("player_level")) progress["player_level"] = get_json_int(progress, "level", 1);
 
 	// Guild membership
 	if (!progress.exists("guild_name")) progress["guild_name"] = "";
@@ -611,6 +624,7 @@ int get_glory_from_progress(json_object@ progress) {
 }
 
 void add_glory(account@ acct, int amount) {
+	if (!GLORY_SYSTEM_ENABLED) return;
 	if (@acct == null or amount <= 0) return;
 	json_object@ progress = get_adventure_progress(acct);
 	if (@progress == null) return;
