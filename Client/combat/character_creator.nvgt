@@ -1833,6 +1833,9 @@ bool choose_gender_step() {
 // running vanilla PHB campaigns can bypass the entire block. Returns false
 // if the player presses Escape/Backspace at the gateway menu (back-nav).
 bool choose_phase1_affiliations_step() {
+    if (!part2_unlocked) {
+        return true; // auto-skip — Part 2 content not yet unlocked
+    }
     clear_creation_back_request();
     menu@ gateway = setup_sub_menu("Setting affiliations. Would you like to pick a Theros god, Tasha's Group Patron, Ravnica Guild, Grim Hollow Transformation, Ebon Tides Fey Court, or Wildemount homeland? These are all optional.");
     gateway.add_item("Yes, configure setting affiliations. 1 of 2");

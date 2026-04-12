@@ -187,6 +187,10 @@ int combat_focus = 0;
 string[] combat_history;
 int combat_history_cursor = -1;
 
+// Part 2 content gate — when false, Phase 1 sub-system menus and
+// character-creation affiliation steps are locked out.
+bool part2_unlocked = false;
+
 // Personal combat resources
 int my_focus_points = 0;
 int my_focus_points_max = 0;
@@ -3553,6 +3557,10 @@ void show_spell_menu() {
 // ============================================================
 
 void show_phase1_menu() {
+	if (!part2_unlocked) {
+		speak("Phase 2 content is not yet unlocked. This will be available in a future update.", true);
+		return;
+	}
 	combat_entity@ me = get_my_entity();
 	if (@me == null) { speak("You are not in combat.", true); return; }
 
